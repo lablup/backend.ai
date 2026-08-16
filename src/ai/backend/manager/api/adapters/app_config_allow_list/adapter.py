@@ -181,7 +181,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
         self, input: PurgeAppConfigAllowListInput
     ) -> PurgeAppConfigAllowListPayload:
         purger = AppConfigAllowListPurger(allow_list_id=AppConfigAllowListID(input.id))
-        action_result = await self._processors.app_config_allow_list.global_purge.run(
+        action_result = await self._processors.app_config_allow_list.purge.run(
             PurgeAppConfigAllowListAction(purger=purger)
         )
         return PurgeAppConfigAllowListPayload(id=action_result.data.id)

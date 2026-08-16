@@ -91,7 +91,7 @@ class TestPurge:
         repository: OpsRepository[AppConfigDefinitionData],
         existing_definition: AppConfigDefinitionData,
     ) -> None:
-        purged = await repository.purge_global_entity(
+        purged = await repository.purge_entity(
             AppConfigDefinitionPurger(definition_id=existing_definition.id)
         )
         assert purged.id == existing_definition.id
@@ -102,9 +102,7 @@ class TestPurge:
         self, repository: OpsRepository[AppConfigDefinitionData]
     ) -> None:
         with pytest.raises(EntityNotFoundError):
-            await repository.purge_global_entity(
-                AppConfigDefinitionPurger(definition_id=_missing_id())
-            )
+            await repository.purge_entity(AppConfigDefinitionPurger(definition_id=_missing_id()))
 
 
 class TestAdminSearch:

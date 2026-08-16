@@ -7,6 +7,9 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
     EntityOpsResult,
 )
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    SingleEntityActionProcessor,
+)
 from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,
 )
@@ -39,7 +42,7 @@ class PrometheusQueryPresetCategoryProcessors:
         SearchCategoriesAction,
         BatchOpsResult[PrometheusQueryPresetCategoryData],
     ]
-    global_purge_category: GlobalActionProcessor[
+    purge_category: SingleEntityActionProcessor[
         PurgeCategoryAction,
         EntityOpsResult[PrometheusQueryPresetCategoryData],
     ]
@@ -48,4 +51,4 @@ class PrometheusQueryPresetCategoryProcessors:
         self.global_create_category = group.global_create_ops(CreateCategoryAction)
         self.global_get_category = group.global_get_ops(GetCategoryAction)
         self.global_search_categories = group.global_search_ops(SearchCategoriesAction)
-        self.global_purge_category = group.global_purge_ops(PurgeCategoryAction)
+        self.purge_category = group.entity_purge_ops(PurgeCategoryAction)

@@ -15,7 +15,7 @@ from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.creator import (
     EntityCreator,
-    FieldEntityCreator,
+    FieldCreator,
     GlobalEntityCreator,
     RoleManagedEntityCreator,
 )
@@ -23,8 +23,7 @@ from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.purger import (
     DataBatchPurger,
     EntityPurger,
-    FieldEntityPurger,
-    GlobalEntityPurger,
+    FieldPurger,
 )
 from ai.backend.manager.models.specs.querier import DataQuerier
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
@@ -32,9 +31,8 @@ from ai.backend.manager.models.specs.types import BulkResultWithFailures, Entity
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.models.specs.upserter import (
     EntityUpserter,
-    FieldEntityUpserter,
+    FieldUpserter,
     GlobalEntityUpserter,
-    RoleManagedEntityUpserter,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
@@ -106,7 +104,7 @@ class OpsRepository[TData]:
     async def create_global_entity_with_fields[TEntityData: EntityData, TFieldData](
         self,
         creator: GlobalEntityCreator[Any, TEntityData],
-        field_creators: Sequence[FieldEntityCreator[Any, Any, TFieldData]],
+        field_creators: Sequence[FieldCreator[Any, Any, TFieldData]],
     ) -> EntityWithFieldsResult[TEntityData, TFieldData]:
         """Insert a global row and the field rows it owns, in one transaction.
 
@@ -133,7 +131,7 @@ class OpsRepository[TData]:
             return await w.create_role_managed_entity(creator)
 
     async def create_field_entity(
-        self, owner_id: Any, creator: FieldEntityCreator[Any, Any, TData]
+        self, owner_id: Any, creator: FieldCreator[Any, Any, TData]
     ) -> TData:
         """Insert one field row under its owner's identifier."""
         async with self._ops.write_ops() as w:
@@ -161,20 +159,11 @@ class OpsRepository[TData]:
             return await w.atomic_create_role_managed_entities(creators)
 
     async def atomic_create_field_entities(
-        self, owner_id: Any, creators: Sequence[FieldEntityCreator[Any, Any, TData]]
+        self, owner_id: Any, creators: Sequence[FieldCreator[Any, Any, TData]]
     ) -> list[TData]:
         """Insert several field rows sharing one owner, atomically."""
         async with self._ops.write_ops() as w:
             return await w.atomic_create_field_entities(owner_id, creators)
-
-    async def purge_global_entity(self, purger: GlobalEntityPurger[Any, TData]) -> TData:
-        async with self._ops.write_ops() as w:
-            data = await w.purge_global_entity(purger)
-            if data is None:
-                raise EntityNotFoundError(
-                    f"{purger.row_class().__name__} {purger.pk_value()} not found"
-                )
-            return data
 
     async def purge_entity(self, purger: EntityPurger[Any, TData]) -> TData:
         """Hard-delete one entity row, tearing its scope down with it."""
@@ -186,7 +175,7 @@ class OpsRepository[TData]:
                 )
             return data
 
-    async def purge_field_entity(self, purger: FieldEntityPurger[Any, TData]) -> TData:
+    async def purge_field_entity(self, purger: FieldPurger[Any, TData]) -> TData:
         """Hard-delete one field row; authorized through the owner, no membership work."""
         async with self._ops.write_ops() as w:
             data = await w.purge_field_entity(purger)
@@ -196,13 +185,6 @@ class OpsRepository[TData]:
                 )
             return data
 
-    async def partial_bulk_purge_global_entities(
-        self, purgers: Mapping[EntityID, GlobalEntityPurger[Any, TData]]
-    ) -> BulkResultWithFailures[TData]:
-        """Hard-delete each named global entity independently, answering for every one."""
-        async with self._ops.write_ops() as w:
-            return await w.partial_bulk_purge_global_entities(purgers)
-
     async def partial_bulk_purge_entities(
         self, purgers: Mapping[EntityID, EntityPurger[Any, TData]]
     ) -> BulkResultWithFailures[TData]:
@@ -211,7 +193,7 @@ class OpsRepository[TData]:
             return await w.partial_bulk_purge_entities(purgers)
 
     async def partial_bulk_purge_field_entities(
-        self, purgers: Mapping[EntityID, FieldEntityPurger[Any, TData]]
+        self, purgers: Mapping[EntityID, FieldPurger[Any, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Hard-delete each named field row independently; authorized through the owner."""
         async with self._ops.write_ops() as w:
@@ -228,16 +210,8 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.upsert_entity(upserter)
 
-    async def upsert_role_managed_entity(
-        self, upserter: RoleManagedEntityUpserter[Any, TData]
-    ) -> TData:
-        """Insert or update a role-managed entity row; preset roles are provisioned
-        only when the upsert actually created the scope. Never absent."""
-        async with self._ops.write_ops() as w:
-            return await w.upsert_role_managed_entity(upserter)
-
     async def upsert_field_entity(
-        self, owner_id: Any, upserter: FieldEntityUpserter[Any, Any, TData]
+        self, owner_id: Any, upserter: FieldUpserter[Any, Any, TData]
     ) -> TData:
         """Insert or update a field row on conflict, under its owner. Never absent."""
         async with self._ops.write_ops() as w:

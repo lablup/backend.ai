@@ -150,7 +150,7 @@ class TestStorageNamespace:
             LookupStorageNamespaceAction(storage_id=storage["id"], namespace="to-unregister")
         )
         assert resolved.data.id == ns["id"]
-        unregister_result = await storage_namespace_processors.global_unregister.run(
+        unregister_result = await storage_namespace_processors.unregister.run(
             UnregisterNamespaceAction(id=resolved.data.id)
         )
         assert unregister_result.data.storage_id == ns["storage_id"]
@@ -243,7 +243,7 @@ class TestStorageNamespace:
         resolved = await storage_namespace_processors.lookup.run(
             LookupStorageNamespaceAction(storage_id=storage["id"], namespace="lifecycle-ns")
         )
-        await storage_namespace_processors.global_unregister.run(
+        await storage_namespace_processors.unregister.run(
             UnregisterNamespaceAction(id=resolved.data.id)
         )
 

@@ -9,6 +9,9 @@ from ai.backend.manager.actions.v2.ops.result import (
     EntityOpsResult,
     LookupOpsResult,
 )
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    SingleEntityActionProcessor,
+)
 from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
     StorageProxyManagerFacingClient,
 )
@@ -48,7 +51,7 @@ class VFSStorageProcessors:
         CreateVFSStorageAction, CreatedEntityOpsResult[VFSStorageData]
     ]
     global_update: GlobalActionProcessor[UpdateVFSStorageAction, EntityOpsResult[VFSStorageData]]
-    global_purge: GlobalActionProcessor[PurgeVFSStorageAction, EntityOpsResult[VFSStorageData]]
+    purge: SingleEntityActionProcessor[PurgeVFSStorageAction, EntityOpsResult[VFSStorageData]]
     global_get: GlobalActionProcessor[GetVFSStorageAction, EntityOpsResult[VFSStorageData]]
     lookup: LookupActionProcessor[LookupVFSStorageAction, LookupOpsResult[VFSStorageData]]
     global_list_storages: GlobalActionProcessor[
@@ -76,7 +79,7 @@ class VFSStorageProcessors:
         self._service = service
         self.global_create = group.global_create_ops(CreateVFSStorageAction)
         self.global_update = group.global_update_ops(UpdateVFSStorageAction)
-        self.global_purge = group.global_purge_ops(PurgeVFSStorageAction)
+        self.purge = group.entity_purge_ops(PurgeVFSStorageAction)
         self.global_get = group.global_get_ops(GetVFSStorageAction)
         self.lookup = group.lookup_ops(LookupVFSStorageAction)
         self.global_list_storages = group.global_search_ops(ListVFSStorageAction)

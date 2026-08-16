@@ -134,7 +134,7 @@ class PrometheusQueryPresetHandler:
         path: PathParam[QueryDefinitionIdPathParam],
     ) -> APIResponse:
         """Delete a preset."""
-        action_result = await self._processor.global_purge_preset.run(
+        action_result = await self._processor.purge_preset.run(
             PurgePresetAction(preset_id=PrometheusQueryPresetID(path.parsed.id))
         )
         resp = DeleteQueryDefinitionResponse(id=action_result.data.id)

@@ -342,8 +342,11 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_delete_keypair_resource_policy(
         self, input: DeleteKeypairResourcePolicyInput
     ) -> DeleteKeypairResourcePolicyPayload:
-        await self._processors.keypair_resource_policy.global_purge.run(
-            PurgeKeyPairResourcePolicyAction(name=input.name)
+        target = await self._processors.keypair_resource_policy.global_get.run(
+            GetKeypairResourcePolicyAction(name=input.name)
+        )
+        await self._processors.keypair_resource_policy.purge.run(
+            PurgeKeyPairResourcePolicyAction(name=input.name, policy_id=target.data.uuid)
         )
         return DeleteKeypairResourcePolicyPayload(name=input.name)
 
@@ -453,8 +456,11 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_delete_user_resource_policy(
         self, input: DeleteUserResourcePolicyInput
     ) -> DeleteUserResourcePolicyPayload:
-        await self._processors.user_resource_policy.global_purge.run(
-            PurgeUserResourcePolicyAction(name=input.name)
+        target = await self._processors.user_resource_policy.global_get.run(
+            GetUserResourcePolicyAction(name=input.name)
+        )
+        await self._processors.user_resource_policy.purge.run(
+            PurgeUserResourcePolicyAction(name=input.name, policy_id=target.data.uuid)
         )
         return DeleteUserResourcePolicyPayload(name=input.name)
 
@@ -550,8 +556,11 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_delete_project_resource_policy(
         self, input: DeleteProjectResourcePolicyInput
     ) -> DeleteProjectResourcePolicyPayload:
-        await self._processors.project_resource_policy.global_purge.run(
-            PurgeProjectResourcePolicyAction(name=input.name)
+        target = await self._processors.project_resource_policy.global_get.run(
+            GetProjectResourcePolicyAction(name=input.name)
+        )
+        await self._processors.project_resource_policy.purge.run(
+            PurgeProjectResourcePolicyAction(name=input.name, policy_id=target.data.uuid)
         )
         return DeleteProjectResourcePolicyPayload(name=input.name)
 

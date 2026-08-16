@@ -21,7 +21,12 @@ import jinja2.sandbox
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.types import (
+    EntityRef,
+    EntityType,
+    ScopeRef,
+    ScopeType,
+)
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import RBACTypeConversionError
 from ai.backend.common.identifier.entity import EntityID
@@ -52,7 +57,7 @@ from ai.backend.manager.models.specs.creator import EntityCreator, RoleManagedEn
 from ai.backend.manager.models.specs.membership import ScopeMembershipEntry
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import BulkResultWithFailures, IntegrityErrorCheck
-from ai.backend.manager.models.specs.upserter import EntityUpserter, RoleManagedEntityUpserter
+from ai.backend.manager.models.specs.upserter import EntityUpserter
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
@@ -153,23 +158,19 @@ class V2EntityWriteOps(V2WriteOpsBase):
     async def purge_entity[TRow: Base, TData](
         self, purger: EntityPurger[TRow, TData]
     ) -> TData | None:
-        """Delete one entity row and tear its scope down with it, symmetrically
-        with the create: any permissions granted on the scope, its virtual scope
-        node (FK cascade removes the edges inside it), and the edges the scope
-        left in other virtual scopes; ``None`` if the row is already gone."""
+        """Delete one entity row and the RBAC graph it left; ``None`` if already gone."""
         await self._validate_conflict_checks(purger.conflict_checks())
         row = await self._delete_row_returning(purger.row_class(), purger.pk_value())
         if row is None:
             return None
-        await self._teardown_scope(purger.scope_of())
+        await self._teardown_entity(purger.entity_id().entity_ref())
         return purger.to_data(row)
 
     async def partial_bulk_purge_entities[TRow: Base, TData](
         self, purgers: Mapping[EntityID, EntityPurger[TRow, TData]]
     ) -> BulkResultWithFailures[TData]:
-        """Delete each named entity independently; a row and its scope teardown
-        share one savepoint, and a missing row is answered with
-        :class:`EntityNotFoundError` rather than skipped."""
+        """Delete each named entity independently, a row and its teardown sharing one
+        savepoint; a missing row raises :class:`EntityNotFoundError`."""
         successes: dict[EntityID, TData] = {}
         errors: dict[EntityID, Exception] = {}
         for entity_id, purger in purgers.items():
@@ -202,28 +203,6 @@ class V2EntityWriteOps(V2WriteOpsBase):
         await self._insert_scope_nodes([scope])
         await self._enroll_member(scope, upserter.member_of(row))
         return upserter.to_data(row)
-
-    async def upsert_role_managed_entity[TRow: Base, TData](
-        self, upserter: RoleManagedEntityUpserter[TRow, TData]
-    ) -> TData:
-        """Insert or update a role-managed entity row on conflict. Preset roles
-        are provisioned only when the upsert actually created the scope, so an
-        update never duplicates them."""
-        row = await self._upsert_row_returning(
-            upserter.row_class(),
-            upserter.index_elements(),
-            upserter.build_insert_values(),
-            upserter.build_update_values(),
-            upserter.integrity_error_checks(),
-        )
-        scope = upserter.scope_of(row)
-        created = await self._insert_scope_nodes([scope])
-        if scope in created:
-            await self._create_preset_roles({scope: upserter.template_value(row)})
-        await self._enroll_member(scope, upserter.member_of(row))
-        return upserter.to_data(row)
-
-    # -- Scope provisioning -------------------------------------------------------
 
     async def _bulk_insert_rows[TRow: Base](
         self, rows: Sequence[TRow], checks: Sequence[IntegrityErrorCheck]
@@ -350,11 +329,10 @@ class V2EntityWriteOps(V2WriteOpsBase):
                 [UserRoleRow(user_id=user_id, role_id=role_id) for role_id in role_ids],
             )
 
-    async def _teardown_scope(self, scope: ScopeRef) -> None:
-        """Remove everything the scope's provisioning and lifetime accumulated: any
-        permissions granted on it, its virtual scope node (FK cascade removes the
-        edges inside it, the enrolled roles' memberships included), and the edges
-        the scope left in other virtual scopes."""
+    async def _teardown_entity(self, entity: EntityRef) -> None:
+        """Remove what the entity left in the RBAC graph: permissions granted on it,
+        its virtual scope node if it provisioned one, and its membership edges."""
+        scope = ScopeRef(scope_type=ScopeType(entity.entity_type), scope_id=entity.entity_id)
         permission_scope_type = self._permission_scope_type(scope.scope_type)
         if permission_scope_type is not None:
             # Types outside the RBAC element enum can never have carried permissions.

@@ -224,7 +224,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
     async def delete(self, input: DeleteQueryDefinitionInput) -> DeleteQueryDefinitionPayload:
         """Delete a query definition by ID."""
-        action_result = await self._processors.prometheus_query_preset.global_purge_preset.run(
+        action_result = await self._processors.prometheus_query_preset.purge_preset.run(
             PurgePresetAction(preset_id=PrometheusQueryPresetID(input.id))
         )
 

@@ -11,10 +11,10 @@ import sqlalchemy as sa
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.specs.creator import FieldEntityCreator
-from ai.backend.manager.models.specs.purger import FieldEntityPurger
+from ai.backend.manager.models.specs.creator import FieldCreator
+from ai.backend.manager.models.specs.purger import FieldPurger
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
-from ai.backend.manager.models.specs.upserter import FieldEntityUpserter
+from ai.backend.manager.models.specs.upserter import FieldUpserter
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 
 
@@ -22,7 +22,7 @@ class V2FieldWriteOps(V2WriteOpsBase):
     """Field writes, bound to a single session."""
 
     async def create_field_entity[TOwnerID: EntityID, TRow: Base, TData](
-        self, owner_id: TOwnerID, creator: FieldEntityCreator[TOwnerID, TRow, TData]
+        self, owner_id: TOwnerID, creator: FieldCreator[TOwnerID, TRow, TData]
     ) -> TData:
         """Insert one field row under its owner's settled identifier."""
         row = creator.build_row(owner_id)
@@ -30,7 +30,7 @@ class V2FieldWriteOps(V2WriteOpsBase):
         return creator.to_data(row)
 
     async def atomic_create_field_entities[TOwnerID: EntityID, TRow: Base, TData](
-        self, owner_id: TOwnerID, creators: Sequence[FieldEntityCreator[TOwnerID, TRow, TData]]
+        self, owner_id: TOwnerID, creators: Sequence[FieldCreator[TOwnerID, TRow, TData]]
     ) -> list[TData]:
         """Insert field rows sharing one owner, atomically in a single flush."""
         if not creators:
@@ -47,7 +47,7 @@ class V2FieldWriteOps(V2WriteOpsBase):
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
     async def purge_field_entity[TRow: Base, TData](
-        self, purger: FieldEntityPurger[TRow, TData]
+        self, purger: FieldPurger[TRow, TData]
     ) -> TData | None:
         """Delete one field row; ``None`` if already gone. The delete is
         authorized through the owner."""
@@ -58,7 +58,7 @@ class V2FieldWriteOps(V2WriteOpsBase):
         return purger.to_data(row)
 
     async def partial_bulk_purge_field_entities[TRow: Base, TData](
-        self, purgers: Mapping[EntityID, FieldEntityPurger[TRow, TData]]
+        self, purgers: Mapping[EntityID, FieldPurger[TRow, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Delete each named field row independently in its own savepoint; a
         missing row is answered with :class:`EntityNotFoundError` rather than
@@ -79,7 +79,7 @@ class V2FieldWriteOps(V2WriteOpsBase):
         return BulkResultWithFailures(successes=successes, errors=errors)
 
     async def upsert_field_entity[TOwnerID: EntityID, TRow: Base, TData](
-        self, owner_id: TOwnerID, upserter: FieldEntityUpserter[TOwnerID, TRow, TData]
+        self, owner_id: TOwnerID, upserter: FieldUpserter[TOwnerID, TRow, TData]
     ) -> TData:
         """Insert or update a field row on conflict, under the owner's settled
         identifier."""

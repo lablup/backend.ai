@@ -39,11 +39,11 @@ class RetentionPolicyProcessors:
         UpdateRetentionPolicyAction,
         EntityOpsResult[RetentionPolicyData],
     ]
-    global_delete: GlobalActionProcessor[
+    delete: SingleEntityActionProcessor[
         DeleteRetentionPolicyAction,
         EntityOpsResult[RetentionPolicyData],
     ]
-    global_purge: GlobalActionProcessor[
+    purge: SingleEntityActionProcessor[
         PurgeRetentionPolicyAction,
         EntityOpsResult[RetentionPolicyData],
     ]
@@ -56,6 +56,6 @@ class RetentionPolicyProcessors:
         self.get = group.single_get_ops(GetRetentionPolicyAction)
         self.global_create = group.global_create_ops(CreateRetentionPolicyAction)
         self.global_update = group.global_update_ops(UpdateRetentionPolicyAction)
-        self.global_delete = group.global_purge_ops(DeleteRetentionPolicyAction)
-        self.global_purge = group.global_purge_ops(PurgeRetentionPolicyAction)
+        self.delete = group.entity_purge_ops(DeleteRetentionPolicyAction)
+        self.purge = group.entity_purge_ops(PurgeRetentionPolicyAction)
         self.global_search = group.global_search_ops(SearchRetentionPoliciesAction)

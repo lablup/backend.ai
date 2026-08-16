@@ -3,16 +3,12 @@ hierarchy. Plain row writes — nothing becomes a scope and nothing is joined.""
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
-from ai.backend.manager.models.specs.purger import GlobalEntityPurger
-from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 
@@ -44,37 +40,6 @@ class V2GlobalWriteOps(V2WriteOpsBase):
                 self._parse_integrity_error(e), creators[0].integrity_error_checks()
             )
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
-
-    async def purge_global_entity[TRow: Base, TData](
-        self, purger: GlobalEntityPurger[TRow, TData]
-    ) -> TData | None:
-        """Delete one row of a global entity; ``None`` if already gone."""
-        await self._validate_conflict_checks(purger.conflict_checks())
-        row = await self._delete_row_returning(purger.row_class(), purger.pk_value())
-        if row is None:
-            return None
-        return purger.to_data(row)
-
-    async def partial_bulk_purge_global_entities[TRow: Base, TData](
-        self, purgers: Mapping[EntityID, GlobalEntityPurger[TRow, TData]]
-    ) -> BulkResultWithFailures[TData]:
-        """Delete each named global entity independently in its own savepoint; a
-        missing row is answered with :class:`EntityNotFoundError` rather than
-        skipped."""
-        successes: dict[EntityID, TData] = {}
-        errors: dict[EntityID, Exception] = {}
-        for entity_id, purger in purgers.items():
-            try:
-                async with self._sess.begin_nested():
-                    data = await self.purge_global_entity(purger)
-                    if data is None:
-                        raise EntityNotFoundError(
-                            f"{purger.row_class().__name__} {purger.pk_value()} not found"
-                        )
-                    successes[entity_id] = data
-            except Exception as e:
-                errors[entity_id] = e
-        return BulkResultWithFailures(successes=successes, errors=errors)
 
     async def upsert_global_entity[TRow: Base, TData](
         self, upserter: GlobalEntityUpserter[TRow, TData]

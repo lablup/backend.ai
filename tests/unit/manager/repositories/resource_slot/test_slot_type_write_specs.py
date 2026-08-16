@@ -11,6 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.resource_slot import ResourceSlotTypeUUID
 from ai.backend.common.types import ResourceSlot, SlotTypes
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.errors.resource_slot import (
@@ -251,9 +252,11 @@ class TestResourceSlotTypePurger:
         db_with_referencing_tables: ExtendedAsyncSAEngine,
         existing_slot_type: str,
     ) -> None:
-        purger = ResourceSlotTypePurger(slot_name=existing_slot_type)
+        purger = ResourceSlotTypePurger(
+            slot_name=existing_slot_type, slot_type_id=ResourceSlotTypeUUID(uuid.uuid4())
+        )
         async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
-            data = await w.purge_global_entity(purger)
+            data = await w.purge_entity(purger)
             assert data is not None
             assert data.slot_name == existing_slot_type
 
@@ -313,10 +316,12 @@ class TestResourceSlotTypePurger:
                 )
             )
 
-        purger = ResourceSlotTypePurger(slot_name=existing_slot_type)
+        purger = ResourceSlotTypePurger(
+            slot_name=existing_slot_type, slot_type_id=ResourceSlotTypeUUID(uuid.uuid4())
+        )
         with pytest.raises(ResourceSlotTypeInUse):
             async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
-                await w.purge_global_entity(purger)
+                await w.purge_entity(purger)
 
         async with db_with_referencing_tables.begin_readonly_session() as db_sess:
             remaining = await db_sess.scalar(

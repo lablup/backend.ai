@@ -9,14 +9,12 @@ from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
-from ai.backend.manager.models.specs.purger import FieldEntityPurger
+from ai.backend.manager.models.specs.purger import FieldPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
 
 @dataclass
-class RolePermissionPresetPurger(
-    FieldEntityPurger[RolePermissionPresetRow, RolePermissionPresetData]
-):
+class RolePermissionPresetPurger(FieldPurger[RolePermissionPresetRow, RolePermissionPresetData]):
     """Purger for one permission entry, authorized through its preset."""
 
     permission_preset_id: RolePermissionPresetID

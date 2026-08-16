@@ -146,7 +146,7 @@ class LoginClientTypeAdapter(BaseAdapter):
         )
 
     async def admin_delete(self, type_id: UUID) -> DeleteLoginClientTypePayload:
-        action_result = await self._processors.login_client_type.global_purge.run(
+        action_result = await self._processors.login_client_type.purge.run(
             PurgeLoginClientTypeAction(id=type_id)
         )
         return DeleteLoginClientTypePayload(id=action_result.data.id)

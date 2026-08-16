@@ -41,7 +41,7 @@ class AppConfigAllowListProcessors:
         UpdateAppConfigAllowListAction,
         EntityOpsResult[AppConfigAllowListData],
     ]
-    global_purge: GlobalActionProcessor[
+    purge: SingleEntityActionProcessor[
         PurgeAppConfigAllowListAction,
         EntityOpsResult[AppConfigAllowListData],
     ]
@@ -54,5 +54,5 @@ class AppConfigAllowListProcessors:
         self.global_create = group.global_create_ops(CreateAppConfigAllowListAction)
         self.get = group.single_get_ops(GetAppConfigAllowListAction)
         self.update = group.single_update_ops(UpdateAppConfigAllowListAction)
-        self.global_purge = group.global_purge_ops(PurgeAppConfigAllowListAction)
+        self.purge = group.entity_purge_ops(PurgeAppConfigAllowListAction)
         self.global_search = group.global_search_ops(AdminSearchAppConfigAllowListAction)

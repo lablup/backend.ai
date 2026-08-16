@@ -127,7 +127,7 @@ class VFSStorageAdapter(BaseAdapter):
 
     async def delete(self, input: DeleteVFSStorageInput) -> DeleteVFSStoragePayload:
         """Delete a VFS storage."""
-        action_result = await self._processors.vfs_storage.global_purge.run(
+        action_result = await self._processors.vfs_storage.purge.run(
             PurgeVFSStorageAction(storage_id=input.id)
         )
         return DeleteVFSStoragePayload(id=action_result.data.id)

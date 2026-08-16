@@ -209,7 +209,7 @@ class ObjectStorageAdapter(BaseAdapter):
 
     async def delete(self, input: DeleteObjectStorageInput) -> DeleteObjectStoragePayload:
         """Delete an object storage."""
-        action_result = await self._processors.object_storage.global_purge.run(
+        action_result = await self._processors.object_storage.purge.run(
             PurgeObjectStorageAction(storage_id=input.id)
         )
         return DeleteObjectStoragePayload(id=action_result.data.id)

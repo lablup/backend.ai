@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.role_preset import ROLE_PERMISSION_PRESET_ENT
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.role_preset import RolePresetID
-from ai.backend.manager.actions.v2.ops.base import AtomicCreateFieldEntityOpsAction
+from ai.backend.manager.actions.v2.ops.base import AtomicCreateFieldOpsAction
 from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
 from ai.backend.manager.models.rbac_models.role_permission_preset.creators import (
     RolePermissionPresetCreator,
@@ -20,9 +20,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 
 @dataclass
 class BulkAddRolePermissionPresetsAction(
-    AtomicCreateFieldEntityOpsAction[
-        RolePresetID, RolePermissionPresetRow, RolePermissionPresetData
-    ]
+    AtomicCreateFieldOpsAction[RolePresetID, RolePermissionPresetRow, RolePermissionPresetData]
 ):
     """Add permission entries to one preset, all or none.
 

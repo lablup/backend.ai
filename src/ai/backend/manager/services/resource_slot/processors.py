@@ -14,6 +14,9 @@ from ai.backend.manager.actions.v2.ops.result import (
     EntityOpsResult,
     LookupOpsResult,
 )
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    SingleEntityActionProcessor,
+)
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.services.resource_slot.actions.create import CreateResourceSlotTypeAction
@@ -85,7 +88,7 @@ class ResourceSlotProcessors:
         UpdateResourceSlotTypeAction,
         EntityOpsResult[ResourceSlotTypeData],
     ]
-    global_purge_resource_slot_type: GlobalActionProcessor[
+    purge_resource_slot_type: SingleEntityActionProcessor[
         PurgeResourceSlotTypeAction,
         EntityOpsResult[ResourceSlotTypeData],
     ]
@@ -127,4 +130,4 @@ class ResourceSlotProcessors:
         self.global_update_resource_slot_type = group.global_update_ops(
             UpdateResourceSlotTypeAction
         )
-        self.global_purge_resource_slot_type = group.global_purge_ops(PurgeResourceSlotTypeAction)
+        self.purge_resource_slot_type = group.entity_purge_ops(PurgeResourceSlotTypeAction)

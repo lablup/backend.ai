@@ -32,7 +32,7 @@ class AppConfigDefinitionProcessors:
     get: SingleEntityActionProcessor[
         GetAppConfigDefinitionAction, EntityOpsResult[AppConfigDefinitionData]
     ]
-    global_purge: GlobalActionProcessor[
+    purge: SingleEntityActionProcessor[
         PurgeAppConfigDefinitionAction, EntityOpsResult[AppConfigDefinitionData]
     ]
     global_search: GlobalActionProcessor[
@@ -42,5 +42,5 @@ class AppConfigDefinitionProcessors:
     def __init__(self, group: ProcessorGroup[AppConfigDefinitionData]) -> None:
         self.global_create = group.global_create_ops(CreateAppConfigDefinitionAction)
         self.get = group.single_get_ops(GetAppConfigDefinitionAction)
-        self.global_purge = group.global_purge_ops(PurgeAppConfigDefinitionAction)
+        self.purge = group.entity_purge_ops(PurgeAppConfigDefinitionAction)
         self.global_search = group.global_search_ops(AdminSearchAppConfigDefinitionsAction)

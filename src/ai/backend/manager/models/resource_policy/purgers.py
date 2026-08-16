@@ -6,6 +6,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.identifier.resource_policy import (
+    KeyPairResourcePolicyUUID,
+    ProjectResourcePolicyUUID,
+    UserResourcePolicyUUID,
+)
 from ai.backend.manager.data.resource.types import (
     KeyPairResourcePolicyData,
     ProjectResourcePolicyData,
@@ -16,15 +22,16 @@ from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.specs.purger import GlobalEntityPurger
+from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
 
 @dataclass
 class KeyPairResourcePolicyPurger(
-    GlobalEntityPurger[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
+    EntityPurger[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
 ):
     name: str
+    policy_id: KeyPairResourcePolicyUUID
 
     @override
     def row_class(self) -> type[KeyPairResourcePolicyRow]:
@@ -33,6 +40,10 @@ class KeyPairResourcePolicyPurger(
     @override
     def pk_value(self) -> str:
         return self.name
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.policy_id
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
@@ -44,8 +55,9 @@ class KeyPairResourcePolicyPurger(
 
 
 @dataclass
-class UserResourcePolicyPurger(GlobalEntityPurger[UserResourcePolicyRow, UserResourcePolicyData]):
+class UserResourcePolicyPurger(EntityPurger[UserResourcePolicyRow, UserResourcePolicyData]):
     name: str
+    policy_id: UserResourcePolicyUUID
 
     @override
     def row_class(self) -> type[UserResourcePolicyRow]:
@@ -54,6 +66,10 @@ class UserResourcePolicyPurger(GlobalEntityPurger[UserResourcePolicyRow, UserRes
     @override
     def pk_value(self) -> str:
         return self.name
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.policy_id
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
@@ -66,9 +82,10 @@ class UserResourcePolicyPurger(GlobalEntityPurger[UserResourcePolicyRow, UserRes
 
 @dataclass
 class ProjectResourcePolicyPurger(
-    GlobalEntityPurger[ProjectResourcePolicyRow, ProjectResourcePolicyData]
+    EntityPurger[ProjectResourcePolicyRow, ProjectResourcePolicyData]
 ):
     name: str
+    policy_id: ProjectResourcePolicyUUID
 
     @override
     def row_class(self) -> type[ProjectResourcePolicyRow]:
@@ -77,6 +94,10 @@ class ProjectResourcePolicyPurger(
     @override
     def pk_value(self) -> str:
         return self.name
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.policy_id
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:

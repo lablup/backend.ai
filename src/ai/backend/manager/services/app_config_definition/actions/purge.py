@@ -8,7 +8,8 @@ from ai.backend.common.data.entity.app_config_definition import (
 )
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
-from ai.backend.manager.actions.v2.ops.base import PurgeGlobalOpsAction
+from ai.backend.common.identifier.entity import EntityID
+from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
 from ai.backend.manager.models.app_config_definition.purgers import AppConfigDefinitionPurger
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
@@ -16,7 +17,7 @@ from ai.backend.manager.models.app_config_definition.row import AppConfigDefinit
 
 @dataclass
 class PurgeAppConfigDefinitionAction(
-    PurgeGlobalOpsAction[AppConfigDefinitionRow, AppConfigDefinitionData]
+    PurgeEntityOpsAction[AppConfigDefinitionRow, AppConfigDefinitionData]
 ):
     """Unregister a config name."""
 
@@ -31,6 +32,10 @@ class PurgeAppConfigDefinitionAction(
     @classmethod
     def action_name(cls) -> str:
         return "purge_app_config_definition"
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.to_purger().entity_id()
 
     @override
     def to_purger(self) -> AppConfigDefinitionPurger:

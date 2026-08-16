@@ -7,7 +7,9 @@ from ai.backend.common.data.entity.resource_policy import (
     USER_RESOURCE_POLICY_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.actions.v2.ops.base import PurgeGlobalOpsAction
+from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.identifier.resource_policy import UserResourcePolicyUUID
+from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.resource_policy.purgers import (
     UserResourcePolicyPurger,
@@ -17,7 +19,7 @@ from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 
 @dataclass
 class PurgeUserResourcePolicyAction(
-    PurgeGlobalOpsAction[UserResourcePolicyRow, UserResourcePolicyData]
+    PurgeEntityOpsAction[UserResourcePolicyRow, UserResourcePolicyData]
 ):
     """Remove a user resource policy.
 
@@ -25,6 +27,7 @@ class PurgeUserResourcePolicyAction(
     always been the row leaving the table."""
 
     name: str
+    policy_id: UserResourcePolicyUUID
 
     @override
     @classmethod
@@ -37,5 +40,9 @@ class PurgeUserResourcePolicyAction(
         return "global_purge_user_resource_policy"
 
     @override
+    def entity_id(self) -> EntityID:
+        return self.to_purger().entity_id()
+
+    @override
     def to_purger(self) -> UserResourcePolicyPurger:
-        return UserResourcePolicyPurger(name=self.name)
+        return UserResourcePolicyPurger(name=self.name, policy_id=self.policy_id)

@@ -136,14 +136,14 @@ class RetentionPolicyAdapter(BaseAdapter):
         return UpdateRetentionPolicyPayload(policy=self._data_to_node(result.data))
 
     async def delete(self, policy_id: RetentionPolicyID) -> DeleteRetentionPolicyPayload:
-        result = await self._processors.retention_policy.global_delete.run(
+        result = await self._processors.retention_policy.delete.run(
             DeleteRetentionPolicyAction(id=policy_id)
         )
         return DeleteRetentionPolicyPayload(id=result.data.id)
 
     async def purge(self, policy_id: RetentionPolicyID) -> PurgeRetentionPolicyPayload:
         purger = RetentionPolicyPurger(policy_id=policy_id)
-        result = await self._processors.retention_policy.global_purge.run(
+        result = await self._processors.retention_policy.purge.run(
             PurgeRetentionPolicyAction(purger=purger)
         )
         return PurgeRetentionPolicyPayload(id=result.data.id)

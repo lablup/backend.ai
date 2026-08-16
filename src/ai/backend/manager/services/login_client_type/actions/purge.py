@@ -6,14 +6,16 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.login_client_type import LOGIN_CLIENT_TYPE_ENTITY_TYPE
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.actions.v2.ops.base import PurgeGlobalOpsAction
+from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.identifier.login_client_type import LoginClientTypeID
+from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.models.login_client_type.purgers import LoginClientTypePurger
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 
 
 @dataclass
-class PurgeLoginClientTypeAction(PurgeGlobalOpsAction[LoginClientTypeRow, LoginClientTypeData]):
+class PurgeLoginClientTypeAction(PurgeEntityOpsAction[LoginClientTypeRow, LoginClientTypeData]):
     """Remove a login client type from the catalog.
 
     Purge-shaped: the table carries no lifecycle column, so deleting one has always
@@ -33,5 +35,9 @@ class PurgeLoginClientTypeAction(PurgeGlobalOpsAction[LoginClientTypeRow, LoginC
         return "purge_login_client_type"
 
     @override
+    def entity_id(self) -> EntityID:
+        return self.to_purger().entity_id()
+
+    @override
     def to_purger(self) -> LoginClientTypePurger:
-        return LoginClientTypePurger(login_client_type_id=self.id)
+        return LoginClientTypePurger(login_client_type_id=LoginClientTypeID(self.id))

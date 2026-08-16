@@ -1,5 +1,11 @@
-from typing import NewType
-from uuid import UUID
+from typing import override
+
+from ai.backend.common.data.entity.resource_policy import (
+    KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
+    PROJECT_RESOURCE_POLICY_ENTITY_TYPE,
+    USER_RESOURCE_POLICY_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
     "KeyPairResourcePolicyUUID",
@@ -8,9 +14,22 @@ __all__ = (
 )
 
 
-# The three policies key on ``name`` — that is what keypairs/users/groups
-# reference — so the UUID below is the unique alternate key that gives each row
-# its ``EntityID``, not its primary key.
-KeyPairResourcePolicyUUID = NewType("KeyPairResourcePolicyUUID", UUID)
-UserResourcePolicyUUID = NewType("UserResourcePolicyUUID", UUID)
-ProjectResourcePolicyUUID = NewType("ProjectResourcePolicyUUID", UUID)
+class KeyPairResourcePolicyUUID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE
+
+
+class UserResourcePolicyUUID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return USER_RESOURCE_POLICY_ENTITY_TYPE
+
+
+class ProjectResourcePolicyUUID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return PROJECT_RESOURCE_POLICY_ENTITY_TYPE

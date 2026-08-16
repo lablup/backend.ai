@@ -7,7 +7,9 @@ from ai.backend.common.data.entity.resource_policy import (
     PROJECT_RESOURCE_POLICY_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.actions.v2.ops.base import PurgeGlobalOpsAction
+from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.identifier.resource_policy import ProjectResourcePolicyUUID
+from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.models.resource_policy.purgers import (
     ProjectResourcePolicyPurger,
@@ -17,7 +19,7 @@ from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyR
 
 @dataclass
 class PurgeProjectResourcePolicyAction(
-    PurgeGlobalOpsAction[ProjectResourcePolicyRow, ProjectResourcePolicyData]
+    PurgeEntityOpsAction[ProjectResourcePolicyRow, ProjectResourcePolicyData]
 ):
     """Remove a project resource policy.
 
@@ -25,6 +27,7 @@ class PurgeProjectResourcePolicyAction(
     always been the row leaving the table."""
 
     name: str
+    policy_id: ProjectResourcePolicyUUID
 
     @override
     @classmethod
@@ -37,5 +40,9 @@ class PurgeProjectResourcePolicyAction(
         return "global_purge_project_resource_policy"
 
     @override
+    def entity_id(self) -> EntityID:
+        return self.to_purger().entity_id()
+
+    @override
     def to_purger(self) -> ProjectResourcePolicyPurger:
-        return ProjectResourcePolicyPurger(name=self.name)
+        return ProjectResourcePolicyPurger(name=self.name, policy_id=self.policy_id)

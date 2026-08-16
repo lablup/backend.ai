@@ -21,7 +21,7 @@ What these tests pin down:
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator, Collection, Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
@@ -32,7 +32,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef, ScopeType
 from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -61,14 +61,13 @@ from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.specs.creator import EntityCreator, RoleManagedEntityCreator
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
-from ai.backend.manager.models.specs.upserter import EntityUpserter, RoleManagedEntityUpserter
+from ai.backend.manager.models.specs.upserter import EntityUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.testutils.db import TableOrORM, with_tables
 
 # =============================================================================
 # A test entity that becomes a "project" scope (present in every enum involved),
@@ -182,13 +181,27 @@ class _RoleManagedCreator(RoleManagedEntityCreator[EntityLifecycleTestRow, _Enti
         return _EntityData(id=row.id, name=row.name, note=row.note)
 
 
+class _TestEntityID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType(_SCOPE_TYPE)
+
+
+class _OpenTypeEntityID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType(_OPEN_SCOPE_TYPE)
+
+
 @dataclass
 class _Purger(EntityPurger[EntityLifecycleTestRow, _EntityData]):
     target: UUID
 
     @override
-    def scope_of(self) -> ScopeRef:
-        return ScopeRef(scope_type=_SCOPE_TYPE, scope_id=self.target)
+    def entity_id(self) -> EntityIdentifier:
+        return _TestEntityID(self.target)
 
     @override
     def row_class(self) -> type[EntityLifecycleTestRow]:
@@ -210,8 +223,8 @@ class _Purger(EntityPurger[EntityLifecycleTestRow, _EntityData]):
 @dataclass
 class _OpenTypePurger(_Purger):
     @override
-    def scope_of(self) -> ScopeRef:
-        return ScopeRef(scope_type=_OPEN_SCOPE_TYPE, scope_id=self.target)
+    def entity_id(self) -> EntityIdentifier:
+        return _OpenTypeEntityID(self.target)
 
 
 @dataclass
@@ -259,86 +272,11 @@ class _Upserter(EntityUpserter[EntityLifecycleTestRow, _EntityData]):
         return _EntityData(id=row.id, name=row.name, note=row.note)
 
 
-@dataclass
-class _RoleManagedUpserter(RoleManagedEntityUpserter[EntityLifecycleTestRow, _EntityData]):
-    """Duplicates the plain upserter's hooks on purpose, like the creator stub."""
-
-    name: str
-    note: str | None = None
-    parents: tuple[UUID, ...] = ()
-
-    @override
-    def scope_type(self) -> ScopeType:
-        return _SCOPE_TYPE
-
-    @override
-    def scope_id(self, row: EntityLifecycleTestRow) -> ScopeID:
-        return row.id
-
-    @override
-    def member_of(self, row: EntityLifecycleTestRow) -> Collection[ScopeRef]:
-        return tuple(
-            ScopeRef(scope_type=_PARENT_SCOPE_TYPE, scope_id=parent) for parent in self.parents
-        )
-
-    @override
-    def template_value(self, row: EntityLifecycleTestRow) -> ScopeTemplateValue:
-        return ScopeTemplateValue(id=row.id, name=row.name, type=str(_SCOPE_TYPE))
-
-    @override
-    def row_class(self) -> type[EntityLifecycleTestRow]:
-        return EntityLifecycleTestRow
-
-    @override
-    def index_elements(self) -> list[str]:
-        return ["name"]
-
-    @override
-    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
-
-    @override
-    def build_insert_values(self) -> dict[str, Any]:
-        return {"name": self.name, "note": self.note}
-
-    @override
-    def build_update_values(self) -> dict[str, Any]:
-        return {"note": self.note}
-
-    @override
-    def to_data(self, row: EntityLifecycleTestRow) -> _EntityData:
-        return _EntityData(id=row.id, name=row.name, note=row.note)
-
-
-# =============================================================================
-# Fixtures and probes
-# =============================================================================
-
-_TABLES: Sequence[TableOrORM] = [
-    EntityLifecycleTestRow,
-    VirtualScopeRow,
-    EntityMembershipRow,
-    ScopeBindingRow,
-    RoleRow,
-    PermissionRow,
-    RolePresetRow,
-    RolePermissionPresetRow,
-]
-
-_PRESET_NAME = "preset-project-member"
-
-
-@pytest.fixture
-async def database(
-    database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-    async with with_tables(database_connection, _TABLES):
-        yield database_connection
-
-
-@pytest.fixture
 def repository(database: ExtendedAsyncSAEngine) -> OpsRepository[_EntityData]:
     return OpsRepository(V2DBOpsProvider(database))
+
+
+_PRESET_NAME = "preset-project-member"
 
 
 @pytest.fixture
@@ -793,31 +731,3 @@ class TestEntityUpsert:
             await repository.upsert_entity(_Upserter(name="a", parents=(uuid.uuid4(),)))
 
         assert await _row_count(database) == 0
-
-    async def test_role_managed_upsert_insert_provisions_preset_roles(
-        self,
-        database: ExtendedAsyncSAEngine,
-        repository: OpsRepository[_EntityData],
-        presets: None,
-    ) -> None:
-        data = await repository.upsert_role_managed_entity(_RoleManagedUpserter(name="a"))
-
-        roles = await _scope_roles(database, data.id)
-        assert _expected_preset_role_name(data.id) in roles
-
-    async def test_role_managed_upsert_update_does_not_duplicate_roles(
-        self,
-        database: ExtendedAsyncSAEngine,
-        repository: OpsRepository[_EntityData],
-        presets: None,
-    ) -> None:
-        # Roles are provisioned only when the upsert actually created the scope.
-        first = await repository.upsert_role_managed_entity(_RoleManagedUpserter(name="a"))
-        second = await repository.upsert_role_managed_entity(
-            _RoleManagedUpserter(name="a", note="updated")
-        )
-
-        assert second.id == first.id
-        roles = await _scope_roles(database, first.id)
-        # One role per preset, exactly once — the update pass added none.
-        assert sorted(roles) == sorted([_expected_preset_role_name(first.id), "a-member"])

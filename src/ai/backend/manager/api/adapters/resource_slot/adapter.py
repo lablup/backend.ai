@@ -235,8 +235,15 @@ class ResourceSlotAdapter(BaseAdapter):
         self, input: PurgeResourceSlotTypeInput
     ) -> PurgeResourceSlotTypePayload:
         """Remove a resource slot type, refusing while anything still references it."""
-        action_result = await self._processors.resource_slot.global_purge_resource_slot_type.run(
-            PurgeResourceSlotTypeAction(purger=ResourceSlotTypePurger(slot_name=input.slot_name))
+        target = await self._processors.resource_slot.public_lookup_resource_slot_type.run(
+            LookupResourceSlotTypeAction(slot_name=input.slot_name)
+        )
+        action_result = await self._processors.resource_slot.purge_resource_slot_type.run(
+            PurgeResourceSlotTypeAction(
+                purger=ResourceSlotTypePurger(
+                    slot_name=input.slot_name, slot_type_id=target.data.uuid
+                )
+            )
         )
         return PurgeResourceSlotTypePayload(slot_name=action_result.data.slot_name)
 

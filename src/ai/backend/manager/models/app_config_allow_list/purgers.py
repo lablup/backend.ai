@@ -4,15 +4,16 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.manager.data.app_config_allow_list.types import AppConfigAllowListData
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
-from ai.backend.manager.models.specs.purger import GlobalEntityPurger
+from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
 
 @dataclass
-class AppConfigAllowListPurger(GlobalEntityPurger[AppConfigAllowListRow, AppConfigAllowListData]):
+class AppConfigAllowListPurger(EntityPurger[AppConfigAllowListRow, AppConfigAllowListData]):
     """Purger for deleting an app config allow-list entry."""
 
     allow_list_id: AppConfigAllowListID
@@ -23,6 +24,10 @@ class AppConfigAllowListPurger(GlobalEntityPurger[AppConfigAllowListRow, AppConf
 
     @override
     def pk_value(self) -> AppConfigAllowListID:
+        return self.allow_list_id
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
         return self.allow_list_id
 
     @override

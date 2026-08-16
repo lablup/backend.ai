@@ -12,6 +12,7 @@ from ai.backend.manager.actions.v2.ops.result import (
 )
 from ai.backend.manager.actions.v2.single_entity.processor import (
     PublicSingleEntityActionProcessor,
+    SingleEntityActionProcessor,
 )
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.services.login_client_type.actions.create import (
@@ -50,7 +51,7 @@ class LoginClientTypeProcessors:
     global_update: GlobalActionProcessor[
         UpdateLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]
     ]
-    global_purge: GlobalActionProcessor[
+    purge: SingleEntityActionProcessor[
         PurgeLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]
     ]
 
@@ -59,4 +60,4 @@ class LoginClientTypeProcessors:
         self.public_search = group.public_search_ops(SearchLoginClientTypesAction)
         self.global_create = group.global_create_ops(CreateLoginClientTypeAction)
         self.global_update = group.global_update_ops(UpdateLoginClientTypeAction)
-        self.global_purge = group.global_purge_ops(PurgeLoginClientTypeAction)
+        self.purge = group.entity_purge_ops(PurgeLoginClientTypeAction)

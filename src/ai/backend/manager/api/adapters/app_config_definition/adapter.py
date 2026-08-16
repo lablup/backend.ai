@@ -138,7 +138,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
     async def admin_purge(
         self, input: PurgeAppConfigDefinitionInput
     ) -> PurgeAppConfigDefinitionPayload:
-        action_result = await self._processors.app_config_definition.global_purge.run(
+        action_result = await self._processors.app_config_definition.purge.run(
             PurgeAppConfigDefinitionAction(definition_id=AppConfigDefinitionID(input.id))
         )
         return PurgeAppConfigDefinitionPayload(id=action_result.data.id)

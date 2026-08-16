@@ -7,8 +7,9 @@ from ai.backend.common.data.entity.runtime_variant_preset import (
     RUNTIME_VARIANT_PRESET_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
-from ai.backend.manager.actions.v2.ops.base import PurgeGlobalOpsAction
+from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.models.runtime_variant_preset.purgers import RuntimeVariantPresetPurger
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
@@ -16,7 +17,7 @@ from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantP
 
 @dataclass
 class PurgeRuntimeVariantPresetAction(
-    PurgeGlobalOpsAction[RuntimeVariantPresetRow, RuntimeVariantPresetData]
+    PurgeEntityOpsAction[RuntimeVariantPresetRow, RuntimeVariantPresetData]
 ):
     """Remove a preset from its variant's catalog.
 
@@ -35,6 +36,10 @@ class PurgeRuntimeVariantPresetAction(
     @classmethod
     def action_name(cls) -> str:
         return "purge_runtime_variant_preset"
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.to_purger().entity_id()
 
     @override
     def to_purger(self) -> RuntimeVariantPresetPurger:

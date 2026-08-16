@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import NewType
+from uuid import UUID
 
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.scope import ScopeID
@@ -29,6 +30,41 @@ class EntityRef:
 
     entity_type: EntityType
     entity_id: EntityID
+
+
+class EntityIdentifier(UUID):
+    """An entity's id, which knows the type it is an id of.
+
+    Subclassing `UUID` keeps every value comparable and hashable against the plain
+    ids already stored, so the change is additive at call sites.
+    """
+
+    def __init__(self, value: UUID) -> None:
+        super().__init__(int=value.int)
+
+    @classmethod
+    @abstractmethod
+    def entity_type(cls) -> EntityType:
+        raise NotImplementedError
+
+    def entity_ref(self) -> EntityRef:
+        return EntityRef(entity_type=self.entity_type(), entity_id=self)
+
+
+class FieldIdentifier(UUID):
+    """A field row's id, which knows the type of the entity that owns it.
+
+    No `entity_ref()`: a field row is absent from the RBAC graph, so there is
+    nothing for it to name there.
+    """
+
+    def __init__(self, value: UUID) -> None:
+        super().__init__(int=value.int)
+
+    @classmethod
+    @abstractmethod
+    def owner_entity_type(cls) -> EntityType:
+        raise NotImplementedError
 
 
 class EntityData(ABC):

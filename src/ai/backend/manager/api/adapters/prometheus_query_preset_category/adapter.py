@@ -127,10 +127,8 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
 
     async def delete(self, input: DeleteCategoryInput) -> DeleteCategoryPayload:
         """Remove a category by ID."""
-        action_result = (
-            await self._processors.prometheus_query_preset_category.global_purge_category.run(
-                PurgeCategoryAction(category_id=PrometheusQueryPresetCategoryID(input.id))
-            )
+        action_result = await self._processors.prometheus_query_preset_category.purge_category.run(
+            PurgeCategoryAction(category_id=PrometheusQueryPresetCategoryID(input.id))
         )
 
         return DeleteCategoryPayload(id=action_result.data.id)

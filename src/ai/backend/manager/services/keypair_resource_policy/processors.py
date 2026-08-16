@@ -9,6 +9,9 @@ from ai.backend.manager.actions.v2.ops.result import (
     EntityOpsResult,
     LookupOpsResult,
 )
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    SingleEntityActionProcessor,
+)
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
@@ -48,7 +51,7 @@ class KeypairResourcePolicyProcessors:
     global_update: GlobalActionProcessor[
         UpdateKeyPairResourcePolicyAction, EntityOpsResult[KeyPairResourcePolicyData]
     ]
-    global_purge: GlobalActionProcessor[
+    purge: SingleEntityActionProcessor[
         PurgeKeyPairResourcePolicyAction, EntityOpsResult[KeyPairResourcePolicyData]
     ]
 
@@ -58,4 +61,4 @@ class KeypairResourcePolicyProcessors:
         self.global_search = group.global_search_ops(GlobalSearchKeypairResourcePoliciesAction)
         self.global_create = group.global_create_ops(CreateKeyPairResourcePolicyAction)
         self.global_update = group.global_update_ops(UpdateKeyPairResourcePolicyAction)
-        self.global_purge = group.global_purge_ops(PurgeKeyPairResourcePolicyAction)
+        self.purge = group.entity_purge_ops(PurgeKeyPairResourcePolicyAction)

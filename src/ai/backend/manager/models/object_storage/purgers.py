@@ -1,28 +1,33 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.identifier.object_storage import ObjectStorageID
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage.row import ObjectStorageRow
-from ai.backend.manager.models.specs.purger import GlobalEntityPurger
+from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
 
 @dataclass
-class ObjectStoragePurger(GlobalEntityPurger[ObjectStorageRow, ObjectStorageData]):
+class ObjectStoragePurger(EntityPurger[ObjectStorageRow, ObjectStorageData]):
     """Purger for removing an object storage registration."""
 
-    storage_id: uuid.UUID
+    storage_id: ObjectStorageID
 
     @override
     def row_class(self) -> type[ObjectStorageRow]:
         return ObjectStorageRow
 
     @override
-    def pk_value(self) -> uuid.UUID:
+    def pk_value(self) -> ObjectStorageID:
+        return self.storage_id
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
         return self.storage_id
 
     @override

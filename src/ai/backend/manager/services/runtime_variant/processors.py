@@ -14,6 +14,7 @@ from ai.backend.manager.actions.v2.ops.result import (
 )
 from ai.backend.manager.actions.v2.single_entity.processor import (
     PublicSingleEntityActionProcessor,
+    SingleEntityActionProcessor,
 )
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.services.runtime_variant.actions.create import (
@@ -46,7 +47,7 @@ class RuntimeVariantProcessors:
     global_update: GlobalActionProcessor[
         UpdateRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]
     ]
-    global_purge: GlobalActionProcessor[
+    purge: SingleEntityActionProcessor[
         PurgeRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]
     ]
     public_search: PublicActionProcessor[
@@ -60,6 +61,6 @@ class RuntimeVariantProcessors:
         self.public_get = group.public_get_ops(GetRuntimeVariantAction)
         self.global_create = group.global_create_ops(CreateRuntimeVariantAction)
         self.global_update = group.global_update_ops(UpdateRuntimeVariantAction)
-        self.global_purge = group.global_purge_ops(PurgeRuntimeVariantAction)
+        self.purge = group.entity_purge_ops(PurgeRuntimeVariantAction)
         self.public_search = group.public_search_ops(SearchRuntimeVariantsAction)
         self.public_lookup = group.public_lookup_ops(LookupRuntimeVariantAction)

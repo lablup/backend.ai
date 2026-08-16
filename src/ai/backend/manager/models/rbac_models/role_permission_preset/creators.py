@@ -12,13 +12,13 @@ from ai.backend.manager.errors.role_preset import RolePermissionPresetConflict
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
-from ai.backend.manager.models.specs.creator import FieldEntityCreator
+from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
 class RolePermissionPresetCreator(
-    FieldEntityCreator[RolePresetID, RolePermissionPresetRow, RolePermissionPresetData]
+    FieldCreator[RolePresetID, RolePermissionPresetRow, RolePermissionPresetData]
 ):
     """Creator for one permission entry of a role preset.
 

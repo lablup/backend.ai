@@ -147,7 +147,7 @@ class RuntimeVariantAdapter(BaseAdapter):
         )
 
     async def delete(self, variant_id: UUID) -> DeleteRuntimeVariantPayload:
-        result = await self._processors.runtime_variant.global_purge.run(
+        result = await self._processors.runtime_variant.purge.run(
             PurgeRuntimeVariantAction(id=RuntimeVariantID(variant_id))
         )
         return DeleteRuntimeVariantPayload(id=result.data.id)
@@ -155,7 +155,7 @@ class RuntimeVariantAdapter(BaseAdapter):
     async def bulk_delete(self, input: DeleteRuntimeVariantsInput) -> DeleteRuntimeVariantsPayload:
         """Delete multiple runtime variants by ID."""
         for variant_id in input.ids:
-            await self._processors.runtime_variant.global_purge.run(
+            await self._processors.runtime_variant.purge.run(
                 PurgeRuntimeVariantAction(id=RuntimeVariantID(variant_id))
             )
         return DeleteRuntimeVariantsPayload(deleted_count=len(input.ids))

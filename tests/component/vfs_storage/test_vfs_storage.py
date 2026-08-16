@@ -342,7 +342,7 @@ class TestVFSStorageCRUD:
         storage = await vfs_storage_factory(name="to-delete")
 
         delete_action = PurgeVFSStorageAction(storage_id=storage["id"])
-        delete_result = await vfs_storage_processors.global_purge.run(delete_action)
+        delete_result = await vfs_storage_processors.purge.run(delete_action)
         assert delete_result.data.id == storage["id"]
 
         # Verify no longer in list
@@ -394,7 +394,7 @@ class TestVFSStorageCRUD:
         assert updated.storage.host == "nfs:updated-lifecycle"
 
         # Delete
-        await vfs_storage_processors.global_purge.run(PurgeVFSStorageAction(storage_id=storage_id))
+        await vfs_storage_processors.purge.run(PurgeVFSStorageAction(storage_id=storage_id))
 
         # Verify deleted via list
         list_after = await admin_registry.storage.list_vfs_storages()

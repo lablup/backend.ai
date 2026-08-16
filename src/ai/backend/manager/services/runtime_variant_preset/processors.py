@@ -8,6 +8,7 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, EntityOpsResult
 from ai.backend.manager.actions.v2.single_entity.processor import (
     PublicSingleEntityActionProcessor,
+    SingleEntityActionProcessor,
 )
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.services.runtime_variant_preset.actions.create import (
@@ -44,7 +45,7 @@ class RuntimeVariantPresetProcessors:
     global_update: GlobalActionProcessor[
         UpdateRuntimeVariantPresetAction, UpdateRuntimeVariantPresetActionResult
     ]
-    global_purge: GlobalActionProcessor[
+    purge: SingleEntityActionProcessor[
         PurgeRuntimeVariantPresetAction, EntityOpsResult[RuntimeVariantPresetData]
     ]
     public_search: PublicActionProcessor[
@@ -59,5 +60,5 @@ class RuntimeVariantPresetProcessors:
         self.public_get = group.public_get_ops(GetRuntimeVariantPresetAction)
         self.global_create = group.global_scope(CreateRuntimeVariantPresetAction, service.create)
         self.global_update = group.global_scope(UpdateRuntimeVariantPresetAction, service.update)
-        self.global_purge = group.global_purge_ops(PurgeRuntimeVariantPresetAction)
+        self.purge = group.entity_purge_ops(PurgeRuntimeVariantPresetAction)
         self.public_search = group.public_search_ops(SearchRuntimeVariantPresetsAction)

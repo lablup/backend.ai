@@ -461,7 +461,7 @@ class TestPurge:
     async def test_purged_row_is_gone(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
-        purged = await repository.purge_global_entity(RolePresetPurger(preset_id=preset.id))
+        purged = await repository.purge_entity(RolePresetPurger(preset_id=preset.id))
 
         assert purged.id == preset.id
         with pytest.raises(EntityNotFoundError):
@@ -469,9 +469,7 @@ class TestPurge:
 
     async def test_missing_row_raises(self, repository: OpsRepository[RolePresetData]) -> None:
         with pytest.raises(EntityNotFoundError):
-            await repository.purge_global_entity(
-                RolePresetPurger(preset_id=RolePresetID(uuid.uuid4()))
-            )
+            await repository.purge_entity(RolePresetPurger(preset_id=RolePresetID(uuid.uuid4())))
 
 
 # =============================================================================

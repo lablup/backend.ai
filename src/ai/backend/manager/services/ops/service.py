@@ -23,18 +23,17 @@ from ai.backend.manager.actions.v2.ops.base import (
     EntityPartialBulkPurgeOpsAction,
     EntityPurgeOpsAction,
     EntityUpsertOpsAction,
-    FieldEntityAtomicCreateOpsAction,
-    FieldEntityCreateOpsAction,
-    FieldEntityPartialBulkPurgeOpsAction,
-    FieldEntityPurgeOpsAction,
-    FieldEntityUpsertOpsAction,
+    FieldAtomicCreateOpsAction,
+    FieldCreateOpsAction,
+    FieldPartialBulkPurgeOpsAction,
+    FieldPurgeOpsAction,
+    FieldUpsertOpsAction,
     GetOpsAction,
     GlobalBatchPurgeOpsAction,
     GlobalBatchUpdateOpsAction,
     GlobalEntityAtomicCreateOpsAction,
     GlobalEntityCreateOpsAction,
     GlobalEntityPartialBulkPurgeOpsAction,
-    GlobalEntityPurgeOpsAction,
     GlobalEntityUpsertOpsAction,
     GlobalEntityWithFieldsCreateOpsAction,
     GlobalSearchOpsAction,
@@ -42,7 +41,6 @@ from ai.backend.manager.actions.v2.ops.base import (
     PartialBulkUpdateOpsAction,
     RoleManagedEntityAtomicCreateOpsAction,
     RoleManagedEntityCreateOpsAction,
-    RoleManagedEntityUpsertOpsAction,
     SearchOpsAction,
     UpdateOpsAction,
 )
@@ -80,7 +78,6 @@ __all__ = (
     "FieldPartialBulkPurgeService",
     "GlobalUpsertService",
     "EntityUpsertService",
-    "RoleManagedEntityUpsertService",
     "FieldUpsertService",
     "UpdateService",
     "DeleteService",
@@ -242,7 +239,7 @@ class FieldCreateService[TData: EntityData]:
         self._repository = repository
 
     async def execute(
-        self, action: FieldEntityCreateOpsAction[Any, Any, TData]
+        self, action: FieldCreateOpsAction[Any, Any, TData]
     ) -> CreatedEntityOpsResult[TData]:
         return CreatedEntityOpsResult(
             data=await self._repository.create_field_entity(action.owner_id(), action.to_creator())
@@ -306,7 +303,7 @@ class FieldAtomicCreateService[TData: EntityData]:
         self._repository = repository
 
     async def execute(
-        self, action: FieldEntityAtomicCreateOpsAction[Any, Any, TData]
+        self, action: FieldAtomicCreateOpsAction[Any, Any, TData]
     ) -> EntitiesOpsResult[TData]:
         return EntitiesOpsResult(
             items=await self._repository.atomic_create_field_entities(
@@ -323,10 +320,8 @@ class GlobalPurgeService[TData]:
     def __init__(self, repository: OpsRepository[TData]) -> None:
         self._repository = repository
 
-    async def execute(
-        self, action: GlobalEntityPurgeOpsAction[Any, TData]
-    ) -> EntityOpsResult[TData]:
-        return EntityOpsResult(data=await self._repository.purge_global_entity(action.to_purger()))
+    async def execute(self, action: EntityPurgeOpsAction[Any, TData]) -> EntityOpsResult[TData]:
+        return EntityOpsResult(data=await self._repository.purge_entity(action.to_purger()))
 
 
 class EntityPurgeService[TData]:
@@ -349,9 +344,7 @@ class FieldPurgeService[TData]:
     def __init__(self, repository: OpsRepository[TData]) -> None:
         self._repository = repository
 
-    async def execute(
-        self, action: FieldEntityPurgeOpsAction[Any, TData]
-    ) -> EntityOpsResult[TData]:
+    async def execute(self, action: FieldPurgeOpsAction[Any, TData]) -> EntityOpsResult[TData]:
         return EntityOpsResult(data=await self._repository.purge_field_entity(action.to_purger()))
 
 
@@ -366,7 +359,7 @@ class GlobalPartialBulkPurgeService[TData]:
     async def execute(
         self, action: GlobalEntityPartialBulkPurgeOpsAction[Any, TData]
     ) -> BulkOpsResult[TData]:
-        result = await self._repository.partial_bulk_purge_global_entities(action.to_purgers())
+        result = await self._repository.partial_bulk_purge_entities(action.to_purgers())
         return BulkOpsResult(successes=result.successes, errors=result.errors)
 
 
@@ -394,7 +387,7 @@ class FieldPartialBulkPurgeService[TData]:
         self._repository = repository
 
     async def execute(
-        self, action: FieldEntityPartialBulkPurgeOpsAction[Any, TData]
+        self, action: FieldPartialBulkPurgeOpsAction[Any, TData]
     ) -> BulkOpsResult[TData]:
         result = await self._repository.partial_bulk_purge_field_entities(action.to_purgers())
         return BulkOpsResult(successes=result.successes, errors=result.errors)
@@ -429,23 +422,6 @@ class EntityUpsertService[TData]:
         return EntityOpsResult(data=await self._repository.upsert_entity(action.to_upserter()))
 
 
-class RoleManagedEntityUpsertService[TData]:
-    """Inserts or updates a role-managed entity row; preset roles are provisioned
-    only when the upsert actually created the scope."""
-
-    _repository: OpsRepository[TData]
-
-    def __init__(self, repository: OpsRepository[TData]) -> None:
-        self._repository = repository
-
-    async def execute(
-        self, action: RoleManagedEntityUpsertOpsAction[Any, TData]
-    ) -> EntityOpsResult[TData]:
-        return EntityOpsResult(
-            data=await self._repository.upsert_role_managed_entity(action.to_upserter())
-        )
-
-
 class FieldUpsertService[TData]:
     """Inserts or updates a field row on conflict, under the action's owner."""
 
@@ -455,7 +431,7 @@ class FieldUpsertService[TData]:
         self._repository = repository
 
     async def execute(
-        self, action: FieldEntityUpsertOpsAction[Any, Any, TData]
+        self, action: FieldUpsertOpsAction[Any, Any, TData]
     ) -> EntityOpsResult[TData]:
         return EntityOpsResult(
             data=await self._repository.upsert_field_entity(action.owner_id(), action.to_upserter())

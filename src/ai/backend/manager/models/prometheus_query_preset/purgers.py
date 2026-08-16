@@ -4,16 +4,17 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow
-from ai.backend.manager.models.specs.purger import GlobalEntityPurger
+from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
 
 @dataclass
 class PrometheusQueryPresetPurger(
-    GlobalEntityPurger[PrometheusQueryPresetRow, PrometheusQueryPresetData]
+    EntityPurger[PrometheusQueryPresetRow, PrometheusQueryPresetData]
 ):
     """Purger for removing a query preset from the catalog."""
 
@@ -25,6 +26,10 @@ class PrometheusQueryPresetPurger(
 
     @override
     def pk_value(self) -> PrometheusQueryPresetID:
+        return self.preset_id
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
         return self.preset_id
 
     @override

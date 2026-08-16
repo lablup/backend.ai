@@ -7,6 +7,9 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
     EntityOpsResult,
 )
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    SingleEntityActionProcessor,
+)
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.services.object_storage.actions.create import (
     CreateObjectStorageAction,
@@ -40,9 +43,7 @@ class ObjectStorageProcessors:
     global_update: GlobalActionProcessor[
         UpdateObjectStorageAction, EntityOpsResult[ObjectStorageData]
     ]
-    global_purge: GlobalActionProcessor[
-        PurgeObjectStorageAction, EntityOpsResult[ObjectStorageData]
-    ]
+    purge: SingleEntityActionProcessor[PurgeObjectStorageAction, EntityOpsResult[ObjectStorageData]]
     global_get: GlobalActionProcessor[GetObjectStorageAction, EntityOpsResult[ObjectStorageData]]
     global_list_storages: GlobalActionProcessor[
         ListObjectStorageAction, BatchOpsResult[ObjectStorageData]
@@ -64,7 +65,7 @@ class ObjectStorageProcessors:
     ) -> None:
         self.global_create = group.global_create_ops(CreateObjectStorageAction)
         self.global_update = group.global_update_ops(UpdateObjectStorageAction)
-        self.global_purge = group.global_purge_ops(PurgeObjectStorageAction)
+        self.purge = group.entity_purge_ops(PurgeObjectStorageAction)
         self.global_get = group.global_get_ops(GetObjectStorageAction)
         self.global_list_storages = group.global_search_ops(ListObjectStorageAction)
         self.global_search_object_storages = group.global_search_ops(SearchObjectStoragesAction)

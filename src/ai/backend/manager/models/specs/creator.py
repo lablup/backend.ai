@@ -125,7 +125,7 @@ class RoleManagedEntityCreator[TRow: Base, TData](RoleTemplateSource[TRow], ABC)
         raise NotImplementedError
 
 
-class FieldEntityCreator[TOwnerID: EntityID, TRow: Base, TData](ABC):
+class FieldCreator[TOwnerID: EntityID, TRow: Base, TData](ABC):
     """Insert spec of a field row — a row owned by another entity.
 
     Built only from the owner's settled identifier (e.g. a just-created parent's

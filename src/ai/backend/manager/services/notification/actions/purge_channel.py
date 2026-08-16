@@ -5,15 +5,16 @@ from typing import override
 
 from ai.backend.common.data.entity.notification import NOTIFICATION_CHANNEL_ENTITY_TYPE
 from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.notification import NotificationChannelID
-from ai.backend.manager.actions.v2.ops.base import PurgeGlobalOpsAction
+from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.notification.types import NotificationChannelData
 from ai.backend.manager.models.notification.purgers import NotificationChannelPurger
 from ai.backend.manager.models.notification.row import NotificationChannelRow
 
 
 @dataclass
-class PurgeChannelAction(PurgeGlobalOpsAction[NotificationChannelRow, NotificationChannelData]):
+class PurgeChannelAction(PurgeEntityOpsAction[NotificationChannelRow, NotificationChannelData]):
     """Remove a notification channel.
 
     Purge-shaped: the table carries no lifecycle column."""
@@ -29,6 +30,10 @@ class PurgeChannelAction(PurgeGlobalOpsAction[NotificationChannelRow, Notificati
     @classmethod
     def action_name(cls) -> str:
         return "purge_notification_channel"
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.to_purger().entity_id()
 
     @override
     def to_purger(self) -> NotificationChannelPurger:

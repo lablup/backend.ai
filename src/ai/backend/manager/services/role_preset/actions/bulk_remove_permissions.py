@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.role_preset import ROLE_PERMISSION_PRESET_ENT
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
-from ai.backend.manager.actions.v2.ops.base import PartialBulkPurgeFieldEntityOpsAction
+from ai.backend.manager.actions.v2.ops.base import PartialBulkPurgeFieldOpsAction
 from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
 from ai.backend.manager.models.rbac_models.role_permission_preset.purgers import (
     RolePermissionPresetPurger,
@@ -20,7 +20,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 
 @dataclass
 class BulkRemoveRolePermissionPresetsAction(
-    PartialBulkPurgeFieldEntityOpsAction[RolePermissionPresetRow, RolePermissionPresetData]
+    PartialBulkPurgeFieldOpsAction[RolePermissionPresetRow, RolePermissionPresetData]
 ):
     """Drop the named permission entries, answering for each one."""
 

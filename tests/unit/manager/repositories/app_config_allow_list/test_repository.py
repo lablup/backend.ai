@@ -240,7 +240,7 @@ class TestPurge:
         repository: OpsRepository[AppConfigAllowListData],
         existing_entry: AppConfigAllowListData,
     ) -> None:
-        purged = await repository.purge_global_entity(
+        purged = await repository.purge_entity(
             AppConfigAllowListPurger(allow_list_id=existing_entry.id)
         )
         assert purged.id == existing_entry.id
@@ -251,9 +251,7 @@ class TestPurge:
         self, repository: OpsRepository[AppConfigAllowListData]
     ) -> None:
         with pytest.raises(EntityNotFoundError):
-            await repository.purge_global_entity(
-                AppConfigAllowListPurger(allow_list_id=_missing_id())
-            )
+            await repository.purge_entity(AppConfigAllowListPurger(allow_list_id=_missing_id()))
 
     async def test_purge_cascades_to_fragments(
         self,
@@ -273,9 +271,7 @@ class TestPurge:
             )
             await db_sess.flush()
 
-        await repository.purge_global_entity(
-            AppConfigAllowListPurger(allow_list_id=existing_entry.id)
-        )
+        await repository.purge_entity(AppConfigAllowListPurger(allow_list_id=existing_entry.id))
 
         async with database.begin_readonly_session() as db_sess:
             remaining = await db_sess.scalar(
@@ -305,7 +301,7 @@ class TestPurge:
             )
             await db_sess.flush()
 
-        await definition_repository.purge_global_entity(
+        await definition_repository.purge_entity(
             AppConfigDefinitionPurger(definition_id=definition.id)
         )
 

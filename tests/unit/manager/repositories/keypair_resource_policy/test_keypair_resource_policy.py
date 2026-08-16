@@ -9,6 +9,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 
+from ai.backend.common.identifier.resource_policy import KeyPairResourcePolicyUUID
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
@@ -405,7 +406,11 @@ class TestKeypairResourcePolicyOps:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Test removing a keypair resource policy"""
-        result = await ops.purge_global_entity(KeyPairResourcePolicyPurger(name=sample_policy_name))
+        result = await ops.purge_entity(
+            KeyPairResourcePolicyPurger(
+                name=sample_policy_name, policy_id=KeyPairResourcePolicyUUID(uuid4())
+            )
+        )
 
         assert result.name == sample_policy_name
 
@@ -423,7 +428,11 @@ class TestKeypairResourcePolicyOps:
     ) -> None:
         """Test that removing a non-existent policy raises EntityNotFoundError"""
         with pytest.raises(EntityNotFoundError):
-            await ops.purge_global_entity(KeyPairResourcePolicyPurger(name="nonexistent-policy"))
+            await ops.purge_entity(
+                KeyPairResourcePolicyPurger(
+                    name="nonexistent-policy", policy_id=KeyPairResourcePolicyUUID(uuid4())
+                )
+            )
 
     @pytest.fixture
     async def allowed_vfolder_updater_spec(

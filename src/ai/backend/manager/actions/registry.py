@@ -43,7 +43,7 @@ from ai.backend.manager.actions.v2.lookup.processor import (
 from ai.backend.manager.actions.v2.lookup.validator import LookupActionValidator
 from ai.backend.manager.actions.v2.ops.base import (
     AtomicCreateEntityOpsAction,
-    AtomicCreateFieldEntityOpsAction,
+    AtomicCreateFieldOpsAction,
     AtomicCreateGlobalEntityOpsAction,
     AtomicCreateRoleManagedEntityOpsAction,
     BatchPurgeGlobalOpsAction,
@@ -51,7 +51,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     BatchUpdateGlobalOpsAction,
     BatchUpdateScopeOpsAction,
     CreateEntityOpsAction,
-    CreateFieldEntityOpsAction,
+    CreateFieldOpsAction,
     CreateGlobalOpsAction,
     CreateGlobalWithFieldsOpsAction,
     CreateRoleManagedEntityOpsAction,
@@ -62,11 +62,10 @@ from ai.backend.manager.actions.v2.ops.base import (
     LookupEntityOpsAction,
     OperationScopeOpsAction,
     PartialBulkPurgeEntityOpsAction,
-    PartialBulkPurgeFieldEntityOpsAction,
+    PartialBulkPurgeFieldOpsAction,
     PartialBulkPurgeGlobalEntityOpsAction,
     PurgeEntityOpsAction,
-    PurgeFieldEntityOpsAction,
-    PurgeGlobalOpsAction,
+    PurgeFieldOpsAction,
     RestorePartialBulkOpsAction,
     RestoreSingleEntityOpsAction,
     SearchGlobalOpsAction,
@@ -74,9 +73,8 @@ from ai.backend.manager.actions.v2.ops.base import (
     UpdatePartialBulkOpsAction,
     UpdateSingleEntityOpsAction,
     UpsertEntityOpsAction,
-    UpsertFieldEntityOpsAction,
+    UpsertFieldOpsAction,
     UpsertGlobalOpsAction,
-    UpsertRoleManagedEntityOpsAction,
 )
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
@@ -123,7 +121,6 @@ from ai.backend.manager.services.ops.service import (
     GlobalCreateService,
     GlobalCreateWithFieldsService,
     GlobalPartialBulkPurgeService,
-    GlobalPurgeService,
     GlobalSearchService,
     GlobalUpsertService,
     LookupService,
@@ -133,7 +130,6 @@ from ai.backend.manager.services.ops.service import (
     RestoreService,
     RoleManagedEntityAtomicCreateService,
     RoleManagedEntityCreateService,
-    RoleManagedEntityUpsertService,
     SearchService,
     UpdateService,
 )
@@ -408,7 +404,7 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.scope, *validators),
         )
 
-    def field_create_ops[TAction: CreateFieldEntityOpsAction[Any, Any, Any]](
+    def field_create_ops[TAction: CreateFieldOpsAction[Any, Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -464,7 +460,7 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.scope, *validators),
         )
 
-    def field_atomic_create_ops[TAction: AtomicCreateFieldEntityOpsAction[Any, Any, Any]](
+    def field_atomic_create_ops[TAction: AtomicCreateFieldOpsAction[Any, Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -476,20 +472,6 @@ class ProcessorGroup[TData: EntityData]:
             FieldAtomicCreateService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.single_entity, *monitors),
             validators=(*self._deps.validators.single_entity, *validators),
-        )
-
-    def global_purge_ops[TAction: PurgeGlobalOpsAction[Any, Any]](
-        self,
-        action_cls: type[TAction],
-        *,
-        validators: Sequence[GlobalActionValidator] = (),
-        monitors: Sequence[GlobalActionMonitor] = (),
-    ) -> GlobalActionProcessor[TAction, EntityOpsResult[TData]]:
-        self._record(action_cls.spec())
-        return GlobalActionProcessor(
-            GlobalPurgeService(self._deps.repository).execute,
-            monitors=(*self._deps.monitors.global_scope, *monitors),
-            validators=(*self._deps.validators.global_scope, *validators),
         )
 
     def entity_purge_ops[TAction: PurgeEntityOpsAction[Any, Any]](
@@ -506,7 +488,7 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.single_entity, *validators),
         )
 
-    def field_purge_ops[TAction: PurgeFieldEntityOpsAction[Any, Any]](
+    def field_purge_ops[TAction: PurgeFieldOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -548,7 +530,7 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.bulk, *validators),
         )
 
-    def field_partial_bulk_purge_ops[TAction: PartialBulkPurgeFieldEntityOpsAction[Any, Any]](
+    def field_partial_bulk_purge_ops[TAction: PartialBulkPurgeFieldOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -590,21 +572,7 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.single_entity, *validators),
         )
 
-    def role_managed_upsert_ops[TAction: UpsertRoleManagedEntityOpsAction[Any, Any]](
-        self,
-        action_cls: type[TAction],
-        *,
-        validators: Sequence[SingleEntityActionValidator] = (),
-        monitors: Sequence[SingleEntityActionMonitor] = (),
-    ) -> SingleEntityActionProcessor[TAction, EntityOpsResult[TData]]:
-        self._record(action_cls.spec())
-        return SingleEntityActionProcessor(
-            RoleManagedEntityUpsertService(self._deps.repository).execute,
-            monitors=(*self._deps.monitors.single_entity, *monitors),
-            validators=(*self._deps.validators.single_entity, *validators),
-        )
-
-    def field_upsert_ops[TAction: UpsertFieldEntityOpsAction[Any, Any, Any]](
+    def field_upsert_ops[TAction: UpsertFieldOpsAction[Any, Any, Any]](
         self,
         action_cls: type[TAction],
         *,

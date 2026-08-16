@@ -248,7 +248,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         return UpdateRuntimeVariantPresetPayload(preset=self._data_to_node(result.preset))
 
     async def delete(self, preset_id: UUID) -> DeleteRuntimeVariantPresetPayload:
-        result = await self._processors.runtime_variant_preset.global_purge.run(
+        result = await self._processors.runtime_variant_preset.purge.run(
             PurgeRuntimeVariantPresetAction(id=RuntimeVariantPresetID(preset_id))
         )
         return DeleteRuntimeVariantPresetPayload(id=result.data.id)

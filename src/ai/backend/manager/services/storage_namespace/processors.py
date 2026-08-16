@@ -9,6 +9,9 @@ from ai.backend.manager.actions.v2.ops.result import (
     EntityOpsResult,
     LookupOpsResult,
 )
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    SingleEntityActionProcessor,
+)
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.lookup import (
@@ -42,7 +45,7 @@ class StorageNamespaceProcessors:
     lookup: LookupActionProcessor[
         LookupStorageNamespaceAction, LookupOpsResult[StorageNamespaceData]
     ]
-    global_unregister: GlobalActionProcessor[
+    unregister: SingleEntityActionProcessor[
         UnregisterNamespaceAction, EntityOpsResult[StorageNamespaceData]
     ]
 
@@ -51,4 +54,4 @@ class StorageNamespaceProcessors:
         self.global_search = group.global_search_ops(SearchStorageNamespacesAction)
         self.global_get_namespaces = group.global_search_ops(GetNamespacesAction)
         self.lookup = group.lookup_ops(LookupStorageNamespaceAction)
-        self.global_unregister = group.global_purge_ops(UnregisterNamespaceAction)
+        self.unregister = group.entity_purge_ops(UnregisterNamespaceAction)

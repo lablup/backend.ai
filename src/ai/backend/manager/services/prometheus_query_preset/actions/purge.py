@@ -7,8 +7,9 @@ from ai.backend.common.data.entity.prometheus_query_preset import (
     PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
-from ai.backend.manager.actions.v2.ops.base import PurgeGlobalOpsAction
+from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.models.prometheus_query_preset.purgers import (
     PrometheusQueryPresetPurger,
@@ -17,7 +18,7 @@ from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQuer
 
 
 @dataclass
-class PurgePresetAction(PurgeGlobalOpsAction[PrometheusQueryPresetRow, PrometheusQueryPresetData]):
+class PurgePresetAction(PurgeEntityOpsAction[PrometheusQueryPresetRow, PrometheusQueryPresetData]):
     """Remove a query preset from the catalog.
 
     Purge-shaped: the table carries no lifecycle column, so removing one has always
@@ -35,6 +36,10 @@ class PurgePresetAction(PurgeGlobalOpsAction[PrometheusQueryPresetRow, Prometheu
     @classmethod
     def action_name(cls) -> str:
         return "purge_prometheus_query_preset"
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.to_purger().entity_id()
 
     @override
     def to_purger(self) -> PrometheusQueryPresetPurger:

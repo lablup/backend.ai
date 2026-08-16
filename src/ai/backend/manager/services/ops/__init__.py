@@ -30,7 +30,6 @@ from .service import (
     RestoreService,
     RoleManagedEntityAtomicCreateService,
     RoleManagedEntityCreateService,
-    RoleManagedEntityUpsertService,
     SearchService,
     UpdateService,
 )
@@ -65,7 +64,6 @@ __all__ = (
     "LookupService",
     "RoleManagedEntityAtomicCreateService",
     "RoleManagedEntityCreateService",
-    "RoleManagedEntityUpsertService",
     "SearchService",
     "UpdateService",
 )

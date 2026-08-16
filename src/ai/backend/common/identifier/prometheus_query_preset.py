@@ -1,7 +1,15 @@
-from typing import NewType
-from uuid import UUID
+from typing import override
+
+from ai.backend.common.data.entity.prometheus_query_preset import (
+    PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = ("PrometheusQueryPresetID",)
 
 
-PrometheusQueryPresetID = NewType("PrometheusQueryPresetID", UUID)
+class PrometheusQueryPresetID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return PROMETHEUS_QUERY_PRESET_ENTITY_TYPE

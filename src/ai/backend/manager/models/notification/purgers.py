@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.identifier.notification import (
     NotificationChannelID,
     NotificationRuleID,
@@ -18,14 +19,12 @@ from ai.backend.manager.models.notification.row import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
-from ai.backend.manager.models.specs.purger import GlobalEntityPurger
+from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
 
 @dataclass
-class NotificationChannelPurger(
-    GlobalEntityPurger[NotificationChannelRow, NotificationChannelData]
-):
+class NotificationChannelPurger(EntityPurger[NotificationChannelRow, NotificationChannelData]):
     channel_id: NotificationChannelID
 
     @override
@@ -34,6 +33,10 @@ class NotificationChannelPurger(
 
     @override
     def pk_value(self) -> NotificationChannelID:
+        return self.channel_id
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
         return self.channel_id
 
     @override
@@ -46,7 +49,7 @@ class NotificationChannelPurger(
 
 
 @dataclass
-class NotificationRulePurger(GlobalEntityPurger[NotificationRuleRow, NotificationRuleData]):
+class NotificationRulePurger(EntityPurger[NotificationRuleRow, NotificationRuleData]):
     rule_id: NotificationRuleID
 
     @override
@@ -55,6 +58,10 @@ class NotificationRulePurger(GlobalEntityPurger[NotificationRuleRow, Notificatio
 
     @override
     def pk_value(self) -> NotificationRuleID:
+        return self.rule_id
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
         return self.rule_id
 
     @override

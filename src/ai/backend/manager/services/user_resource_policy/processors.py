@@ -9,6 +9,9 @@ from ai.backend.manager.actions.v2.ops.result import (
     EntityOpsResult,
     LookupOpsResult,
 )
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    SingleEntityActionProcessor,
+)
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
     CreateUserResourcePolicyAction,
@@ -48,7 +51,7 @@ class UserResourcePolicyProcessors:
     global_update: GlobalActionProcessor[
         UpdateUserResourcePolicyAction, EntityOpsResult[UserResourcePolicyData]
     ]
-    global_purge: GlobalActionProcessor[
+    purge: SingleEntityActionProcessor[
         PurgeUserResourcePolicyAction, EntityOpsResult[UserResourcePolicyData]
     ]
 
@@ -58,4 +61,4 @@ class UserResourcePolicyProcessors:
         self.global_search = group.global_search_ops(GlobalSearchUserResourcePoliciesAction)
         self.global_create = group.global_create_ops(CreateUserResourcePolicyAction)
         self.global_update = group.global_update_ops(UpdateUserResourcePolicyAction)
-        self.global_purge = group.global_purge_ops(PurgeUserResourcePolicyAction)
+        self.purge = group.entity_purge_ops(PurgeUserResourcePolicyAction)

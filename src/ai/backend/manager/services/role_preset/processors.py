@@ -60,7 +60,7 @@ class RolePresetProcessors:
     update: GlobalActionProcessor[UpdateRolePresetAction, EntityOpsResult[RolePresetData]]
     bulk_delete: BulkActionProcessor[BulkDeleteRolePresetsAction, BulkOpsResult[RolePresetData]]
     bulk_restore: BulkActionProcessor[BulkRestoreRolePresetsAction, BulkOpsResult[RolePresetData]]
-    purge: GlobalActionProcessor[PurgeRolePresetAction, EntityOpsResult[RolePresetData]]
+    purge: SingleEntityActionProcessor[PurgeRolePresetAction, EntityOpsResult[RolePresetData]]
     bulk_purge: BulkActionProcessor[BulkPurgeRolePresetsAction, BulkOpsResult[RolePresetData]]
     bulk_add_permissions: SingleEntityActionProcessor[
         BulkAddRolePermissionPresetsAction, EntitiesOpsResult[RolePermissionPresetData]
@@ -87,7 +87,7 @@ class RolePresetProcessors:
         )
         self.bulk_delete = preset_group.partial_bulk_delete_ops(BulkDeleteRolePresetsAction)
         self.bulk_restore = preset_group.partial_bulk_restore_ops(BulkRestoreRolePresetsAction)
-        self.purge = preset_group.global_purge_ops(PurgeRolePresetAction)
+        self.purge = preset_group.entity_purge_ops(PurgeRolePresetAction)
         self.bulk_purge = preset_group.global_partial_bulk_purge_ops(BulkPurgeRolePresetsAction)
         self.bulk_add_permissions = permission_group.field_atomic_create_ops(
             BulkAddRolePermissionPresetsAction

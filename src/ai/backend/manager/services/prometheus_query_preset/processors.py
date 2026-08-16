@@ -7,6 +7,9 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
     EntityOpsResult,
 )
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    SingleEntityActionProcessor,
+)
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.services.prometheus_query_preset.actions.create import CreatePresetAction
 from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset import (
@@ -39,7 +42,7 @@ class PrometheusQueryPresetProcessors:
     global_search_presets: GlobalActionProcessor[
         SearchPresetsAction, BatchOpsResult[PrometheusQueryPresetData]
     ]
-    global_purge_preset: GlobalActionProcessor[
+    purge_preset: SingleEntityActionProcessor[
         PurgePresetAction, EntityOpsResult[PrometheusQueryPresetData]
     ]
     global_update_preset: GlobalActionProcessor[UpdatePresetAction, UpdatePresetActionResult]
@@ -57,7 +60,7 @@ class PrometheusQueryPresetProcessors:
         )
         self.global_get_preset = group.global_get_ops(GetPresetAction)
         self.global_search_presets = group.global_search_ops(SearchPresetsAction)
-        self.global_purge_preset = group.global_purge_ops(PurgePresetAction)
+        self.purge_preset = group.entity_purge_ops(PurgePresetAction)
         self.global_update_preset = group.global_scope(UpdatePresetAction, service.update_preset)
         self.global_preview_preset = group.global_scope(PreviewPresetAction, service.preview_preset)
         self.global_execute_preset = group.global_scope(ExecutePresetAction, service.execute_preset)

@@ -272,7 +272,7 @@ class TestPrometheusQueryPresetRepository:
         preset_repository: PrometheusQueryPresetRepository,
         sample_preset_id: uuid.UUID,
     ) -> None:
-        result = await preset_ops.purge_global_entity(
+        result = await preset_ops.purge_entity(
             PrometheusQueryPresetPurger(preset_id=PrometheusQueryPresetID(sample_preset_id))
         )
         assert result.id == sample_preset_id
@@ -285,7 +285,7 @@ class TestPrometheusQueryPresetRepository:
         preset_ops: OpsRepository[PrometheusQueryPresetData],
     ) -> None:
         with pytest.raises(EntityNotFoundError):
-            await preset_ops.purge_global_entity(
+            await preset_ops.purge_entity(
                 PrometheusQueryPresetPurger(preset_id=PrometheusQueryPresetID(uuid.uuid4()))
             )
 
