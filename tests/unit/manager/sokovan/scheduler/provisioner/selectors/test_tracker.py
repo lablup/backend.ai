@@ -8,8 +8,7 @@ from decimal import Decimal
 
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session_group import SessionGroupID
-from ai.backend.common.data.value.architecture import ArchName
-from ai.backend.common.types import AgentId, SessionId
+from ai.backend.common.types import AgentId, ArchName, SessionId
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.tracker import (
     AgentStateTracker,
     build_agent_trackers,

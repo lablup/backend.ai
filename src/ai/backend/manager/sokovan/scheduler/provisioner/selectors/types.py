@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
-from ai.backend.common.data.value.architecture import ArchName
+from ai.backend.common.types import ArchName
 from ai.backend.manager.views.sokovan.workload import ResourceRequest
 
 

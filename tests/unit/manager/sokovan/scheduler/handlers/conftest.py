@@ -11,10 +11,10 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.value.architecture import ArchName
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    ArchName,
     ClusterMode,
     KernelId,
     PreemptionMode,

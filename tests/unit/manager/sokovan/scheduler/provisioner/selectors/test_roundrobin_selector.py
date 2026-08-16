@@ -6,8 +6,7 @@ from collections.abc import Mapping
 from decimal import Decimal
 
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
-from ai.backend.common.data.value.architecture import ArchName
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, ArchName
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.roundrobin import (
     RoundRobinAgentSelector,
 )

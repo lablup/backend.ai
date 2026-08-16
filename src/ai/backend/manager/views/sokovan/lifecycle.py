@@ -7,10 +7,11 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from ai.backend.common.data.value.architecture import ArchName
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    ArchName,
+    BinarySize,
     ClusterMode,
     KernelId,
     ResourceSlot,

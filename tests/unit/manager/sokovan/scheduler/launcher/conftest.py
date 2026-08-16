@@ -10,10 +10,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.common.data.value.architecture import ArchName
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    ArchName,
     AutoPullBehavior,
     ClusterMode,
     KernelId,

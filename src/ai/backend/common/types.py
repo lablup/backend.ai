@@ -407,6 +407,7 @@ ContainerId = NewType("ContainerId", str)
 RuleId = NewType("RuleId", UUID)
 SessionId = NewType("SessionId", UUID)
 KernelId = NewType("KernelId", UUID)
+ArchName = NewType("ArchName", str)
 ImageAlias = NewType("ImageAlias", str)
 Subdomain = NewType("Subdomain", str)
 
