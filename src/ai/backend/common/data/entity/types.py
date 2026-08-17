@@ -26,9 +26,14 @@ ScopeType = NewType("ScopeType", EntityType)
 
 
 class FieldType(str):
-    """The type of a field row, which knows the entity that owns it."""
+    """The type of a field row, which knows the type of entity that owns it.
+
+    A class rather than a `NewType` for the same reason `EntityType` is one: the two
+    must not be assignable to each other.
+    """
 
     @classmethod
+    @abstractmethod
     def owner_entity_type(cls) -> EntityType:
         raise NotImplementedError
 
@@ -85,10 +90,10 @@ class EntityIdentifier(UUID):
 
 
 class FieldIdentifier(UUID):
-    """A field row's id, which knows the type of the entity that owns it.
+    """A field row's id, which knows its own type and the entity that owns it.
 
     No `entity_ref()`: a field row is absent from the RBAC graph, so there is
-    nothing for it to name there.
+    nothing for it to name there. Reaching the graph is a lookup through the owner.
     """
 
     def __init__(self, value: UUID) -> None:
@@ -96,8 +101,13 @@ class FieldIdentifier(UUID):
 
     @classmethod
     @abstractmethod
-    def owner_entity_type(cls) -> EntityType:
+    def field_type(cls) -> FieldType:
         raise NotImplementedError
+
+    @classmethod
+    def owner_entity_type(cls) -> EntityType:
+        """Derived from the field type, which is where the ownership is declared."""
+        return cls.field_type().owner_entity_type()
 
 
 class EntityData(ABC):
