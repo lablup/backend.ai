@@ -8,9 +8,8 @@ from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     BulkOpsResult,
     CreatedEntityWithFieldsOpsResult,
-    EntitiesOpsResult,
-    FieldsOpsResult,
     EntityOpsResult,
+    FieldsOpsResult,
 )
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.role_preset.types import (
@@ -32,6 +31,7 @@ from ai.backend.manager.services.role_preset.actions.delete import (
 )
 from ai.backend.manager.services.role_preset.actions.get import GetRolePresetAction
 from ai.backend.manager.services.role_preset.actions.lookup_permission_owner import (
+    LookupBulkRolePermissionPresetOwnerAction,
     LookupRolePermissionPresetOwnerAction,
 )
 from ai.backend.manager.services.role_preset.actions.purge import PurgeRolePresetAction
@@ -91,7 +91,9 @@ class RolePresetProcessors:
         self.bulk_purge = preset_group.global_partial_bulk_purge_ops(BulkPurgeRolePresetsAction)
 
         permissions = preset_group.field_group(
-            RolePermissionPresetData, LookupRolePermissionPresetOwnerAction
+            RolePermissionPresetData,
+            LookupRolePermissionPresetOwnerAction,
+            LookupBulkRolePermissionPresetOwnerAction,
         )
         self.search_permission_presets = permissions.global_search_ops(
             SearchRolePermissionPresetsAction

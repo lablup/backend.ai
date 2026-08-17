@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE, RolePresetID
 from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.models.rbac_models.role_permission_preset.lookups import (
@@ -53,6 +55,37 @@ class LookupRolePermissionPresetOwnerAction(
     @override
     def field_id(self) -> RolePermissionPresetID:
         return self.permission_preset_id
+
+    @override
+    def to_owner_lookup(self) -> RolePermissionPresetOwnerLookup:
+        return RolePermissionPresetOwnerLookup()
+
+
+@dataclass
+class LookupBulkRolePermissionPresetOwnerAction(
+    LookupBulkFieldOwnerOpsAction[RolePermissionPresetID, RolePresetID]
+):
+    """The presets several permission entries belong to."""
+
+    permission_preset_ids: Sequence[RolePermissionPresetID]
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return ROLE_PRESET_ENTITY_TYPE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "lookup_bulk_role_permission_preset_owner"
+
+    @override
+    def to_lookup_key(self, field_id: RolePermissionPresetID) -> LookupKey:
+        return RolePermissionPresetIDLookupKey(field_id)
+
+    @override
+    def field_ids(self) -> Sequence[RolePermissionPresetID]:
+        return tuple(self.permission_preset_ids)
 
     @override
     def to_owner_lookup(self) -> RolePermissionPresetOwnerLookup:

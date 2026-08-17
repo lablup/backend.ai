@@ -15,7 +15,14 @@ rather than hidden in an argument.
 from typing import Any
 
 from ai.backend.common.data.entity.types import EntityData, FieldData
+from ai.backend.manager.actions.run_status import ActionRunStatus
+from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.actions.v2.field.bulk_lookup import (
+    BulkFieldOwnerLookupOpsResult,
+    LookupBulkFieldOwnerOpsAction,
+)
 from ai.backend.manager.actions.v2.field.lookup import FieldOwnerLookupOpsAction
+from ai.backend.manager.actions.v2.lookup.bulk_base import BulkLookupKeyResult
 from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
     BatchUpdateOpsAction,
@@ -53,9 +60,9 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityWithFieldsOpsResult,
     CreatedFieldOpsResult,
     EntitiesOpsResult,
-    FieldsOpsResult,
     EntityOpsResult,
     FieldOwnerLookupOpsResult,
+    FieldsOpsResult,
     LookupOpsResult,
     ScopedBatchOpsResult,
 )
@@ -64,6 +71,7 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 __all__ = (
     "GetService",
     "LookupService",
+    "BulkFieldOwnerLookupService",
     "FieldOwnerLookupService",
     "SearchService",
     "GlobalSearchService",
@@ -137,6 +145,34 @@ class FieldOwnerLookupService:
             action.to_owner_lookup(), action.field_id()
         )
         return FieldOwnerLookupOpsResult(owner_entity_id=owner_entity_id)
+
+
+class BulkFieldOwnerLookupService:
+    """Reads the entities owning the field rows an action names, answering per row."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: LookupBulkFieldOwnerOpsAction[Any, Any]
+    ) -> BulkFieldOwnerLookupOpsResult[Any]:
+        field_ids = action.field_ids()
+        owners = await self._repository.field_owners(action.to_owner_lookup(), field_ids)
+        found = ActionRunStatus.success()
+        key_results = [
+            BulkLookupKeyResult(
+                key=action.to_lookup_key(field_id),
+                status=found.status if field_id in owners else OperationStatus.ERROR,
+                description=found.description
+                if field_id in owners
+                else "No field row matches the given id.",
+                error_code=None,
+            )
+            for field_id in field_ids
+        ]
+        return BulkFieldOwnerLookupOpsResult(owners=owners, key_results=key_results)
 
 
 class SearchService[TData: EntityData]:

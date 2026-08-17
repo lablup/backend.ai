@@ -46,6 +46,9 @@ from ai.backend.manager.actions.v2.global_scope.monitor.prometheus import (
 from ai.backend.manager.actions.v2.global_scope.monitor.reporter import (
     GlobalActionReporterMonitor,
 )
+from ai.backend.manager.actions.v2.lookup.bulk_monitor.audit_log import (
+    BulkLookupActionAuditLogMonitor,
+)
 from ai.backend.manager.actions.v2.lookup.monitor.audit_log import LookupActionAuditLogMonitor
 from ai.backend.manager.actions.v2.lookup.monitor.prometheus import (
     LookupActionPrometheusMonitor,
@@ -297,6 +300,9 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             lookup=[
                 LookupActionPrometheusMonitor(),
                 LookupActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+            ],
+            bulk_lookup=[
+                BulkLookupActionAuditLogMonitor(audit_log_repository, audit_log_policy),
             ],
         )
 

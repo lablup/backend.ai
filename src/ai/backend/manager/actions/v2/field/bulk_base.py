@@ -3,14 +3,14 @@ from collections.abc import Sequence
 
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.models.specs.lookup import FieldOwnerLookup
+from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
 
 
 class BaseBulkFieldAction[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](ABC):
     """Base for actions that operate on an explicit set of field rows.
 
-    The caller names field rows, which are absent from the RBAC graph; the entities
-    owning them are read in one go and each is answered for.
+    The caller names field rows, whose membership is only knowable through their
+    owners; those entities are read in one go and each is answered for.
     """
 
     @classmethod
@@ -33,6 +33,6 @@ class BaseBulkFieldAction[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier]
         raise NotImplementedError
 
     @abstractmethod
-    def to_owner_lookup(self) -> FieldOwnerLookup[TFieldID, TOwnerID]:
-        """Return the spec reading the entity that owns each row."""
+    def to_owner_lookup_action(self) -> LookupBulkFieldOwnerOpsAction[TFieldID, TOwnerID]:
+        """Return the lookup that reads the entity owning each row."""
         raise NotImplementedError

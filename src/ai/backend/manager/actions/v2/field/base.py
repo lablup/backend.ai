@@ -8,8 +8,9 @@ from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerOpsAction
 class BaseSingleFieldAction[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](ABC):
     """Base for actions that operate on a single, already-identified field row.
 
-    A field row is absent from the RBAC graph, so this action names no entity. It names
-    the lookup that reads one instead, and that entity answers for the operation.
+    Every operation is answered for by an entity, and a field row carries no membership
+    of its own — what it belongs to is only knowable through its owner. So this action
+    names the lookup that reads that entity rather than an entity of its own.
     """
 
     @classmethod

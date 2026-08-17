@@ -16,11 +16,19 @@ from ai.backend.manager.actions.v2.bulk.result import (
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.validator import BulkActionValidator
 from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
+from ai.backend.manager.actions.v2.field.bulk_lookup import (
+    BulkFieldOwnerLookupOpsResult,
+    LookupBulkFieldOwnerOpsAction,
+)
+from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.errors.repository import EntityNotFoundError
-from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = ("BulkFieldActionProcessor",)
+
+type OwnerBulkLookupProcessor = BulkLookupActionProcessor[
+    LookupBulkFieldOwnerOpsAction[Any, Any], BulkFieldOwnerLookupOpsResult[Any]
+]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -37,19 +45,19 @@ class BulkFieldActionProcessor[TAction: BaseBulkFieldAction[Any, Any], TData]:
     """
 
     _func: Callable[[TAction], Awaitable[BulkFieldOpsResult[TData]]]
-    _repository: OpsRepository[Any]
+    _owner_lookup: OwnerBulkLookupProcessor
     _monitors: Sequence[BulkActionMonitor]
     _validators: Sequence[BulkActionValidator]
 
     def __init__(
         self,
         func: Callable[[TAction], Awaitable[BulkFieldOpsResult[TData]]],
-        repository: OpsRepository[Any],
+        owner_lookup: OwnerBulkLookupProcessor,
         monitors: Sequence[BulkActionMonitor] | None = None,
         validators: Sequence[BulkActionValidator] | None = None,
     ) -> None:
         self._func = func
-        self._repository = repository
+        self._owner_lookup = owner_lookup
         self._monitors = monitors or []
         self._validators = validators or []
 
@@ -71,8 +79,8 @@ class BulkFieldActionProcessor[TAction: BaseBulkFieldAction[Any, Any], TData]:
                 log.warning("Error in monitor done method: {}", e)
 
     async def run(self, action: TAction) -> BulkFieldOpsResult[TData]:
-        field_ids = action.field_ids()
-        owners = await self._repository.field_owners(action.to_owner_lookup(), field_ids)
+        lookup_result = await self._owner_lookup.run(action.to_owner_lookup_action())
+        owners = lookup_result.owners
         if not owners:
             raise EntityNotFoundError("No field row matches the given ids")
 
