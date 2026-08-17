@@ -1,8 +1,9 @@
 from typing import override
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
-from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
+from ai.backend.manager.actions.v2.single_entity.trigger import (
+    SingleEntityActionTriggerMeta,
+)
 from ai.backend.manager.actions.v2.single_entity.validator.base import SingleEntityActionValidator
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.user import UserNotFound
@@ -18,7 +19,7 @@ class AuthenticatedActionValidator(SingleEntityActionValidator):
     """
 
     @override
-    async def validate(self, action: BaseSingleEntityAction, meta: BaseActionTriggerMeta) -> None:
+    async def validate(self, meta: SingleEntityActionTriggerMeta) -> None:
         user = current_user()
         if user is None:
             raise UserNotFound("User not found in context")

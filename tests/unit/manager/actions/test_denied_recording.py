@@ -14,12 +14,14 @@ import pytest
 
 from ai.backend.common.data.entity.types import EntityID, EntityIdentifier, EntityType
 from ai.backend.common.exception import PermissionDeniedError
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.single_entity.monitor.base import SingleEntityActionMonitor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.actions.v2.single_entity.result import SingleEntityActionProcessResult
+from ai.backend.manager.actions.v2.single_entity.trigger import (
+    SingleEntityActionTriggerMeta,
+)
 from ai.backend.manager.actions.v2.single_entity.validator.base import (
     SingleEntityActionValidator,
 )
@@ -60,28 +62,30 @@ class _Result:
 class _RecordingMonitor(SingleEntityActionMonitor):
     def __init__(self) -> None:
         self.prepared = 0
+        self.done_metas: list[SingleEntityActionTriggerMeta] = []
         self.done_results: list[SingleEntityActionProcessResult] = []
 
     @override
-    async def prepare(self, action: BaseSingleEntityAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, meta: SingleEntityActionTriggerMeta) -> None:
         self.prepared += 1
 
     @override
     async def done(
-        self, action: BaseSingleEntityAction, result: SingleEntityActionProcessResult
+        self, meta: SingleEntityActionTriggerMeta, result: SingleEntityActionProcessResult
     ) -> None:
+        self.done_metas.append(meta)
         self.done_results.append(result)
 
 
 class _DenyingValidator(SingleEntityActionValidator):
     @override
-    async def validate(self, action: BaseSingleEntityAction, meta: BaseActionTriggerMeta) -> None:
+    async def validate(self, meta: SingleEntityActionTriggerMeta) -> None:
         raise PermissionDeniedError("nope")
 
 
 class _BrokenValidator(SingleEntityActionValidator):
     @override
-    async def validate(self, action: BaseSingleEntityAction, meta: BaseActionTriggerMeta) -> None:
+    async def validate(self, meta: SingleEntityActionTriggerMeta) -> None:
         raise InternalServerError("the permission lookup itself blew up")
 
 
@@ -101,7 +105,7 @@ async def test_denied_validation_reaches_monitors_as_denied() -> None:
     assert monitor.prepared == 1
     meta = monitor.done_results[0].meta
     assert meta.status is OperationStatus.DENIED
-    assert meta.entity_id == _ENTITY_ID
+    assert monitor.done_metas[0].entity.entity_id == _ENTITY_ID
 
 
 async def test_non_authorization_validation_failure_is_an_error_not_a_denial() -> None:

@@ -54,6 +54,9 @@ from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualScopeScopeActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
+from ai.backend.manager.actions.v2.single_entity.trigger import (
+    SingleEntityActionTriggerMeta,
+)
 from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualScopeSingleEntityActionRBACValidator,
 )
@@ -729,7 +732,15 @@ class TestVirtualScopeSingleEntityActionRBACValidator:
         user_with_vfolder_update_at_project: UserData,
     ) -> None:
         with with_user(user_with_vfolder_update_at_project):
-            await single_entity_validator.validate(single_entity_action, trigger_meta)
+            await single_entity_validator.validate(
+                SingleEntityActionTriggerMeta(
+                    action_id=trigger_meta.action_id,
+                    started_at=trigger_meta.started_at,
+                    entity=single_entity_action.entity_id().entity_ref(),
+                    operation_type=single_entity_action.operation_type(),
+                    action_name=single_entity_action.action_name(),
+                )
+            )
 
     async def test_without_permission_raises(
         self,
@@ -740,7 +751,15 @@ class TestVirtualScopeSingleEntityActionRBACValidator:
     ) -> None:
         with with_user(regular_user_without_permission):
             with pytest.raises(NotEnoughPermission):
-                await single_entity_validator.validate(single_entity_action, trigger_meta)
+                await single_entity_validator.validate(
+                    SingleEntityActionTriggerMeta(
+                        action_id=trigger_meta.action_id,
+                        started_at=trigger_meta.started_at,
+                        entity=single_entity_action.entity_id().entity_ref(),
+                        operation_type=single_entity_action.operation_type(),
+                        action_name=single_entity_action.action_name(),
+                    )
+                )
 
     async def test_entity_cap_clips_granted_permission(
         self,
@@ -751,7 +770,15 @@ class TestVirtualScopeSingleEntityActionRBACValidator:
     ) -> None:
         with with_user(user_with_read_capped_vfolder):
             with pytest.raises(NotEnoughPermission):
-                await single_entity_validator.validate(single_entity_action, trigger_meta)
+                await single_entity_validator.validate(
+                    SingleEntityActionTriggerMeta(
+                        action_id=trigger_meta.action_id,
+                        started_at=trigger_meta.started_at,
+                        entity=single_entity_action.entity_id().entity_ref(),
+                        operation_type=single_entity_action.operation_type(),
+                        action_name=single_entity_action.action_name(),
+                    )
+                )
 
 
 class TestUpsertRequiresBothCreateAndUpdate:
@@ -771,7 +798,15 @@ class TestUpsertRequiresBothCreateAndUpdate:
     ) -> None:
         with with_user(user_with_vfolder_create_only):
             with pytest.raises(NotEnoughPermission):
-                await single_entity_validator.validate(upsert_action, trigger_meta)
+                await single_entity_validator.validate(
+                    SingleEntityActionTriggerMeta(
+                        action_id=trigger_meta.action_id,
+                        started_at=trigger_meta.started_at,
+                        entity=upsert_action.entity_id().entity_ref(),
+                        operation_type=upsert_action.operation_type(),
+                        action_name=upsert_action.action_name(),
+                    )
+                )
 
     async def test_update_only_is_rejected(
         self,
@@ -782,7 +817,15 @@ class TestUpsertRequiresBothCreateAndUpdate:
     ) -> None:
         with with_user(user_with_vfolder_update_only):
             with pytest.raises(NotEnoughPermission):
-                await single_entity_validator.validate(upsert_action, trigger_meta)
+                await single_entity_validator.validate(
+                    SingleEntityActionTriggerMeta(
+                        action_id=trigger_meta.action_id,
+                        started_at=trigger_meta.started_at,
+                        entity=upsert_action.entity_id().entity_ref(),
+                        operation_type=upsert_action.operation_type(),
+                        action_name=upsert_action.action_name(),
+                    )
+                )
 
     async def test_both_bits_pass(
         self,
@@ -792,7 +835,15 @@ class TestUpsertRequiresBothCreateAndUpdate:
         user_with_vfolder_create_and_update: UserData,
     ) -> None:
         with with_user(user_with_vfolder_create_and_update):
-            await single_entity_validator.validate(upsert_action, trigger_meta)
+            await single_entity_validator.validate(
+                SingleEntityActionTriggerMeta(
+                    action_id=trigger_meta.action_id,
+                    started_at=trigger_meta.started_at,
+                    entity=upsert_action.entity_id().entity_ref(),
+                    operation_type=upsert_action.operation_type(),
+                    action_name=upsert_action.action_name(),
+                )
+            )
 
     async def test_single_bit_operation_still_passes_with_one_bit(
         self,
@@ -803,7 +854,15 @@ class TestUpsertRequiresBothCreateAndUpdate:
     ) -> None:
         # Regression: the subset semantics must not tighten single-bit operations.
         with with_user(user_with_vfolder_update_only):
-            await single_entity_validator.validate(single_entity_action, trigger_meta)
+            await single_entity_validator.validate(
+                SingleEntityActionTriggerMeta(
+                    action_id=trigger_meta.action_id,
+                    started_at=trigger_meta.started_at,
+                    entity=single_entity_action.entity_id().entity_ref(),
+                    operation_type=single_entity_action.operation_type(),
+                    action_name=single_entity_action.action_name(),
+                )
+            )
 
 
 class TestVirtualScopeBulkActionRBACValidator:

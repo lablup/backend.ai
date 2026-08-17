@@ -4,12 +4,13 @@ from typing import override
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.types import BLANK_ID
-from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.single_entity.monitor.base import SingleEntityActionMonitor
 from ai.backend.manager.actions.v2.single_entity.result import SingleEntityActionProcessResult
+from ai.backend.manager.actions.v2.single_entity.trigger import (
+    SingleEntityActionTriggerMeta,
+)
 from ai.backend.manager.repositories.audit_log.creators import (
     SingleEntityAuditLogCreatorSpec,
 )
@@ -34,32 +35,31 @@ class SingleEntityActionAuditLogMonitor(SingleEntityActionMonitor):
         self._policy = policy
 
     @override
-    async def prepare(self, action: BaseSingleEntityAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, meta: SingleEntityActionTriggerMeta) -> None:
         pass
 
     @override
     async def done(
-        self, action: BaseSingleEntityAction, result: SingleEntityActionProcessResult
+        self, meta: SingleEntityActionTriggerMeta, result: SingleEntityActionProcessResult
     ) -> None:
-        meta = result.meta
-        if not self._policy.should_record(action.operation_type(), meta.status):
+        if not self._policy.should_record(meta.operation_type, result.meta.status):
             return
         trigger = triggered_user()
         acting = current_user()
         creator = Creator(
             spec=SingleEntityAuditLogCreatorSpec(
                 action_id=meta.action_id,
-                entity_type=action.entity_type(),
-                operation=action.operation_type(),
-                action_name=action.action_name(),
+                entity_type=meta.entity.entity_type,
+                operation=meta.operation_type,
+                action_name=meta.action_name,
                 created_at=meta.started_at,
-                description=meta.description,
-                status=meta.status,
-                entity_id=meta.entity_id,
+                description=result.meta.description,
+                status=result.meta.status,
+                entity_id=meta.entity.entity_id,
                 request_id=current_request_id() or BLANK_ID,
                 triggered_by=str(trigger.user_id) if trigger else None,
                 acted_as=acting.user_id if acting else None,
-                duration=meta.duration,
+                duration=result.meta.duration,
             )
         )
         await self._repository.create(creator)

@@ -4,7 +4,6 @@ from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
@@ -12,6 +11,9 @@ from ai.backend.manager.actions.v2.single_entity.monitor import SingleEntityActi
 from ai.backend.manager.actions.v2.single_entity.result import (
     SingleEntityActionProcessResult,
     SingleEntityActionResultMeta,
+)
+from ai.backend.manager.actions.v2.single_entity.trigger import (
+    SingleEntityActionTriggerMeta,
 )
 from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
 from ai.backend.manager.actions.v2.single_entity.validator.authenticated import (
@@ -48,35 +50,43 @@ class SingleEntityActionProcessor[TAction: BaseSingleEntityAction, TResult]:
         self._monitors = monitors or []
         self._validators = validators or []
 
-    async def _prepare_monitors(self, action: TAction, trigger_meta: BaseActionTriggerMeta) -> None:
+    async def _prepare_monitors(self, trigger_meta: SingleEntityActionTriggerMeta) -> None:
         for monitor in self._monitors:
             try:
-                await monitor.prepare(action, trigger_meta)
+                await monitor.prepare(trigger_meta)
             except Exception as e:
                 log.warning("Error in monitor prepare method: {}", e)
 
-    async def _finalize_monitors(self, action: TAction, meta: SingleEntityActionResultMeta) -> None:
+    async def _finalize_monitors(
+        self, trigger_meta: SingleEntityActionTriggerMeta, meta: SingleEntityActionResultMeta
+    ) -> None:
         process_result = SingleEntityActionProcessResult(meta=meta)
         for monitor in reversed(self._monitors):
             try:
-                await monitor.done(action, process_result)
+                await monitor.done(trigger_meta, process_result)
             except Exception as e:
                 log.warning("Error in monitor done method: {}", e)
 
     async def run(self, action: TAction) -> TResult:
         started_at = datetime.now(UTC)
         action_id = uuid.uuid4()
-        trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
+        trigger_meta = SingleEntityActionTriggerMeta(
+            action_id=action_id,
+            started_at=started_at,
+            entity=action.entity_id().entity_ref(),
+            operation_type=action.operation_type(),
+            action_name=action.action_name(),
+        )
 
         run_status = ActionRunStatus.unknown()
 
         # Validation runs inside the monitor lifecycle so a rejected action is
         # recorded too; monitors that only wrapped execution missed every denial.
-        await self._prepare_monitors(action, trigger_meta)
+        await self._prepare_monitors(trigger_meta)
         try:
             try:
                 for validator in self._validators:
-                    await validator.validate(action, trigger_meta)
+                    await validator.validate(trigger_meta)
             except BaseException as e:
                 run_status = ActionRunStatus.of_failure(e, during_validation=True)
                 raise
@@ -91,16 +101,13 @@ class SingleEntityActionProcessor[TAction: BaseSingleEntityAction, TResult]:
         finally:
             ended_at = datetime.now(UTC)
             meta = SingleEntityActionResultMeta(
-                action_id=action_id,
-                entity_id=action.entity_id(),
                 status=run_status.status,
                 description=run_status.description,
-                started_at=started_at,
                 ended_at=ended_at,
                 duration=ended_at - started_at,
                 error_code=run_status.error_code,
             )
-            await self._finalize_monitors(action, meta)
+            await self._finalize_monitors(trigger_meta, meta)
 
 
 class PublicSingleEntityActionProcessor[TAction: BaseSingleEntityAction, TResult](

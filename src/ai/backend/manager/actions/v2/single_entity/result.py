@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from ai.backend.common.data.entity.action import ActionID
-from ai.backend.common.data.entity.types import EntityID
 from ai.backend.common.exception import ErrorCode
 from ai.backend.manager.actions.types import OperationStatus
 
@@ -14,17 +12,14 @@ __all__ = (
 
 @dataclass
 class SingleEntityActionResultMeta:
-    """Outcome metadata for a single-entity action run.
+    """How a single-entity action run turned out.
 
-    Self-contained for the pure-ABC single-entity line; ``entity_id`` is always
-    present because :class:`BaseSingleEntityAction` operates on an identified entity.
+    What the run *is* — its id, entity, operation and name — is the trigger meta's;
+    this carries only the outcome.
     """
 
-    action_id: ActionID
-    entity_id: EntityID
     status: OperationStatus
     description: str
-    started_at: datetime
     ended_at: datetime
     duration: timedelta
     error_code: ErrorCode | None
