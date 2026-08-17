@@ -3,90 +3,106 @@
 > For the selection table and design rationale, see `KNOWLEDGE.md` in the same directory.
 
 Declarative write specs, colocated with the schema: a spec says *what* to write
-(row, scope, memberships, checks); executing it is the ops layer's job
+(row, membership, checks); executing it is the ops layer's job
 (`repositories/ops/v2/`). Specs must NOT touch sessions or issue SQL.
 
 ## Every v2-consumed spec lives here
 
-Whatever spec type the v2 actions and ops consume is declared in this package —
-the write specs below, plus the read/update declarations (`querier.py`,
-`lookup.py`, `searcher.py`, `updater.py`, `pagination.py`, and the batch purge
-spec in `purger.py`). `repositories/base/` keeps legacy-compatible views
-(aliases or bridge subclasses) for the transition only; do not declare a new
-spec there.
+Whatever spec type the v2 actions and ops consume is declared in this package — the
+write specs below, plus the read/update declarations (`querier.py`, `lookup.py`,
+`searcher.py`, `updater.py`, `pagination.py`, and the batch purge spec in
+`purger.py`). `repositories/base/` keeps legacy-compatible views for the transition
+only; do not declare a new spec there.
 
 ## What a spec splits on depends on the operation
 
-- A row is an entity or a field. There is nothing else.
-- **purger**: `EntityPurger` and `FieldEntityPurger`. `EntityPurger` adds one method
-  returning its own `EntityRef`, and that value removes the RBAC edges left behind.
-  An entity that provisioned no virtual scope node has none to remove.
-- **creator**: three. `Global` joins entity and field, because a create acts on a
-  scope and this is where linking to a virtual scope is decided.
-- **updater**: one. An update never changes what a row belongs to, and soft delete
-  and restore are updates.
-- `DataUpdater` does not expose the soft-delete column; the soft-delete and restore
-  updaters handle that column alone.
-- A domain that offers soft delete offers restore.
+A row is an entity or a field. There is nothing else, and which one it is comes from
+the table in `KNOWLEDGE.md`.
 
-## The three roots are deliberately unrelated
+| Operation | Roots | Why |
+|---|---|---|
+| creator | `GlobalEntityCreator` / `EntityCreator` / `RoleManagedEntityCreator` / `FieldCreator` | only a create settles what a row belongs to |
+| purger | `EntityPurger` / `FieldPurger` | removing an entity removes what it left in the graph |
+| updater | `DataUpdater` alone | an update never changes what a row belongs to |
 
-- Choose between `Entity` / `Global` / `Field` by the table in `KNOWLEDGE.md`.
-- Do NOT extract a common base across those roots or type any function
-  against "any creator/purger" — the absence of a common supertype is the
-  enforcement (rationale: `KNOWLEDGE.md`).
-- Reuse execution logic through ops-layer helpers that take plain values
-  (`row_class`, `pk_value`, ...), never through a shared spec supertype.
+The four roots are deliberately unrelated. Do NOT extract a common base across them
+or type any function against "any creator/purger" — the absence of a common supertype
+is the enforcement. Reuse execution logic through ops-layer helpers that take plain
+values (`row_class`, `pk_value`, ...).
+
+## An entity answers its own id
+
+- A creator and an upserter answer one hook — `entity_id(row)`. It returns an
+  `EntityIdentifier`, which answers its own type, so nothing declares the type
+  separately.
+- It takes the row because the id does not exist before the insert; the database
+  usually fills it.
+- Some tables key on something else (a resource policy's primary key is `name` and its
+  id is a separate `uuid` column). Which column it is, only the domain knows.
+
+## A global entity is an entity too
+
+`GlobalEntityCreator` merely does not go under another entity; it provisions its own
+virtual scope node exactly as `EntityCreator` does. Rows are created under a global
+entity too — an image under its container registry — so it has to be namable in the
+graph. What it does not have is `member_of`, and the missing hook is what says it
+joins nothing.
+
+## Membership declarations
+
+- `member_of(row)` declares which existing entities the new one joins as a member; a
+  target without a virtual scope node fails the write. It never carries a permission
+  cap (membership vs sharing: `KNOWLEDGE.md`).
+- Entity types are open strings: types outside the RBAC element enum are accepted, and
+  permission-carrying paths convert lazily.
+- Do NOT keep module-level declaration instances (no `X_MEMBERSHIP = ...()`).
 
 ## Role-managed entities
 
-- Entities that allow role presets (domain/project/user) implement the combined
-  roots — `RoleManagedEntityCreator` / `RoleManagedEntityUpserter` — and are
-  executed through the role-managed ops methods (`create_role_managed_entity`, ...).
+- Entities that allow role presets (domain/project/user) implement
+  `RoleManagedEntityCreator` and are executed through the role-managed ops methods.
   The type decides the path; there is NO runtime capability check (`isinstance`).
-- The combined roots are deliberately NOT subtypes of `EntityCreator` /
-  `EntityUpserter` (rationale: `KNOWLEDGE.md`). `RoleTemplateSource` is the only
-  shared base; no write path accepts that type bare.
-- Entity specs declare NO roles — the spec contributes only `template_value(row)`
-  for the presets' name templates. Restricting which scope types may carry
-  presets is the preset-creation service's validation, not the spec's.
+- That root is deliberately NOT a subtype of `EntityCreator`. `RoleTemplateSource` is
+  the only shared base; no write path accepts that type bare.
+- Entity specs declare NO roles — the spec contributes only `template_value(row)` for
+  the presets' name templates. Restricting which types may carry presets is the
+  preset-creation service's validation.
 - The plain entity paths never touch roles, even when matching presets exist.
-- Enrollment writes graph edges only. Granting a joining user the target scopes'
-  auto_assign roles is an explicit ops primitive — never an implicit side effect
-  keyed on the scope type.
+- Enrollment writes graph edges only. Granting a joining user the target's auto_assign
+  roles is an explicit ops primitive — never an implicit side effect keyed on the type.
 
-## Scope declarations
+## A field row's owner
 
-- Do NOT override `scope_of()` — it is `@final`; answer the two hooks
-  (`scope_type()` / `scope_id(row)`) instead.
-- `member_of(row)` declares which existing scopes the new entity joins as a
-  member; a target without a virtual scope fails the write. It never carries a
-  permission cap (membership vs sharing: `KNOWLEDGE.md`).
-- Scope types are open strings: types outside the RBAC element enum are
-  accepted, and permission-carrying paths convert lazily.
-- Do NOT keep module-level declaration instances (no `X_MEMBERSHIP = ...()`).
+- A field row carries no membership of its own. What it belongs to is only knowable
+  through the entity that owns it, so an operation naming a field row has to read that
+  entity before it has anything to validate and record against.
+- `FieldOwnerLookup` declares that read: from a field row's id to its owning entity's
+  id. A query rather than conditions, so an owner reached through a join is
+  expressible; it selects the pair (row id, owner id), so one spec serves a single row
+  and a batch alike.
+- It takes two type parameters, so the type `field_id()` answers and the type this
+  lookup handles cannot come apart.
+- Do NOT pre-read the owner to check existence. Declare the FK violation in
+  `integrity_error_checks()` mapped to the domain error; preconditions beyond
+  existence (e.g. lifecycle) belong to the service layer as EXISTS checks.
 
 ## Soft delete belongs to its own updaters
 
-- The lifecycle column a domain deletes by — `deleted`, `status`, whichever
-  carries the removed state — is NOT exposed on the general `DataUpdater`. With
-  no field for it, the ordinary edit path cannot make the transition at all.
-- Soft delete and restore each get their own updater, and `build_values()`
-  returns a constant. A transition value taken as an argument is a value that can
-  be passed wrong.
+- The lifecycle column a domain deletes by — `deleted`, `status`, whichever carries
+  the removed state — is NOT exposed on the general `DataUpdater`. With no field for
+  it, the ordinary edit path cannot make the transition at all.
+- Soft delete and restore each get their own updater, and `build_values()` returns a
+  constant. A transition value taken as an argument is a value that can be passed
+  wrong.
 - Naming: `<Entity>SoftDeleteUpdater` / `<Entity>RestoreUpdater`, carried by a
   `Delete*` and a `Restore*` action base respectively.
+- A domain that offers soft delete offers restore.
 - ops executes both as an update — the DB operation is an UPDATE, so no delete
-  operation exists to generalize. What records the run as a delete is the
-  action's `operation_type()`; see `../../actions/AGENTS.md`.
+  operation exists to generalize. What records the run as a delete is the action's
+  `operation_type()`; see `../../actions/AGENTS.md`.
 
 ## Naming: what is written vs where a read looks
 
-`…_global_entity` / `…_entity` / `…_field_entity` methods name **what is written**; `…_in_global` / `…_in_scopes` name the **operation
-scope** (where a read looks). Never conflate the two axes.
-
-## Owner existence for field rows
-
-Do NOT pre-read the owner to check existence. Declare the FK violation in
-`integrity_error_checks()` mapped to the domain error; state preconditions
-beyond existence (e.g. lifecycle) belong to the service layer as EXISTS checks.
+`…_global_entity` / `…_entity` / `…_field_entity` methods name **what is written**;
+`…_in_global` / `…_in_scopes` name the **operation scope** (where a read looks). Never
+conflate the two axes.
