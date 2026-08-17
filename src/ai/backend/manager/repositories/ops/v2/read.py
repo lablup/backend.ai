@@ -6,6 +6,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.errors.repository import (
     AmbiguousEntityKeyError,
     EmptyOperationScopeError,
@@ -14,7 +15,7 @@ from ai.backend.manager.errors.repository import (
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.lookup import DataLookup
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.querier import DataQuerier, FieldOwnerQuerier
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
 from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
 
@@ -61,6 +62,22 @@ class V2ReadOps(V2OpsBase):
                 f"The given key matches more than one {row_class.__name__}"
             )
         return lookup.to_data(rows[0])
+
+    async def query_field_owner(self, querier: FieldOwnerQuerier) -> EntityIdentifier | None:
+        """Fetch the id of the entity owning one field row.
+
+        Reads at most two rows and rejects the second, as ``lookup_data`` does: the
+        query is expected to name one field row.
+        """
+        result = await self._sess.execute(querier.build_query().limit(2))
+        values = result.scalars().all()
+        if not values:
+            return None
+        if len(values) > 1:
+            raise AmbiguousEntityKeyError(
+                "The field owner query matches more than one row",
+            )
+        return querier.to_entity_id(values[0])
 
     async def search_with_scopes[TRow: Base, TData](
         self,

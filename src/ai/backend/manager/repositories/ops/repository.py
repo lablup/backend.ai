@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.creator import (
@@ -24,7 +24,7 @@ from ai.backend.manager.models.specs.purger import (
     EntityPurger,
     FieldPurger,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.querier import DataQuerier, FieldOwnerQuerier
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
 from ai.backend.manager.models.specs.types import BulkResultWithFailures, EntityWithFieldsResult
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
@@ -70,6 +70,19 @@ class OpsRepository[TData]:
             if data is None:
                 raise EntityNotFoundError(f"No {lookup.row_class().__name__} matches the given key")
             return data
+
+    async def field_owner(self, querier: FieldOwnerQuerier) -> EntityIdentifier:
+        """Read the id of the entity owning one field row, raising if it resolves to
+        nothing.
+
+        The absent case is a missing field row, which the caller must answer for exactly
+        as it answers a permission denial: telling the two apart leaks existence.
+        """
+        async with self._ops.read_ops() as r:
+            entity_id = await r.query_field_owner(querier)
+            if entity_id is None:
+                raise EntityNotFoundError("No field row matches the given id")
+            return entity_id
 
     async def search_in_scopes(
         self,
