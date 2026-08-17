@@ -3,8 +3,11 @@ from __future__ import annotations
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import NewType
+from typing import Any, NewType
 from uuid import UUID
+
+from pydantic import GetCoreSchemaHandler
+from pydantic_core import CoreSchema, core_schema
 
 # An entity's identifier. Polymorphic across entity kinds; the concrete kind is
 # discriminated by the accompanying entity_type.
@@ -20,6 +23,12 @@ class EntityType(str):
     A class rather than a `NewType` so a `FieldType` cannot be passed where this is
     expected: two `NewType`s over `str` are mutually assignable.
     """
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        """Validated as the string it is; pydantic builds no schema for a `str`
+        subclass on its own."""
+        return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
 
 
 # Every entity doubles as a scope, so a scope type IS an entity type; the
@@ -39,6 +48,12 @@ class FieldType(str):
     def owner_entity_type(cls) -> EntityType:
         raise NotImplementedError
 
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        """Validated as the string it is; pydantic builds no schema for a `str`
+        subclass on its own."""
+        return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
+
 
 class NaturalKey(str):
     """A column value that forms part of a key drawn from the data itself.
@@ -50,6 +65,12 @@ class NaturalKey(str):
     @classmethod
     def key_name(cls) -> str:
         raise NotImplementedError
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        """Validated as the string it is; pydantic builds no schema for a `str`
+        subclass on its own."""
+        return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,12 +120,18 @@ class EntityIdentifier(UUID):
     def entity_ref(self) -> EntityRef:
         return EntityRef(entity_type=self.entity_type(), entity_id=self)
 
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        """Validated as the uuid it is; pydantic builds no schema for a `UUID`
+        subclass on its own."""
+        return core_schema.no_info_after_validator_function(cls, core_schema.uuid_schema())
+
 
 class FieldIdentifier(UUID):
     """A field row's id, which knows its own type and the entity that owns it.
 
-    No `entity_ref()`: a field row is absent from the RBAC graph, so there is
-    nothing for it to name there. Reaching the graph is a lookup through the owner.
+    No `entity_ref()`: a field row carries no membership of its own, so what it belongs
+    to is only knowable through the entity that owns it.
     """
 
     def __init__(self, value: UUID) -> None:
@@ -119,6 +146,12 @@ class FieldIdentifier(UUID):
     def owner_entity_type(cls) -> EntityType:
         """Derived from the field type, which is where the ownership is declared."""
         return cls.field_type().owner_entity_type()
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        """Validated as the uuid it is; pydantic builds no schema for a `UUID`
+        subclass on its own."""
+        return core_schema.no_info_after_validator_function(cls, core_schema.uuid_schema())
 
 
 class EntityData(ABC):
@@ -143,8 +176,8 @@ class EntityData(ABC):
 class FieldData(ABC):
     """A ``data/`` type describing a field row.
 
-    Deliberately not an :class:`EntityData`: a field row is absent from the RBAC graph,
-    so what a result must name is the entity that owns it, not the row itself.
+    Deliberately not an :class:`EntityData`: a field row carries no membership of its
+    own, so what a result names is the entity owning it, not the row.
     """
 
     @abstractmethod
