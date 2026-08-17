@@ -4,9 +4,8 @@ from typing import override
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
+from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.types import BLANK_ID
-from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.result import BulkActionProcessResult
 from ai.backend.manager.reporters.base import FinishedActionMessage, StartedActionMessage
@@ -29,46 +28,45 @@ class BulkActionReporterMonitor(BulkActionMonitor):
         self._reporter_hub = reporter_hub
 
     @override
-    async def prepare(self, action: BaseBulkAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, meta: BulkActionTriggerMeta) -> None:
         # triggered_by = the caller who triggered the request; acted_as = the effective
         # (acting) subject. They differ only while a super admin is impersonating.
         trigger = triggered_user()
         acting = current_user()
         request_id = current_request_id()
-        for entity_id in action.entity_ids():
+        for entity_id in meta.entity_ids:
             message = StartedActionMessage(
                 action_id=meta.action_id,
-                action_type=action.action_name(),
+                action_type=meta.action_name,
                 entity_id=entity_id,
-                entity_type=action.entity_type(),
+                entity_type=meta.entity_type,
                 request_id=request_id,
                 triggered_by=str(trigger.user_id) if trigger else None,
                 acted_as=acting.user_id if acting else None,
-                operation_type=action.operation_type(),
+                operation_type=meta.operation_type,
                 created_at=meta.started_at,
             )
             await self._reporter_hub.report_started(message)
 
     @override
-    async def done(self, action: BaseBulkAction, result: BulkActionProcessResult) -> None:
+    async def done(self, meta: BulkActionTriggerMeta, result: BulkActionProcessResult) -> None:
         trigger = triggered_user()
         acting = current_user()
-        meta = result.meta
         request_id = current_request_id() or BLANK_ID
-        for entity_result in meta.entity_results:
+        for entity_result in result.meta.entity_results:
             message = FinishedActionMessage(
-                action_id=meta.action_id,
-                action_type=action.action_name(),
+                action_id=result.meta.action_id,
+                action_type=meta.action_name,
                 entity_id=entity_result.entity_id,
                 request_id=request_id,
                 triggered_by=str(trigger.user_id) if trigger else None,
                 acted_as=acting.user_id if acting else None,
-                entity_type=action.entity_type(),
-                operation_type=action.operation_type(),
+                entity_type=meta.entity_type,
+                operation_type=meta.operation_type,
                 status=entity_result.status,
                 description=entity_result.description,
-                created_at=meta.started_at,
-                ended_at=meta.ended_at,
-                duration=meta.duration,
+                created_at=result.meta.started_at,
+                ended_at=result.meta.ended_at,
+                duration=result.meta.duration,
             )
             await self._reporter_hub.report_finished(message)

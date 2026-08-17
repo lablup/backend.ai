@@ -19,7 +19,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.entity.types import EntityData, FieldData
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
@@ -27,6 +27,7 @@ from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.bulk.result import BaseBulkActionResult
 from ai.backend.manager.actions.v2.bulk.validator import BulkActionValidator
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
+from ai.backend.manager.actions.v2.field.bulk_processor import BulkFieldActionProcessor
 from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.field.processor import (
     OwnerLookupProcessor,
@@ -90,7 +91,9 @@ from ai.backend.manager.actions.v2.ops.result import (
     BulkOpsResult,
     CreatedEntityOpsResult,
     CreatedEntityWithFieldsOpsResult,
+    CreatedFieldOpsResult,
     EntitiesOpsResult,
+    FieldsOpsResult,
     EntityOpsResult,
     FieldOwnerLookupOpsResult,
     LookupOpsResult,
@@ -148,6 +151,7 @@ from ai.backend.manager.services.ops.service import (
 __all__ = (
     "ProcessorDependencies",
     "ProcessorGroup",
+    "FieldProcessorGroup",
     "ProcessorRegistry",
 )
 
@@ -166,6 +170,15 @@ class ProcessorGroup[TData: EntityData]:
     def __init__(self, deps: ProcessorDependencies[TData], actions: list[type[Any]]) -> None:
         self._deps = deps
         self._actions = actions
+
+    @property
+    def deps(self) -> ProcessorDependencies[TData]:
+        """Read by :class:`FieldProcessorGroup`, which builds processors of this group."""
+        return self._deps
+
+    def record(self, action_cls: type[Any]) -> None:
+        """Record a class wired through a sub-group, so one catalog holds them all."""
+        self._record(action_cls)
 
     def _record(self, action_cls: type[Any]) -> None:
         """Keep the class itself: every classmethod it declares — the operation, the
@@ -275,104 +288,23 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.lookup, *validators),
         )
 
-    def field_owner_lookup_ops[TAction: LookupFieldOwnerOpsAction](
+    def field_group[TFieldData: FieldData](
         self,
-        action_cls: type[TAction],
-        *,
-        validators: Sequence[LookupActionValidator] = (),
-        monitors: Sequence[LookupActionMonitor] = (),
-    ) -> LookupActionProcessor[TAction, FieldOwnerLookupOpsResult]:
-        """Wire the lookup that resolves one field table's rows into their owners.
+        data_cls: type[TFieldData],
+        owner_lookup_action_cls: type[LookupFieldOwnerOpsAction[Any, Any]],
+    ) -> FieldProcessorGroup[TFieldData]:
+        """The operations over one kind of field row.
 
-        One per field table, shared by every field operation over it.
+        Builds the owner lookup itself: it is not an operation a domain wires, only the
+        step every field operation runs first.
         """
-        self._record(action_cls)
-        return LookupActionProcessor(
+        self._record(owner_lookup_action_cls)
+        owner_lookup: OwnerLookupProcessor = LookupActionProcessor(
             FieldOwnerLookupService(self._deps.repository).execute,
-            monitors=(*self._deps.monitors.lookup, *monitors),
-            validators=(*self._deps.validators.lookup, *validators),
+            monitors=self._deps.monitors.lookup,
+            validators=self._deps.validators.lookup,
         )
-
-    def field_get_ops[TAction: GetFieldOpsAction[Any, Any]](
-        self,
-        action_cls: type[TAction],
-        owner_lookup: OwnerLookupProcessor,
-        *,
-        validators: Sequence[SingleEntityActionValidator] = (),
-        monitors: Sequence[SingleEntityActionMonitor] = (),
-    ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TData]]:
-        self._record(action_cls)
-        return SingleFieldActionProcessor(
-            GetService(self._deps.repository).execute,
-            owner_lookup,
-            monitors=(*self._deps.monitors.single_entity, *monitors),
-            validators=(*self._deps.validators.single_entity, *validators),
-        )
-
-    def field_update_ops[TAction: UpdateFieldOpsAction[Any, Any]](
-        self,
-        action_cls: type[TAction],
-        owner_lookup: OwnerLookupProcessor,
-        *,
-        validators: Sequence[SingleEntityActionValidator] = (),
-        monitors: Sequence[SingleEntityActionMonitor] = (),
-    ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TData]]:
-        self._record(action_cls)
-        return SingleFieldActionProcessor(
-            UpdateService(self._deps.repository).execute,
-            owner_lookup,
-            monitors=(*self._deps.monitors.single_entity, *monitors),
-            validators=(*self._deps.validators.single_entity, *validators),
-        )
-
-    def field_delete_ops[TAction: DeleteFieldOpsAction[Any, Any]](
-        self,
-        action_cls: type[TAction],
-        owner_lookup: OwnerLookupProcessor,
-        *,
-        validators: Sequence[SingleEntityActionValidator] = (),
-        monitors: Sequence[SingleEntityActionMonitor] = (),
-    ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TData]]:
-        self._record(action_cls)
-        return SingleFieldActionProcessor(
-            DeleteService(self._deps.repository).execute,
-            owner_lookup,
-            monitors=(*self._deps.monitors.single_entity, *monitors),
-            validators=(*self._deps.validators.single_entity, *validators),
-        )
-
-    def field_restore_ops[TAction: RestoreFieldOpsAction[Any, Any]](
-        self,
-        action_cls: type[TAction],
-        owner_lookup: OwnerLookupProcessor,
-        *,
-        validators: Sequence[SingleEntityActionValidator] = (),
-        monitors: Sequence[SingleEntityActionMonitor] = (),
-    ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TData]]:
-        self._record(action_cls)
-        return SingleFieldActionProcessor(
-            RestoreService(self._deps.repository).execute,
-            owner_lookup,
-            monitors=(*self._deps.monitors.single_entity, *monitors),
-            validators=(*self._deps.validators.single_entity, *validators),
-        )
-
-    def single_field[TAction: BaseSingleFieldAction, TResult](
-        self,
-        action_cls: type[TAction],
-        func: Callable[[TAction], Awaitable[TResult]],
-        owner_lookup: OwnerLookupProcessor,
-        *,
-        validators: Sequence[SingleEntityActionValidator] = (),
-        monitors: Sequence[SingleEntityActionMonitor] = (),
-    ) -> SingleFieldActionProcessor[TAction, TResult]:
-        self._record(action_cls)
-        return SingleFieldActionProcessor(
-            func,
-            owner_lookup,
-            monitors=(*self._deps.monitors.single_entity, *monitors),
-            validators=(*self._deps.validators.single_entity, *validators),
-        )
+        return FieldProcessorGroup(self, owner_lookup)
 
     def single_get_ops[TAction: GetSingleEntityOpsAction[Any, Any]](
         self,
@@ -516,20 +448,6 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.scope, *validators),
         )
 
-    def field_create_ops[TAction: CreateFieldOpsAction[Any, Any, Any]](
-        self,
-        action_cls: type[TAction],
-        *,
-        validators: Sequence[SingleEntityActionValidator] = (),
-        monitors: Sequence[SingleEntityActionMonitor] = (),
-    ) -> SingleEntityActionProcessor[TAction, CreatedEntityOpsResult[TData]]:
-        self._record(action_cls)
-        return SingleEntityActionProcessor(
-            FieldCreateService(self._deps.repository).execute,
-            monitors=(*self._deps.monitors.single_entity, *monitors),
-            validators=(*self._deps.validators.single_entity, *validators),
-        )
-
     def global_atomic_create_ops[TAction: AtomicCreateGlobalEntityOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
@@ -572,20 +490,6 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.scope, *validators),
         )
 
-    def field_atomic_create_ops[TAction: AtomicCreateFieldOpsAction[Any, Any, Any]](
-        self,
-        action_cls: type[TAction],
-        *,
-        validators: Sequence[SingleEntityActionValidator] = (),
-        monitors: Sequence[SingleEntityActionMonitor] = (),
-    ) -> SingleEntityActionProcessor[TAction, EntitiesOpsResult[TData]]:
-        self._record(action_cls)
-        return SingleEntityActionProcessor(
-            FieldAtomicCreateService(self._deps.repository).execute,
-            monitors=(*self._deps.monitors.single_entity, *monitors),
-            validators=(*self._deps.validators.single_entity, *validators),
-        )
-
     def entity_purge_ops[TAction: PurgeEntityOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
@@ -596,22 +500,6 @@ class ProcessorGroup[TData: EntityData]:
         self._record(action_cls)
         return SingleEntityActionProcessor(
             EntityPurgeService(self._deps.repository).execute,
-            monitors=(*self._deps.monitors.single_entity, *monitors),
-            validators=(*self._deps.validators.single_entity, *validators),
-        )
-
-    def field_purge_ops[TAction: PurgeFieldOpsAction[Any, Any]](
-        self,
-        action_cls: type[TAction],
-        owner_lookup: OwnerLookupProcessor,
-        *,
-        validators: Sequence[SingleEntityActionValidator] = (),
-        monitors: Sequence[SingleEntityActionMonitor] = (),
-    ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TData]]:
-        self._record(action_cls)
-        return SingleFieldActionProcessor(
-            FieldPurgeService(self._deps.repository).execute,
-            owner_lookup,
             monitors=(*self._deps.monitors.single_entity, *monitors),
             validators=(*self._deps.validators.single_entity, *validators),
         )
@@ -644,20 +532,6 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.bulk, *validators),
         )
 
-    def field_partial_bulk_purge_ops[TAction: PartialBulkPurgeFieldOpsAction[Any, Any]](
-        self,
-        action_cls: type[TAction],
-        *,
-        validators: Sequence[BulkActionValidator] = (),
-        monitors: Sequence[BulkActionMonitor] = (),
-    ) -> BulkActionProcessor[TAction, BulkOpsResult[TData]]:
-        self._record(action_cls)
-        return BulkActionProcessor(
-            FieldPartialBulkPurgeService(self._deps.repository).execute,
-            monitors=(*self._deps.monitors.bulk, *monitors),
-            validators=(*self._deps.validators.bulk, *validators),
-        )
-
     def global_upsert_ops[TAction: UpsertGlobalOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
@@ -682,20 +556,6 @@ class ProcessorGroup[TData: EntityData]:
         self._record(action_cls)
         return SingleEntityActionProcessor(
             EntityUpsertService(self._deps.repository).execute,
-            monitors=(*self._deps.monitors.single_entity, *monitors),
-            validators=(*self._deps.validators.single_entity, *validators),
-        )
-
-    def field_upsert_ops[TAction: UpsertFieldOpsAction[Any, Any, Any]](
-        self,
-        action_cls: type[TAction],
-        *,
-        validators: Sequence[SingleEntityActionValidator] = (),
-        monitors: Sequence[SingleEntityActionMonitor] = (),
-    ) -> SingleEntityActionProcessor[TAction, EntityOpsResult[TData]]:
-        self._record(action_cls)
-        return SingleEntityActionProcessor(
-            FieldUpsertService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.single_entity, *monitors),
             validators=(*self._deps.validators.single_entity, *validators),
         )
@@ -869,3 +729,183 @@ class ProcessorRegistry[TData: EntityData]:
     def wired_actions(self) -> Sequence[type[Any]]:
         """Every action class wired through this registry's groups, in wiring order."""
         return tuple(self._actions)
+
+
+class FieldProcessorGroup[TFieldData: FieldData]:
+    """Every operation over one kind of field row.
+
+    Reached only through :meth:`ProcessorGroup.field_group`, so the catalog cannot be
+    bypassed. The field data type and the owner lookup are named once here rather than
+    at every operation.
+    """
+
+    _group: ProcessorGroup[Any]
+    _owner_lookup: OwnerLookupProcessor
+
+    def __init__(self, group: ProcessorGroup[Any], owner_lookup: OwnerLookupProcessor) -> None:
+        self._group = group
+        self._owner_lookup = owner_lookup
+
+    def get_ops[TAction: GetFieldOpsAction[Any, Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TFieldData]]:
+        self._group.record(action_cls)
+        return SingleFieldActionProcessor(
+            GetService(self._group.deps.repository).execute,
+            self._owner_lookup,
+            monitors=(*self._group.deps.monitors.single_entity, *monitors),
+            validators=(*self._group.deps.validators.single_entity, *validators),
+        )
+
+    def update_ops[TAction: UpdateFieldOpsAction[Any, Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TFieldData]]:
+        self._group.record(action_cls)
+        return SingleFieldActionProcessor(
+            UpdateService(self._group.deps.repository).execute,
+            self._owner_lookup,
+            monitors=(*self._group.deps.monitors.single_entity, *monitors),
+            validators=(*self._group.deps.validators.single_entity, *validators),
+        )
+
+    def delete_ops[TAction: DeleteFieldOpsAction[Any, Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TFieldData]]:
+        self._group.record(action_cls)
+        return SingleFieldActionProcessor(
+            DeleteService(self._group.deps.repository).execute,
+            self._owner_lookup,
+            monitors=(*self._group.deps.monitors.single_entity, *monitors),
+            validators=(*self._group.deps.validators.single_entity, *validators),
+        )
+
+    def restore_ops[TAction: RestoreFieldOpsAction[Any, Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TFieldData]]:
+        self._group.record(action_cls)
+        return SingleFieldActionProcessor(
+            RestoreService(self._group.deps.repository).execute,
+            self._owner_lookup,
+            monitors=(*self._group.deps.monitors.single_entity, *monitors),
+            validators=(*self._group.deps.validators.single_entity, *validators),
+        )
+
+    def global_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> GlobalActionProcessor[TAction, BatchOpsResult[TFieldData]]:
+        """A read across every row of this field type; no owner is named, so nothing is
+        looked up."""
+        self._group.record(action_cls)
+        return GlobalActionProcessor(
+            GlobalSearchService(self._group.deps.repository).execute,
+            monitors=(*self._group.deps.monitors.global_scope, *monitors),
+            validators=(*self._group.deps.validators.global_scope, *validators),
+        )
+
+    def single_field[TAction: BaseSingleFieldAction[Any, Any], TResult](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[TResult]],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleFieldActionProcessor[TAction, TResult]:
+        self._group.record(action_cls)
+        return SingleFieldActionProcessor(
+            func,
+            self._owner_lookup,
+            monitors=(*self._group.deps.monitors.single_entity, *monitors),
+            validators=(*self._group.deps.validators.single_entity, *validators),
+        )
+
+    def create_ops[TAction: CreateFieldOpsAction[Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleEntityActionProcessor[TAction, CreatedFieldOpsResult[TFieldData]]:
+        self._group.record(action_cls)
+        return SingleEntityActionProcessor(
+            FieldCreateService(self._group.deps.repository).execute,
+            monitors=(*self._group.deps.monitors.single_entity, *monitors),
+            validators=(*self._group.deps.validators.single_entity, *validators),
+        )
+
+    def atomic_create_ops[TAction: AtomicCreateFieldOpsAction[Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleEntityActionProcessor[TAction, FieldsOpsResult[TFieldData]]:
+        self._group.record(action_cls)
+        return SingleEntityActionProcessor(
+            FieldAtomicCreateService(self._group.deps.repository).execute,
+            monitors=(*self._group.deps.monitors.single_entity, *monitors),
+            validators=(*self._group.deps.validators.single_entity, *validators),
+        )
+
+    def purge_ops[TAction: PurgeFieldOpsAction[Any, Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TFieldData]]:
+        self._group.record(action_cls)
+        return SingleFieldActionProcessor(
+            FieldPurgeService(self._group.deps.repository).execute,
+            self._owner_lookup,
+            monitors=(*self._group.deps.monitors.single_entity, *monitors),
+            validators=(*self._group.deps.validators.single_entity, *validators),
+        )
+
+    def partial_bulk_purge_ops[TAction: PartialBulkPurgeFieldOpsAction[Any, Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[BulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> BulkFieldActionProcessor[TAction, TFieldData]:
+        self._group.record(action_cls)
+        return BulkFieldActionProcessor(
+            FieldPartialBulkPurgeService(self._group.deps.repository).execute,
+            self._group.deps.repository,
+            monitors=(*self._group.deps.monitors.bulk, *monitors),
+            validators=(*self._group.deps.validators.bulk, *validators),
+        )
+
+    def upsert_ops[TAction: UpsertFieldOpsAction[Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleEntityActionProcessor[TAction, EntityOpsResult[TFieldData]]:
+        self._group.record(action_cls)
+        return SingleEntityActionProcessor(
+            FieldUpsertService(self._group.deps.repository).execute,
+            monitors=(*self._group.deps.monitors.single_entity, *monitors),
+            validators=(*self._group.deps.validators.single_entity, *validators),
+        )

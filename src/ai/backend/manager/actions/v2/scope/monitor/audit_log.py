@@ -4,7 +4,7 @@ from typing import override
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
-from ai.backend.common.data.entity.types import EntityID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.types import BLANK_ID
@@ -61,7 +61,7 @@ class ScopeActionAuditLogMonitor(ScopeActionMonitor):
         self,
         action: BaseScopeAction,
         result: ScopeActionProcessResult,
-        entity_id: EntityID | None,
+        entity_id: EntityIdentifier | None,
     ) -> ScopeAuditLogCreatorSpec:
         trigger = triggered_user()
         acting = current_user()

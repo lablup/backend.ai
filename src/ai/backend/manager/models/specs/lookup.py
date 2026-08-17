@@ -63,7 +63,7 @@ class DataLookup[TRow: Base, TData](ABC):
         raise NotImplementedError
 
 
-class FieldOwnerLookup(ABC):
+class FieldOwnerLookup[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](ABC):
     """Resolves a field row's id into the id of the entity that owns it.
 
     A field row is absent from the RBAC graph, so an action naming one has nothing to
@@ -71,26 +71,28 @@ class FieldOwnerLookup(ABC):
     it names the target of the permission check and of the audit row.
 
     A query rather than conditions, unlike :class:`DataLookup`, so an owner reached
-    through a join is expressible and only the id is read. The row is named by an
-    argument, so the owner read is that of the id the action declares.
+    through a join is expressible. It selects the pair, so one spec serves a single row
+    and a batch alike: which row each owner belongs to survives.
 
     Example:
-        class ObjectStorageOwnerLookup(FieldOwnerLookup):
-            def build_query(self, field_id: FieldIdentifier) -> sa.sql.Select[tuple[UUID]]:
-                return sa.select(ObjectStorageRow.storage_namespace_id).where(
-                    ObjectStorageRow.id == field_id
+        class ReplicaOwnerLookup(FieldOwnerLookup):
+            def build_query(self, field_ids):
+                return sa.select(ReplicaRow.id, ReplicaRow.deployment_id).where(
+                    ReplicaRow.id.in_(field_ids)
                 )
 
-            def to_entity_id(self, value: UUID) -> StorageNamespaceID:
-                return StorageNamespaceID(value)
+            def to_entity_id(self, value: UUID) -> DeploymentID:
+                return DeploymentID(value)
     """
 
     @abstractmethod
-    def build_query(self, field_id: FieldIdentifier) -> sa.sql.Select[tuple[UUID]]:
-        """Build the query selecting the owning entity's id, matching at most one row."""
+    def build_query(
+        self, field_ids: Sequence[TFieldID]
+    ) -> sa.sql.Select[tuple[TFieldID, TOwnerID]]:
+        """Build the query selecting each named row's id and its owning entity's id."""
         raise NotImplementedError
 
     @abstractmethod
-    def to_entity_id(self, value: UUID) -> EntityIdentifier:
+    def to_entity_id(self, value: UUID) -> TOwnerID:
         """Convert the selected value into the owning entity's identifier."""
         raise NotImplementedError

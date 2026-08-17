@@ -4,10 +4,9 @@ from typing import override
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
+from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.types import BLANK_ID
-from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.result import BulkActionProcessResult
 from ai.backend.manager.repositories.audit_log.creators import BulkAuditLogCreatorSpec
@@ -34,33 +33,32 @@ class BulkActionAuditLogMonitor(BulkActionMonitor):
         self._policy = policy
 
     @override
-    async def prepare(self, action: BaseBulkAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, meta: BulkActionTriggerMeta) -> None:
         pass
 
     @override
-    async def done(self, action: BaseBulkAction, result: BulkActionProcessResult) -> None:
+    async def done(self, meta: BulkActionTriggerMeta, result: BulkActionProcessResult) -> None:
         trigger = triggered_user()
         acting = current_user()
-        meta = result.meta
         request_id = current_request_id() or BLANK_ID
         bulk_creator = BulkCreator(
             specs=[
                 BulkAuditLogCreatorSpec(
-                    action_id=meta.action_id,
-                    entity_type=action.entity_type(),
-                    operation=action.operation_type(),
-                    action_name=action.action_name(),
-                    created_at=meta.started_at,
+                    action_id=result.meta.action_id,
+                    entity_type=meta.entity_type,
+                    operation=meta.operation_type,
+                    action_name=meta.action_name,
+                    created_at=result.meta.started_at,
                     description=entity_result.description,
                     status=entity_result.status,
                     entity_id=entity_result.entity_id,
                     request_id=request_id,
                     triggered_by=str(trigger.user_id) if trigger else None,
                     acted_as=acting.user_id if acting else None,
-                    duration=meta.duration,
+                    duration=result.meta.duration,
                 )
-                for entity_result in meta.entity_results
-                if self._policy.should_record(action.operation_type(), entity_result.status)
+                for entity_result in result.meta.entity_results
+                if self._policy.should_record(meta.operation_type, entity_result.status)
             ]
         )
         await self._repository.bulk_create(bulk_creator)

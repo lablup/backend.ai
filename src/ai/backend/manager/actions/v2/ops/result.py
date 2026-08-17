@@ -16,7 +16,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
+from ai.backend.common.data.entity.types import (
+    FieldIdentifier,
+    FieldData,
+    EntityData,
+    EntityIdentifier,
+)
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.bulk.result import BaseBulkActionResult, BulkEntityResult
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupActionResult
@@ -27,6 +32,9 @@ __all__ = (
     "CreatedEntityOpsResult",
     "CreatedEntityWithFieldsOpsResult",
     "LookupOpsResult",
+    "CreatedFieldOpsResult",
+    "FieldsOpsResult",
+    "BulkFieldOpsResult",
     "FieldOwnerLookupOpsResult",
     "EntitiesOpsResult",
     "BulkOpsResult",
@@ -57,7 +65,7 @@ class CreatedEntityOpsResult[TData: EntityData](EntityOpsResult[TData], BaseScop
     """
 
     @override
-    def entity_ids(self) -> Sequence[EntityID]:
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
         return (self.data.entity_id(),)
 
 
@@ -83,7 +91,7 @@ class LookupOpsResult[TData: EntityData](EntityOpsResult[TData], BaseLookupActio
     """
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.data.entity_id()
 
 
@@ -98,7 +106,7 @@ class FieldOwnerLookupOpsResult(BaseLookupActionResult):
     owner_entity_id: EntityIdentifier
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.owner_entity_id
 
 
@@ -115,8 +123,8 @@ class BulkOpsResult[TData](BaseBulkActionResult):
     ones the caller passed in, not something to recover from what came back.
     """
 
-    successes: dict[EntityID, TData]
-    errors: dict[EntityID, Exception]
+    successes: dict[EntityIdentifier, TData]
+    errors: dict[EntityIdentifier, Exception]
 
     @override
     def entity_results(self) -> Sequence[BulkEntityResult]:
@@ -161,8 +169,37 @@ class EntitiesOpsResult[TData: EntityData](BaseScopeActionResult):
     items: list[TData]
 
     @override
-    def entity_ids(self) -> Sequence[EntityID]:
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
         return tuple(item.entity_id() for item in self.items)
+
+
+@dataclass
+class BulkFieldOpsResult[TData]:
+    """How each field row a bulk write named fared.
+
+    Keyed by the field rows the caller named, unlike :class:`BulkOpsResult`: the answer
+    the caller expects is per row. What the run is recorded against is the entity owning
+    each row, which the processor resolves.
+    """
+
+    successes: dict[FieldIdentifier, TData]
+    errors: dict[FieldIdentifier, Exception]
+
+
+@dataclass
+class CreatedFieldOpsResult[TData: FieldData](EntityOpsResult[TData]):
+    """The field row a write created."""
+
+
+@dataclass
+class FieldsOpsResult[TData: FieldData]:
+    """Every field row a write created.
+
+    Names nothing on its own: the operation is answered for by the owner the action
+    already declares, so there is no id for this result to report.
+    """
+
+    items: list[TData]
 
 
 @dataclass
@@ -189,7 +226,7 @@ class ScopedBatchOpsResult[TData: EntityData](BatchOpsResult[TData], BaseScopeAc
     """
 
     @override
-    def entity_ids(self) -> Sequence[EntityID]:
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
         """Every entity on the page.
 
         A read still names what it reached. How much of that is worth recording is the

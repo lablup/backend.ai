@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from ai.backend.common.data.entity.types import EntityID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.models.clauses import QueryCondition
 
@@ -66,8 +66,8 @@ class BulkResultWithFailures[TData]:
     ``errors`` off this reads them the same way off ``BulkUpdaterResult``.
     """
 
-    successes: dict[EntityID, TData]
-    errors: dict[EntityID, Exception]
+    successes: dict[EntityIdentifier, TData]
+    errors: dict[EntityIdentifier, Exception]
 
 
 @dataclass

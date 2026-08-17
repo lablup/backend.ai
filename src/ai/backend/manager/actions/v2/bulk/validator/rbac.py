@@ -4,8 +4,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.types import EntityRef
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UnreachableError
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
-from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.validator.base import BulkActionValidator
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.permission.virtual_scope import EntityPermissionCheckKey
@@ -34,7 +33,7 @@ class VirtualScopeBulkActionRBACValidator(BulkActionValidator):
         self._config_provider = config_provider
 
     @override
-    async def validate(self, action: BaseBulkAction, meta: BaseActionTriggerMeta) -> None:
+    async def validate(self, meta: BulkActionTriggerMeta) -> None:
         if not self._config_provider.config.manager.rbac.enforcement_enabled:
             return
 
@@ -48,13 +47,13 @@ class VirtualScopeBulkActionRBACValidator(BulkActionValidator):
             EntityPermissionCheckKey(
                 user_id=UserID(user.user_id),
                 entity=EntityRef(
-                    entity_type=action.entity_type(),
+                    entity_type=meta.entity_type,
                     entity_id=entity_id,
                 ),
             )
-            for entity_id in action.entity_ids()
+            for entity_id in meta.entity_ids
         ]
-        permission = action.operation_type().to_permission()
+        permission = meta.operation_type.to_permission()
         permission_map = await self._repository.check_bulk_permission_via_virtual_scope(
             keys, permission
         )
@@ -62,5 +61,5 @@ class VirtualScopeBulkActionRBACValidator(BulkActionValidator):
         if denied:
             raise NotEnoughPermission(
                 f"User {user.user_id} lacks permission {permission!r} "
-                f"on {action.entity_type()} entities {denied}"
+                f"on {meta.entity_type} entities {denied}"
             )

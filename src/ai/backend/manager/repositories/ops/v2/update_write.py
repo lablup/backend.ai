@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from ai.backend.common.data.entity.types import EntityID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
@@ -36,12 +36,12 @@ class V2UpdateWriteOps(V2WriteOpsBase):
         return updater.to_data(row)
 
     async def partial_bulk_update_data[TRow: Base, TData](
-        self, updaters: Mapping[EntityID, DataUpdater[TRow, TData]]
+        self, updaters: Mapping[EntityIdentifier, DataUpdater[TRow, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Update each named entity independently in its own savepoint, reporting
         per entity — a missing row is an answer, not a gap."""
-        successes: dict[EntityID, TData] = {}
-        errors: dict[EntityID, Exception] = {}
+        successes: dict[EntityIdentifier, TData] = {}
+        errors: dict[EntityIdentifier, Exception] = {}
         for entity_id, updater in updaters.items():
             try:
                 async with self._sess.begin_nested():

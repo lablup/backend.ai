@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+
+from typing import Any
 
 import sqlalchemy as sa
 
@@ -63,23 +65,19 @@ class V2ReadOps(V2OpsBase):
             )
         return lookup.to_data(rows[0])
 
-    async def lookup_field_owner(
-        self, lookup: FieldOwnerLookup, field_id: FieldIdentifier
-    ) -> EntityIdentifier | None:
-        """Read the id of the entity owning the named field row.
+    async def lookup_field_owners(
+        self, lookup: FieldOwnerLookup[Any, Any], field_ids: Sequence[FieldIdentifier]
+    ) -> Mapping[FieldIdentifier, EntityIdentifier]:
+        """Read the owning entity of each named field row.
 
-        Reads at most two rows and rejects the second, as ``lookup_data`` does: the
-        query is expected to name one field row.
+        A row that is gone is absent from the mapping rather than an error: the caller
+        decides whether that is a miss or one failed item among many.
         """
-        result = await self._sess.execute(lookup.build_query(field_id).limit(2))
-        values = result.scalars().all()
-        if not values:
-            return None
-        if len(values) > 1:
-            raise AmbiguousEntityKeyError(
-                "The field owner lookup matches more than one row",
-            )
-        return lookup.to_entity_id(values[0])
+        if not field_ids:
+            return {}
+        rows = (await self._sess.execute(lookup.build_query(field_ids))).all()
+        owners = {row[0]: lookup.to_entity_id(row[1]) for row in rows}
+        return {field_id: owners[field_id] for field_id in field_ids if field_id in owners}
 
     async def search_with_scopes[TRow: Base, TData](
         self,

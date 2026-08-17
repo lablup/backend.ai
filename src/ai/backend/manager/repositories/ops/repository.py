@@ -11,12 +11,13 @@ from typing import Any
 
 from ai.backend.common.data.entity.types import (
     EntityData,
-    EntityID,
+    EntityIdentifier,
     EntityIdentifier,
     FieldIdentifier,
 )
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.models.specs.creator import (
     EntityCreator,
     FieldCreator,
@@ -76,19 +77,26 @@ class OpsRepository[TData]:
                 raise EntityNotFoundError(f"No {lookup.row_class().__name__} matches the given key")
             return data
 
+    async def field_owners(
+        self, lookup: FieldOwnerLookup[Any, Any], field_ids: Sequence[FieldIdentifier]
+    ) -> Mapping[FieldIdentifier, EntityIdentifier]:
+        """Read the owning entity of each named field row; a row that is gone is absent."""
+        async with self._ops.read_ops() as r:
+            return await r.lookup_field_owners(lookup, field_ids)
+
     async def field_owner(
-        self, lookup: FieldOwnerLookup, field_id: FieldIdentifier
+        self, lookup: FieldOwnerLookup[Any, Any], field_id: FieldIdentifier
     ) -> EntityIdentifier:
-        """Read a field row's owning entity id, raising if the row is gone.
+        """Read one field row's owning entity, raising if the row is gone.
 
         A lookup has to produce an id, so an absent row cannot be reported by returning
         ``None`` — the same contract ``lookup`` keeps.
         """
-        async with self._ops.read_ops() as r:
-            entity_id = await r.lookup_field_owner(lookup, field_id)
-            if entity_id is None:
-                raise EntityNotFoundError("No field row matches the given id")
-            return entity_id
+        owners = await self.field_owners(lookup, [field_id])
+        owner = owners.get(field_id)
+        if owner is None:
+            raise EntityNotFoundError("No field row matches the given id")
+        return owner
 
     async def search_in_scopes(
         self,
@@ -204,15 +212,15 @@ class OpsRepository[TData]:
             return data
 
     async def partial_bulk_purge_entities(
-        self, purgers: Mapping[EntityID, EntityPurger[Any, TData]]
+        self, purgers: Mapping[EntityIdentifier, EntityPurger[Any, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Hard-delete each named entity independently, answering for every one."""
         async with self._ops.write_ops() as w:
             return await w.partial_bulk_purge_entities(purgers)
 
     async def partial_bulk_purge_field_entities(
-        self, purgers: Mapping[EntityID, FieldPurger[Any, TData]]
-    ) -> BulkResultWithFailures[TData]:
+        self, purgers: Mapping[FieldIdentifier, FieldPurger[Any, TData]]
+    ) -> BulkFieldOpsResult[TData]:
         """Hard-delete each named field row independently; authorized through the owner."""
         async with self._ops.write_ops() as w:
             return await w.partial_bulk_purge_field_entities(purgers)
@@ -245,7 +253,7 @@ class OpsRepository[TData]:
             return data
 
     async def partial_bulk_update(
-        self, updaters: Mapping[EntityID, DataUpdater[Any, TData]]
+        self, updaters: Mapping[EntityIdentifier, DataUpdater[Any, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Update each named entity independently, answering for every one of them.
 

@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 
-from ai.backend.common.data.entity.types import FieldIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerOpsAction
 
 
-class BaseSingleFieldAction(ABC):
+class BaseSingleFieldAction[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](ABC):
     """Base for actions that operate on a single, already-identified field row.
 
     A field row is absent from the RBAC graph, so this action names no entity. It names
@@ -27,11 +27,11 @@ class BaseSingleFieldAction(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def field_id(self) -> FieldIdentifier:
+    def field_id(self) -> TFieldID:
         """Return the id of the field row that this action applies to."""
         raise NotImplementedError
 
     @abstractmethod
-    def to_owner_lookup_action(self) -> LookupFieldOwnerOpsAction:
+    def to_owner_lookup_action(self) -> LookupFieldOwnerOpsAction[TFieldID, TOwnerID]:
         """Return the lookup that reads the entity owning this row."""
         raise NotImplementedError

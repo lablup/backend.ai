@@ -2,6 +2,7 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
+from typing import Any
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.run_status import ActionRunStatus
@@ -22,11 +23,11 @@ __all__ = ("SingleFieldActionProcessor",)
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 type OwnerLookupProcessor = LookupActionProcessor[
-    LookupFieldOwnerOpsAction, FieldOwnerLookupOpsResult
+    LookupFieldOwnerOpsAction[Any, Any], FieldOwnerLookupOpsResult
 ]
 
 
-class SingleFieldActionProcessor[TAction: BaseSingleFieldAction, TResult]:
+class SingleFieldActionProcessor[TAction: BaseSingleFieldAction[Any, Any], TResult]:
     """Look the field row's owner up, then run the single-entity pipeline against it.
 
     Two runs, each recorded as what it is: a lookup reading the entity that owns the

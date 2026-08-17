@@ -23,7 +23,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import (
-    EntityID,
+    EntityIdentifier,
     EntityIdentifier,
     EntityType,
     ScopeType,
@@ -166,12 +166,12 @@ class V2EntityWriteOps(V2WriteOpsBase):
         return purger.to_data(row)
 
     async def partial_bulk_purge_entities[TRow: Base, TData](
-        self, purgers: Mapping[EntityID, EntityPurger[TRow, TData]]
+        self, purgers: Mapping[EntityIdentifier, EntityPurger[TRow, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Delete each named entity independently, a row and its teardown sharing one
         savepoint; a missing row raises :class:`EntityNotFoundError`."""
-        successes: dict[EntityID, TData] = {}
-        errors: dict[EntityID, Exception] = {}
+        successes: dict[EntityIdentifier, TData] = {}
+        errors: dict[EntityIdentifier, Exception] = {}
         for entity_id, purger in purgers.items():
             try:
                 async with self._sess.begin_nested():

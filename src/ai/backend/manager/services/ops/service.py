@@ -14,7 +14,7 @@ rather than hidden in an argument.
 
 from typing import Any
 
-from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.entity.types import EntityData, FieldData
 from ai.backend.manager.actions.v2.field.lookup import FieldOwnerLookupOpsAction
 from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
@@ -47,10 +47,13 @@ from ai.backend.manager.actions.v2.ops.base import (
 )
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    BulkFieldOpsResult,
     BulkOpsResult,
     CreatedEntityOpsResult,
     CreatedEntityWithFieldsOpsResult,
+    CreatedFieldOpsResult,
     EntitiesOpsResult,
+    FieldsOpsResult,
     EntityOpsResult,
     FieldOwnerLookupOpsResult,
     LookupOpsResult,
@@ -127,7 +130,9 @@ class FieldOwnerLookupService:
     def __init__(self, repository: OpsRepository[Any]) -> None:
         self._repository = repository
 
-    async def execute(self, action: FieldOwnerLookupOpsAction) -> FieldOwnerLookupOpsResult:
+    async def execute(
+        self, action: FieldOwnerLookupOpsAction[Any, Any]
+    ) -> FieldOwnerLookupOpsResult:
         owner_entity_id = await self._repository.field_owner(
             action.to_owner_lookup(), action.field_id()
         )
@@ -248,18 +253,18 @@ class RoleManagedEntityCreateService[TData: EntityData]:
         )
 
 
-class FieldCreateService[TData: EntityData]:
+class FieldCreateService[TData: FieldData]:
     """Inserts the field row the action's creator describes under the action's owner."""
 
-    _repository: OpsRepository[TData]
+    _repository: OpsRepository[Any]
 
-    def __init__(self, repository: OpsRepository[TData]) -> None:
+    def __init__(self, repository: OpsRepository[Any]) -> None:
         self._repository = repository
 
     async def execute(
         self, action: FieldCreateOpsAction[Any, Any, TData]
-    ) -> CreatedEntityOpsResult[TData]:
-        return CreatedEntityOpsResult(
+    ) -> CreatedFieldOpsResult[TData]:
+        return CreatedFieldOpsResult(
             data=await self._repository.create_field_entity(action.owner_id(), action.to_creator())
         )
 
@@ -312,18 +317,18 @@ class RoleManagedEntityAtomicCreateService[TData: EntityData]:
         )
 
 
-class FieldAtomicCreateService[TData: EntityData]:
+class FieldAtomicCreateService[TData: FieldData]:
     """Inserts every field row the action's creators describe under the action's owner."""
 
-    _repository: OpsRepository[TData]
+    _repository: OpsRepository[Any]
 
-    def __init__(self, repository: OpsRepository[TData]) -> None:
+    def __init__(self, repository: OpsRepository[Any]) -> None:
         self._repository = repository
 
     async def execute(
         self, action: FieldAtomicCreateOpsAction[Any, Any, TData]
-    ) -> EntitiesOpsResult[TData]:
-        return EntitiesOpsResult(
+    ) -> FieldsOpsResult[TData]:
+        return FieldsOpsResult(
             items=await self._repository.atomic_create_field_entities(
                 action.owner_id(), action.to_creators()
             )
@@ -405,10 +410,9 @@ class FieldPartialBulkPurgeService[TData]:
         self._repository = repository
 
     async def execute(
-        self, action: FieldPartialBulkPurgeOpsAction[Any, TData]
-    ) -> BulkOpsResult[TData]:
-        result = await self._repository.partial_bulk_purge_field_entities(action.to_purgers())
-        return BulkOpsResult(successes=result.successes, errors=result.errors)
+        self, action: FieldPartialBulkPurgeOpsAction[Any, Any, TData]
+    ) -> BulkFieldOpsResult[TData]:
+        return await self._repository.partial_bulk_purge_field_entities(action.to_purgers())
 
 
 class GlobalUpsertService[TData]:

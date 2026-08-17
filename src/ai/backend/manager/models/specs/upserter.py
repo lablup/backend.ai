@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Collection, Sequence
 from typing import Any
 
-from ai.backend.common.data.entity.types import EntityID, EntityIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -98,7 +98,7 @@ class EntityUpserter[TRow: Base, TData](ABC):
         raise NotImplementedError
 
 
-class FieldUpserter[TOwnerID: EntityID, TRow: Base, TData](ABC):
+class FieldUpserter[TOwnerID: EntityIdentifier, TRow: Base, TData](ABC):
     """Upsert spec of a field row — built only under the owner's settled
     identifier, like the field create; no scope involved."""
 

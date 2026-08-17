@@ -2,11 +2,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from typing import Any, override
 
-from ai.backend.common.data.entity.types import EntityID
-from ai.backend.common.data.entity.types import EntityID as OwnerEntityID
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier as OwnerEntityID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
+from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
@@ -326,7 +327,7 @@ class GlobalEntityPartialBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction)
     separately; no membership involved."""
 
     @abstractmethod
-    def to_purgers(self) -> Mapping[EntityID, EntityPurger[TRow, TData]]:
+    def to_purgers(self) -> Mapping[EntityIdentifier, EntityPurger[TRow, TData]]:
         """Return the delete spec for each entity this action names."""
         raise NotImplementedError
 
@@ -336,18 +337,20 @@ class EntityPartialBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
     every row's scope is torn down with it."""
 
     @abstractmethod
-    def to_purgers(self) -> Mapping[EntityID, EntityPurger[TRow, TData]]:
+    def to_purgers(self) -> Mapping[EntityIdentifier, EntityPurger[TRow, TData]]:
         """Return the delete spec for each entity this action names."""
         raise NotImplementedError
 
 
-class FieldPartialBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
-    """A hard delete of field rows the caller named, each answered for
-    separately; authorized through the owner the shape names."""
+class FieldPartialBulkPurgeOpsAction[TFieldID: FieldIdentifier, TRow: Base, TData](
+    OpsBackendAction
+):
+    """A hard delete of field rows the caller named, each answered for separately;
+    authorized through the entities owning them."""
 
     @abstractmethod
-    def to_purgers(self) -> Mapping[EntityID, FieldPurger[TRow, TData]]:
-        """Return the delete spec for each entity this action names."""
+    def to_purgers(self) -> Mapping[TFieldID, FieldPurger[TRow, TData]]:
+        """Return the delete spec for each row this action names."""
         raise NotImplementedError
 
 
@@ -407,7 +410,7 @@ class PartialBulkUpdateOpsAction[TRow: Base, TData](OpsBackendAction):
     """
 
     @abstractmethod
-    def to_updaters(self) -> Mapping[EntityID, DataUpdater[TRow, TData]]:
+    def to_updaters(self) -> Mapping[EntityIdentifier, DataUpdater[TRow, TData]]:
         """Return the update spec for each entity this action names."""
         raise NotImplementedError
 
@@ -576,7 +579,7 @@ class CreateFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
+        return ActionOperationType.UPDATE
 
 
 class AtomicCreateGlobalEntityOpsAction[TRow: Base, TData](
@@ -620,7 +623,7 @@ class AtomicCreateFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
+        return ActionOperationType.UPDATE
 
 
 class PurgeEntityOpsAction[TRow: Base, TData](
@@ -634,7 +637,9 @@ class PurgeEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.PURGE
 
 
-class GetFieldOpsAction[TRow: Base, TData](BaseSingleFieldAction, GetOpsAction[TRow, TData], ABC):
+class GetFieldOpsAction[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier, TRow: Base, TData](
+    BaseSingleFieldAction[TFieldID, TOwnerID], GetOpsAction[TRow, TData], ABC
+):
     """A read of one field row, authorized against the entity owning it."""
 
     @override
@@ -643,9 +648,12 @@ class GetFieldOpsAction[TRow: Base, TData](BaseSingleFieldAction, GetOpsAction[T
         return ActionOperationType.GET
 
 
-class UpdateFieldOpsAction[TRow: Base, TData](
-    BaseSingleFieldAction, UpdateOpsAction[TRow, TData], ABC
-):
+class UpdateFieldOpsAction[
+    TFieldID: FieldIdentifier,
+    TOwnerID: EntityIdentifier,
+    TRow: Base,
+    TData,
+](BaseSingleFieldAction[TFieldID, TOwnerID], UpdateOpsAction[TRow, TData], ABC):
     """A write to one field row, authorized against the entity owning it."""
 
     @override
@@ -654,37 +662,43 @@ class UpdateFieldOpsAction[TRow: Base, TData](
         return ActionOperationType.UPDATE
 
 
-class DeleteFieldOpsAction[TRow: Base, TData](
-    BaseSingleFieldAction, UpdateOpsAction[TRow, TData], ABC
-):
+class DeleteFieldOpsAction[
+    TFieldID: FieldIdentifier,
+    TOwnerID: EntityIdentifier,
+    TRow: Base,
+    TData,
+](BaseSingleFieldAction[TFieldID, TOwnerID], UpdateOpsAction[TRow, TData], ABC):
     """A soft delete of one field row; the updater writes the lifecycle column alone."""
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
+        return ActionOperationType.UPDATE
 
 
-class RestoreFieldOpsAction[TRow: Base, TData](
-    BaseSingleFieldAction, UpdateOpsAction[TRow, TData], ABC
-):
+class RestoreFieldOpsAction[
+    TFieldID: FieldIdentifier,
+    TOwnerID: EntityIdentifier,
+    TRow: Base,
+    TData,
+](BaseSingleFieldAction[TFieldID, TOwnerID], UpdateOpsAction[TRow, TData], ABC):
     """The reverse transition of a field row's soft delete."""
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.RESTORE
+        return ActionOperationType.UPDATE
 
 
-class PurgeFieldOpsAction[TRow: Base, TData](
-    BaseSingleFieldAction, FieldPurgeOpsAction[TRow, TData], ABC
+class PurgeFieldOpsAction[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier, TRow: Base, TData](
+    BaseSingleFieldAction[TFieldID, TOwnerID], FieldPurgeOpsAction[TRow, TData], ABC
 ):
     """A hard delete of a field row, authorized against its owner."""
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.PURGE
+        return ActionOperationType.UPDATE
 
 
 class PartialBulkPurgeGlobalEntityOpsAction[TRow: Base, TData](
@@ -709,15 +723,22 @@ class PartialBulkPurgeEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.PURGE
 
 
-class PartialBulkPurgeFieldOpsAction[TRow: Base, TData](
-    BaseBulkAction, FieldPartialBulkPurgeOpsAction[TRow, TData], ABC
+class PartialBulkPurgeFieldOpsAction[
+    TFieldID: FieldIdentifier,
+    TOwnerID: EntityIdentifier,
+    TRow: Base,
+    TData,
+](
+    BaseBulkFieldAction[TFieldID, TOwnerID],
+    FieldPartialBulkPurgeOpsAction[TFieldID, TRow, TData],
+    ABC,
 ):
     """A hard delete over the field rows the caller named."""
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.PURGE
+        return ActionOperationType.UPDATE
 
 
 class UpsertGlobalOpsAction[TRow: Base, TData](
@@ -750,7 +771,7 @@ class UpsertFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPSERT
+        return ActionOperationType.UPDATE
 
 
 class GetGlobalOpsAction[TRow: Base, TData](BaseGlobalAction, GetOpsAction[TRow, TData], ABC):
@@ -768,7 +789,7 @@ class GetGlobalOpsAction[TRow: Base, TData](BaseGlobalAction, GetOpsAction[TRow,
 
 
 class UpdateGlobalOpsAction[TRow: Base, TData](BaseGlobalAction, UpdateOpsAction[TRow, TData], ABC):
-    """A write to one row of system-wide state, named by a key that is not an ``EntityID``.
+    """A write to one row of system-wide state, named by a key that is not an ``EntityIdentifier``.
 
     Global rather than single-entity because the row it names belongs to no RBAC scope:
     the SUPERADMIN gate is what answers for the write, and the catalogs this shape

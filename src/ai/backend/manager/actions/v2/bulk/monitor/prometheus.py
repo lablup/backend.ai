@@ -7,9 +7,8 @@ from ai.backend.common.metrics.metric import (
     ACTION_STATUS_PARTIAL,
     ActionMetricObserver,
 )
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
+from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.types import OperationStatus
-from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.result import (
     BulkActionProcessResult,
@@ -32,24 +31,23 @@ class BulkActionPrometheusMonitor(BulkActionMonitor):
         self._observer = ActionMetricObserver.instance()
 
     @override
-    async def prepare(self, action: BaseBulkAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, meta: BulkActionTriggerMeta) -> None:
         return
 
     @override
-    async def done(self, action: BaseBulkAction, result: BulkActionProcessResult) -> None:
-        meta = result.meta
-        failed = [r for r in meta.entity_results if r.status is not OperationStatus.SUCCESS]
+    async def done(self, meta: BulkActionTriggerMeta, result: BulkActionProcessResult) -> None:
+        failed = [r for r in result.meta.entity_results if r.status is not OperationStatus.SUCCESS]
         self._observer.observe_action(
-            entity_type=action.entity_type(),
-            operation_type=action.operation_type(),
-            status=self._run_status_label(meta.entity_results, failed),
-            duration=meta.duration.total_seconds(),
+            entity_type=meta.entity_type,
+            operation_type=meta.operation_type,
+            status=self._run_status_label(result.meta.entity_results, failed),
+            duration=result.meta.duration.total_seconds(),
             error_code=failed[0].error_code if failed else None,
         )
-        for entity_result in meta.entity_results:
+        for entity_result in result.meta.entity_results:
             self._observer.observe_action_entity(
-                entity_type=action.entity_type(),
-                operation_type=action.operation_type(),
+                entity_type=meta.entity_type,
+                operation_type=meta.operation_type,
                 status=entity_result.status,
                 error_code=entity_result.error_code,
             )

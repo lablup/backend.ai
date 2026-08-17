@@ -9,7 +9,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Collection, Sequence
 
-from ai.backend.common.data.entity.types import EntityID, EntityIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.role_template import RoleTemplateSource
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -116,7 +116,7 @@ class RoleManagedEntityCreator[TRow: Base, TData](RoleTemplateSource[TRow], ABC)
         raise NotImplementedError
 
 
-class FieldCreator[TOwnerID: EntityID, TRow: Base, TData](ABC):
+class FieldCreator[TOwnerID: EntityIdentifier, TRow: Base, TData](ABC):
     """Insert spec of a field row — a row owned by another entity.
 
     Built only from the owner's settled identifier (e.g. a just-created parent's

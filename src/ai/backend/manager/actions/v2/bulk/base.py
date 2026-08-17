@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 
 
@@ -29,6 +29,6 @@ class BaseBulkAction(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def entity_ids(self) -> Sequence[EntityID]:
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
         """Return the IDs of the entities that this action applies to."""
         raise NotImplementedError
