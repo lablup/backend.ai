@@ -10,7 +10,7 @@ sources:
   - src/ai/backend/manager/models/rbac_models/role_permission_preset
 generated:
   by: claude-code/opus-5
-  at: 2026-08-14
+  at: 2026-08-18
 status: stable
 ---
 
@@ -35,23 +35,24 @@ the preset that owns them.
 | `bulk_restore` | `BulkRestoreRolePresetsAction` | ROLE_PRESET | partial bulk | RESTORE |
 | `purge` | `PurgeRolePresetAction` | ROLE_PRESET | global | PURGE |
 | `bulk_purge` | `BulkPurgeRolePresetsAction` | ROLE_PRESET | partial bulk | PURGE |
-| `search_permission_presets` | `SearchRolePermissionPresetsAction` | ROLE_PERMISSION_PRESET | global | SEARCH |
-| `bulk_add_permissions` | `BulkAddRolePermissionPresetsAction` | ROLE_PERMISSION_PRESET | field, atomic | CREATE |
-| `bulk_remove_permissions` | `BulkRemoveRolePermissionPresetsAction` | ROLE_PERMISSION_PRESET | field, partial bulk | PURGE |
+| `search_permission_presets` | `SearchRolePermissionPresetsAction` | ROLE_PRESET | global | SEARCH |
+| `bulk_add_permissions` | `BulkAddRolePermissionPresetsAction` | ROLE_PRESET | single entity, atomic | UPDATE |
+| `bulk_remove_permissions` | `BulkRemoveRolePermissionPresetsAction` | ROLE_PRESET | bulk field, partial | UPDATE |
 
-Two `ProcessorGroup`s are wired, one per entity type, so each operation records
-the entity it actually acts on.
+One `ProcessorGroup` is wired. The preset is the entity and its permission entries
+are field rows of it, so the last three come from the field sub-group that group hands
+out. The entity recorded is always the preset.
 
 ## A preset is global state that owns field rows
 
 - The preset sits outside the scope hierarchy: it declares what a scope type
   gets, joins no scope, and is never shared — so `RolePresetCreator` is a
   `GlobalEntityCreator`.
-- Its permission rows are a `FieldEntityCreator`: FK to the preset with
+- Its permission rows are a `FieldCreator`: FK to the preset with
   `ondelete=CASCADE`, unique on the `(preset, entity_type, operation)` triple,
   and referenced by nothing else.
-- A global owner is not a contradiction. Field means the row is authorized
-  through its owner, not that the owner carries a scope.
+- A global owner is not a contradiction. Field means the row's membership is only
+  knowable through its owner, not that the owner sits under something.
 
 ## Creation is one action so the two tables share a transaction
 
@@ -59,8 +60,18 @@ the entity it actually acts on.
   creators together; a preset that survived a failed permission row would grant
   less than it declares.
 - The field creators build from the parent's id, which does not exist until the
-  parent row does — `FieldEntityCreator.build_row(owner_id)` is what makes that
+  parent row does — `FieldCreator.build_row(owner_id)` is what makes that
   orderable inside one write.
+
+## A permission entry is answered for by its preset
+
+- Adding or removing an entry is a change to the preset, so it is recorded as `UPDATE`.
+  An entry carries no permission bit of its own.
+- `bulk_add` takes the preset id: there is no entry yet to name. `bulk_remove` takes
+  entry ids alone and the owning preset is what the lookup answers.
+- The entries `bulk_remove` takes may belong to different presets. Their owners are
+  read in one go and every one is checked. The answer is per entry, the record per
+  preset.
 
 ## Delete and purge are different operations, not duplicates
 
