@@ -117,6 +117,7 @@ class CheckPresetsDBData:
 
     known_slot_types: Mapping[SlotName, SlotTypes]
     keypair_data: KeypairResourceData
+    domain_limits: list[SlotQuantity]
     per_sgroup_data: dict[str, PerScalingGroupResourceData]
     presets: list[PresetAllocatabilityData]
 

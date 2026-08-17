@@ -495,6 +495,11 @@ class TestResourcePresetServiceCompatibility:
                 SlotQuantity("mem", Decimal("102005473280")),
                 SlotQuantity("gpu", Decimal("10")),
             ],
+            domain_limits=[
+                SlotQuantity("cpu", Decimal("200")),
+                SlotQuantity("mem", Decimal("214748364800")),
+                SlotQuantity("gpu", Decimal("20")),
+            ],
             scaling_group_remaining=[
                 SlotQuantity("cpu", Decimal("1000")),
                 SlotQuantity("mem", Decimal("1073741824000")),
@@ -713,6 +718,10 @@ class TestResourcePresetServiceCompatibility:
                 SlotQuantity("cpu", Decimal("45")),
                 SlotQuantity("mem", Decimal("48318382080")),
             ],
+            domain_limits=[
+                SlotQuantity("cpu", Decimal("200")),
+                SlotQuantity("mem", Decimal("214748364800")),
+            ],
             scaling_group_remaining=[
                 SlotQuantity("cpu", Decimal("1000")),
                 SlotQuantity("mem", Decimal("1073741824000")),
@@ -745,4 +754,5 @@ class TestResourcePresetServiceCompatibility:
         assert len(result.group_limits) == 2
         assert len(result.group_using) == 2
         assert len(result.group_remaining) == 2
+        assert len(result.domain_limits) == 2
         assert len(result.presets) == 1

@@ -173,6 +173,7 @@ class ResourcePresetService:
             group_limits=result.group_limits,
             group_using=result.group_using,
             group_remaining=result.group_remaining,
+            domain_limits=result.domain_limits,
             scaling_group_remaining=result.scaling_group_remaining,
             scaling_groups=per_sgroup_dict,
         )

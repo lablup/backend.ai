@@ -25,6 +25,7 @@ class CheckPresetsResult:
     group_limits: list[SlotQuantity]
     group_using: list[SlotQuantity]
     group_remaining: list[SlotQuantity]
+    domain_limits: list[SlotQuantity]
     scaling_group_remaining: list[SlotQuantity]
     scaling_groups: dict[str, PerScalingGroupResourceData]
 
@@ -42,6 +43,7 @@ class CheckPresetsResult:
             "group_limits": quantities_to_json(self.group_limits),
             "group_using": quantities_to_json(self.group_using),
             "group_remaining": quantities_to_json(self.group_remaining),
+            "domain_limits": quantities_to_json(self.domain_limits),
             "scaling_group_remaining": quantities_to_json(self.scaling_group_remaining),
             "scaling_groups": {
                 sgname: sg_data.to_cache() for sgname, sg_data in self.scaling_groups.items()
@@ -68,6 +70,8 @@ class CheckPresetsResult:
             group_limits=quantities_from_json(data["group_limits"]),
             group_using=quantities_from_json(data["group_using"]),
             group_remaining=quantities_from_json(data["group_remaining"]),
+            # Entries cached before this field existed lack the key.
+            domain_limits=quantities_from_json(data.get("domain_limits", "{}")),
             scaling_group_remaining=quantities_from_json(data["scaling_group_remaining"]),
             scaling_groups={
                 sgname: PerScalingGroupResourceData.from_cache(sg_data)

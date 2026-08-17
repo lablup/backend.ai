@@ -268,6 +268,7 @@ class ResourcePresetRepository:
             group_limits=group_limits,
             group_using=group_occupied,
             group_remaining=group_remaining,
+            domain_limits=db_data.domain_limits,
             scaling_group_remaining=db_data.keypair_data.scaling_group_remaining,
             scaling_groups=db_data.per_sgroup_data,
         )
