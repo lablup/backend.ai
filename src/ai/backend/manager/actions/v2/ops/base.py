@@ -6,10 +6,9 @@ from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifie
 from ai.backend.common.data.entity.types import EntityIdentifier as OwnerEntityID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
-from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
-from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
+from ai.backend.manager.actions.v2.ops.backend import OpsBackendAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.models.base import Base
@@ -78,14 +77,8 @@ __all__ = (
     "AtomicCreateRoleManagedEntityOpsAction",
     "AtomicCreateFieldOpsAction",
     "PurgeEntityOpsAction",
-    "GetFieldOpsAction",
-    "UpdateFieldOpsAction",
-    "DeleteFieldOpsAction",
-    "RestoreFieldOpsAction",
-    "PurgeFieldOpsAction",
     "PartialBulkPurgeGlobalEntityOpsAction",
     "PartialBulkPurgeEntityOpsAction",
-    "PartialBulkPurgeFieldOpsAction",
     "UpsertGlobalOpsAction",
     "UpsertEntityOpsAction",
     "UpsertFieldOpsAction",
@@ -102,25 +95,6 @@ __all__ = (
     "BatchPurgeGlobalOpsAction",
     "GetGlobalOpsAction",
 )
-
-
-class OpsBackendAction(ABC):
-    """Executed directly against repository ops; no service method needed.
-
-    Mixed in alongside the shape axis (``BaseScopeAction``, ``BaseSingleEntityAction``,
-    ...), which stays responsible for RBAC and audit. This axis only says how the action
-    is backed: it carries the repository spec instead of a hand-written service method.
-    Promote the action to a real service method as soon as it grows a branch.
-
-    Not a new contract: actions across the codebase already hold a ``Creator`` /
-    ``Updater`` / ``Purger`` / ``Upserter`` as a field. This names that contract so a
-    generic service can execute it.
-
-    There is deliberately no ``delete`` variant. A soft delete is a status transition,
-    so it carries a ``DataUpdater`` like any other write and runs through the update
-    service; ``repositories/base/`` has no deleter spec because there is no delete
-    operation to generalize.
-    """
 
 
 class GetOpsAction[TRow: Base, TData](OpsBackendAction):
@@ -637,70 +611,6 @@ class PurgeEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.PURGE
 
 
-class GetFieldOpsAction[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier, TRow: Base, TData](
-    BaseSingleFieldAction[TFieldID, TOwnerID], GetOpsAction[TRow, TData], ABC
-):
-    """A read of one field row, authorized against the entity owning it."""
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
-
-
-class UpdateFieldOpsAction[
-    TFieldID: FieldIdentifier,
-    TOwnerID: EntityIdentifier,
-    TRow: Base,
-    TData,
-](BaseSingleFieldAction[TFieldID, TOwnerID], UpdateOpsAction[TRow, TData], ABC):
-    """A write to one field row, authorized against the entity owning it."""
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-class DeleteFieldOpsAction[
-    TFieldID: FieldIdentifier,
-    TOwnerID: EntityIdentifier,
-    TRow: Base,
-    TData,
-](BaseSingleFieldAction[TFieldID, TOwnerID], UpdateOpsAction[TRow, TData], ABC):
-    """A soft delete of one field row; the updater writes the lifecycle column alone."""
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-class RestoreFieldOpsAction[
-    TFieldID: FieldIdentifier,
-    TOwnerID: EntityIdentifier,
-    TRow: Base,
-    TData,
-](BaseSingleFieldAction[TFieldID, TOwnerID], UpdateOpsAction[TRow, TData], ABC):
-    """The reverse transition of a field row's soft delete."""
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-class PurgeFieldOpsAction[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier, TRow: Base, TData](
-    BaseSingleFieldAction[TFieldID, TOwnerID], FieldPurgeOpsAction[TRow, TData], ABC
-):
-    """A hard delete of a field row, authorized against its owner."""
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
 class PartialBulkPurgeGlobalEntityOpsAction[TRow: Base, TData](
     BaseBulkAction, GlobalEntityPartialBulkPurgeOpsAction[TRow, TData], ABC
 ):
@@ -721,24 +631,6 @@ class PartialBulkPurgeEntityOpsAction[TRow: Base, TData](
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.PURGE
-
-
-class PartialBulkPurgeFieldOpsAction[
-    TFieldID: FieldIdentifier,
-    TOwnerID: EntityIdentifier,
-    TRow: Base,
-    TData,
-](
-    BaseBulkFieldAction[TFieldID, TOwnerID],
-    FieldPartialBulkPurgeOpsAction[TFieldID, TRow, TData],
-    ABC,
-):
-    """A hard delete over the field rows the caller named."""
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
 
 
 class UpsertGlobalOpsAction[TRow: Base, TData](

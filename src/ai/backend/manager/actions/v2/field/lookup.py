@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
-from ai.backend.manager.actions.v2.ops.base import OpsBackendAction
+from ai.backend.manager.actions.v2.ops.backend import OpsBackendAction
 from ai.backend.manager.models.specs.lookup import FieldOwnerLookup
 
 __all__ = (

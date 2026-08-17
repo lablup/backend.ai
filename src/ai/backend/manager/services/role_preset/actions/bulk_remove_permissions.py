@@ -6,16 +6,18 @@ from typing import override
 
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.manager.actions.v2.ops.base import PartialBulkPurgeFieldOpsAction
-from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
-from ai.backend.manager.models.rbac_models.role_permission_preset.lookups import (
-    RolePermissionPresetOwnerLookup,
+from ai.backend.manager.actions.v2.field.ops import (
+    PartialBulkPurgeFieldOpsAction,
 )
+from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
 from ai.backend.manager.models.rbac_models.role_permission_preset.purgers import (
     RolePermissionPresetPurger,
 )
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
+)
+from ai.backend.manager.services.role_preset.actions.lookup_permission_owner import (
+    LookupBulkRolePermissionPresetOwnerAction,
 )
 
 
@@ -46,8 +48,8 @@ class BulkRemoveRolePermissionPresetsAction(
         return tuple(self.ids)
 
     @override
-    def to_owner_lookup(self) -> RolePermissionPresetOwnerLookup:
-        return RolePermissionPresetOwnerLookup()
+    def to_owner_lookup_action(self) -> LookupBulkRolePermissionPresetOwnerAction:
+        return LookupBulkRolePermissionPresetOwnerAction(permission_preset_ids=self.ids)
 
     @override
     def to_purgers(self) -> Mapping[RolePermissionPresetID, RolePermissionPresetPurger]:

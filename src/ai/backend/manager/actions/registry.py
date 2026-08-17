@@ -15,6 +15,8 @@ The ``validators`` / ``monitors`` arguments only append — what the shape carri
 always applied.
 """
 
+from __future__ import annotations
+
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -27,8 +29,20 @@ from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.bulk.result import BaseBulkActionResult
 from ai.backend.manager.actions.v2.bulk.validator import BulkActionValidator
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
-from ai.backend.manager.actions.v2.field.bulk_processor import BulkFieldActionProcessor
+from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
+from ai.backend.manager.actions.v2.field.bulk_processor import (
+    BulkFieldActionProcessor,
+    OwnerBulkLookupProcessor,
+)
 from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerOpsAction
+from ai.backend.manager.actions.v2.field.ops import (
+    DeleteFieldOpsAction,
+    GetFieldOpsAction,
+    PartialBulkPurgeFieldOpsAction,
+    PurgeFieldOpsAction,
+    RestoreFieldOpsAction,
+    UpdateFieldOpsAction,
+)
 from ai.backend.manager.actions.v2.field.processor import (
     OwnerLookupProcessor,
     SingleFieldActionProcessor,
@@ -41,6 +55,7 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
 )
 from ai.backend.manager.actions.v2.global_scope.validator import GlobalActionValidator
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, BaseLookupActionResult
+from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.monitor import LookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.processor import (
     LookupActionProcessor,
@@ -61,24 +76,18 @@ from ai.backend.manager.actions.v2.ops.base import (
     CreateGlobalOpsAction,
     CreateGlobalWithFieldsOpsAction,
     CreateRoleManagedEntityOpsAction,
-    DeleteFieldOpsAction,
     DeletePartialBulkOpsAction,
     DeleteSingleEntityOpsAction,
-    GetFieldOpsAction,
     GetGlobalOpsAction,
     GetSingleEntityOpsAction,
     LookupEntityOpsAction,
     OperationScopeOpsAction,
     PartialBulkPurgeEntityOpsAction,
-    PartialBulkPurgeFieldOpsAction,
     PartialBulkPurgeGlobalEntityOpsAction,
     PurgeEntityOpsAction,
-    PurgeFieldOpsAction,
-    RestoreFieldOpsAction,
     RestorePartialBulkOpsAction,
     RestoreSingleEntityOpsAction,
     SearchGlobalOpsAction,
-    UpdateFieldOpsAction,
     UpdateGlobalOpsAction,
     UpdatePartialBulkOpsAction,
     UpdateSingleEntityOpsAction,
@@ -93,9 +102,8 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityWithFieldsOpsResult,
     CreatedFieldOpsResult,
     EntitiesOpsResult,
-    FieldsOpsResult,
     EntityOpsResult,
-    FieldOwnerLookupOpsResult,
+    FieldsOpsResult,
     LookupOpsResult,
     ScopedBatchOpsResult,
 )
@@ -116,6 +124,7 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.ops.service import (
     BatchPurgeService,
     BatchUpdateService,
+    BulkFieldOwnerLookupService,
     DeleteService,
     EntityAtomicCreateService,
     EntityCreateService,
@@ -292,19 +301,25 @@ class ProcessorGroup[TData: EntityData]:
         self,
         data_cls: type[TFieldData],
         owner_lookup_action_cls: type[LookupFieldOwnerOpsAction[Any, Any]],
+        bulk_owner_lookup_action_cls: type[LookupBulkFieldOwnerOpsAction[Any, Any]],
     ) -> FieldProcessorGroup[TFieldData]:
         """The operations over one kind of field row.
 
-        Builds the owner lookup itself: it is not an operation a domain wires, only the
-        step every field operation runs first.
+        Builds the owner lookups itself: they are not operations a domain wires, only
+        the step every field operation runs first — one row at a time or many.
         """
         self._record(owner_lookup_action_cls)
+        self._record(bulk_owner_lookup_action_cls)
         owner_lookup: OwnerLookupProcessor = LookupActionProcessor(
             FieldOwnerLookupService(self._deps.repository).execute,
             monitors=self._deps.monitors.lookup,
             validators=self._deps.validators.lookup,
         )
-        return FieldProcessorGroup(self, owner_lookup)
+        bulk_owner_lookup: OwnerBulkLookupProcessor = BulkLookupActionProcessor(
+            BulkFieldOwnerLookupService(self._deps.repository).execute,
+            monitors=self._deps.monitors.bulk_lookup,
+        )
+        return FieldProcessorGroup(self, owner_lookup, bulk_owner_lookup)
 
     def single_get_ops[TAction: GetSingleEntityOpsAction[Any, Any]](
         self,
@@ -741,10 +756,17 @@ class FieldProcessorGroup[TFieldData: FieldData]:
 
     _group: ProcessorGroup[Any]
     _owner_lookup: OwnerLookupProcessor
+    _bulk_owner_lookup: OwnerBulkLookupProcessor
 
-    def __init__(self, group: ProcessorGroup[Any], owner_lookup: OwnerLookupProcessor) -> None:
+    def __init__(
+        self,
+        group: ProcessorGroup[Any],
+        owner_lookup: OwnerLookupProcessor,
+        bulk_owner_lookup: OwnerBulkLookupProcessor,
+    ) -> None:
         self._group = group
         self._owner_lookup = owner_lookup
+        self._bulk_owner_lookup = bulk_owner_lookup
 
     def get_ops[TAction: GetFieldOpsAction[Any, Any, Any, Any]](
         self,
@@ -891,7 +913,7 @@ class FieldProcessorGroup[TFieldData: FieldData]:
         self._group.record(action_cls)
         return BulkFieldActionProcessor(
             FieldPartialBulkPurgeService(self._group.deps.repository).execute,
-            self._group.deps.repository,
+            self._bulk_owner_lookup,
             monitors=(*self._group.deps.monitors.bulk, *monitors),
             validators=(*self._group.deps.validators.bulk, *validators),
         )
