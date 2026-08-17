@@ -23,6 +23,9 @@ class CheckPresetsResponse(BaseResponseModel):
     group_limits: dict[str, Any] = Field(description="Group resource limits")
     group_using: dict[str, Any] = Field(description="Group resource usage")
     group_remaining: dict[str, Any] = Field(description="Group remaining resources")
+    domain_limits: dict[str, Any] = Field(
+        default_factory=dict, description="Domain resource limits"
+    )
     scaling_group_remaining: dict[str, Any] = Field(description="Scaling group remaining resources")
     scaling_groups: dict[str, dict[str, Any]] = Field(description="Per-scaling-group resource info")
 

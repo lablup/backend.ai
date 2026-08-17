@@ -148,6 +148,7 @@ class ResourceHandler:
             group_limits=quantities_to_dict(result.group_limits),
             group_using=quantities_to_dict(result.group_using),
             group_remaining=quantities_to_dict(result.group_remaining),
+            domain_limits=quantities_to_dict(result.domain_limits),
             scaling_group_remaining=quantities_to_dict(result.scaling_group_remaining),
             scaling_groups=scaling_groups_json,
         )

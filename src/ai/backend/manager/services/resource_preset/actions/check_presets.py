@@ -43,6 +43,7 @@ class CheckResourcePresetsActionResult(BaseActionResult):
     group_limits: list[SlotQuantity]
     group_using: list[SlotQuantity]
     group_remaining: list[SlotQuantity]
+    domain_limits: list[SlotQuantity]
     scaling_group_remaining: list[SlotQuantity]
     scaling_groups: Mapping[str, Mapping[ResourceSlotState, list[SlotQuantity]]]
 
