@@ -21,7 +21,7 @@ What these tests pin down:
 from __future__ import annotations
 
 import uuid
-from collections.abc import Collection, Sequence
+from collections.abc import AsyncGenerator, Collection, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
@@ -71,6 +71,7 @@ from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRo
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.testutils.db import with_tables
 
 # =============================================================================
 # A test entity that becomes a "project" scope (present in every enum involved),
@@ -280,6 +281,27 @@ class _Upserter(EntityUpserter[EntityLifecycleTestRow, _EntityData]):
         return _EntityData(id=row.id, name=row.name, note=row.note)
 
 
+@pytest.fixture
+async def database(
+    database_connection: ExtendedAsyncSAEngine,
+) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    async with with_tables(
+        database_connection,
+        [
+            VirtualScopeRow,
+            EntityMembershipRow,
+            ScopeBindingRow,
+            RolePresetRow,
+            RolePermissionPresetRow,
+            RoleRow,
+            PermissionRow,
+            EntityLifecycleTestRow,
+        ],
+    ):
+        yield database_connection
+
+
+@pytest.fixture
 def repository(database: ExtendedAsyncSAEngine) -> OpsRepository[_EntityData]:
     return OpsRepository(V2DBOpsProvider(database))
 
@@ -685,10 +707,10 @@ class TestEntityPurge:
         self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
     ) -> None:
         data = await repository.create_entity(_Creator(name="a"))
-        absent = uuid.uuid4()
+        absent = _EntityID(uuid.uuid4())
 
         result = await repository.partial_bulk_purge_entities({
-            data.id: _Purger(target=data.id),
+            _EntityID(data.id): _Purger(target=data.id),
             absent: _Purger(target=absent),
         })
 

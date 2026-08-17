@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from pathlib import Path
 from typing import override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.logging import BraceStyleAdapter
 from ai.backend.common.data.entity.vfs_storage import VFSStorageID
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.base import (
     GUID,

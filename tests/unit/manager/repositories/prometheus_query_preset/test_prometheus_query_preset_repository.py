@@ -37,6 +37,9 @@ from ai.backend.manager.models.prometheus_query_preset_category import (
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -63,7 +66,13 @@ class TestPrometheusQueryPresetRepository:
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         async with with_tables(
             database_connection,
-            [PrometheusQueryPresetCategoryRow, PrometheusQueryPresetRow],
+            [
+                VirtualScopeRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
+                PrometheusQueryPresetCategoryRow,
+                PrometheusQueryPresetRow,
+            ],
         ):
             yield database_connection
 

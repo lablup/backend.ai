@@ -24,7 +24,6 @@ from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
-    EntityIdentifier,
     EntityType,
     ScopeType,
 )

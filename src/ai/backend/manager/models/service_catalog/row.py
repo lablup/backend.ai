@@ -15,8 +15,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
+from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.models.base import (
     GUID,
     Base,

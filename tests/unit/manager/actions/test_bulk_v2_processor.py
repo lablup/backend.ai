@@ -14,9 +14,8 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.exception import PermissionDeniedError
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
@@ -26,25 +25,35 @@ from ai.backend.manager.actions.v2.bulk.result import (
     BulkActionProcessResult,
     BulkEntityResult,
 )
+from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.validator.base import BulkActionValidator
 
+_SESSION_ENTITY_TYPE = EntityType("session")
 
-def _eid(raw: str) -> EntityID:
-    return uuid.uuid5(uuid.NAMESPACE_OID, raw)
+
+class _SessionID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return _SESSION_ENTITY_TYPE
+
+
+def _eid(raw: str) -> _SessionID:
+    return _SessionID(uuid.uuid5(uuid.NAMESPACE_OID, raw))
 
 
 @dataclass
 class _Action(BaseBulkAction):
-    ids: list[EntityID]
+    ids: list[_SessionID]
 
     @override
-    def entity_ids(self) -> Sequence[EntityID]:
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
         return self.ids
 
     @classmethod
     @override
     def entity_type(cls) -> EntityType:
-        return EntityType("session")
+        return _SESSION_ENTITY_TYPE
 
     @classmethod
     @override
@@ -71,21 +80,21 @@ class _RecordingMonitor(BulkActionMonitor):
         self.done_results: list[BulkActionProcessResult] = []
 
     @override
-    async def prepare(self, action: BaseBulkAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, meta: BulkActionTriggerMeta) -> None:
         return
 
     @override
-    async def done(self, action: BaseBulkAction, result: BulkActionProcessResult) -> None:
+    async def done(self, meta: BulkActionTriggerMeta, result: BulkActionProcessResult) -> None:
         self.done_results.append(result)
 
 
 class _DenyingValidator(BulkActionValidator):
     @override
-    async def validate(self, action: BaseBulkAction, meta: BaseActionTriggerMeta) -> None:
+    async def validate(self, meta: BulkActionTriggerMeta) -> None:
         raise PermissionDeniedError("nope")
 
 
-def _ok(entity_id: EntityID) -> BulkEntityResult:
+def _ok(entity_id: EntityIdentifier) -> BulkEntityResult:
     return BulkEntityResult(
         entity_id=entity_id,
         status=OperationStatus.SUCCESS,

@@ -29,9 +29,11 @@ from ai.backend.common.data.entity.role_preset import (
 )
 from ai.backend.common.data.entity.types import (
     EntityData,
-    EntityID,
     EntityIdentifier,
     EntityType,
+    FieldData,
+    FieldIdentifier,
+    FieldType,
     ScopeRef,
     ScopeType,
 )
@@ -65,6 +67,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     UpdateOpsAction,
 )
 from ai.backend.manager.actions.v2.ops.result import (
+    BulkFieldOpsResult,
     CreatedEntityOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
@@ -136,6 +139,40 @@ _ENTITY_TYPE = EntityType("role_preset")
 _SCOPE_TYPE = ScopeType(_ENTITY_TYPE)
 
 
+class _RolePresetFieldType(FieldType):
+    @override
+    @classmethod
+    def owner_entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+
+_FIELD_TYPE = _RolePresetFieldType("role_preset_field")
+
+
+class _FieldID(FieldIdentifier):
+    @override
+    @classmethod
+    def field_type(cls) -> FieldType:
+        return _FIELD_TYPE
+
+    @override
+    @classmethod
+    def owner_entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+
+@dataclass(frozen=True)
+class _PresetFieldData(FieldData):
+    """What a field write returns; it names the entity owning the row."""
+
+    id: _FieldID
+    owner: _EntityID
+
+    @override
+    def owner_entity_id(self) -> EntityIdentifier:
+        return self.owner
+
+
 class _EntityID(EntityIdentifier):
     @override
     @classmethod
@@ -159,11 +196,11 @@ class _StubEntityID(EntityIdentifier):
 class _PresetData(EntityData):
     """What the repository returns. Names itself because ``create`` has to report it."""
 
-    id: uuid.UUID
+    id: EntityIdentifier
     name: str
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id
 
 
@@ -404,7 +441,7 @@ class _PresetGlobalCreator(GlobalEntityCreator[RolePresetRow, _PresetData]):
         return _PresetData(id=row.id, name=row.name)
 
 
-class _PresetFieldCreator(FieldCreator[uuid.UUID, RolePresetRow, _PresetData]):
+class _PresetFieldCreator(FieldCreator[_EntityID, RolePresetRow, _PresetFieldData]):
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return ()
@@ -414,8 +451,8 @@ class _PresetFieldCreator(FieldCreator[uuid.UUID, RolePresetRow, _PresetData]):
         return RolePresetRow()
 
     @override
-    def to_data(self, row: RolePresetRow) -> _PresetData:
-        return _PresetData(id=row.id, name=row.name)
+    def to_data(self, row: RolePresetRow) -> _PresetFieldData:
+        return _PresetFieldData(id=_FieldID(row.id), owner=_EntityID(row.id))
 
 
 @dataclass
@@ -498,7 +535,7 @@ class _PresetGlobalUpserter(GlobalEntityUpserter[RolePresetRow, _PresetData]):
 
 
 @dataclass
-class _PresetFieldUpserter(FieldUpserter[uuid.UUID, RolePresetRow, _PresetData]):
+class _PresetFieldUpserter(FieldUpserter[_EntityID, RolePresetRow, _PresetData]):
     target: uuid.UUID
 
     @override
@@ -558,7 +595,7 @@ class _ProjectScope(OperationScope):
 
 @dataclass
 class _GetAction(BaseSingleEntityAction, GetOpsAction[RolePresetRow, _PresetData]):
-    target: EntityID
+    target: EntityIdentifier
     querier: _PresetQuerier
 
     @override
@@ -584,7 +621,7 @@ class _GetAction(BaseSingleEntityAction, GetOpsAction[RolePresetRow, _PresetData
 class _DeleteAction(BaseSingleEntityAction, UpdateOpsAction[RolePresetRow, _PresetData]):
     """A soft delete: declared as DELETE, written as an update of the deleted flag."""
 
-    target: EntityID
+    target: EntityIdentifier
     updater: _PresetUpdater
 
     @override
@@ -637,7 +674,7 @@ class _CreateAction(BaseScopeAction, EntityCreateOpsAction[RolePresetRow, _Prese
 
 @dataclass
 class _UpdateAction(BaseSingleEntityAction, UpdateOpsAction[RolePresetRow, _PresetData]):
-    target: EntityID
+    target: EntityIdentifier
     updater: _PresetUpdater
 
     @override
@@ -661,7 +698,7 @@ class _UpdateAction(BaseSingleEntityAction, UpdateOpsAction[RolePresetRow, _Pres
 
 @dataclass
 class _PurgeAction(BaseSingleEntityAction, EntityPurgeOpsAction[RolePresetRow, _PresetData]):
-    target: EntityID
+    target: EntityIdentifier
     purger: _PresetPurger
 
     @override
@@ -687,7 +724,7 @@ class _PurgeAction(BaseSingleEntityAction, EntityPurgeOpsAction[RolePresetRow, _
 class _UpsertAction(BaseSingleEntityAction, EntityUpsertOpsAction[RolePresetRow, _PresetData]):
     """Declares itself an UPDATE: ``ActionOperationType`` has no upsert."""
 
-    target: EntityID
+    target: EntityIdentifier
     upserter: _PresetUpserter
 
     @override
@@ -749,14 +786,14 @@ class _LookupAction(BaseLookupAction, LookupOpsAction[RolePresetRow, _PresetData
 
 @dataclass
 class _BulkUpdateAction(BaseBulkAction, PartialBulkUpdateOpsAction[RolePresetRow, _PresetData]):
-    updaters: dict[EntityID, _PresetUpdater]
+    updaters: dict[EntityIdentifier, _PresetUpdater]
 
     @override
-    def to_updaters(self) -> Mapping[EntityID, DataUpdater[RolePresetRow, _PresetData]]:
+    def to_updaters(self) -> Mapping[EntityIdentifier, DataUpdater[RolePresetRow, _PresetData]]:
         return self.updaters
 
     @override
-    def entity_ids(self) -> Sequence[EntityID]:
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
         # Read off the same mapping, so the two cannot drift.
         return tuple(self.updaters)
 
@@ -778,14 +815,14 @@ class _BulkUpdateAction(BaseBulkAction, PartialBulkUpdateOpsAction[RolePresetRow
 
 @dataclass
 class _BulkPurgeAction(BaseBulkAction, EntityPartialBulkPurgeOpsAction[RolePresetRow, _PresetData]):
-    purgers: dict[EntityID, _PresetPurger]
+    purgers: dict[EntityIdentifier, _PresetPurger]
 
     @override
-    def to_purgers(self) -> Mapping[EntityID, EntityPurger[RolePresetRow, _PresetData]]:
+    def to_purgers(self) -> Mapping[EntityIdentifier, EntityPurger[RolePresetRow, _PresetData]]:
         return self.purgers
 
     @override
-    def entity_ids(self) -> Sequence[EntityID]:
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
         return tuple(self.purgers)
 
     @classmethod
@@ -889,14 +926,14 @@ class _BulkCreateGlobalAction(
 class _BulkPurgeGlobalAction(
     BaseBulkAction, GlobalEntityPartialBulkPurgeOpsAction[RolePresetRow, _PresetData]
 ):
-    purgers: dict[EntityID, _PresetGlobalPurger]
+    purgers: dict[EntityIdentifier, _PresetGlobalPurger]
 
     @override
-    def to_purgers(self) -> Mapping[EntityID, EntityPurger[RolePresetRow, _PresetData]]:
+    def to_purgers(self) -> Mapping[EntityIdentifier, EntityPurger[RolePresetRow, _PresetData]]:
         return self.purgers
 
     @override
-    def entity_ids(self) -> Sequence[EntityID]:
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
         return tuple(self.purgers)
 
     @classmethod
@@ -917,18 +954,18 @@ class _BulkPurgeGlobalAction(
 
 @dataclass
 class _BulkCreateFieldAction(
-    BaseSingleEntityAction, FieldAtomicCreateOpsAction[uuid.UUID, RolePresetRow, _PresetData]
+    BaseSingleEntityAction, FieldAtomicCreateOpsAction[_EntityID, RolePresetRow, _PresetFieldData]
 ):
     owner: uuid.UUID
     creators: list[_PresetFieldCreator]
 
     @override
-    def to_creators(self) -> Sequence[FieldCreator[uuid.UUID, RolePresetRow, _PresetData]]:
+    def to_creators(self) -> Sequence[FieldCreator[_EntityID, RolePresetRow, _PresetFieldData]]:
         return self.creators
 
     @override
-    def owner_id(self) -> uuid.UUID:
-        return self.owner
+    def owner_id(self) -> _EntityID:
+        return _EntityID(self.owner)
 
     @override
     def entity_id(self) -> EntityIdentifier:
@@ -951,49 +988,28 @@ class _BulkCreateFieldAction(
 
 
 @dataclass
-class _BulkPurgeFieldAction(
-    BaseBulkAction, FieldPartialBulkPurgeOpsAction[RolePresetRow, _PresetData]
-):
-    purgers: dict[EntityID, _PresetFieldPurger]
+class _BulkPurgeFieldAction(FieldPartialBulkPurgeOpsAction[_FieldID, RolePresetRow, _PresetData]):
+    purgers: dict[_FieldID, _PresetFieldPurger]
 
     @override
-    def to_purgers(self) -> Mapping[EntityID, FieldPurger[RolePresetRow, _PresetData]]:
+    def to_purgers(self) -> Mapping[_FieldID, FieldPurger[RolePresetRow, _PresetData]]:
         return self.purgers
-
-    @override
-    def entity_ids(self) -> Sequence[EntityID]:
-        return tuple(self.purgers)
-
-    @classmethod
-    @override
-    def entity_type(cls) -> EntityType:
-        return _ENTITY_TYPE
-
-    @classmethod
-    @override
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.PURGE
-
-    @classmethod
-    @override
-    def action_name(cls) -> str:
-        return "purge_field_role_presets"
 
 
 @dataclass
 class _FieldUpsertAction(
-    BaseSingleEntityAction, FieldUpsertOpsAction[uuid.UUID, RolePresetRow, _PresetData]
+    BaseSingleEntityAction, FieldUpsertOpsAction[_EntityID, RolePresetRow, _PresetData]
 ):
     owner: uuid.UUID
     upserter: _PresetFieldUpserter
 
     @override
-    def to_upserter(self) -> FieldUpserter[uuid.UUID, RolePresetRow, _PresetData]:
+    def to_upserter(self) -> FieldUpserter[_EntityID, RolePresetRow, _PresetData]:
         return self.upserter
 
     @override
-    def owner_id(self) -> uuid.UUID:
-        return self.owner
+    def owner_id(self) -> _EntityID:
+        return _EntityID(self.owner)
 
     @override
     def entity_id(self) -> EntityIdentifier:
@@ -1212,7 +1228,12 @@ class _SearchAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _PresetData]
 
 @pytest.fixture
 def stored() -> _PresetData:
-    return _PresetData(id=uuid.uuid4(), name="default")
+    return _PresetData(id=_EntityID(uuid.uuid4()), name="default")
+
+
+@pytest.fixture
+def field_stored() -> _PresetFieldData:
+    return _PresetFieldData(id=_FieldID(uuid.uuid4()), owner=_EntityID(uuid.uuid4()))
 
 
 @pytest.fixture
@@ -1421,7 +1442,7 @@ async def test_partial_bulk_update_answers_for_every_named_entity(
 
     result = await service.execute(_BulkUpdateAction(updaters=updaters))
 
-    assert [r.entity_id for r in result.entity_results()] == [stored.id]
+    assert list(result.successes) == [stored.id]
     repository.partial_bulk_update.assert_awaited_once_with(updaters)
 
 
@@ -1433,7 +1454,7 @@ async def test_partial_bulk_delete_writes_through_the_update_path(
 
     result = await service.execute(_BulkUpdateAction(updaters=updaters))
 
-    assert [r.entity_id for r in result.entity_results()] == [stored.id]
+    assert list(result.successes) == [stored.id]
     repository.partial_bulk_update.assert_awaited_once_with(updaters)
 
 
@@ -1445,7 +1466,7 @@ async def test_partial_bulk_purge_answers_for_every_named_entity(
 
     result = await service.execute(_BulkPurgeAction(purgers=purgers))
 
-    assert [r.entity_id for r in result.entity_results()] == [stored.id]
+    assert list(result.successes) == [stored.id]
     repository.partial_bulk_purge_entities.assert_awaited_once_with(purgers)
 
 
@@ -1502,15 +1523,16 @@ async def test_global_atomic_create_forwards_every_creator(
 
 
 async def test_field_atomic_create_forwards_owner_and_creators(
-    repository: MagicMock, stored: _PresetData
+    repository: MagicMock, field_stored: _PresetFieldData
 ) -> None:
-    service: FieldAtomicCreateService[_PresetData] = FieldAtomicCreateService(repository)
+    service: FieldAtomicCreateService[_PresetFieldData] = FieldAtomicCreateService(repository)
+    repository.atomic_create_field_entities.return_value = [field_stored]
     owner = uuid.uuid4()
     creators = [_PresetFieldCreator(), _PresetFieldCreator()]
 
     result = await service.execute(_BulkCreateFieldAction(owner=owner, creators=creators))
 
-    assert result.items == [stored]
+    assert result.items == [field_stored]
     repository.atomic_create_field_entities.assert_awaited_once_with(owner, creators)
 
 
@@ -1522,19 +1544,23 @@ async def test_global_partial_bulk_purge_answers_for_every_named_entity(
 
     result = await service.execute(_BulkPurgeGlobalAction(purgers=purgers))
 
-    assert [r.entity_id for r in result.entity_results()] == [stored.id]
+    assert list(result.successes) == [stored.id]
     repository.partial_bulk_purge_entities.assert_awaited_once_with(purgers)
 
 
 async def test_field_partial_bulk_purge_answers_for_every_named_entity(
-    repository: MagicMock, stored: _PresetData
+    repository: MagicMock, field_stored: _PresetFieldData
 ) -> None:
     service: FieldPartialBulkPurgeService[_PresetData] = FieldPartialBulkPurgeService(repository)
-    purgers = {stored.id: _PresetFieldPurger(target=stored.id)}
+    field_id = _FieldID(uuid.uuid4())
+    purgers = {field_id: _PresetFieldPurger(target=field_id)}
+    repository.partial_bulk_purge_field_entities.return_value = BulkFieldOpsResult(
+        successes={field_id: field_stored}, errors={}
+    )
 
     result = await service.execute(_BulkPurgeFieldAction(purgers=purgers))
 
-    assert [r.entity_id for r in result.entity_results()] == [stored.id]
+    assert list(result.successes) == [field_id]
     repository.partial_bulk_purge_field_entities.assert_awaited_once_with(purgers)
 
 

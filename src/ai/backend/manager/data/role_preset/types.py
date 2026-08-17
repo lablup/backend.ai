@@ -6,7 +6,7 @@ from typing import override
 
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import FieldData, EntityData, EntityID, EntityIdentifier
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,

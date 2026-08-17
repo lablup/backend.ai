@@ -1,7 +1,7 @@
 from abc import ABC
 
-from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.result import BulkActionProcessResult
+from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 
 __all__ = ("BulkActionMonitor",)
 

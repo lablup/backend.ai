@@ -3,10 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import override
-from uuid import UUID
 
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
-from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
 
 __all__ = ("LoginClientTypeData",)
 

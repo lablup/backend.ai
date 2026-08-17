@@ -9,12 +9,11 @@ from collections.abc import Mapping, Sequence
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.creator import FieldCreator
-from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.models.specs.purger import FieldPurger
-from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.specs.upserter import FieldUpserter
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 

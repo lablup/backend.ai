@@ -17,10 +17,10 @@ from ai.backend.manager.models.specs.searcher import (
     Searcher,
     SearcherResult,
 )
-from ai.backend.manager.repositories.base.types import LegacyBulkResultWithFailures
 from ai.backend.manager.models.specs.types import (
     IntegrityErrorCheck,
 )
+from ai.backend.manager.repositories.base.types import LegacyBulkResultWithFailures
 
 from .creator import (
     BulkCreator,

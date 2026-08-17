@@ -12,6 +12,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -82,7 +83,7 @@ class TestObjectStorageService:
     @pytest.fixture
     def sample_object_storage_data(self) -> ObjectStorageData:
         return ObjectStorageData(
-            id=uuid4(),
+            id=ObjectStorageID(uuid4()),
             name="test-object-storage",
             host="storage-proxy-1",
             access_key="test-access-key",

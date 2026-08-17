@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.dto.manager.v2.object_storage.request import (
     AdminSearchObjectStoragesInput,
     CreateObjectStorageInput,
@@ -25,7 +26,6 @@ from ai.backend.common.dto.manager.v2.object_storage.response import (
     UpdateObjectStoragePayload,
 )
 from ai.backend.common.dto.manager.v2.object_storage.types import OrderDirection
-from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
+from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.common.dto.manager.v2.vfs_storage.request import (
     AdminSearchVFSStoragesInput,
     CreateVFSStorageInput,
@@ -18,7 +19,6 @@ from ai.backend.common.dto.manager.v2.vfs_storage.response import (
     UpdateVFSStoragePayload,
     VFSStorageNode,
 )
-from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination

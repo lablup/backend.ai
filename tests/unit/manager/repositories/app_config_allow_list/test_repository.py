@@ -48,6 +48,9 @@ from ai.backend.manager.models.specs.pagination import (
     OffsetPagination,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.app_config_allow_list.queriers import (
     AppConfigAllowListQuerier,
 )
@@ -68,7 +71,14 @@ async def database(
     # fragments hanging off the allow-list (cascade tests need them).
     async with with_tables(
         database_connection,
-        [AppConfigDefinitionRow, AppConfigAllowListRow, AppConfigFragmentRow],
+        [
+            VirtualScopeRow,
+            EntityMembershipRow,
+            ScopeBindingRow,
+            AppConfigDefinitionRow,
+            AppConfigAllowListRow,
+            AppConfigFragmentRow,
+        ],
     ):
         yield database_connection
 

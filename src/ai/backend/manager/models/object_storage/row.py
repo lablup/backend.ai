@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from typing import override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.logging import BraceStyleAdapter
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.base import (
     GUID,

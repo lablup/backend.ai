@@ -17,10 +17,10 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.types import (
-    FieldIdentifier,
-    FieldData,
     EntityData,
     EntityIdentifier,
+    FieldData,
+    FieldIdentifier,
 )
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.bulk.result import BaseBulkActionResult, BulkEntityResult

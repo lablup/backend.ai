@@ -14,8 +14,8 @@ class BulkActionTriggerMeta:
     """What a run of this shape is, handed to its validators and monitors.
 
     They read the entities from here rather than from the action: a field bulk names
-    rows that are absent from the RBAC graph, and the entities owning them are looked
-    up before anything is checked or recorded.
+    rows whose membership is only knowable through their owners, so those entities are
+    read before anything is checked or recorded.
     """
 
     action_id: ActionID

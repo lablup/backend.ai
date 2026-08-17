@@ -2,10 +2,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityID, EntityType
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction

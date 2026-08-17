@@ -24,6 +24,9 @@ from ai.backend.manager.models.app_config_definition.purgers import (
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.specs.pagination import CursorForwardPagination, OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.app_config_definition.queriers import (
     AppConfigDefinitionQuerier,
 )
@@ -39,7 +42,10 @@ from ai.backend.testutils.db import with_tables
 async def repository(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[OpsRepository[AppConfigDefinitionData], None]:
-    async with with_tables(database_connection, [AppConfigDefinitionRow]):
+    async with with_tables(
+        database_connection,
+        [VirtualScopeRow, EntityMembershipRow, ScopeBindingRow, AppConfigDefinitionRow],
+    ):
         yield OpsRepository(V2DBOpsProvider(database_connection))
 
 

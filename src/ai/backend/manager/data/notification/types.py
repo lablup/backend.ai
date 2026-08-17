@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.notification import (
     NotificationChannelID,
     NotificationRuleID,
 )
-from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
 from ai.backend.common.data.notification import (
     EmailSpec,
     NotificationChannelType,

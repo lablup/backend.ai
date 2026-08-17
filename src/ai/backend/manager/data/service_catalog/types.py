@@ -6,7 +6,7 @@ from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
-from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
 from ai.backend.common.types import ServiceCatalogStatus
 
 

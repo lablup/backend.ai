@@ -25,7 +25,7 @@ from ai.backend.common.data.entity.role_preset import (
 )
 from ai.backend.common.data.entity.types import (
     EntityData,
-    EntityID,
+    EntityIdentifier,
     EntityType,
     ScopeRef,
     ScopeType,
@@ -59,6 +59,9 @@ from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorC
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
 from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.services.ops.service import SearchService
@@ -213,7 +216,7 @@ class _PresetView(EntityData):
     name: str
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id
 
 
@@ -256,7 +259,9 @@ class _PresetSearcher(Searcher[RolePresetRow, _PresetView]):
 async def database(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-    async with with_tables(database_connection, [RolePresetRow]):
+    async with with_tables(
+        database_connection, [VirtualScopeRow, EntityMembershipRow, ScopeBindingRow, RolePresetRow]
+    ):
         yield database_connection
 
 

@@ -46,6 +46,7 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualScopeBulkActionRBACValidator,
 )
@@ -206,8 +207,28 @@ class _BulkVfolderUpdateAction(BaseBulkAction):
         return "update_vfolders"
 
     @override
-    def entity_ids(self) -> Sequence[EntityID]:
-        return self.ids
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(_VfolderID(i) for i in self.ids)
+
+
+def _bulk_meta(
+    action: _BulkVfolderUpdateAction, trigger_meta: BaseActionTriggerMeta
+) -> BulkActionTriggerMeta:
+    return BulkActionTriggerMeta(
+        action_id=trigger_meta.action_id,
+        started_at=trigger_meta.started_at,
+        entity_type=action.entity_type(),
+        entity_ids=action.entity_ids(),
+        operation_type=action.operation_type(),
+        action_name=action.action_name(),
+    )
+
+
+class _VfolderID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType("vfolder")
 
 
 def _domain_scope(scope_id: ScopeID) -> ScopeRef:
@@ -875,7 +896,16 @@ class TestVirtualScopeBulkActionRBACValidator:
     ) -> None:
         # No permission rows seeded; bypass must succeed regardless.
         with with_user(superadmin_user):
-            await bulk_validator.validate(bulk_vfolder_action, trigger_meta)
+            await bulk_validator.validate(
+                BulkActionTriggerMeta(
+                    action_id=trigger_meta.action_id,
+                    started_at=trigger_meta.started_at,
+                    entity_type=bulk_vfolder_action.entity_type(),
+                    entity_ids=bulk_vfolder_action.entity_ids(),
+                    operation_type=bulk_vfolder_action.operation_type(),
+                    action_name=bulk_vfolder_action.action_name(),
+                )
+            )
 
     async def test_all_targets_granted_passes(
         self,
@@ -885,7 +915,16 @@ class TestVirtualScopeBulkActionRBACValidator:
         user_with_all_bulk_vfolders_granted: UserData,
     ) -> None:
         with with_user(user_with_all_bulk_vfolders_granted):
-            await bulk_validator.validate(bulk_vfolder_action, trigger_meta)
+            await bulk_validator.validate(
+                BulkActionTriggerMeta(
+                    action_id=trigger_meta.action_id,
+                    started_at=trigger_meta.started_at,
+                    entity_type=bulk_vfolder_action.entity_type(),
+                    entity_ids=bulk_vfolder_action.entity_ids(),
+                    operation_type=bulk_vfolder_action.operation_type(),
+                    action_name=bulk_vfolder_action.action_name(),
+                )
+            )
 
     async def test_any_denied_target_rejects_whole_action(
         self,
@@ -897,7 +936,16 @@ class TestVirtualScopeBulkActionRBACValidator:
         # _BULK_VF_DENIED has no membership, so the whole bulk action must be rejected.
         with with_user(user_with_partial_bulk_membership):
             with pytest.raises(NotEnoughPermission):
-                await bulk_validator.validate(bulk_vfolder_action, trigger_meta)
+                await bulk_validator.validate(
+                    BulkActionTriggerMeta(
+                        action_id=trigger_meta.action_id,
+                        started_at=trigger_meta.started_at,
+                        entity_type=bulk_vfolder_action.entity_type(),
+                        entity_ids=bulk_vfolder_action.entity_ids(),
+                        operation_type=bulk_vfolder_action.operation_type(),
+                        action_name=bulk_vfolder_action.action_name(),
+                    )
+                )
 
     async def test_entity_cap_clips_granted_permission(
         self,
@@ -908,8 +956,7 @@ class TestVirtualScopeBulkActionRBACValidator:
         with with_user(user_with_read_capped_bulk_vfolder):
             with pytest.raises(NotEnoughPermission):
                 await bulk_validator.validate(
-                    _BulkVfolderUpdateAction(ids=[_BULK_VF_GRANTED]),
-                    trigger_meta,
+                    _bulk_meta(_BulkVfolderUpdateAction(ids=[_BULK_VF_GRANTED]), trigger_meta)
                 )
 
     async def test_empty_targets_passes(
@@ -919,4 +966,6 @@ class TestVirtualScopeBulkActionRBACValidator:
         regular_user_without_permission: UserData,
     ) -> None:
         with with_user(regular_user_without_permission):
-            await bulk_validator.validate(_BulkVfolderUpdateAction(ids=[]), trigger_meta)
+            await bulk_validator.validate(
+                _bulk_meta(_BulkVfolderUpdateAction(ids=[]), trigger_meta)
+            )

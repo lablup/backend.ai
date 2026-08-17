@@ -4,7 +4,6 @@ from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
@@ -14,6 +13,7 @@ from ai.backend.manager.actions.v2.bulk.result import (
     BulkActionResultMeta,
     BulkEntityResult,
 )
+from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.validator import BulkActionValidator
 
 __all__ = ("BulkActionProcessor",)

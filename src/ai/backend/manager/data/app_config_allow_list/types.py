@@ -6,7 +6,7 @@ from typing import override
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
-from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
 
 
 @dataclass(frozen=True)

@@ -7,13 +7,13 @@ from ai.backend.common.metrics.metric import (
     ACTION_STATUS_PARTIAL,
     ActionMetricObserver,
 )
-from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.result import (
     BulkActionProcessResult,
     BulkEntityResult,
 )
+from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 
 __all__ = ("BulkActionPrometheusMonitor",)
 

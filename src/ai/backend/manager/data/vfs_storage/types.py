@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
 from ai.backend.common.data.entity.vfs_storage import VFSStorageID
-from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 
 
 @dataclass

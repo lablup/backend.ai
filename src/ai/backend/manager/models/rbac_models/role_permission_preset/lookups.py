@@ -8,8 +8,8 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )

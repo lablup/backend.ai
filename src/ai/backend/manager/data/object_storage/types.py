@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
-from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
 from ai.backend.common.dto.manager.response import ObjectStorageResponse
 
 

@@ -22,8 +22,11 @@ from unittest.mock import MagicMock
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry import ProcessorDependencies, ProcessorRegistry
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
+from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
+from ai.backend.manager.actions.v2.lookup.bulk_base import BaseBulkLookupAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.validators import ActionValidators
@@ -76,6 +79,9 @@ _V2_ACTION_BASES: tuple[type[Any], ...] = (
     BaseScopeAction,
     BaseGlobalAction,
     BaseLookupAction,
+    BaseBulkLookupAction,
+    BaseSingleFieldAction,
+    BaseBulkFieldAction,
 )
 
 _SNAKE_CASE = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
@@ -123,7 +129,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     ProjectResourcePolicyProcessors(registry.group())
     UserResourcePolicyProcessors(registry.group())
     KeypairResourcePolicyProcessors(registry.group())
-    RolePresetProcessors(registry.group(), registry.group())
+    RolePresetProcessors(registry.group())
     RuntimeVariantProcessors(registry.group())
     ObjectStorageProcessors(MagicMock(), registry.group())
     VFSStorageProcessors(MagicMock(), registry.group())
@@ -151,17 +157,18 @@ def test_action_names_follow_the_snake_case_convention() -> None:
         )
 
 
-def test_identity_triple_is_unique_across_v2_actions() -> None:
-    """Audit rows identify the run by (entity_type, operation, action_name).
+def test_action_name_is_unique_across_v2_actions() -> None:
+    """Audit rows identify the run by its action name.
 
-    Two actions sharing all three would be indistinguishable once recorded — the
-    ambiguity ``action_name`` exists to prevent.
+    The entity type no longer joins it: a single-entity action derives that from the id
+    it names and a field action has none until its owner is read, so the name alone has
+    to tell two runs apart.
     """
-    seen: dict[tuple[str, str, str], type[Any]] = {}
+    seen: dict[str, type[Any]] = {}
     for cls in _concrete_v2_action_classes():
-        triple = (str(cls.entity_type()), str(cls.operation_type()), cls.action_name())
-        holder = seen.setdefault(triple, cls)
+        name = cls.action_name()
+        holder = seen.setdefault(name, cls)
         assert holder is cls, (
             f"{cls.__module__}.{cls.__qualname__} and {holder.__module__}.{holder.__qualname__} "
-            f"both record as {triple}; declare a distinct action_name() on one of them."
+            f"both record as {name!r}; declare a distinct action_name() on one of them."
         )

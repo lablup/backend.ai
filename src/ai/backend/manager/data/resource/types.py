@@ -10,7 +10,7 @@ from ai.backend.common.data.entity.resource_policy import (
     UserResourcePolicyUUID,
 )
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
-from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,

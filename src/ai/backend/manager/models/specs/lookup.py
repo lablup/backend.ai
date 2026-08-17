@@ -66,9 +66,9 @@ class DataLookup[TRow: Base, TData](ABC):
 class FieldOwnerLookup[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](ABC):
     """Resolves a field row's id into the id of the entity that owns it.
 
-    A field row is absent from the RBAC graph, so an action naming one has nothing to
-    authorize against until this runs. The id it reads never reaches the service layer:
-    it names the target of the permission check and of the audit row.
+    A field row carries no membership of its own: what it belongs to is only knowable
+    through the entity owning it, which is what an action naming the row is checked and
+    recorded against. The id read never reaches the service layer.
 
     A query rather than conditions, unlike :class:`DataLookup`, so an owner reached
     through a join is expressible. It selects the pair, so one spec serves a single row

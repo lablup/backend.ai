@@ -12,12 +12,11 @@ from typing import Any
 from ai.backend.common.data.entity.types import (
     EntityData,
     EntityIdentifier,
-    EntityIdentifier,
     FieldIdentifier,
 )
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.models.specs.creator import (
     EntityCreator,
     FieldCreator,
