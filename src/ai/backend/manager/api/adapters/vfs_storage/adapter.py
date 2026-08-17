@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.vfs_storage.response import (
     UpdateVFSStoragePayload,
     VFSStorageNode,
 )
+from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
@@ -86,7 +87,7 @@ class VFSStorageAdapter(BaseAdapter):
             SearchVFSStoragesAction(searcher=searcher)
         )
         storage_map = {item.id: self._vfs_storage_data_to_dto(item) for item in action_result.items}
-        return [storage_map.get(storage_id) for storage_id in ids]
+        return [storage_map.get(VFSStorageID(storage_id)) for storage_id in ids]
 
     async def get(self, storage_id: UUID) -> VFSStorageNode:
         """Retrieve a single VFS storage by ID."""

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE, RolePresetID
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import RestorePartialBulkOpsAction
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.row import (
@@ -33,9 +33,9 @@ class BulkRestoreRolePresetsAction(RestorePartialBulkOpsAction[RolePresetRow, Ro
         return "bulk_restore_role_presets"
 
     @override
-    def entity_ids(self) -> Sequence[EntityID]:
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
         return tuple(self.ids)
 
     @override
-    def to_updaters(self) -> Mapping[EntityID, RolePresetRestoreUpdater]:
+    def to_updaters(self) -> Mapping[EntityIdentifier, RolePresetRestoreUpdater]:
         return {preset_id: RolePresetRestoreUpdater(preset_id=preset_id) for preset_id in self.ids}

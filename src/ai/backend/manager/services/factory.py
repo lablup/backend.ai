@@ -491,7 +491,7 @@ def create_processors(
             registry.group(),
         ),
         retention_policy=RetentionPolicyProcessors(registry.group()),
-        role_preset=RolePresetProcessors(registry.group(), registry.group()),
+        role_preset=RolePresetProcessors(registry.group()),
         runtime_variant=RuntimeVariantProcessors(registry.group()),
         runtime_variant_preset=RuntimeVariantPresetProcessors(
             services.runtime_variant_preset, registry.group()

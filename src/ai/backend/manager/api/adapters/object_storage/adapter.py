@@ -25,6 +25,7 @@ from ai.backend.common.dto.manager.v2.object_storage.response import (
     UpdateObjectStoragePayload,
 )
 from ai.backend.common.dto.manager.v2.object_storage.types import OrderDirection
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -150,7 +151,7 @@ class ObjectStorageAdapter(BaseAdapter):
             SearchObjectStoragesAction(searcher=searcher)
         )
         storage_map = {item.id: self._data_to_dto(item) for item in action_result.items}
-        return [storage_map.get(storage_id) for storage_id in ids]
+        return [storage_map.get(ObjectStorageID(storage_id)) for storage_id in ids]
 
     async def get(self, storage_id: UUID) -> ObjectStorageNode:
         """Retrieve a single object storage by ID."""
