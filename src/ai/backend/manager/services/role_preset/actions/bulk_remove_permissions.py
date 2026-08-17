@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
-from ai.backend.common.data.entity.role_preset import ROLE_PERMISSION_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.types import EntityID, EntityType
 from ai.backend.manager.actions.v2.ops.base import PartialBulkPurgeFieldOpsAction
 from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
@@ -28,7 +28,7 @@ class BulkRemoveRolePermissionPresetsAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return ROLE_PERMISSION_PRESET_ENTITY_TYPE
+        return ROLE_PRESET_ENTITY_TYPE
 
     @override
     @classmethod

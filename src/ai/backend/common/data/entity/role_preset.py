@@ -3,16 +3,13 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
-    "ROLE_PERMISSION_PRESET_ENTITY_TYPE",
     "ROLE_PRESET_ENTITY_TYPE",
     "RolePresetID",
 )
 
 
-# Raw strings mirroring the RBAC-managed EntityType values a role preset and its
-# permission rows are recorded under.
-ROLE_PRESET_ENTITY_TYPE = EntityType("role")
-ROLE_PERMISSION_PRESET_ENTITY_TYPE = EntityType("role:permission")
+# Raw string mirroring the RBAC-managed EntityType a role preset is recorded under.
+ROLE_PRESET_ENTITY_TYPE = EntityType("role_preset")
 
 
 class RolePresetID(EntityIdentifier):
