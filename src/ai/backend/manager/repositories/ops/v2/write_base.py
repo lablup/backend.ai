@@ -8,6 +8,7 @@ the per-concern write ops inherit these on top of :class:`~.base.V2OpsBase`.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Collection, Mapping, Sequence
 from typing import Any, ClassVar, NoReturn
 
@@ -15,8 +16,17 @@ import sqlalchemy as sa
 from asyncpg.exceptions import PostgresError
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.types import (
+    EntityIdentifier,
+    EntityType,
+    ScopeRef,
+    ScopeType,
+)
 from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
+from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.manager.data.permission.types import (
+    ScopeType as LegacyScopeType,
+)
 from ai.backend.manager.errors.permission import VirtualScopeNotFound
 from ai.backend.manager.errors.repository import (
     CheckConstraintViolationError,
@@ -29,15 +39,106 @@ from ai.backend.manager.errors.repository import (
     UpsertEmptyResultError,
 )
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.specs.membership import ScopeMembershipEntry
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.specs.membership import EntityMembershipEntry
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
 
 
 class V2WriteOpsBase(V2OpsBase):
     """The shared write primitives, bound to a single session."""
+
+    async def _provision_entities(self, entities: Sequence[EntityIdentifier]) -> None:
+        """Put each entity into the RBAC graph: its virtual scope node, its self
+        entity-membership and its self scope-binding (permission_cap NULL). The reverse
+        of :meth:`_teardown_entity`. Idempotent: an existing node is a no-op."""
+        if not entities:
+            return
+        values = [{"scope_type": e.entity_type(), "scope_id": e} for e in entities]
+        insert_stmt = (
+            pg_insert(VirtualScopeRow)
+            .values(values)
+            .on_conflict_do_nothing(index_elements=["scope_type", "scope_id"])
+            .returning(
+                VirtualScopeRow.id,
+                VirtualScopeRow.scope_type,
+                VirtualScopeRow.scope_id,
+            )
+        )
+        inserted = (await self._sess.execute(insert_stmt)).all()
+        if not inserted:
+            return
+        membership_stmt = (
+            pg_insert(EntityMembershipRow)
+            .values([
+                {
+                    "virtual_scope_id": row.id,
+                    "entity_type": row.scope_type,
+                    "entity_id": row.scope_id,
+                    "permission_cap": None,
+                }
+                for row in inserted
+            ])
+            .on_conflict_do_nothing()
+        )
+        await self._sess.execute(membership_stmt)
+        binding_stmt = (
+            pg_insert(ScopeBindingRow)
+            .values([
+                {
+                    "virtual_scope_id": row.id,
+                    "scope_type": row.scope_type,
+                    "scope_id": row.scope_id,
+                    "permission_cap": None,
+                }
+                for row in inserted
+            ])
+            .on_conflict_do_nothing()
+        )
+        await self._sess.execute(binding_stmt)
+
+    async def _teardown_entity(self, entity: EntityIdentifier) -> None:
+        """Remove what the entity left in the RBAC graph: permissions granted on it,
+        its virtual scope node if it provisioned one, and its membership edges."""
+        scope = ScopeRef(scope_type=ScopeType(entity.entity_type()), scope_id=entity)
+        permission_scope_type = self._permission_scope_type(scope.scope_type)
+        if permission_scope_type is not None:
+            # Types outside the RBAC element enum can never have carried permissions.
+            await self._sess.execute(
+                sa.delete(PermissionRow).where(
+                    PermissionRow.scope_type == permission_scope_type,
+                    PermissionRow.scope_id == str(scope.scope_id),
+                )
+            )
+        await self._sess.execute(
+            sa.delete(VirtualScopeRow).where(
+                VirtualScopeRow.scope_type == scope.scope_type,
+                VirtualScopeRow.scope_id == scope.scope_id,
+            )
+        )
+        await self._sess.execute(
+            sa.delete(ScopeBindingRow).where(
+                ScopeBindingRow.scope_type == scope.scope_type,
+                ScopeBindingRow.scope_id == scope.scope_id,
+            )
+        )
+        await self._sess.execute(
+            sa.delete(EntityMembershipRow).where(
+                EntityMembershipRow.entity_type == scope.scope_type,
+                EntityMembershipRow.entity_id == scope.scope_id,
+            )
+        )
+
+    def _permission_scope_type(self, scope_type: ScopeType) -> LegacyScopeType | None:
+        """The ``permissions.scope_type`` value for ``scope_type``, or ``None`` for
+        types outside the RBAC element enum (which can carry no permissions)."""
+        try:
+            return RBACElementType(scope_type).to_scope_type()
+        except ValueError:
+            return None
 
     _SQLSTATE_TO_ERROR: ClassVar[Mapping[str, type[RepositoryIntegrityError]]] = {
         "23505": UniqueConstraintViolationError,
@@ -244,25 +345,25 @@ class V2WriteOpsBase(V2OpsBase):
         await self._sess.execute(stmt)
         await self._sess.flush()
 
-    async def _record_memberships(self, entries: Sequence[ScopeMembershipEntry]) -> None:
+    async def _record_memberships(self, entries: Sequence[EntityMembershipEntry]) -> None:
         """Record declared memberships in the parents' virtual scopes, idempotently;
         a declared parent without a virtual scope fails (resolve-or-fail)."""
         if not entries:
             return
-        scope_ids = await self._resolve_virtual_scope_ids([e.parent_scope for e in entries])
+        scope_ids = await self._resolve_virtual_scope_ids([e.parent for e in entries])
         await self._bulk_insert_ignore_conflicts(
             [
                 EntityMembershipRow(
-                    virtual_scope_id=scope_ids[entry.parent_scope],
-                    entity_type=entry.member.entity_type,
-                    entity_id=entry.member.entity_id,
+                    virtual_scope_id=scope_ids[(entry.parent.entity_type(), entry.parent)],
+                    entity_type=entry.member.entity_type(),
+                    entity_id=entry.member,
                     permission_cap=None,
                 )
                 for entry in entries
             ],
         )
 
-    async def _remove_memberships(self, members: Sequence[EntityRef]) -> None:
+    async def _remove_memberships(self, members: Sequence[EntityIdentifier]) -> None:
         """Remove every membership the members hold, so a purge cannot leave
         orphan registrations behind."""
         if not members:
@@ -270,14 +371,14 @@ class V2WriteOpsBase(V2OpsBase):
         await self._sess.execute(
             sa.delete(EntityMembershipRow).where(
                 sa.tuple_(EntityMembershipRow.entity_type, EntityMembershipRow.entity_id).in_([
-                    (m.entity_type, m.entity_id) for m in members
+                    (m.entity_type(), m) for m in members
                 ])
             )
         )
 
     async def _resolve_virtual_scope_ids(
-        self, scopes: Sequence[ScopeRef]
-    ) -> dict[ScopeRef, VirtualScopeID]:
+        self, entities: Sequence[EntityIdentifier]
+    ) -> dict[tuple[EntityType, uuid.UUID], VirtualScopeID]:
         """Resolve-or-fail, never get-or-create: a declared parent without a virtual
         scope raises :class:`VirtualScopeNotFound` naming every missing scope."""
         stmt = sa.select(
@@ -286,19 +387,17 @@ class V2WriteOpsBase(V2OpsBase):
             VirtualScopeRow.id,
         ).where(
             sa.tuple_(VirtualScopeRow.scope_type, VirtualScopeRow.scope_id).in_([
-                (s.scope_type, s.scope_id) for s in scopes
+                (e.entity_type(), e) for e in entities
             ])
         )
         resolved = {
-            ScopeRef(
-                scope_type=ScopeType(EntityType(row.scope_type)), scope_id=row.scope_id
-            ): row.id
+            (EntityType(row.scope_type), row.scope_id): row.id
             for row in (await self._sess.execute(stmt)).all()
         }
-        missing = [s for s in scopes if s not in resolved]
+        missing = [e for e in entities if (e.entity_type(), e) not in resolved]
         if missing:
             raise VirtualScopeNotFound(
-                "No virtual scope for scopes: "
-                + ", ".join(f"{s.scope_type}:{s.scope_id}" for s in missing)
+                "No virtual scope for entities: "
+                + ", ".join(f"{e.entity_type()}:{e}" for e in missing)
             )
         return resolved

@@ -5,6 +5,9 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.config import DefaultModelDefinition
+from ai.backend.common.data.entity.runtime_variant import (
+    RuntimeVariantID,
+)
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import RuntimeVariantConflict
@@ -19,6 +22,10 @@ class RuntimeVariantCreator(GlobalEntityCreator[RuntimeVariantRow, RuntimeVarian
 
     name: str
     description: str | None
+
+    @override
+    def entity_id(self, row: RuntimeVariantRow) -> RuntimeVariantID:
+        return RuntimeVariantID(row.id)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -17,6 +18,10 @@ class VFSStorageCreator(GlobalEntityCreator[VFSStorageRow, VFSStorageData]):
     name: str
     host: str
     base_path: str
+
+    @override
+    def entity_id(self, row: VFSStorageRow) -> VFSStorageID:
+        return VFSStorageID(row.id)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

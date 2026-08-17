@@ -4,6 +4,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.login_client_type import (
+    LoginClientTypeID,
+)
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.errors.auth import LoginClientTypeConflict
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
@@ -18,6 +21,10 @@ class LoginClientTypeCreator(GlobalEntityCreator[LoginClientTypeRow, LoginClient
 
     name: str
     description: str | None
+
+    @override
+    def entity_id(self, row: LoginClientTypeRow) -> LoginClientTypeID:
+        return LoginClientTypeID(row.id)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

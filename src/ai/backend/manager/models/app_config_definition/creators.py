@@ -4,6 +4,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.app_config_definition import (
+    AppConfigDefinitionID,
+)
 from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
@@ -17,6 +20,10 @@ class AppConfigDefinitionCreator(
     """Creator for one registered config name."""
 
     config_name: str
+
+    @override
+    def entity_id(self, row: AppConfigDefinitionRow) -> AppConfigDefinitionID:
+        return AppConfigDefinitionID(row.id)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

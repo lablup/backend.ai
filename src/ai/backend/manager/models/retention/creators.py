@@ -5,6 +5,9 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import override
 
+from ai.backend.common.data.entity.retention_policy import (
+    RetentionPolicyID,
+)
 from ai.backend.common.data.retention.types import RetentionCategory
 from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
@@ -21,6 +24,10 @@ class RetentionPolicyCreator(GlobalEntityCreator[RetentionPolicyRow, RetentionPo
     category: RetentionCategory
     retention_period: timedelta
     enabled: bool
+
+    @override
+    def entity_id(self, row: RetentionPolicyRow) -> RetentionPolicyID:
+        return RetentionPolicyID(row.id)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

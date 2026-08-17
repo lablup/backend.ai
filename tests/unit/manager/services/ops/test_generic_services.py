@@ -24,12 +24,14 @@ import sqlalchemy as sa
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.role_preset import (
+    RolePresetID,
+)
 from ai.backend.common.data.entity.types import (
     EntityData,
     EntityID,
     EntityIdentifier,
     EntityType,
-    ScopeID,
     ScopeRef,
     ScopeType,
 )
@@ -134,6 +136,13 @@ _ENTITY_TYPE = EntityType("role_preset")
 _SCOPE_TYPE = ScopeType(_ENTITY_TYPE)
 
 
+class _EntityID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+
 # =============================================================================
 # The domain's own types: a `data/` value and its specs.
 # =============================================================================
@@ -177,15 +186,11 @@ class _PresetQuerier(DataQuerier[RolePresetRow, _PresetData]):
 
 class _PresetCreator(EntityCreator[RolePresetRow, _PresetData]):
     @override
-    def scope_type(self) -> ScopeType:
-        return _SCOPE_TYPE
+    def entity_id(self, row: RolePresetRow) -> EntityIdentifier:
+        return _EntityID(row.id)
 
     @override
-    def scope_id(self, row: RolePresetRow) -> ScopeID:
-        return row.id
-
-    @override
-    def member_of(self, row: RolePresetRow) -> Collection[ScopeRef]:
+    def member_of(self, row: RolePresetRow) -> Collection[EntityIdentifier]:
         return ()
 
     @override
@@ -203,15 +208,11 @@ class _PresetCreator(EntityCreator[RolePresetRow, _PresetData]):
 
 class _PresetRoleManagedCreator(RoleManagedEntityCreator[RolePresetRow, _PresetData]):
     @override
-    def scope_type(self) -> ScopeType:
-        return _SCOPE_TYPE
+    def entity_id(self, row: RolePresetRow) -> EntityIdentifier:
+        return _EntityID(row.id)
 
     @override
-    def scope_id(self, row: RolePresetRow) -> ScopeID:
-        return row.id
-
-    @override
-    def member_of(self, row: RolePresetRow) -> Collection[ScopeRef]:
+    def member_of(self, row: RolePresetRow) -> Collection[EntityIdentifier]:
         return ()
 
     @override
@@ -353,15 +354,11 @@ class _PresetUpserter(EntityUpserter[RolePresetRow, _PresetData]):
     target: uuid.UUID
 
     @override
-    def scope_type(self) -> ScopeType:
-        return _SCOPE_TYPE
+    def entity_id(self, row: RolePresetRow) -> EntityIdentifier:
+        return _EntityID(row.id)
 
     @override
-    def scope_id(self, row: RolePresetRow) -> ScopeID:
-        return row.id
-
-    @override
-    def member_of(self, row: RolePresetRow) -> Collection[ScopeRef]:
+    def member_of(self, row: RolePresetRow) -> Collection[EntityIdentifier]:
         return ()
 
     @override
@@ -390,6 +387,10 @@ class _PresetUpserter(EntityUpserter[RolePresetRow, _PresetData]):
 
 
 class _PresetGlobalCreator(GlobalEntityCreator[RolePresetRow, _PresetData]):
+    @override
+    def entity_id(self, row: RolePresetRow) -> RolePresetID:
+        return RolePresetID(row.id)
+
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return ()
@@ -466,6 +467,10 @@ class _PresetFieldPurger(FieldPurger[RolePresetRow, _PresetData]):
 @dataclass
 class _PresetGlobalUpserter(GlobalEntityUpserter[RolePresetRow, _PresetData]):
     target: uuid.UUID
+
+    @override
+    def entity_id(self, row: RolePresetRow) -> RolePresetID:
+        return RolePresetID(row.id)
 
     @override
     def row_class(self) -> type[RolePresetRow]:

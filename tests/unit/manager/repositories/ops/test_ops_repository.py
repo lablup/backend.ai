@@ -20,7 +20,9 @@ from typing import Any, override
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.role_preset import (
+    RolePresetID,
+)
 from ai.backend.common.data.entity.types import (
     EntityData,
     EntityID,
@@ -76,6 +78,10 @@ class _PresetCreator(GlobalEntityCreator[RolePresetRow, RolePresetData]):
     scope_type: RBACScopeType
 
     @override
+    def entity_id(self, row: RolePresetRow) -> RolePresetID:
+        return RolePresetID(row.id)
+
+    @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return ()
 
@@ -92,6 +98,10 @@ class _PresetCreator(GlobalEntityCreator[RolePresetRow, RolePresetData]):
 class _PresetUpserter(GlobalEntityUpserter[RolePresetRow, RolePresetData]):
     target: RolePresetID
     name: str
+
+    @override
+    def entity_id(self, row: RolePresetRow) -> RolePresetID:
+        return RolePresetID(row.id)
 
     @override
     def row_class(self) -> type[RolePresetRow]:

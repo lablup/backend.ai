@@ -8,15 +8,26 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Collection, Sequence
-from typing import Any, final
+from typing import Any
 
-from ai.backend.common.data.entity.types import EntityID, ScopeID, ScopeRef, ScopeType
+from ai.backend.common.data.entity.types import EntityID, EntityIdentifier
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 class GlobalEntityUpserter[TRow: Base, TData](ABC):
-    """Upsert spec of a global entity; no scope involved."""
+    """Upsert spec of a global entity: an entity that belongs under no other scope.
+
+    The node stays provisioned idempotently, as the entity upsert does; what is absent
+    is ``member_of``.
+    """
+
+    @abstractmethod
+    def entity_id(self, row: TRow) -> EntityIdentifier:
+        """The entity's id, read off the settled row; not necessarily the primary key.
+
+        Answers the type too, so nothing declares it separately."""
+        raise NotImplementedError
 
     @abstractmethod
     def row_class(self) -> type[TRow]:
@@ -46,24 +57,19 @@ class GlobalEntityUpserter[TRow: Base, TData](ABC):
 
 class EntityUpserter[TRow: Base, TData](ABC):
     """Upsert spec of an entity: the row that comes back — inserted or updated —
-    keeps its scope provisioned idempotently (virtual scope node get-or-create,
-    memberships registered under the create rule)."""
+    stays provisioned in the RBAC graph idempotently (node get-or-create, memberships
+    registered under the create rule)."""
 
     @abstractmethod
-    def scope_type(self) -> ScopeType:
+    def entity_id(self, row: TRow) -> EntityIdentifier:
+        """The entity's id, read off the settled row; not necessarily the primary key.
+
+        Answers the type too, so nothing declares it separately."""
         raise NotImplementedError
 
     @abstractmethod
-    def scope_id(self, row: TRow) -> ScopeID:
-        raise NotImplementedError
-
-    @final
-    def scope_of(self, row: TRow) -> ScopeRef:
-        return ScopeRef(scope_type=self.scope_type(), scope_id=self.scope_id(row))
-
-    @abstractmethod
-    def member_of(self, row: TRow) -> Collection[ScopeRef]:
-        """The existing scopes the entity belongs to; registered idempotently."""
+    def member_of(self, row: TRow) -> Collection[EntityIdentifier]:
+        """The existing entities this one belongs to; registered idempotently."""
         raise NotImplementedError
 
     @abstractmethod

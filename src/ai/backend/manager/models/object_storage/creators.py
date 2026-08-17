@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage.row import ObjectStorageRow
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
@@ -20,6 +21,10 @@ class ObjectStorageCreator(GlobalEntityCreator[ObjectStorageRow, ObjectStorageDa
     secret_key: str
     endpoint: str
     region: str
+
+    @override
+    def entity_id(self, row: ObjectStorageRow) -> ObjectStorageID:
+        return ObjectStorageID(row.id)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

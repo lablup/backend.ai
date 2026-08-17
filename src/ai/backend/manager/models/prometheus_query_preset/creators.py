@@ -4,6 +4,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.prometheus_query_preset import (
+    PrometheusQueryPresetID,
+)
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
@@ -31,6 +34,10 @@ class PrometheusQueryPresetCreator(
     description: str | None = None
     rank: int = 0
     category_id: PrometheusQueryPresetCategoryID | None = None
+
+    @override
+    def entity_id(self, row: PrometheusQueryPresetRow) -> PrometheusQueryPresetID:
+        return PrometheusQueryPresetID(row.id)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

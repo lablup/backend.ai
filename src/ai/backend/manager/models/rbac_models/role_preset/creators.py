@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
@@ -23,6 +24,10 @@ class RolePresetCreator(GlobalEntityCreator[RolePresetRow, RolePresetData]):
     scope_type: ScopeType
     auto_assign: bool = False
     role_name_template: str | None = None
+
+    @override
+    def entity_id(self, row: RolePresetRow) -> RolePresetID:
+        return RolePresetID(row.id)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.types import ScopeID, ScopeRef, ScopeType
+from ai.backend.common.data.entity.model_card import ModelCardID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
@@ -16,9 +16,6 @@ from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-
-_PROJECT_SCOPE = ScopeType(PROJECT_ENTITY_TYPE)
-_MODEL_CARD_SCOPE = ScopeType(MODEL_CARD_ENTITY_TYPE)
 
 
 @dataclass
@@ -49,16 +46,12 @@ class ModelCardCreator(EntityCreator[ModelCardRow, ModelCardData]):
     access_level: str
 
     @override
-    def scope_type(self) -> ScopeType:
-        return _MODEL_CARD_SCOPE
+    def entity_id(self, row: ModelCardRow) -> ModelCardID:
+        return ModelCardID(row.id)
 
     @override
-    def scope_id(self, row: ModelCardRow) -> ScopeID:
-        return row.id
-
-    @override
-    def member_of(self, row: ModelCardRow) -> Collection[ScopeRef]:
-        return (ScopeRef(scope_type=_PROJECT_SCOPE, scope_id=self.project_id),)
+    def member_of(self, row: ModelCardRow) -> Collection[EntityIdentifier]:
+        return (ProjectID(self.project_id),)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

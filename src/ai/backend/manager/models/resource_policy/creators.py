@@ -6,6 +6,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.entity.resource_policy import (
+    KeyPairResourcePolicyUUID,
+    ProjectResourcePolicyUUID,
+    UserResourcePolicyUUID,
+)
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.manager.data.resource.types import (
     KeyPairResourcePolicyData,
@@ -37,6 +42,10 @@ class KeyPairResourcePolicyCreator(
     max_concurrent_sftp_sessions: int | None
     max_session_lifetime: int | None
     total_resource_slots: ResourceSlot | None
+
+    @override
+    def entity_id(self, row: KeyPairResourcePolicyRow) -> KeyPairResourcePolicyUUID:
+        return KeyPairResourcePolicyUUID(row.uuid)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
@@ -74,6 +83,10 @@ class UserResourcePolicyCreator(GlobalEntityCreator[UserResourcePolicyRow, UserR
     max_concurrent_logins: int | None = None
 
     @override
+    def entity_id(self, row: UserResourcePolicyRow) -> UserResourcePolicyUUID:
+        return UserResourcePolicyUUID(row.uuid)
+
+    @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return ()
 
@@ -101,6 +114,10 @@ class ProjectResourcePolicyCreator(
     max_vfolder_count: int
     max_quota_scope_size: int
     max_network_count: int
+
+    @override
+    def entity_id(self, row: ProjectResourcePolicyRow) -> ProjectResourcePolicyUUID:
+        return ProjectResourcePolicyUUID(row.uuid)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

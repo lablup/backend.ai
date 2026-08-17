@@ -35,8 +35,6 @@ from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
     EntityType,
-    ScopeID,
-    ScopeRef,
     ScopeType,
 )
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
@@ -108,24 +106,41 @@ _PARENT_SCOPE_TYPE = DOMAIN_SCOPE_TYPE
 _OPEN_SCOPE_TYPE = ScopeType(EntityType("not_an_rbac_element_type"))
 
 
+class _EntityID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType(_SCOPE_TYPE)
+
+
+class _ParentID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType(_PARENT_SCOPE_TYPE)
+
+
+class _OpenTypeID(EntityIdentifier):
+    """An id whose type is outside the RBAC element enum."""
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType(_OPEN_SCOPE_TYPE)
+
+
 @dataclass
 class _Creator(EntityCreator[EntityLifecycleTestRow, _EntityData]):
     name: str
     parents: tuple[UUID, ...] = ()
 
     @override
-    def scope_type(self) -> ScopeType:
-        return _SCOPE_TYPE
+    def entity_id(self, row: EntityLifecycleTestRow) -> EntityIdentifier:
+        return _EntityID(row.id)
 
     @override
-    def scope_id(self, row: EntityLifecycleTestRow) -> ScopeID:
-        return row.id
-
-    @override
-    def member_of(self, row: EntityLifecycleTestRow) -> Collection[ScopeRef]:
-        return tuple(
-            ScopeRef(scope_type=_PARENT_SCOPE_TYPE, scope_id=parent) for parent in self.parents
-        )
+    def member_of(self, row: EntityLifecycleTestRow) -> Collection[EntityIdentifier]:
+        return tuple(_ParentID(parent) for parent in self.parents)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
@@ -143,8 +158,8 @@ class _Creator(EntityCreator[EntityLifecycleTestRow, _EntityData]):
 @dataclass
 class _OpenTypeCreator(_Creator):
     @override
-    def scope_type(self) -> ScopeType:
-        return _OPEN_SCOPE_TYPE
+    def entity_id(self, row: EntityLifecycleTestRow) -> EntityIdentifier:
+        return _OpenTypeID(row.id)
 
 
 @dataclass
@@ -156,18 +171,12 @@ class _RoleManagedCreator(RoleManagedEntityCreator[EntityLifecycleTestRow, _Enti
     parents: tuple[UUID, ...] = ()
 
     @override
-    def scope_type(self) -> ScopeType:
-        return _SCOPE_TYPE
+    def entity_id(self, row: EntityLifecycleTestRow) -> EntityIdentifier:
+        return _EntityID(row.id)
 
     @override
-    def scope_id(self, row: EntityLifecycleTestRow) -> ScopeID:
-        return row.id
-
-    @override
-    def member_of(self, row: EntityLifecycleTestRow) -> Collection[ScopeRef]:
-        return tuple(
-            ScopeRef(scope_type=_PARENT_SCOPE_TYPE, scope_id=parent) for parent in self.parents
-        )
+    def member_of(self, row: EntityLifecycleTestRow) -> Collection[EntityIdentifier]:
+        return tuple(_ParentID(parent) for parent in self.parents)
 
     @override
     def template_value(self, row: EntityLifecycleTestRow) -> ScopeTemplateValue:
@@ -239,18 +248,12 @@ class _Upserter(EntityUpserter[EntityLifecycleTestRow, _EntityData]):
     parents: tuple[UUID, ...] = ()
 
     @override
-    def scope_type(self) -> ScopeType:
-        return _SCOPE_TYPE
+    def entity_id(self, row: EntityLifecycleTestRow) -> EntityIdentifier:
+        return _EntityID(row.id)
 
     @override
-    def scope_id(self, row: EntityLifecycleTestRow) -> ScopeID:
-        return row.id
-
-    @override
-    def member_of(self, row: EntityLifecycleTestRow) -> Collection[ScopeRef]:
-        return tuple(
-            ScopeRef(scope_type=_PARENT_SCOPE_TYPE, scope_id=parent) for parent in self.parents
-        )
+    def member_of(self, row: EntityLifecycleTestRow) -> Collection[EntityIdentifier]:
+        return tuple(_ParentID(parent) for parent in self.parents)
 
     @override
     def row_class(self) -> type[EntityLifecycleTestRow]:

@@ -19,15 +19,18 @@ class V2GlobalWriteOps(V2WriteOpsBase):
     async def create_global_entity[TRow: Base, TData](
         self, creator: GlobalEntityCreator[TRow, TData]
     ) -> TData:
-        """Insert one row of a global entity."""
+        """Insert one global entity row and provision it in the RBAC graph; it joins
+        nothing."""
         row = creator.build_row()
         await self._insert_row(row, creator.integrity_error_checks())
+        await self._provision_entities([creator.entity_id(row)])
         return creator.to_data(row)
 
     async def atomic_create_global_entities[TRow: Base, TData](
         self, creators: Sequence[GlobalEntityCreator[TRow, TData]]
     ) -> list[TData]:
-        """Insert global rows atomically in one flush; nothing is registered."""
+        """Insert global rows atomically in one flush, provisioning each as
+        :meth:`create_global_entity` does for one."""
         if not creators:
             return []
         rows = [creator.build_row() for creator in creators]
@@ -39,12 +42,16 @@ class V2GlobalWriteOps(V2WriteOpsBase):
             self._match_integrity_error(
                 self._parse_integrity_error(e), creators[0].integrity_error_checks()
             )
+        await self._provision_entities([
+            creator.entity_id(row) for creator, row in zip(creators, rows, strict=True)
+        ])
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
     async def upsert_global_entity[TRow: Base, TData](
         self, upserter: GlobalEntityUpserter[TRow, TData]
     ) -> TData:
-        """Insert or update on conflict, for a global entity."""
+        """Insert or update on conflict, for a global entity; the node stays
+        provisioned idempotently."""
         row = await self._upsert_row_returning(
             upserter.row_class(),
             upserter.index_elements(),
@@ -52,4 +59,5 @@ class V2GlobalWriteOps(V2WriteOpsBase):
             upserter.build_update_values(),
             upserter.integrity_error_checks(),
         )
+        await self._provision_entities([upserter.entity_id(row)])
         return upserter.to_data(row)

@@ -11,15 +11,13 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.error_log import ERROR_LOG_ENTITY_TYPE
-from ai.backend.common.data.entity.types import ScopeID, ScopeRef, ScopeType
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.error_log import ErrorLogID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.error_log.types import ErrorLogData, ErrorLogSeverity
 from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-
-_ERROR_LOG_SCOPE = ScopeType(ERROR_LOG_ENTITY_TYPE)
 
 
 @dataclass
@@ -43,18 +41,14 @@ class ErrorLogCreator(EntityCreator[ErrorLogRow, ErrorLogData]):
     traceback: str | None = None
 
     @override
-    def scope_type(self) -> ScopeType:
-        return _ERROR_LOG_SCOPE
+    def entity_id(self, row: ErrorLogRow) -> ErrorLogID:
+        return ErrorLogID(row.id)
 
     @override
-    def scope_id(self, row: ErrorLogRow) -> ScopeID:
-        return row.id
-
-    @override
-    def member_of(self, row: ErrorLogRow) -> Collection[ScopeRef]:
+    def member_of(self, row: ErrorLogRow) -> Collection[EntityIdentifier]:
         if row.user is None:
             return ()
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=row.user),)
+        return (UserID(row.user),)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

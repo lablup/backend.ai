@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -51,6 +53,19 @@ class NaturalKey(str):
 
 
 @dataclass(frozen=True, slots=True)
+class EntityRef:
+    """An entity identified by its (open) type and id.
+
+    Both are values read at run time — the graph layer reads them off a row — so the id
+    is a bare one. Where the entity is known statically, pass an
+    :class:`EntityIdentifier`, which needs no separate type beside it.
+    """
+
+    entity_type: EntityType
+    entity_id: EntityID
+
+
+@dataclass(frozen=True, slots=True)
 class ScopeRef:
     """A scope identified by its (open) type and id.
 
@@ -61,13 +76,9 @@ class ScopeRef:
     scope_type: ScopeType
     scope_id: ScopeID
 
-
-@dataclass(frozen=True, slots=True)
-class EntityRef:
-    """An entity identified by its (open) type and id."""
-
-    entity_type: EntityType
-    entity_id: EntityID
+    def to_entity_ref(self) -> EntityRef:
+        """An entity's scope identity is its entity identity: one pair serves both."""
+        return EntityRef(entity_type=self.scope_type, entity_id=self.scope_id)
 
 
 class EntityIdentifier(UUID):

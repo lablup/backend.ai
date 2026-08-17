@@ -5,6 +5,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.storage_namespace import (
+    StorageNamespaceID,
+)
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -17,6 +20,10 @@ class StorageNamespaceCreator(GlobalEntityCreator[StorageNamespaceRow, StorageNa
 
     storage_id: uuid.UUID
     namespace: str
+
+    @override
+    def entity_id(self, row: StorageNamespaceRow) -> StorageNamespaceID:
+        return StorageNamespaceID(row.id)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

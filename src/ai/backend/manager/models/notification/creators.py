@@ -11,7 +11,10 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.data.entity.notification import NotificationChannelID
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
@@ -42,6 +45,10 @@ class NotificationChannelCreator(
     enabled: bool = True
 
     @override
+    def entity_id(self, row: NotificationChannelRow) -> NotificationChannelID:
+        return NotificationChannelID(row.id)
+
+    @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return ()
 
@@ -70,6 +77,10 @@ class NotificationRuleCreator(GlobalEntityCreator[NotificationRuleRow, Notificat
     created_by: UUID
     description: str | None = None
     enabled: bool = True
+
+    @override
+    def entity_id(self, row: NotificationRuleRow) -> NotificationRuleID:
+        return NotificationRuleID(row.id)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
