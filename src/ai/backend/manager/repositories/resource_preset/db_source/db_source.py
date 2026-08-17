@@ -323,8 +323,9 @@ class ResourcePresetDBSource:
         """
         rst = ResourceSlotTypeRow.__table__
         j = (
-            sa
-            .join(ResourceAllocationRow, KernelRow, ResourceAllocationRow.kernel_id == KernelRow.id)
+            sa.join(
+                ResourceAllocationRow, KernelRow, ResourceAllocationRow.kernel_id == KernelRow.id
+            )
             .join(SessionRow, KernelRow.session_id == SessionRow.id)
             .join(rst, ResourceAllocationRow.slot_name == rst.c.slot_name)
         )
@@ -332,8 +333,7 @@ class ResourcePresetDBSource:
             ResourceAllocationRow.used, ResourceAllocationRow.requested
         )
         query = (
-            sa
-            .select(
+            sa.select(
                 SessionRow.scaling_group_name,
                 ResourceAllocationRow.slot_name,
                 sa.func.sum(effective_amount).label("total"),
@@ -395,8 +395,7 @@ class ResourcePresetDBSource:
             rst, AgentResourceRow.slot_name == rst.c.slot_name
         )
         query = (
-            sa
-            .select(
+            sa.select(
                 AgentRow.id.label("agent_id"),
                 AgentRow.scaling_group,
                 AgentResourceRow.slot_name,
@@ -487,8 +486,7 @@ class ResourcePresetDBSource:
             ResourceAllocationRow.used, ResourceAllocationRow.requested
         )
         query = (
-            sa
-            .select(
+            sa.select(
                 ResourceAllocationRow.slot_name,
                 sa.func.sum(effective_amount).label("total"),
             )
