@@ -1375,7 +1375,7 @@ async def test_lookup_forwards_the_action_s_lookup_spec(
     result = await service.execute(_LookupAction(lookup=lookup))
 
     assert result.data == stored
-    assert result.resolved_entity_id() == stored.id
+    assert result.entity_id() == stored.id
     repository.lookup.assert_awaited_once_with(lookup)
 
 
@@ -1393,7 +1393,7 @@ async def test_lookup_runs_under_the_lookup_processor(
         result = await processor.run(_LookupAction(lookup=_PresetByName(name="default")))
 
     # The id the key resolved to is what reaches the audit trail.
-    assert result.resolved_entity_id() == stored.id
+    assert result.entity_id() == stored.id
 
 
 async def test_atomic_create_forwards_every_creator(

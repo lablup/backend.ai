@@ -67,6 +67,6 @@ class BaseLookupAction(ABC):
 
 class BaseLookupActionResult(ABC):
     @abstractmethod
-    def resolved_entity_id(self) -> EntityID:
-        """Return the id the key resolved to."""
+    def entity_id(self) -> EntityID:
+        """Return the id the key names."""
         raise NotImplementedError

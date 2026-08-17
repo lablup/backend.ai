@@ -68,7 +68,7 @@ class _Action(BaseLookupAction):
 @dataclass
 class _Result(BaseLookupActionResult):
     @override
-    def resolved_entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityID:
         return _RESOLVED
 
 
@@ -147,7 +147,7 @@ async def test_a_resolved_lookup_returns_the_id(
     with with_user(authenticated_user):
         result = await processor.run(action)
 
-    assert result.resolved_entity_id() == _RESOLVED
+    assert result.entity_id() == _RESOLVED
     assert monitor.done_results[0].meta.status is OperationStatus.SUCCESS
 
 

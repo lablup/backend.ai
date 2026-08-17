@@ -6,6 +6,7 @@ from ai.backend.common.data.entity.types import EntityID
 from ai.backend.common.data.entity.types import EntityID as OwnerEntityID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
@@ -76,6 +77,10 @@ __all__ = (
     "AtomicCreateRoleManagedEntityOpsAction",
     "AtomicCreateFieldOpsAction",
     "PurgeEntityOpsAction",
+    "GetFieldOpsAction",
+    "UpdateFieldOpsAction",
+    "DeleteFieldOpsAction",
+    "RestoreFieldOpsAction",
     "PurgeFieldOpsAction",
     "PartialBulkPurgeGlobalEntityOpsAction",
     "PartialBulkPurgeEntityOpsAction",
@@ -629,8 +634,50 @@ class PurgeEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.PURGE
 
 
+class GetFieldOpsAction[TRow: Base, TData](BaseSingleFieldAction, GetOpsAction[TRow, TData], ABC):
+    """A read of one field row, authorized against the entity owning it."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+
+class UpdateFieldOpsAction[TRow: Base, TData](
+    BaseSingleFieldAction, UpdateOpsAction[TRow, TData], ABC
+):
+    """A write to one field row, authorized against the entity owning it."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
+class DeleteFieldOpsAction[TRow: Base, TData](
+    BaseSingleFieldAction, UpdateOpsAction[TRow, TData], ABC
+):
+    """A soft delete of one field row; the updater writes the lifecycle column alone."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
+
+
+class RestoreFieldOpsAction[TRow: Base, TData](
+    BaseSingleFieldAction, UpdateOpsAction[TRow, TData], ABC
+):
+    """The reverse transition of a field row's soft delete."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.RESTORE
+
+
 class PurgeFieldOpsAction[TRow: Base, TData](
-    BaseSingleEntityAction, FieldPurgeOpsAction[TRow, TData], ABC
+    BaseSingleFieldAction, FieldPurgeOpsAction[TRow, TData], ABC
 ):
     """A hard delete of a field row, authorized against its owner."""
 

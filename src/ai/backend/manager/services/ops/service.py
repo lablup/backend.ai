@@ -15,6 +15,7 @@ rather than hidden in an argument.
 from typing import Any
 
 from ai.backend.common.data.entity.types import EntityData
+from ai.backend.manager.actions.v2.field.lookup import FieldOwnerLookupOpsAction
 from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
     BatchUpdateOpsAction,
@@ -51,6 +52,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityWithFieldsOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
+    FieldOwnerLookupOpsResult,
     LookupOpsResult,
     ScopedBatchOpsResult,
 )
@@ -59,6 +61,7 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 __all__ = (
     "GetService",
     "LookupService",
+    "FieldOwnerLookupService",
     "SearchService",
     "GlobalSearchService",
     "GlobalCreateService",
@@ -114,6 +117,21 @@ class LookupService[TData: EntityData]:
 
     async def execute(self, action: LookupOpsAction[Any, TData]) -> LookupOpsResult[TData]:
         return LookupOpsResult(data=await self._repository.lookup(action.to_lookup()))
+
+
+class FieldOwnerLookupService:
+    """Reads the id of the entity that owns a field row."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: FieldOwnerLookupOpsAction) -> FieldOwnerLookupOpsResult:
+        owner_entity_id = await self._repository.field_owner(
+            action.to_owner_lookup(), action.field_id()
+        )
+        return FieldOwnerLookupOpsResult(owner_entity_id=owner_entity_id)
 
 
 class SearchService[TData: EntityData]:

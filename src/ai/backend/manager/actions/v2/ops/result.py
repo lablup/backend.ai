@@ -16,7 +16,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.bulk.result import BaseBulkActionResult, BulkEntityResult
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupActionResult
@@ -27,6 +27,7 @@ __all__ = (
     "CreatedEntityOpsResult",
     "CreatedEntityWithFieldsOpsResult",
     "LookupOpsResult",
+    "FieldOwnerLookupOpsResult",
     "EntitiesOpsResult",
     "BulkOpsResult",
     "BatchOpsResult",
@@ -75,15 +76,30 @@ class CreatedEntityWithFieldsOpsResult[TData: EntityData, TFieldData](
 
 @dataclass
 class LookupOpsResult[TData: EntityData](EntityOpsResult[TData], BaseLookupActionResult):
-    """The entity a lookup resolved its key to.
+    """The entity a lookup's key names.
 
     A lookup declares no target — producing one is the point of the run — so the id
     reaches the audit trail through the result, the same way a create's does.
     """
 
     @override
-    def resolved_entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityID:
         return self.data.entity_id()
+
+
+@dataclass
+class FieldOwnerLookupOpsResult(BaseLookupActionResult):
+    """The id of the entity a field row belongs to.
+
+    Carries the id alone: the owner's data is never read, because this value exists to
+    name the RBAC target and the audit row of the operation that follows.
+    """
+
+    owner_entity_id: EntityIdentifier
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.owner_entity_id
 
 
 @dataclass
