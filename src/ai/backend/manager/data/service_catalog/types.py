@@ -5,13 +5,14 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
+from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 from ai.backend.common.types import ServiceCatalogStatus
 
 
 @dataclass
 class ServiceCatalogEndpointData:
-    id: UUID
+    id: ServiceCatalogID
     service_id: UUID
     role: str
     scope: str
@@ -23,7 +24,7 @@ class ServiceCatalogEndpointData:
 
 @dataclass
 class ServiceCatalogData(EntityData):
-    id: UUID
+    id: ServiceCatalogID
     service_group: str
     instance_id: str
     display_name: str
@@ -37,5 +38,5 @@ class ServiceCatalogData(EntityData):
     endpoints: list[ServiceCatalogEndpointData] = field(default_factory=list)
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id

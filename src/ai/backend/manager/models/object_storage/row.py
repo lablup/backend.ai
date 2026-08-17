@@ -8,6 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.base import (
     GUID,
@@ -28,8 +29,8 @@ class ObjectStorageRow(Base):
 
     __tablename__ = "object_storages"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ObjectStorageID] = mapped_column(
+        "id", GUID(ObjectStorageID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String, index=True, unique=True, nullable=False)
     host: Mapped[str] = mapped_column("host", sa.String, index=True, nullable=False)

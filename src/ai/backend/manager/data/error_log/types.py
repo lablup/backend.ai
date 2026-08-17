@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, override
 
 from ai.backend.common.data.entity.error_log import ErrorLogID
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 
 
 class ErrorLogSeverity(enum.StrEnum):
@@ -43,7 +43,7 @@ class ErrorLogData(EntityData):
     content: ErrorLogContent
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id
 
 

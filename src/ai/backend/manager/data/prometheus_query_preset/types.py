@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQuer
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
@@ -39,7 +39,7 @@ class PrometheusQueryPresetData(EntityData):
     updated_at: datetime = field(compare=False)
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id
 
 

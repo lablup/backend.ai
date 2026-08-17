@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import override
 
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 
 
@@ -53,7 +53,7 @@ class ResourceSlotTypeData(EntityData):
     rank: int
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.uuid
 
 

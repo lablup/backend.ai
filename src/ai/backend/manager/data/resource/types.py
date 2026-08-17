@@ -10,7 +10,7 @@ from ai.backend.common.data.entity.resource_policy import (
     UserResourcePolicyUUID,
 )
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
@@ -33,7 +33,7 @@ class UserResourcePolicyData(EntityData):
     max_concurrent_logins: int | None = None
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.uuid
 
 
@@ -49,7 +49,7 @@ class ProjectResourcePolicyData(EntityData):
     max_network_count: int = 0
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.uuid
 
 
@@ -73,7 +73,7 @@ class KeyPairResourcePolicyData(EntityData):
     allowed_vfolder_hosts: dict[str, Any]
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.uuid
 
 

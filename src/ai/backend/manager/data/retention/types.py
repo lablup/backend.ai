@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import override
 
 from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 from ai.backend.common.data.retention.types import RetentionCategory
 
 __all__ = (
@@ -28,7 +28,7 @@ class RetentionPolicyData(EntityData):
     updated_at: datetime
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id
 
 

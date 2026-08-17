@@ -6,7 +6,7 @@ from typing import override
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 
 
 @dataclass(frozen=True)
@@ -25,7 +25,7 @@ class AppConfigAllowListData(EntityData):
     updated_at: datetime
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id
 
 

@@ -6,7 +6,7 @@ from typing import override
 
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
@@ -79,5 +79,5 @@ class RuntimeVariantPresetData(EntityData):
     updated_at: datetime | None
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id

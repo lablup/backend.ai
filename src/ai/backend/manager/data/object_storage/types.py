@@ -4,7 +4,8 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
+from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 from ai.backend.common.dto.manager.response import ObjectStorageResponse
 
 
@@ -20,7 +21,7 @@ class ObjectStorageListResult:
 
 @dataclass
 class ObjectStorageData(EntityData):
-    id: uuid.UUID
+    id: ObjectStorageID
     name: str
     host: str
     access_key: str
@@ -29,7 +30,7 @@ class ObjectStorageData(EntityData):
     region: str | None
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id
 
     def to_dto(self) -> ObjectStorageResponse:

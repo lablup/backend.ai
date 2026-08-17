@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import override
 
 from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 
 
 @dataclass(frozen=True)
@@ -18,7 +18,7 @@ class AppConfigDefinitionData(EntityData):
     updated_at: datetime
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id
 
 

@@ -35,7 +35,7 @@ from ai.backend.manager.repositories.base import (
     BulkCreatorResult,
     BulkCreatorResultWithFailures,
     BulkPurgerResultWithFailures,
-    BulkResultWithFailures,
+    LegacyBulkResultWithFailures,
     BulkUpdaterResult,
     BulkUpserter,
     BulkUpserterError,
@@ -284,7 +284,7 @@ class WriteOps(ReadOps):
 
     async def bulk_update_data[TRow: Base, TData](
         self, updaters: Mapping[EntityID, DataUpdater[TRow, TData]]
-    ) -> BulkResultWithFailures[TData]:
+    ) -> LegacyBulkResultWithFailures[TData]:
         """Update each named entity independently, reporting per entity.
 
         Each row is written inside its own savepoint, so one failure rolls back only
@@ -312,11 +312,11 @@ class WriteOps(ReadOps):
                     successes[entity_id] = updater.to_data(result.row)
             except Exception as e:
                 errors[entity_id] = e
-        return BulkResultWithFailures(successes=successes, errors=errors)
+        return LegacyBulkResultWithFailures(successes=successes, errors=errors)
 
     async def bulk_purge_data[TRow: Base, TData](
         self, purgers: Mapping[EntityID, DataPurger[TRow, TData]]
-    ) -> BulkResultWithFailures[TData]:
+    ) -> LegacyBulkResultWithFailures[TData]:
         """Delete each named entity independently, reporting per entity.
 
         Same savepoint isolation and the same reason for the explicit loop as
@@ -335,7 +335,7 @@ class WriteOps(ReadOps):
                     successes[entity_id] = purger.to_data(result.row)
             except Exception as e:
                 errors[entity_id] = e
-        return BulkResultWithFailures(successes=successes, errors=errors)
+        return LegacyBulkResultWithFailures(successes=successes, errors=errors)
 
     async def batch_update_data[TRow: Base, TData](
         self, updater: DataBatchUpdater[TRow, TData]

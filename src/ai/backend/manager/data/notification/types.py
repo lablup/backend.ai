@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.notification import (
     NotificationChannelID,
     NotificationRuleID,
 )
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 from ai.backend.common.data.notification import (
     EmailSpec,
     NotificationChannelType,
@@ -34,7 +34,7 @@ class NotificationChannelData(EntityData):
     updated_at: datetime = field(compare=False)
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id
 
 
@@ -58,7 +58,7 @@ class NotificationRuleData(EntityData):
     updated_at: datetime = field(compare=False)
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id
 
 

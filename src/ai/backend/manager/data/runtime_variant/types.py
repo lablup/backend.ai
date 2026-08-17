@@ -6,7 +6,7 @@ from typing import override
 
 from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 
 
 @dataclass(frozen=True)
@@ -20,5 +20,5 @@ class RuntimeVariantData(EntityData):
     updated_at: datetime | None
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id

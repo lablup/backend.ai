@@ -135,6 +135,19 @@ class EntityData(ABC):
     """
 
     @abstractmethod
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         """Return the id of the entity this value describes."""
+        raise NotImplementedError
+
+
+class FieldData(ABC):
+    """A ``data/`` type describing a field row.
+
+    Deliberately not an :class:`EntityData`: a field row is absent from the RBAC graph,
+    so what a result must name is the entity that owns it, not the row itself.
+    """
+
+    @abstractmethod
+    def owner_entity_id(self) -> EntityIdentifier:
+        """Return the id of the entity that owns the row this value describes."""
         raise NotImplementedError

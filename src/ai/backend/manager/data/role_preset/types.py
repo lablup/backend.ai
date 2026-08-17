@@ -6,7 +6,7 @@ from typing import override
 
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.types import FieldData, EntityData, EntityID, EntityIdentifier
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
@@ -20,7 +20,7 @@ from ai.backend.manager.data.common.bulk import (
 
 
 @dataclass(frozen=True)
-class RolePermissionPresetData(EntityData):
+class RolePermissionPresetData(FieldData):
     id: RolePermissionPresetID
     role_preset_id: RolePresetID
     entity_type: EntityType
@@ -28,8 +28,8 @@ class RolePermissionPresetData(EntityData):
     created_at: datetime
 
     @override
-    def entity_id(self) -> EntityID:
-        return self.id
+    def owner_entity_id(self) -> EntityIdentifier:
+        return self.role_preset_id
 
 
 @dataclass(frozen=True)
@@ -44,7 +44,7 @@ class RolePresetData(EntityData):
     updated_at: datetime
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id
 
 

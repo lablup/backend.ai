@@ -8,6 +8,7 @@ from typing import Any, override
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.manager.data.service_catalog.types import (
     ServiceCatalogData,
     ServiceCatalogEndpointData,

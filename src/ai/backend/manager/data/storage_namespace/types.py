@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 
 
 @dataclass
@@ -25,5 +25,5 @@ class StorageNamespaceData(EntityData):
     namespace: str
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id

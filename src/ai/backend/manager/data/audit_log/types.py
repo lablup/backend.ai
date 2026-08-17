@@ -7,7 +7,7 @@ from typing import override
 
 from ai.backend.common.data.entity.action import ActionID
 from ai.backend.common.data.entity.audit_log import AuditLogID
-from ai.backend.common.data.entity.types import EntityData, EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID, EntityIdentifier
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 
 
@@ -37,7 +37,7 @@ class AuditLogData(EntityData):
     duration: timedelta | None
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id
 
 
