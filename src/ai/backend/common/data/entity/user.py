@@ -1,7 +1,6 @@
-from typing import NewType
-from uuid import UUID
+from typing import override
 
-from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeType
 
 __all__ = (
     "USER_ENTITY_TYPE",
@@ -14,4 +13,9 @@ __all__ = (
 USER_ENTITY_TYPE = EntityType("user")
 USER_SCOPE_TYPE = ScopeType(USER_ENTITY_TYPE)
 
-UserID = NewType("UserID", UUID)
+
+class UserID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return USER_ENTITY_TYPE

@@ -1,7 +1,6 @@
-import uuid
-from typing import NewType
+from typing import override
 
-from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeType
 
 __all__ = (
     "CONTAINER_REGISTRY_ENTITY_TYPE",
@@ -14,4 +13,9 @@ __all__ = (
 CONTAINER_REGISTRY_ENTITY_TYPE = EntityType("container_registry")
 CONTAINER_REGISTRY_SCOPE_TYPE = ScopeType(CONTAINER_REGISTRY_ENTITY_TYPE)
 
-ContainerRegistryID = NewType("ContainerRegistryID", uuid.UUID)
+
+class ContainerRegistryID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return CONTAINER_REGISTRY_ENTITY_TYPE

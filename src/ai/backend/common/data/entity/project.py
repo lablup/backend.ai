@@ -1,7 +1,6 @@
-from typing import NewType
-from uuid import UUID
+from typing import override
 
-from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeType
 
 __all__ = (
     "PROJECT_ENTITY_TYPE",
@@ -14,4 +13,9 @@ __all__ = (
 PROJECT_ENTITY_TYPE = EntityType("project")
 PROJECT_SCOPE_TYPE = ScopeType(PROJECT_ENTITY_TYPE)
 
-ProjectID = NewType("ProjectID", UUID)
+
+class ProjectID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return PROJECT_ENTITY_TYPE

@@ -1,7 +1,6 @@
-import uuid
-from typing import NewType, override
+from typing import override
 
-from ai.backend.common.data.entity.types import EntityType, NaturalKey, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, NaturalKey, ScopeType
 
 __all__ = (
     "RESOURCE_GROUP_ENTITY_TYPE",
@@ -15,7 +14,12 @@ __all__ = (
 RESOURCE_GROUP_ENTITY_TYPE = EntityType("resource_group")
 RESOURCE_GROUP_SCOPE_TYPE = ScopeType(RESOURCE_GROUP_ENTITY_TYPE)
 
-ResourceGroupID = NewType("ResourceGroupID", uuid.UUID)
+
+class ResourceGroupID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return RESOURCE_GROUP_ENTITY_TYPE
 
 
 class ResourceGroupName(NaturalKey):
