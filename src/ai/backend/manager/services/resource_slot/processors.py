@@ -7,7 +7,7 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
 )
-from ai.backend.manager.actions.v2.lookup.processor import PublicLookupActionProcessor
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     CreatedEntityOpsResult,
@@ -66,7 +66,7 @@ class ResourceSlotProcessors:
     search_resource_allocations: ActionProcessor[
         SearchResourceAllocationsAction, SearchResourceAllocationsResult
     ]
-    public_lookup_resource_slot_type: PublicLookupActionProcessor[
+    public_lookup_resource_slot_type: LookupActionProcessor[
         LookupResourceSlotTypeAction,
         LookupOpsResult[ResourceSlotTypeData],
     ]

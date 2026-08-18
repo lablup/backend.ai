@@ -169,6 +169,7 @@ class BulkFieldOwnerLookupService:
                 if field_id in owners
                 else "No field row matches the given id.",
                 error_code=None,
+                entity_id=owners.get(field_id),
             )
             for field_id in field_ids
         ]

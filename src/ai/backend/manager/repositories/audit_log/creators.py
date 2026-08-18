@@ -126,6 +126,7 @@ class ScopeAuditLogCreatorSpec(AuditLogCreatorSpec):
 class LookupAuditLogCreatorSpec(AuditLogCreatorSpec):
     lookup_kind: str
     lookup_key: str
+    entity_id: EntityID | None
 
     @classmethod
     @override
@@ -134,7 +135,11 @@ class LookupAuditLogCreatorSpec(AuditLogCreatorSpec):
 
     @override
     def build_row(self) -> AuditLogRow:
-        return self._build_row(lookup_kind=self.lookup_kind, lookup_key=self.lookup_key)
+        return self._build_row(
+            entity_id=self.entity_id,
+            lookup_kind=self.lookup_kind,
+            lookup_key=self.lookup_key,
+        )
 
 
 @dataclass

@@ -5,7 +5,7 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
 )
-from ai.backend.manager.actions.v2.lookup.processor import PublicLookupActionProcessor
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     CreatedEntityOpsResult,
@@ -53,7 +53,7 @@ class RuntimeVariantProcessors:
     public_search: PublicActionProcessor[
         SearchRuntimeVariantsAction, BatchOpsResult[RuntimeVariantData]
     ]
-    public_lookup: PublicLookupActionProcessor[
+    public_lookup: LookupActionProcessor[
         LookupRuntimeVariantAction, LookupOpsResult[RuntimeVariantData]
     ]
 

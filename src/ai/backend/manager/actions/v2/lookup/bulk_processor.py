@@ -5,6 +5,8 @@ from datetime import UTC, datetime
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.run_status import ActionRunStatus
+from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
+from ai.backend.manager.actions.v2.bulk.validator import BulkActionValidator
 from ai.backend.manager.actions.v2.lookup.bulk_base import (
     BaseBulkLookupAction,
     BaseBulkLookupActionResult,
@@ -29,24 +31,31 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class BulkLookupActionProcessor[TAction: BaseBulkLookupAction, TResult: BaseBulkLookupActionResult]:
     """Validate, run monitors around, then execute a bulk lookup.
 
-    The authentication gate always runs first — it is the whole of this layer's
-    authorization, since a lookup has no target to check permissions against. A key that
-    names nothing is one failed key, and the record says so per key.
+    Authorization comes in two halves, as the single lookup's does: the authentication
+    gate first, then the post-validators against every entity the keys resolved to.
+    They are the bulk validators, so the permission a read of those entities would face
+    is the one this faces.
+
+    A key that names nothing is one failed key, and the record says so per key; it
+    contributes no entity to check.
     """
 
     _func: Callable[[TAction], Awaitable[TResult]]
     _monitors: Sequence[BulkLookupActionMonitor]
     _validators: Sequence[BulkLookupActionValidator]
+    _post_validators: Sequence[BulkActionValidator]
 
     def __init__(
         self,
         func: Callable[[TAction], Awaitable[TResult]],
         monitors: Sequence[BulkLookupActionMonitor] | None = None,
         validators: Sequence[BulkLookupActionValidator] | None = None,
+        post_validators: Sequence[BulkActionValidator] | None = None,
     ) -> None:
         self._func = func
         self._monitors = monitors or []
         self._validators = [AuthenticatedBulkLookupActionValidator(), *(validators or [])]
+        self._post_validators = post_validators or []
 
     async def _prepare_monitors(self, trigger_meta: BulkLookupActionTriggerMeta) -> None:
         for monitor in self._monitors:
@@ -95,7 +104,14 @@ class BulkLookupActionProcessor[TAction: BaseBulkLookupAction, TResult: BaseBulk
                 raise
             else:
                 key_results = result.key_results()
-                return result
+                try:
+                    await self._validate_resolved(action, action_id, started_at, key_results)
+                except BaseException as e:
+                    run_status = ActionRunStatus.of_failure(e, during_validation=True)
+                    key_results = self._same_result_for_every_key(action, run_status)
+                    raise
+                else:
+                    return result
         finally:
             ended_at = datetime.now(UTC)
             meta = BulkLookupActionResultMeta(
@@ -107,6 +123,29 @@ class BulkLookupActionProcessor[TAction: BaseBulkLookupAction, TResult: BaseBulk
             )
             await self._finalize_monitors(trigger_meta, meta)
 
+    async def _validate_resolved(
+        self,
+        action: TAction,
+        action_id: uuid.UUID,
+        started_at: datetime,
+        key_results: Sequence[BulkLookupKeyResult],
+    ) -> None:
+        entity_ids = list(
+            dict.fromkeys(r.entity_id for r in key_results if r.entity_id is not None)
+        )
+        if not entity_ids or not self._post_validators:
+            return
+        meta = BulkActionTriggerMeta(
+            action_id=action_id,
+            started_at=started_at,
+            entity_type=action.entity_type(),
+            entity_ids=entity_ids,
+            operation_type=action.operation_type(),
+            action_name=action.action_name(),
+        )
+        for validator in self._post_validators:
+            await validator.validate(meta)
+
     def _same_result_for_every_key(
         self, action: TAction, run_status: ActionRunStatus
     ) -> Sequence[BulkLookupKeyResult]:
@@ -117,6 +156,7 @@ class BulkLookupActionProcessor[TAction: BaseBulkLookupAction, TResult: BaseBulk
                 status=run_status.status,
                 description=run_status.description,
                 error_code=run_status.error_code,
+                entity_id=None,
             )
             for key in action.lookup_keys()
         ]

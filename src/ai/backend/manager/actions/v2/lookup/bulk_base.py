@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.exception import ErrorCode
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
@@ -49,12 +49,13 @@ class BaseBulkLookupAction(ABC):
 
 @dataclass(frozen=True)
 class BulkLookupKeyResult:
-    """How one key of a bulk lookup fared."""
+    """How one key of a bulk lookup fared, and what it resolved to."""
 
     key: LookupKey
     status: OperationStatus
     description: str
     error_code: ErrorCode | None
+    entity_id: EntityIdentifier | None
 
 
 class BaseBulkLookupActionResult(ABC):

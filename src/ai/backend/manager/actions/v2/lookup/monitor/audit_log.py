@@ -18,11 +18,12 @@ __all__ = ("LookupActionAuditLogMonitor",)
 
 
 class LookupActionAuditLogMonitor(LookupActionMonitor):
-    """Persists an audit-log row for a lookup that did not resolve.
+    """Persists an audit-log row for a lookup.
 
-    A lookup has no entity id — producing one is what the run failed to do — so the
-    key it was looking for is what identifies the row, and ``entity_id`` stays NULL.
-    Putting the name in ``entity_id`` is the conflation these columns exist to undo.
+    The key is what identifies the row; ``entity_id`` carries what the key resolved to
+    and stays NULL when the run did not get that far — a denial on the resolved entity
+    still names it. Putting the key in ``entity_id`` is the conflation these columns
+    exist to undo.
 
     Successful lookups are not recorded by default, but that is not a special case: a
     lookup reads, so the ordinary rule for reads applies to it unchanged.
@@ -58,6 +59,7 @@ class LookupActionAuditLogMonitor(LookupActionMonitor):
                 status=meta.status,
                 lookup_kind=key.kind(),
                 lookup_key=self._render_key(key),
+                entity_id=meta.entity_id,
                 request_id=current_request_id() or BLANK_ID,
                 triggered_by=str(trigger.user_id) if trigger else None,
                 acted_as=acting.user_id if acting else None,

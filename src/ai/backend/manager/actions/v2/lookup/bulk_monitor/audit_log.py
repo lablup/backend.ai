@@ -54,6 +54,7 @@ class BulkLookupActionAuditLogMonitor(BulkLookupActionMonitor):
                 status=key_result.status,
                 lookup_kind=key_result.key.kind(),
                 lookup_key=self._render_key(key_result.key),
+                entity_id=key_result.entity_id,
                 request_id=request_id,
                 triggered_by=str(trigger.user_id) if trigger else None,
                 acted_as=acting.user_id if acting else None,

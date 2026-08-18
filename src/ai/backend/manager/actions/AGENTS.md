@@ -84,9 +84,19 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 - `global` extends `scope` to the whole installation and runs behind the SUPERADMIN
   gate. Global reads open to all authenticated users are wired via the `public_*`
   factories — read operations only; the constructor rejects writes.
-- `lookup` and `bulk_lookup` verify authentication only. Adapters must return the same
-  response for a lookup miss and for a permission denial on the follow-up action (no
-  existence leakage).
+- `lookup` and `bulk_lookup` check authentication first and the permission on whatever
+  the key resolved to after. The check splits in two because the entity a key names is
+  not known until the run produces it. The second half takes the `single_entity` and
+  `bulk` validators respectively — `LOOKUP` is a read, so it asks for read on that
+  entity.
+- A key that named nothing offers no entity to check. It is one failed key.
+- Wiring through `public_lookup_ops` leaves the second half empty, so every
+  authenticated caller may resolve.
+- Adapters must return the same response for a lookup miss and for a permission denial
+  (no existence leakage).
+- The owner lookup a field operation runs first is checked the same way. It is a
+  different permission from the write that follows — the lookup asks for read, the
+  write for write.
 - `BaseGlobalAction` declares no `entity_id()`.
 
 ## Monitors

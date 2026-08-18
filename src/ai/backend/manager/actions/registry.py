@@ -59,7 +59,6 @@ from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupAction
 from ai.backend.manager.actions.v2.lookup.monitor import LookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.processor import (
     LookupActionProcessor,
-    PublicLookupActionProcessor,
 )
 from ai.backend.manager.actions.v2.lookup.validator import LookupActionValidator
 from ai.backend.manager.actions.v2.ops.base import (
@@ -267,6 +266,7 @@ class ProcessorGroup[TData: EntityData]:
             func,
             monitors=(*self._deps.monitors.lookup, *monitors),
             validators=(*self._deps.validators.lookup, *validators),
+            post_validators=self._deps.validators.single_entity,
         )
 
     def lookup_ops[TAction: LookupEntityOpsAction[Any, Any]](
@@ -281,6 +281,7 @@ class ProcessorGroup[TData: EntityData]:
             LookupService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.lookup, *monitors),
             validators=(*self._deps.validators.lookup, *validators),
+            post_validators=self._deps.validators.single_entity,
         )
 
     def public_lookup_ops[TAction: LookupEntityOpsAction[Any, Any]](
@@ -289,9 +290,11 @@ class ProcessorGroup[TData: EntityData]:
         *,
         validators: Sequence[LookupActionValidator] = (),
         monitors: Sequence[LookupActionMonitor] = (),
-    ) -> PublicLookupActionProcessor[TAction, LookupOpsResult[TData]]:
+    ) -> LookupActionProcessor[TAction, LookupOpsResult[TData]]:
+        """A key every authenticated caller may resolve: no post-validators, so the
+        resolved entity carries no permission."""
         self._record(action_cls)
-        return PublicLookupActionProcessor(
+        return LookupActionProcessor(
             LookupService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.lookup, *monitors),
             validators=(*self._deps.validators.lookup, *validators),
@@ -314,10 +317,12 @@ class ProcessorGroup[TData: EntityData]:
             FieldOwnerLookupService(self._deps.repository).execute,
             monitors=self._deps.monitors.lookup,
             validators=self._deps.validators.lookup,
+            post_validators=self._deps.validators.single_entity,
         )
         bulk_owner_lookup: OwnerBulkLookupProcessor = BulkLookupActionProcessor(
             BulkFieldOwnerLookupService(self._deps.repository).execute,
             monitors=self._deps.monitors.bulk_lookup,
+            post_validators=self._deps.validators.bulk,
         )
         return FieldProcessorGroup(self, owner_lookup, bulk_owner_lookup)
 
