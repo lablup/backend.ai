@@ -31,12 +31,7 @@ from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.repositories.ops.repository import OpsRepository
-from ai.backend.manager.services.app_config_allow_list.processors import (
-    AppConfigAllowListProcessors,
-)
-from ai.backend.manager.services.app_config_definition.processors import (
-    AppConfigDefinitionProcessors,
-)
+from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
@@ -123,7 +118,9 @@ def test_every_defined_v2_action_is_wired() -> None:
     # One shared registry, as in the production wiring: every v2 package registers
     # through it, so its wired_actions() is the complete catalog of registered actions.
     registry = _ops_registry()
-    AppConfigAllowListProcessors(registry.group())
+    AppConfigProcessors(
+        registry.group(), registry.group(), registry.group(), registry.group(), MagicMock()
+    )
     ResourceSlotProcessors(MagicMock(), [], MagicMock(), registry.group())
     IdleCheckerProcessors(MagicMock(), [], registry.group())
     RetentionPolicyProcessors(registry.group())
@@ -141,7 +138,6 @@ def test_every_defined_v2_action_is_wired() -> None:
     RuntimeVariantPresetProcessors(MagicMock(), registry.group())
     ErrorLogProcessors(registry.group())
     AuditLogProcessors(MagicMock(), MagicMock(), registry.group())
-    AppConfigDefinitionProcessors(registry.group())
     PrometheusQueryPresetProcessors(MagicMock(), registry.group())
     StorageNamespaceProcessors(registry.group())
     DeploymentPresetProcessors(registry.group(), MagicMock())

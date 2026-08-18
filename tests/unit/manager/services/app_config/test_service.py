@@ -14,7 +14,7 @@ from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentI
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
+from ai.backend.manager.data.app_config.types import AppConfigFragmentData
 from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.repositories.app_config_fragment.types import (
     PublicAppConfigFragmentOperationScope,

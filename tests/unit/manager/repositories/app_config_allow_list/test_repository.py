@@ -11,10 +11,10 @@ import sqlalchemy as sa
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.manager.data.app_config_allow_list.types import (
+from ai.backend.manager.data.app_config.types import (
     AppConfigAllowListData,
+    AppConfigDefinitionData,
 )
-from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
 from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
 from ai.backend.manager.errors.repository import (
     EntityNotFoundError,

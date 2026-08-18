@@ -42,7 +42,7 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.app_config_fragment.types import (
+from ai.backend.manager.data.app_config.types import (
     AppConfigFragmentData,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -64,25 +64,25 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
+from ai.backend.manager.services.app_config.actions.fragment.admin_search import (
     AdminSearchAppConfigFragmentAction,
 )
-from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
+from ai.backend.manager.services.app_config.actions.fragment.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
 )
-from ai.backend.manager.services.app_config_fragment.actions.bulk_upsert import (
+from ai.backend.manager.services.app_config.actions.fragment.bulk_upsert import (
     BulkUpsertAppConfigFragmentsAction,
 )
-from ai.backend.manager.services.app_config_fragment.actions.get import (
+from ai.backend.manager.services.app_config.actions.fragment.get import (
     GetAppConfigFragmentAction,
 )
-from ai.backend.manager.services.app_config_fragment.actions.global_bulk_upsert import (
+from ai.backend.manager.services.app_config.actions.fragment.global_bulk_upsert import (
     GlobalBulkUpsertAppConfigFragmentsAction,
 )
-from ai.backend.manager.services.app_config_fragment.actions.purge import (
+from ai.backend.manager.services.app_config.actions.fragment.purge import (
     PurgeAppConfigFragmentAction,
 )
-from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
+from ai.backend.manager.services.app_config.actions.fragment.scoped_search import (
     ScopedSearchAppConfigFragmentAction,
 )
 
@@ -129,7 +129,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
         """Route by who owns the fragments: a public write answers to no scope, so it runs
         behind the SUPERADMIN gate instead."""
         if owner is None:
-            written = await self._processors.app_config_fragment.global_bulk_upsert.run(
+            written = await self._processors.app_config.fragment_global_bulk_upsert.run(
                 GlobalBulkUpsertAppConfigFragmentsAction(
                     upserters=[
                         PublicAppConfigFragmentUpserter(
@@ -140,7 +140,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
                 )
             )
         else:
-            written = await self._processors.app_config_fragment.bulk_upsert.run(
+            written = await self._processors.app_config.fragment_bulk_upsert.run(
                 BulkUpsertAppConfigFragmentsAction(
                     owner=owner,
                     upserters=[
@@ -157,13 +157,13 @@ class AppConfigFragmentAdapter(BaseAdapter):
         )
 
     async def get(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentNode:
-        action_result = await self._processors.app_config_fragment.get.run(
+        action_result = await self._processors.app_config.fragment_get.run(
             GetAppConfigFragmentAction(querier=AppConfigFragmentQuerier(fragment_id=fragment_id))
         )
         return self._fragment_to_node(action_result.data)
 
     async def purge(self, fragment_id: AppConfigFragmentID) -> PurgeAppConfigFragmentPayload:
-        action_result = await self._processors.app_config_fragment.purge.run(
+        action_result = await self._processors.app_config.fragment_purge.run(
             PurgeAppConfigFragmentAction(purger=AppConfigFragmentPurger(fragment_id=fragment_id))
         )
         return PurgeAppConfigFragmentPayload(id=action_result.data.id)
@@ -171,7 +171,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
     async def bulk_purge(
         self, input: BulkPurgeAppConfigFragmentInput
     ) -> BulkPurgeAppConfigFragmentPayload:
-        action_result = await self._processors.app_config_fragment.bulk_purge.run(
+        action_result = await self._processors.app_config.fragment_bulk_purge.run(
             BulkPurgeAppConfigFragmentAction(
                 purgers=[
                     AppConfigFragmentPurger(fragment_id=fragment_id) for fragment_id in input.ids
@@ -209,7 +209,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
             pagination_spec=_get_app_config_fragment_pagination_spec(),
             limit=len(fragment_ids),
         )
-        action_result = await self._processors.app_config_fragment.scoped_search.run(
+        action_result = await self._processors.app_config.fragment_scoped_search.run(
             ScopedSearchAppConfigFragmentAction(owner=UserID(me.user_id), searcher=searcher)
         )
         node_map = {node.id: node for node in map(self._fragment_to_node, action_result.items)}
@@ -252,7 +252,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
             pagination_spec=_get_app_config_fragment_pagination_spec(),
             limit=len(config_names),
         )
-        action_result = await self._processors.app_config_fragment.scoped_search.run(
+        action_result = await self._processors.app_config.fragment_scoped_search.run(
             ScopedSearchAppConfigFragmentAction(owner=owner, searcher=searcher)
         )
         # Answer at the position each name was asked for, so a name with no fragment at this
@@ -284,7 +284,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.app_config_fragment.admin_search.run(
+        action_result = await self._processors.app_config.fragment_admin_search.run(
             AdminSearchAppConfigFragmentAction(searcher=searcher)
         )
         return SearchAppConfigFragmentPayload(
@@ -313,7 +313,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.app_config_fragment.scoped_search.run(
+        action_result = await self._processors.app_config.fragment_scoped_search.run(
             ScopedSearchAppConfigFragmentAction(
                 owner=self._scope_owner(input.scope), searcher=searcher
             )

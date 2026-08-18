@@ -41,20 +41,10 @@ from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowLi
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.app_config_fragment.repository import (
-    AppConfigFragmentRepository,
-)
-from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 from ai.backend.manager.services.app_config.service import AppConfigService
-from ai.backend.manager.services.app_config_allow_list.processors import (
-    AppConfigAllowListProcessors,
-)
-from ai.backend.manager.services.app_config_definition.processors import (
-    AppConfigDefinitionProcessors,
-)
 from ai.backend.testutils.processors import ops_processor_group
 
 if TYPE_CHECKING:
@@ -66,13 +56,25 @@ if TYPE_CHECKING:
 @pytest.fixture()
 def app_config_processors(database_engine: ExtendedAsyncSAEngine) -> AppConfigProcessors:
     """The real read path: no RBAC validator, since the adapter fills the principal itself."""
-    repository = AppConfigFragmentRepository(RBACOpsProvider(database_engine))
-    return AppConfigProcessors(service=AppConfigService(repository), action_monitors=[])
+    registry = ProcessorRegistry(
+        ProcessorDependencies(
+            monitors=ActionMonitors(),
+            validators=ActionValidators(),
+            repository=OpsRepository(V2DBOpsProvider(database_engine)),
+        )
+    )
+    return AppConfigProcessors(
+        registry.group(),
+        ops_processor_group(database_engine),
+        registry.group(),
+        registry.group(),
+        AppConfigService(OpsRepository(V2DBOpsProvider(database_engine))),
+    )
 
 
 @pytest.fixture()
 def app_config_adapter(app_config_processors: AppConfigProcessors) -> AppConfigAdapter:
-    """``AppConfigAdapter`` reaches only ``self._processors.app_config``, so a MagicMock
+    """Every app config adapter reaches only ``self._processors.app_config``, so a MagicMock
     carrying the real processors on that attribute is enough."""
     processors = MagicMock()
     processors.app_config = app_config_processors
@@ -81,30 +83,19 @@ def app_config_adapter(app_config_processors: AppConfigProcessors) -> AppConfigA
 
 @pytest.fixture()
 def app_config_definition_adapter(
-    database_engine: ExtendedAsyncSAEngine,
+    app_config_processors: AppConfigProcessors,
 ) -> AppConfigDefinitionAdapter:
     processors = MagicMock()
-    processors.app_config_definition = AppConfigDefinitionProcessors(
-        ops_processor_group(database_engine)
-    )
+    processors.app_config = app_config_processors
     return AppConfigDefinitionAdapter(processors)
 
 
 @pytest.fixture()
 def app_config_allow_list_adapter(
-    database_engine: ExtendedAsyncSAEngine,
+    app_config_processors: AppConfigProcessors,
 ) -> AppConfigAllowListAdapter:
-    """This domain runs straight against ops, so it takes a processor group, not a service."""
     processors = MagicMock()
-    processors.app_config_allow_list = AppConfigAllowListProcessors(
-        ProcessorRegistry(
-            ProcessorDependencies(
-                monitors=ActionMonitors(),
-                validators=ActionValidators(),
-                repository=OpsRepository(V2DBOpsProvider(database_engine)),
-            )
-        ).group()
-    )
+    processors.app_config = app_config_processors
     return AppConfigAllowListAdapter(processors)
 
 

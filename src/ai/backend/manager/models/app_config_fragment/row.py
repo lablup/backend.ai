@@ -10,7 +10,7 @@ from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config import AppConfigScopeID
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.manager.data.app_config_fragment.types import (
+from ai.backend.manager.data.app_config.types import (
     AppConfigFragmentData,
 )
 from ai.backend.manager.models.base import GUID, Base, StrEnumType

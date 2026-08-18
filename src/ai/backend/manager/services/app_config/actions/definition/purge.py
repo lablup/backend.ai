@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.app_config_definition import (
 )
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
-from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
+from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
 from ai.backend.manager.models.app_config_definition.purgers import AppConfigDefinitionPurger
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 

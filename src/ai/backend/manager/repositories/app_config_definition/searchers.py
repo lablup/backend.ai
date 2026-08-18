@@ -7,7 +7,7 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
+from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.specs.searcher import Searcher
 

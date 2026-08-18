@@ -3,8 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ai.backend.manager.data.app_config.types import AppConfigData
-from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
+from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigFragmentData
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.repositories.ops.repository import OpsRepository

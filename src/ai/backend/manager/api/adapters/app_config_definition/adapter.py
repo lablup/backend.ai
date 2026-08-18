@@ -25,7 +25,7 @@ from ai.backend.common.dto.manager.v2.app_config_definition.types import (
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
+from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
 from ai.backend.manager.models.app_config_definition.conditions import (
     AppConfigDefinitionConditions,
 )
@@ -41,16 +41,16 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.services.app_config_definition.actions.admin_search import (
+from ai.backend.manager.services.app_config.actions.definition.admin_search import (
     AdminSearchAppConfigDefinitionsAction,
 )
-from ai.backend.manager.services.app_config_definition.actions.create import (
+from ai.backend.manager.services.app_config.actions.definition.create import (
     CreateAppConfigDefinitionAction,
 )
-from ai.backend.manager.services.app_config_definition.actions.get import (
+from ai.backend.manager.services.app_config.actions.definition.get import (
     GetAppConfigDefinitionAction,
 )
-from ai.backend.manager.services.app_config_definition.actions.purge import (
+from ai.backend.manager.services.app_config.actions.definition.purge import (
     PurgeAppConfigDefinitionAction,
 )
 
@@ -73,7 +73,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
         self, input: CreateAppConfigDefinitionInput
     ) -> CreateAppConfigDefinitionPayload:
         creator = AppConfigDefinitionCreator(config_name=input.config_name)
-        action_result = await self._processors.app_config_definition.global_create.run(
+        action_result = await self._processors.app_config.definition_global_create.run(
             CreateAppConfigDefinitionAction(creator=creator)
         )
         return CreateAppConfigDefinitionPayload(
@@ -81,7 +81,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
         )
 
     async def admin_get(self, definition_id: AppConfigDefinitionID) -> AppConfigDefinitionNode:
-        action_result = await self._processors.app_config_definition.get.run(
+        action_result = await self._processors.app_config.definition_get.run(
             GetAppConfigDefinitionAction(definition_id=definition_id)
         )
         return self._data_to_node(action_result.data)
@@ -102,7 +102,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             pagination_spec=_get_app_config_definition_pagination_spec(),
             limit=len(ids),
         )
-        action_result = await self._processors.app_config_definition.global_search.run(
+        action_result = await self._processors.app_config.definition_global_search.run(
             AdminSearchAppConfigDefinitionsAction(searcher=searcher)
         )
         node_map = {node.id: node for node in map(self._data_to_node, action_result.items)}
@@ -125,7 +125,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.app_config_definition.global_search.run(
+        action_result = await self._processors.app_config.definition_global_search.run(
             AdminSearchAppConfigDefinitionsAction(searcher=searcher)
         )
         return SearchAppConfigDefinitionsPayload(
@@ -138,7 +138,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
     async def admin_purge(
         self, input: PurgeAppConfigDefinitionInput
     ) -> PurgeAppConfigDefinitionPayload:
-        action_result = await self._processors.app_config_definition.purge.run(
+        action_result = await self._processors.app_config.definition_purge.run(
             PurgeAppConfigDefinitionAction(definition_id=AppConfigDefinitionID(input.id))
         )
         return PurgeAppConfigDefinitionPayload(id=action_result.data.id)

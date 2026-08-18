@@ -52,15 +52,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.app_config.service import (
         AppConfigService,
     )
-    from ai.backend.manager.services.app_config_allow_list.processors import (
-        AppConfigAllowListProcessors,
-    )
-    from ai.backend.manager.services.app_config_definition.processors import (
-        AppConfigDefinitionProcessors,
-    )
-    from ai.backend.manager.services.app_config_fragment.processors import (
-        AppConfigFragmentProcessors,
-    )
     from ai.backend.manager.services.artifact.processors import (
         ArtifactProcessors,
     )
@@ -419,9 +410,6 @@ class ProcessorArgs:
 class Processors:
     agent: AgentProcessors
     app_config: AppConfigProcessors
-    app_config_allow_list: AppConfigAllowListProcessors
-    app_config_definition: AppConfigDefinitionProcessors
-    app_config_fragment: AppConfigFragmentProcessors
     domain: DomainProcessors
     dotfile: DotfileProcessors
     error_log: ErrorLogProcessors

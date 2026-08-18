@@ -761,3 +761,53 @@ class TestEntityUpsert:
             await repository.upsert_entity(_Upserter(name="a", parents=(uuid.uuid4(),)))
 
         assert await _row_count(database) == 0
+
+    async def test_atomic_upsert_provisions_and_joins_each_entity(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: OpsRepository[_EntityData],
+        parent_id: UUID,
+    ) -> None:
+        items = await repository.atomic_upsert_entities([
+            _Upserter(name="a", parents=(parent_id,)),
+            _Upserter(name="b", parents=(parent_id,)),
+        ])
+
+        assert [item.name for item in items] == ["a", "b"]
+        for item in items:
+            assert await _virtual_scope_id(database, item.id) is not None
+            assert await _self_membership_exists(database, item.id)
+        assert await _parent_membership_entity_ids(database, parent_id) == {
+            item.id for item in items
+        }
+
+    async def test_atomic_upsert_updates_an_existing_row_in_place(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: OpsRepository[_EntityData],
+        parent_id: UUID,
+    ) -> None:
+        first = await repository.upsert_entity(_Upserter(name="a", parents=(parent_id,)))
+
+        items = await repository.atomic_upsert_entities([
+            _Upserter(name="a", note="updated", parents=(parent_id,)),
+            _Upserter(name="b", parents=(parent_id,)),
+        ])
+
+        assert items[0].id == first.id
+        assert items[0].note == "updated"
+        assert await _row_count(database) == 2
+
+    async def test_atomic_upsert_is_all_or_nothing(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: OpsRepository[_EntityData],
+        parent_id: UUID,
+    ) -> None:
+        with pytest.raises(VirtualScopeNotFound):
+            await repository.atomic_upsert_entities([
+                _Upserter(name="a", parents=(parent_id,)),
+                _Upserter(name="b", parents=(uuid.uuid4(),)),
+            ])
+
+        assert await _row_count(database) == 0

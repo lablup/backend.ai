@@ -17,15 +17,6 @@ from ai.backend.manager.services.app_config.processors import (
 from ai.backend.manager.services.app_config.service import (
     AppConfigService,
 )
-from ai.backend.manager.services.app_config_allow_list.processors import (
-    AppConfigAllowListProcessors,
-)
-from ai.backend.manager.services.app_config_definition.processors import (
-    AppConfigDefinitionProcessors,
-)
-from ai.backend.manager.services.app_config_fragment.processors import (
-    AppConfigFragmentProcessors,
-)
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
@@ -437,9 +428,13 @@ def create_processors(
     )
     processors = Processors(
         agent=AgentProcessors(services.agent, action_monitors, validators),
-        app_config=AppConfigProcessors(registry.group(), services.app_config),
-        app_config_allow_list=AppConfigAllowListProcessors(registry.group()),
-        app_config_fragment=AppConfigFragmentProcessors(registry.group()),
+        app_config=AppConfigProcessors(
+            registry.group(),
+            registry.group(),
+            registry.group(),
+            registry.group(),
+            services.app_config,
+        ),
         domain=DomainProcessors(services.domain, action_monitors, validators),
         dotfile=DotfileProcessors(services.dotfile, action_monitors, validators),
         error_log=ErrorLogProcessors(registry.group()),
@@ -502,7 +497,6 @@ def create_processors(
             services.model_serving_auto_scaling, action_monitors, validators
         ),
         auth=AuthProcessors(services.auth, action_monitors, validators),
-        app_config_definition=AppConfigDefinitionProcessors(registry.group()),
         login_client_type=LoginClientTypeProcessors(registry.group()),
         notification=NotificationProcessors(
             services.notification, registry.group(), registry.group()
