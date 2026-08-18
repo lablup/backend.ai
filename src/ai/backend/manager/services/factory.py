@@ -455,7 +455,7 @@ def create_processors(
         ),
         session=SessionProcessors(services.session, action_monitors, validators),
         keypair_resource_policy=KeypairResourcePolicyProcessors(registry.group()),
-        manager_admin=ManagerAdminProcessors(services.manager_admin, action_monitors, validators),
+        manager_admin=ManagerAdminProcessors(registry.group(), services.manager_admin),
         user_resource_policy=UserResourcePolicyProcessors(registry.group()),
         project_resource_policy=ProjectResourcePolicyProcessors(registry.group()),
         prometheus_query_preset=PrometheusQueryPresetProcessors(
