@@ -35,9 +35,20 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   ask which entity it was about.
 - A field row carries no membership of its own. What it belongs to is only knowable
   through the entity that owns it.
+- **Which end the operation starts from decides the check.** Starting from a field row
+  means its membership is unknown and the owner has to be read first; starting from an
+  entity means the value to check is already in hand.
 - So a field action names no entity directly — it names the **lookup action** that
   reads the owning one. The processor runs that lookup first, then runs the same
   `single_entity` / `bulk` validators and monitors against what came back.
+- The other direction — **an entity id and no field id** — is a `single_entity`
+  operation on that entity. It stays one even when it reads that entity's field rows as
+  a page: the work and the result are a search's, but the validation, the record and the
+  response are single-entity. Nothing was named, so there is no owner to read.
+- Creating a field row takes the owning entity's id for the same reason: it writes
+  inside that entity's scope and is answered for by it.
+- Neither contradicts "an operation naming existing rows takes their ids and nothing
+  else". What that forbids is passing an owner **alongside a named row**.
 - Every write to a field row declares `operation_type() == UPDATE` — create, edit,
   delete and purge alike. Adding or removing a row is a change to that entity, and it
   is that entity's permission that answers for it. Only a read is `GET`.

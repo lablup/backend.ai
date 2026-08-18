@@ -41,6 +41,7 @@ from ai.backend.manager.actions.v2.field.ops import (
     PartialBulkPurgeFieldOpsAction,
     PurgeFieldOpsAction,
     RestoreFieldOpsAction,
+    SearchFieldOpsAction,
     UpdateFieldOpsAction,
 )
 from ai.backend.manager.actions.v2.field.processor import (
@@ -833,6 +834,25 @@ class FieldProcessorGroup[TFieldData: FieldData]:
             validators=(*self._group.deps.validators.single_entity, *validators),
         )
 
+    def search_ops[TAction: SearchFieldOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleEntityActionProcessor[TAction, BatchOpsResult[TFieldData]]:
+        """A page of one owner's field rows.
+
+        The owner is named on the action, so nothing is looked up and the check is the
+        owner's own read. The searcher carries the owner filter.
+        """
+        self._group.record(action_cls)
+        return SingleEntityActionProcessor(
+            GlobalSearchService(self._group.deps.repository).execute,
+            monitors=(*self._group.deps.monitors.single_entity, *monitors),
+            validators=(*self._group.deps.validators.single_entity, *validators),
+        )
+
     def global_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
@@ -840,8 +860,9 @@ class FieldProcessorGroup[TFieldData: FieldData]:
         validators: Sequence[GlobalActionValidator] = (),
         monitors: Sequence[GlobalActionMonitor] = (),
     ) -> GlobalActionProcessor[TAction, BatchOpsResult[TFieldData]]:
-        """A read across every row of this field type; no owner is named, so nothing is
-        looked up."""
+        """A read across every row of this field type, behind the SUPERADMIN gate.
+
+        For one owner's rows use :meth:`search_ops`; this one names no owner."""
         self._group.record(action_cls)
         return GlobalActionProcessor(
             GlobalSearchService(self._group.deps.repository).execute,

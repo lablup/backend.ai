@@ -65,6 +65,29 @@ the global entity itself is reachable by nobody but a super-admin.
 The delete side always tore the node down (`purge_entity` calls `_teardown_entity`).
 The create side removed the asymmetry of tearing down what was never built.
 
+## A field row carries an id of its own
+
+- A row with exactly one owning entity and a cascading FK is a field row. Whether an
+  API names one individually today is not the test — that arrives later.
+- So such a table gets an `id` uuid. Where the primary key is composite it stays as it
+  is and `id` is added as a unique column: every existing query and index survives, and
+  a `FieldIdentifier` becomes expressible.
+- The five tables recording one slot's amount per owner (agent / session / model card /
+  deployment preset / deployment revision) are this shape.
+
+## Which end the operation starts from decides the check
+
+| Starting point | Owner known | Checked against |
+|---|---|---|
+| a field row's id | no | the owning entity, read first |
+| an entity's id | yes | that entity, directly |
+
+- A read that comes back with several of that entity's field rows still started from the
+  entity. The work and the result are a search's; the validation, the record and the
+  response are single-entity.
+- Creating a field row takes the owning entity's id for the same reason.
+- The rules: `../../actions/AGENTS.md`.
+
 ## A field row's membership is only knowable through its owner
 
 - A field row carries no membership of its own, so an operation naming one has nothing
