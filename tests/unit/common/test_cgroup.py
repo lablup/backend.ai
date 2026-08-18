@@ -59,7 +59,7 @@ class TestGetContainerCgroupPath:
     async def test_joins_mount_point_with_the_cgroup_of_the_main_process(self) -> None:
         with (
             patch(
-                "ai.backend.common.cgroup._get_container_main_pid",
+                "ai.backend.common.cgroup.get_container_main_pid",
                 AsyncMock(return_value=PID(1234)),
             ),
             patch(
@@ -80,7 +80,7 @@ class TestGetContainerCgroupPath:
     async def test_passes_the_controller_through_to_both_lookups(self) -> None:
         with (
             patch(
-                "ai.backend.common.cgroup._get_container_main_pid",
+                "ai.backend.common.cgroup.get_container_main_pid",
                 AsyncMock(return_value=PID(1234)),
             ),
             patch(
@@ -96,7 +96,7 @@ class TestGetContainerCgroupPath:
 
     async def test_propagates_resolution_failure(self) -> None:
         with patch(
-            "ai.backend.common.cgroup._get_container_main_pid",
+            "ai.backend.common.cgroup.get_container_main_pid",
             AsyncMock(side_effect=CgroupResolutionFailed("no running process")),
         ):
             with pytest.raises(CgroupResolutionFailed):

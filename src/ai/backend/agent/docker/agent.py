@@ -109,7 +109,11 @@ from ai.backend.agent.utils import (
     update_nested_dict,
 )
 from ai.backend.common.asyncio import current_loop
-from ai.backend.common.cgroup import CgroupController, get_container_cgroup_path
+from ai.backend.common.cgroup import (
+    CgroupController,
+    get_cgroup_path_of_pid,
+    get_container_main_pid,
+)
 from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.docker import (
     MAX_KERNELSPEC,
@@ -176,7 +180,14 @@ _SECCOMP_PROFILE_FILENAME: Final[str] = "seccomp.json"
 # document, others open it as a path, and neither accepts the other form. These engine
 # components, as reported by the version API, are the ones that require a path.
 _SECCOMP_PATH_ENGINES: Final[frozenset[str]] = frozenset({"Podman Engine"})
-_CGROUP_PATH_CACHE_SIZE: Final[int] = 256
+# Cached per container, so the capacity is the number of containers an agent may host.
+_CGROUP_PATH_CACHE_SIZE: Final[int] = 2048
+# Controllers the intrinsic plugins read, resolved together from a single inspect.
+_TRACKED_CGROUP_CONTROLLERS: Final[tuple[CgroupController, ...]] = (
+    CgroupController.CPUACCT,
+    CgroupController.MEMORY,
+    CgroupController.BLKIO,
+)
 
 known_glibc_distros: Final[dict[float, str]] = {
     2.17: "centos7.6",
@@ -1497,7 +1508,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     gwbridge_subnet: str | None
     checked_invalid_images: set[str]
     _seccomp_profile_as_path: bool
-    _cgroup_path_cache: LRUCache[tuple[CgroupController, ContainerId], Path]
+    _cgroup_path_cache: LRUCache[ContainerId, dict[CgroupController, Path]]
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -1692,13 +1703,25 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def get_cgroup_path(
         self, controller: CgroupController, container_id: ContainerId
     ) -> Path:
-        cache_key = (controller, container_id)
-        if (cached_path := self._cgroup_path_cache.get(cache_key)) is not None:
+        cached_paths = self._cgroup_path_cache.get(container_id)
+        if cached_paths is not None and (cached_path := cached_paths.get(controller)) is not None:
             return cached_path
+        # The PID is used immediately and never cached: it changes when the container
+        # restarts, while the resolved cgroup path does not.
+        pid = await get_container_main_pid(container_id)
         version = self.docker_info["CgroupVersion"]
-        cgroup_path = await get_container_cgroup_path(version, controller, container_id)
-        self._cgroup_path_cache[cache_key] = cgroup_path
-        return cgroup_path
+        resolved = {
+            each_controller: get_cgroup_path_of_pid(version, each_controller, pid)
+            for each_controller in {*_TRACKED_CGROUP_CONTROLLERS, controller}
+        }
+        if cached_paths is None:
+            self._cgroup_path_cache[container_id] = resolved
+        else:
+            cached_paths.update(resolved)
+        return resolved[controller]
+
+    def _invalidate_cgroup_path_cache(self, container_id: ContainerId) -> None:
+        self._cgroup_path_cache.pop(container_id, None)
 
     @override
     def get_cgroup_version(self) -> str:
@@ -2157,6 +2180,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         restarting: bool,
     ) -> None:
         loop = current_loop()
+        if container_id is not None:
+            self._invalidate_cgroup_path_cache(container_id)
         async with closing_async(Docker()) as docker:
             if container_id is not None:
                 container = docker.containers.container(container_id)

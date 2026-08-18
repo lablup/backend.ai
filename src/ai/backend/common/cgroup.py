@@ -14,6 +14,7 @@ import enum
 import logging
 import re
 from dataclasses import dataclass
+from http import HTTPStatus
 from pathlib import Path
 from typing import Final, Literal, override
 
@@ -132,18 +133,23 @@ def get_container_id_of_cgroup(cgroup: str) -> str | None:
     return matched.group("id")
 
 
-async def _get_container_main_pid(cid: ContainerId) -> PID:
+async def get_container_main_pid(cid: ContainerId) -> PID:
     connector = get_docker_connector()
     async with aiohttp.ClientSession(connector=connector.connector) as sess:
         async with sess.get(connector.docker_host / f"containers/{cid}/json") as resp:
+            if resp.status != HTTPStatus.OK:
+                # The container may have been removed since the caller observed it.
+                raise CgroupResolutionFailed(
+                    f"could not inspect container {cid} (HTTP {resp.status})"
+                )
             data = await resp.json()
-    pid = data["State"]["Pid"]
-    if not pid:
+    state = data.get("State")
+    if state is None or not state.get("Pid"):
         raise CgroupResolutionFailed(f"container {cid} has no running process")
-    return PID(pid)
+    return PID(state["Pid"])
 
 
-def _get_cgroup_path_of_pid(version: str, controller: CgroupController, pid: PID) -> Path:
+def get_cgroup_path_of_pid(version: str, controller: CgroupController, pid: PID) -> Path:
     return get_cgroup_mount_point(version, controller) / get_cgroup_of_pid(controller, pid)
 
 
@@ -154,8 +160,8 @@ async def get_container_cgroup_path(
     Resolve the cgroup path of a container from the cgroup its main process actually
     belongs to, instead of assembling a runtime-specific path.
     """
-    pid = await _get_container_main_pid(cid)
-    return _get_cgroup_path_of_pid(version, controller, pid)
+    pid = await get_container_main_pid(cid)
+    return get_cgroup_path_of_pid(version, controller, pid)
 
 
 async def get_container_pids(cid: ContainerId) -> list[int]:
