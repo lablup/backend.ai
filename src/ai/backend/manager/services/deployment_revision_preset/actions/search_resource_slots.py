@@ -1,46 +1,39 @@
-"""Action for searching resource slots of a deployment revision preset."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import override
-from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.deployment_revision_preset.actions.base import (
-    DeploymentRevisionPresetAction,
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.field.ops import SearchFieldOpsAction
+from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotData
+from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
+from ai.backend.manager.repositories.deployment_revision_preset.searchers import (
+    PresetResourceSlotSearcher,
 )
 
 
 @dataclass
-class SearchPresetResourceSlotsAction(DeploymentRevisionPresetAction):
-    """Action to search resource slots allocated to a deployment revision preset."""
+class SearchPresetResourceSlotsAction(
+    SearchFieldOpsAction[PresetResourceSlotRow, PresetResourceSlotData]
+):
+    """Page through the slot amounts one preset declares.
 
-    preset_id: UUID
-    querier: BatchQuerier
+    The preset is named, so this is answered for by a read of the preset itself.
+    """
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.preset_id)
+    preset_id: DeploymentPresetID
+    searcher: PresetResourceSlotSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchPresetResourceSlotsActionResult(BaseActionResult):
-    """Result of searching preset resource slots."""
-
-    items: list[tuple[str, Decimal]]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def action_name(cls) -> str:
+        return "search_deployment_preset_resource_slots"
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def entity_id(self) -> EntityIdentifier:
+        return self.preset_id
+
+    @override
+    def to_searcher(self) -> PresetResourceSlotSearcher:
+        return self.searcher

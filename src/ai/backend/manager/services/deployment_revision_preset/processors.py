@@ -1,56 +1,80 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.services.deployment_revision_preset.actions.create import (
-    CreateDeploymentRevisionPresetAction,
-    CreateDeploymentRevisionPresetActionResult,
+from __future__ import annotations
+
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityWithFieldsOpsResult,
+    EntityOpsResult,
 )
-from ai.backend.manager.services.deployment_revision_preset.actions.delete import (
-    DeleteDeploymentRevisionPresetAction,
-    DeleteDeploymentRevisionPresetActionResult,
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotData
+from ai.backend.manager.data.deployment_revision_preset.types import (
+    DeploymentRevisionPresetData,
+    ResourceSlotEntryData,
+)
+from ai.backend.manager.services.deployment_revision_preset.actions.create import (
+    CreateDeploymentPresetAction,
+)
+from ai.backend.manager.services.deployment_revision_preset.actions.get import (
+    GetDeploymentPresetAction,
+)
+from ai.backend.manager.services.deployment_revision_preset.actions.lookup_slot_owner import (
+    LookupBulkPresetResourceSlotOwnerAction,
+    LookupPresetResourceSlotOwnerAction,
+)
+from ai.backend.manager.services.deployment_revision_preset.actions.purge import (
+    PurgeDeploymentPresetAction,
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.search import (
-    SearchDeploymentRevisionPresetsAction,
-    SearchDeploymentRevisionPresetsActionResult,
+    GlobalSearchDeploymentPresetsAction,
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.search_resource_slots import (
     SearchPresetResourceSlotsAction,
-    SearchPresetResourceSlotsActionResult,
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.update import (
-    UpdateDeploymentRevisionPresetAction,
-    UpdateDeploymentRevisionPresetActionResult,
+    UpdateDeploymentPresetAction,
 )
-from ai.backend.manager.services.deployment_revision_preset.service import (
-    DeploymentRevisionPresetService,
-)
+from ai.backend.manager.services.deployment_revision_preset.service import DeploymentPresetService
 
 
-class DeploymentRevisionPresetProcessors:
-    create: ActionProcessor[
-        CreateDeploymentRevisionPresetAction, CreateDeploymentRevisionPresetActionResult
+class DeploymentPresetProcessors:
+    """An update restates the preset's slots, so it goes through the service; the rest
+    run straight against ops."""
+
+    create: GlobalActionProcessor[
+        CreateDeploymentPresetAction,
+        CreatedEntityWithFieldsOpsResult[DeploymentRevisionPresetData, ResourceSlotEntryData],
     ]
-    update: ActionProcessor[
-        UpdateDeploymentRevisionPresetAction, UpdateDeploymentRevisionPresetActionResult
+    get: SingleEntityActionProcessor[
+        GetDeploymentPresetAction, EntityOpsResult[DeploymentRevisionPresetData]
     ]
-    delete: ActionProcessor[
-        DeleteDeploymentRevisionPresetAction, DeleteDeploymentRevisionPresetActionResult
+    global_search: GlobalActionProcessor[
+        GlobalSearchDeploymentPresetsAction, BatchOpsResult[DeploymentRevisionPresetData]
     ]
-    search: ActionProcessor[
-        SearchDeploymentRevisionPresetsAction, SearchDeploymentRevisionPresetsActionResult
+    update: SingleEntityActionProcessor[
+        UpdateDeploymentPresetAction, EntityOpsResult[DeploymentRevisionPresetData]
     ]
-    search_resource_slots: ActionProcessor[
-        SearchPresetResourceSlotsAction, SearchPresetResourceSlotsActionResult
+    purge: SingleEntityActionProcessor[
+        PurgeDeploymentPresetAction, EntityOpsResult[DeploymentRevisionPresetData]
+    ]
+    search_resource_slots: SingleEntityActionProcessor[
+        SearchPresetResourceSlotsAction, BatchOpsResult[PresetResourceSlotData]
     ]
 
     def __init__(
         self,
-        service: DeploymentRevisionPresetService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
+        group: ProcessorGroup[DeploymentRevisionPresetData],
+        service: DeploymentPresetService,
     ) -> None:
-        self.create = ActionProcessor(service.create, action_monitors)
-        self.update = ActionProcessor(service.update, action_monitors)
-        self.delete = ActionProcessor(service.delete, action_monitors)
-        self.search = ActionProcessor(service.search, action_monitors)
-        self.search_resource_slots = ActionProcessor(service.search_resource_slots, action_monitors)
+        self.create = group.global_create_with_fields_ops(CreateDeploymentPresetAction)
+        self.get = group.single_get_ops(GetDeploymentPresetAction)
+        self.global_search = group.global_search_ops(GlobalSearchDeploymentPresetsAction)
+        self.update = group.single_entity(UpdateDeploymentPresetAction, service.update)
+        self.purge = group.entity_purge_ops(PurgeDeploymentPresetAction)
+        slots = group.field_group(
+            PresetResourceSlotData,
+            LookupPresetResourceSlotOwnerAction,
+            LookupBulkPresetResourceSlotOwnerAction,
+        )
+        self.search_resource_slots = slots.search_ops(SearchPresetResourceSlotsAction)

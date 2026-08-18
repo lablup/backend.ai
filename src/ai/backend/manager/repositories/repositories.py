@@ -16,7 +16,7 @@ from ai.backend.manager.repositories.container_registry.repositories import (
 )
 from ai.backend.manager.repositories.deployment.repositories import DeploymentRepositories
 from ai.backend.manager.repositories.deployment_revision_preset.repositories import (
-    DeploymentRevisionPresetRepositories,
+    DeploymentPresetRepositories,
 )
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
 from ai.backend.manager.repositories.dotfile.repositories import DotfileRepositories
@@ -109,7 +109,7 @@ class Repositories:
     resource_slot: ResourceSlotRepositories
     runtime_variant: RuntimeVariantRepositories
     runtime_variant_preset: RuntimeVariantPresetRepositories
-    deployment_revision_preset: DeploymentRevisionPresetRepositories
+    deployment_revision_preset: DeploymentPresetRepositories
     model_card: ModelCardRepositories
     resource_usage_history: ResourceUsageHistoryRepositories
     scaling_group: ScalingGroupRepositories
@@ -159,7 +159,7 @@ class Repositories:
         resource_slot_repositories = ResourceSlotRepositories.create(args)
         runtime_variant_repositories = RuntimeVariantRepositories.create(args)
         runtime_variant_preset_repositories = RuntimeVariantPresetRepositories.create(args)
-        deployment_revision_preset_repositories = DeploymentRevisionPresetRepositories.create(args)
+        deployment_revision_preset_repositories = DeploymentPresetRepositories.create(args)
         model_card_repositories = ModelCardRepositories.create(args)
         resource_usage_history_repositories = ResourceUsageHistoryRepositories.create(args)
         scaling_group_repositories = ScalingGroupRepositories.create(args)

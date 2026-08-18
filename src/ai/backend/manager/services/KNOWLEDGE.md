@@ -163,14 +163,20 @@ Consult this table before deciding to keep a service method.
 
 | Legacy pattern | Demotion tool | Status |
 |---|---|---|
-| id/name double-lookup branch | a lookup action composed with the real action by the adapter | foundation exists, zero usages |
+| id/name double-lookup branch | the adapter runs a lookup action before the real one | in use |
 | 1-2 lines of validation (state check, name rule) | the factory's `validators=` extra argument | available |
 | folding lifecycle values into a status (pure function) | the spec's `to_data()` / the Searcher's data conversion | available |
 | soft delete | `DataUpdater` (treated as a status transition; no deleter spec exists) | available |
-| rank allocation | `NextValuePolicy` | **v2 gap** — legacy provider only |
-| parent+child rows created together | children of an existing owner use `FieldEntity*`; creating parent and children together needs `DependentCreatorSpec` | **v2 gap** — legacy provider only |
+| rank allocation | the creator puts a SQL expression on that column in `build_row()` | in use |
+| parent and children created together | `create_*_with_fields` puts the `FieldCreator`s in one transaction | in use |
+| reading one owner's field rows | `FieldProcessorGroup.search_ops` | in use |
 
-- Until the two gaps close, only the affected actions stay service-backed.
+- The rank is computed inside the INSERT, without a lock. Concurrent inserts can land on
+  the same value, which is accepted where the rank only orders a listing. A
+  deterministic order needs the lock back, and no tool in this table provides it: the
+  spec would have to declare what to lock.
+- A column filled by a SQL expression is read back once after the insert. `_insert_rows`
+  works that out from the row, so a spec declares nothing.
 
 ## Non-DB targets are not ops-direct candidates
 

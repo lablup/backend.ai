@@ -1,17 +1,22 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, override
 
+import sqlalchemy as sa
+
 from ai.backend.common.config import PresetModelDefinition
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.types import BinarySize
-from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
+from ai.backend.manager.data.deployment_revision_preset.types import (
+    DeploymentRevisionPresetData,
+    ResourceSlotEntryData,
+)
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import DeploymentRevisionPresetConflict
 from ai.backend.manager.models.base import ResourceOptsEntry
@@ -20,8 +25,17 @@ from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
+from ai.backend.manager.models.specs.creator import FieldCreator, GlobalEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-from ai.backend.manager.repositories.base.creator import DependentCreatorSpec
+
+__all__ = (
+    "RANK_GAP",
+    "DeploymentPresetCreator",
+    "PresetResourceSlotCreator",
+)
+
+# Ranks are spaced so a preset can later be placed between two existing ones.
+RANK_GAP = 100
 
 
 def _parse_quantity(value: str) -> Decimal:
@@ -32,10 +46,14 @@ def _parse_quantity(value: str) -> Decimal:
 
 
 @dataclass
-class DeploymentRevisionPresetCreatorSpec(DependentCreatorSpec[int, DeploymentRevisionPresetRow]):
-    """Preset creator whose rank is assigned by the ops layer (next-value) at execution.
+class DeploymentPresetCreator(
+    GlobalEntityCreator[DeploymentRevisionPresetRow, DeploymentRevisionPresetData]
+):
+    """Insert a preset, ranked last within its runtime variant.
 
-    ``build_row`` receives the computed next rank as its dependency.
+    The rank is a subquery in the INSERT rather than a locked read before it, so two
+    concurrent inserts can land on the same rank. Rank only orders a catalog, and
+    presets are created rarely enough that a tie costs a momentary ordering wobble.
     """
 
     runtime_variant_id: RuntimeVariantID
@@ -56,7 +74,10 @@ class DeploymentRevisionPresetCreatorSpec(DependentCreatorSpec[int, DeploymentRe
     open_to_public: bool | None = None
     revision_history_limit: int | None = None
 
-    @property
+    @override
+    def entity_id(self, row: DeploymentRevisionPresetRow) -> DeploymentPresetID:
+        return row.id
+
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return (
@@ -69,12 +90,16 @@ class DeploymentRevisionPresetCreatorSpec(DependentCreatorSpec[int, DeploymentRe
         )
 
     @override
-    def build_row(self, next_rank: int) -> DeploymentRevisionPresetRow:
+    def to_data(self, row: DeploymentRevisionPresetRow) -> DeploymentRevisionPresetData:
+        return row.to_data()
+
+    @override
+    def build_row(self) -> DeploymentRevisionPresetRow:
         return DeploymentRevisionPresetRow(
             runtime_variant=self.runtime_variant_id,
             name=self.name,
             description=self.description,
-            rank=next_rank,
+            rank=self._next_rank(),
             image_id=self.image_id,
             model_definition=self.model_definition,
             resource_opts=self.resource_opts,
@@ -91,24 +116,37 @@ class DeploymentRevisionPresetCreatorSpec(DependentCreatorSpec[int, DeploymentRe
             deployment_strategy_spec=self.deployment_strategy_spec,
         )
 
-
-@dataclass(frozen=True)
-class PresetSlotDependency:
-    """Dependency value for creating preset resource slots: the owning preset's id."""
-
-    preset_id: uuid.UUID
+    def _next_rank(self) -> sa.sql.elements.ColumnElement[int]:
+        return (
+            sa.select(sa.func.coalesce(sa.func.max(DeploymentRevisionPresetRow.rank), 0) + RANK_GAP)
+            .where(DeploymentRevisionPresetRow.runtime_variant == self.runtime_variant_id)
+            .scalar_subquery()
+        )
 
 
 @dataclass
-class PresetResourceSlotDependentCreatorSpec(
-    DependentCreatorSpec[PresetSlotDependency, PresetResourceSlotRow]
+class PresetResourceSlotCreator(
+    FieldCreator[DeploymentPresetID, PresetResourceSlotRow, ResourceSlotEntryData]
 ):
+    """Insert one slot quantity of the preset that owns it."""
+
     entry: ResourceSlotEntryData
 
     @override
-    def build_row(self, dependency: PresetSlotDependency) -> PresetResourceSlotRow:
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_row(self, owner_id: DeploymentPresetID) -> PresetResourceSlotRow:
         return PresetResourceSlotRow(
-            preset_id=dependency.preset_id,
+            preset_id=owner_id,
             slot_name=self.entry.resource_type,
             quantity=_parse_quantity(self.entry.quantity),
+        )
+
+    @override
+    def to_data(self, row: PresetResourceSlotRow) -> ResourceSlotEntryData:
+        return ResourceSlotEntryData(
+            resource_type=row.slot_name,
+            quantity=str(row.quantity),
         )

@@ -63,7 +63,7 @@ from ai.backend.manager.repositories.deployment.creators import (
 from ai.backend.manager.repositories.deployment.updaters import DeploymentUpdaterSpec
 from ai.backend.manager.repositories.deployment.upserters import DeploymentPolicyUpserterSpec
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
-    DeploymentRevisionPresetRepository,
+    DeploymentPresetRepository,
 )
 from ai.backend.manager.repositories.runtime_variant_preset.repository import (
     RuntimeVariantPresetRepository,
@@ -427,7 +427,7 @@ class DeploymentService:
     _deployment_controller: DeploymentController
     _deployment_repository: DeploymentRepository
     _appproxy_client_pool: AppProxyClientPool
-    _deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
+    _deployment_revision_preset_repository: DeploymentPresetRepository | None
     _runtime_variant_preset_repository: RuntimeVariantPresetRepository | None
 
     def __init__(
@@ -435,7 +435,7 @@ class DeploymentService:
         deployment_controller: DeploymentController,
         deployment_repository: DeploymentRepository,
         appproxy_client_pool: AppProxyClientPool,
-        deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None = None,
+        deployment_revision_preset_repository: DeploymentPresetRepository | None = None,
         runtime_variant_preset_repository: RuntimeVariantPresetRepository | None = None,
     ) -> None:
         """Initialize deployment service with controller and repository."""

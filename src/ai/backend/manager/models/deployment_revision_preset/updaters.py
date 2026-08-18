@@ -1,23 +1,30 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
 from ai.backend.common.config import PresetModelDefinition
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
-from ai.backend.manager.repositories.base.updater import UpdaterSpec
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
-class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRow]):
+class DeploymentPresetUpdater(
+    DataUpdater[DeploymentRevisionPresetRow, DeploymentRevisionPresetData]
+):
+    preset_id: DeploymentPresetID
     runtime_variant: OptionalState[RuntimeVariantID] = field(
         default_factory=OptionalState[RuntimeVariantID].nop
     )
@@ -55,6 +62,19 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
     @override
     def row_class(self) -> type[DeploymentRevisionPresetRow]:
         return DeploymentRevisionPresetRow
+
+    @override
+    def pk_value(self) -> DeploymentPresetID:
+        return self.preset_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: DeploymentRevisionPresetRow) -> DeploymentRevisionPresetData:
+        return row.to_data()
 
     @override
     def build_values(self) -> dict[str, Any]:

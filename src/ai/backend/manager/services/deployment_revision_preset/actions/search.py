@@ -3,36 +3,34 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.deployment_revision_preset.actions.base import (
-    DeploymentRevisionPresetAction,
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.repositories.deployment_revision_preset.searchers import (
+    DeploymentPresetSearcher,
 )
 
 
 @dataclass
-class SearchDeploymentRevisionPresetsAction(DeploymentRevisionPresetAction):
-    querier: BatchQuerier
+class GlobalSearchDeploymentPresetsAction(
+    SearchGlobalOpsAction[DeploymentRevisionPresetRow, DeploymentRevisionPresetData]
+):
+    """Page through every deployment revision preset."""
+
+    searcher: DeploymentPresetSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def entity_type(cls) -> EntityType:
+        return DEPLOYMENT_PRESET_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-@dataclass
-class SearchDeploymentRevisionPresetsActionResult(BaseActionResult):
-    items: list[DeploymentRevisionPresetData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_search_deployment_presets"
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def to_searcher(self) -> DeploymentPresetSearcher:
+        return self.searcher

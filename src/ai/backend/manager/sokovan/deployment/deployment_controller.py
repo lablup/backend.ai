@@ -98,7 +98,7 @@ from ai.backend.manager.types import OptionalState
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.deployment_revision_preset.repository import (
-        DeploymentRevisionPresetRepository,
+        DeploymentPresetRepository,
     )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -115,7 +115,7 @@ class DeploymentControllerArgs:
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
     revision_draft_reader: RevisionDraftReader
-    deployment_revision_preset_repository: "DeploymentRevisionPresetRepository | None"
+    deployment_revision_preset_repository: "DeploymentPresetRepository | None"
 
 
 class DeploymentController:
@@ -137,7 +137,7 @@ class DeploymentController:
     _event_producer: EventProducer
     _valkey_schedule: ValkeyScheduleClient
     _revision_draft_reader: RevisionDraftReader
-    _deployment_revision_preset_repository: "DeploymentRevisionPresetRepository | None"
+    _deployment_revision_preset_repository: "DeploymentPresetRepository | None"
     _deployment_revision_validator: DeploymentRevisionValidator
 
     def __init__(self, args: DeploymentControllerArgs) -> None:

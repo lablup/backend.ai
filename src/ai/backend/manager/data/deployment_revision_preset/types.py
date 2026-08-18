@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, override
 
 from ai.backend.common.config import PresetModelDefinition
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 
@@ -31,7 +32,7 @@ class EnvironEntryData:
 
 
 @dataclass(frozen=True)
-class DeploymentRevisionPresetData:
+class DeploymentRevisionPresetData(EntityData):
     id: DeploymentPresetID
     runtime_variant_id: RuntimeVariantID
     name: str
@@ -55,3 +56,7 @@ class DeploymentRevisionPresetData:
     revision_history_limit: int | None = None
     created_at: datetime = field(default=None)  # type: ignore[assignment]
     updated_at: datetime | None = None
+
+    @override
+    def entity_id(self) -> DeploymentPresetID:
+        return self.id

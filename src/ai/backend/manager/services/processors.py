@@ -99,10 +99,10 @@ if TYPE_CHECKING:
         DeploymentService,
     )
     from ai.backend.manager.services.deployment_revision_preset.processors import (
-        DeploymentRevisionPresetProcessors,
+        DeploymentPresetProcessors,
     )
     from ai.backend.manager.services.deployment_revision_preset.service import (
-        DeploymentRevisionPresetService,
+        DeploymentPresetService,
     )
     from ai.backend.manager.services.domain.processors import (
         DomainProcessors,
@@ -386,7 +386,7 @@ class Services:
     resource_slot: ResourceSlotService
     role_preset: RolePresetService
     runtime_variant_preset: RuntimeVariantPresetService
-    deployment_revision_preset: DeploymentRevisionPresetService
+    deployment_revision_preset: DeploymentPresetService
     model_card: ModelCardService
     resource_usage: ResourceUsageService
     scaling_group: ScalingGroupService
@@ -455,7 +455,7 @@ class Processors:
     role_preset: RolePresetProcessors
     runtime_variant: RuntimeVariantProcessors
     runtime_variant_preset: RuntimeVariantPresetProcessors
-    deployment_revision_preset: DeploymentRevisionPresetProcessors
+    deployment_revision_preset: DeploymentPresetProcessors
     model_card: ModelCardProcessors
     resource_usage: ResourceUsageProcessors
     scaling_group: ScalingGroupProcessors

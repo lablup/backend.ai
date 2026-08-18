@@ -1,7 +1,18 @@
-from typing import NewType
-from uuid import UUID
+from typing import override
 
-__all__ = ("DeploymentPresetID",)
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+
+__all__ = (
+    "DEPLOYMENT_PRESET_ENTITY_TYPE",
+    "DeploymentPresetID",
+)
 
 
-DeploymentPresetID = NewType("DeploymentPresetID", UUID)
+DEPLOYMENT_PRESET_ENTITY_TYPE = EntityType("deployment_preset")
+
+
+class DeploymentPresetID(EntityIdentifier):
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return DEPLOYMENT_PRESET_ENTITY_TYPE

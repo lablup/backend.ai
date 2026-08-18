@@ -44,10 +44,10 @@ from ai.backend.manager.services.container_registry.service import ContainerRegi
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.services.deployment_revision_preset.processors import (
-    DeploymentRevisionPresetProcessors,
+    DeploymentPresetProcessors,
 )
 from ai.backend.manager.services.deployment_revision_preset.service import (
-    DeploymentRevisionPresetService,
+    DeploymentPresetService,
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
@@ -295,7 +295,7 @@ def create_services(args: ServiceArgs) -> Services:
         runtime_variant_preset=RuntimeVariantPresetService(
             repositories.runtime_variant_preset.repository,
         ),
-        deployment_revision_preset=DeploymentRevisionPresetService(
+        deployment_revision_preset=DeploymentPresetService(
             repositories.deployment_revision_preset.repository,
         ),
         model_card=ModelCardService(
@@ -498,8 +498,8 @@ def create_processors(
         runtime_variant_preset=RuntimeVariantPresetProcessors(
             services.runtime_variant_preset, registry.group()
         ),
-        deployment_revision_preset=DeploymentRevisionPresetProcessors(
-            services.deployment_revision_preset, action_monitors, validators
+        deployment_revision_preset=DeploymentPresetProcessors(
+            registry.group(), services.deployment_revision_preset
         ),
         model_card=ModelCardProcessors(services.model_card, action_monitors, validators),
         resource_usage=ResourceUsageProcessors(
