@@ -221,9 +221,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.resource_usage.processors import (
         ResourceUsageProcessors,
     )
-    from ai.backend.manager.services.resource_usage.service import (
-        ResourceUsageService,
-    )
     from ai.backend.manager.services.retention_policy.processors import (
         RetentionPolicyProcessors,
     )
@@ -374,7 +371,6 @@ class Services:
     runtime_variant_preset: RuntimeVariantPresetService
     deployment_revision_preset: DeploymentPresetService
     model_card: ModelCardService
-    resource_usage: ResourceUsageService
     scaling_group: ScalingGroupService
     metric: MetricService
     model_serving: ModelServingService

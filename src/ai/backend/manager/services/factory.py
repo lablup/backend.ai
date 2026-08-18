@@ -117,7 +117,6 @@ from ai.backend.manager.services.resource_preset.service import ResourcePresetSe
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.services.resource_slot.service import ResourceSlotService
 from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
-from ai.backend.manager.services.resource_usage.service import ResourceUsageService
 from ai.backend.manager.services.retention_policy.processors import RetentionPolicyProcessors
 from ai.backend.manager.services.role_preset.processors import RolePresetProcessors
 from ai.backend.manager.services.role_preset.service import RolePresetService
@@ -283,9 +282,6 @@ def create_services(args: ServiceArgs) -> Services:
         model_card=ModelCardService(
             repositories.model_card.repository,
             args.storage_manager,
-        ),
-        resource_usage=ResourceUsageService(
-            repository=repositories.resource_usage_history.repository,
         ),
         scaling_group=ScalingGroupService(
             repositories.scaling_group.repository,
@@ -485,9 +481,7 @@ def create_processors(
             registry.group(), services.deployment_revision_preset
         ),
         model_card=ModelCardProcessors(services.model_card, action_monitors, validators),
-        resource_usage=ResourceUsageProcessors(
-            services.resource_usage, action_monitors, validators
-        ),
+        resource_usage=ResourceUsageProcessors(registry.group()),
         scaling_group=ScalingGroupProcessors(services.scaling_group, action_monitors, validators),
         metric=MetricProcessors(services.metric, action_monitors, validators),
         model_serving=ModelServingProcessors(services.model_serving, action_monitors, validators),

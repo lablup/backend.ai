@@ -59,6 +59,11 @@ from ai.backend.manager.data.fair_share.types import (
     ProjectFairShareData,
     UserFairShareData,
 )
+from ai.backend.manager.data.resource_usage_history.types import (
+    DomainUsageBucketData,
+    ProjectUsageBucketData,
+    UserUsageBucketData,
+)
 from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.fair_share.conditions import (
@@ -86,11 +91,6 @@ from ai.backend.manager.repositories.resource_usage_history.options import (
     ProjectUsageBucketOrders,
     UserUsageBucketConditions,
     UserUsageBucketOrders,
-)
-from ai.backend.manager.repositories.resource_usage_history.types import (
-    DomainUsageBucketData,
-    ProjectUsageBucketData,
-    UserUsageBucketData,
 )
 
 SECONDS_PER_DAY = Decimal("86400")

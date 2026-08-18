@@ -25,6 +25,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.resource_usage_history.types import (
+    DomainUsageBucketData,
+    KernelUsageRecordData,
+    ProjectUsageBucketData,
+    UserUsageBucketData,
+)
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -93,6 +99,21 @@ class KernelUsageRecordRow(Base):
         sa.Index("ix_kernel_usage_user_period", "user_uuid", "period_start"),
     )
 
+    def to_data(self) -> KernelUsageRecordData:
+        return KernelUsageRecordData(
+            id=self.id,
+            kernel_id=self.kernel_id,
+            session_id=self.session_id,
+            user_uuid=self.user_uuid,
+            project_id=self.project_id,
+            domain_name=self.domain_name,
+            resource_group=self.resource_group,
+            resource_group_id=self.resource_group_id,
+            period_start=self.period_start,
+            period_end=self.period_end,
+            resource_usage=self.resource_usage,
+        )
+
 
 class DomainUsageBucketRow(LifecycleTimestampsMixin, Base):
     """Per-domain period-based resource usage aggregation.
@@ -149,6 +170,21 @@ class DomainUsageBucketRow(LifecycleTimestampsMixin, Base):
         ),
         sa.Index("ix_domain_usage_bucket_lookup", "domain_name", "resource_group", "period_start"),
     )
+
+    def to_data(self) -> DomainUsageBucketData:
+        return DomainUsageBucketData(
+            id=self.id,
+            domain_name=self.domain_name,
+            resource_group=self.resource_group,
+            resource_group_id=self.resource_group_id,
+            period_start=self.period_start,
+            period_end=self.period_end,
+            decay_unit_days=self.decay_unit_days,
+            resource_usage=self.resource_usage,
+            capacity_snapshot=self.capacity_snapshot,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
 
 class ProjectUsageBucketRow(LifecycleTimestampsMixin, Base):
@@ -207,6 +243,22 @@ class ProjectUsageBucketRow(LifecycleTimestampsMixin, Base):
         ),
         sa.Index("ix_project_usage_bucket_lookup", "project_id", "resource_group", "period_start"),
     )
+
+    def to_data(self) -> ProjectUsageBucketData:
+        return ProjectUsageBucketData(
+            id=self.id,
+            project_id=self.project_id,
+            domain_name=self.domain_name,
+            resource_group=self.resource_group,
+            resource_group_id=self.resource_group_id,
+            period_start=self.period_start,
+            period_end=self.period_end,
+            decay_unit_days=self.decay_unit_days,
+            resource_usage=self.resource_usage,
+            capacity_snapshot=self.capacity_snapshot,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
 
 class UserUsageBucketRow(LifecycleTimestampsMixin, Base):
@@ -278,6 +330,23 @@ class UserUsageBucketRow(LifecycleTimestampsMixin, Base):
             "period_start",
         ),
     )
+
+    def to_data(self) -> UserUsageBucketData:
+        return UserUsageBucketData(
+            id=self.id,
+            user_uuid=self.user_uuid,
+            project_id=self.project_id,
+            domain_name=self.domain_name,
+            resource_group=self.resource_group,
+            resource_group_id=self.resource_group_id,
+            period_start=self.period_start,
+            period_end=self.period_end,
+            decay_unit_days=self.decay_unit_days,
+            resource_usage=self.resource_usage,
+            capacity_snapshot=self.capacity_snapshot,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
 
 class UsageBucketEntryRow(Base):
