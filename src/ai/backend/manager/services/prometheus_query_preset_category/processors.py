@@ -34,7 +34,7 @@ class PrometheusQueryPresetCategoryProcessors:
         CreateCategoryAction,
         CreatedEntityOpsResult[PrometheusQueryPresetCategoryData],
     ]
-    global_get_category: GlobalActionProcessor[
+    get_category: SingleEntityActionProcessor[
         GetCategoryAction,
         EntityOpsResult[PrometheusQueryPresetCategoryData],
     ]
@@ -49,6 +49,6 @@ class PrometheusQueryPresetCategoryProcessors:
 
     def __init__(self, group: ProcessorGroup[PrometheusQueryPresetCategoryData]) -> None:
         self.global_create_category = group.global_create_ops(CreateCategoryAction)
-        self.global_get_category = group.global_get_ops(GetCategoryAction)
+        self.get_category = group.single_get_ops(GetCategoryAction)
         self.global_search_categories = group.global_search_ops(SearchCategoriesAction)
         self.purge_category = group.entity_purge_ops(PurgeCategoryAction)

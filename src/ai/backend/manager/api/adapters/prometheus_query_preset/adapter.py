@@ -141,7 +141,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
     async def get(self, preset_id: UUID) -> GetQueryDefinitionPayload:
         """Get a single query definition by ID."""
-        action_result = await self._processors.prometheus_query_preset.global_get_preset.run(
+        action_result = await self._processors.prometheus_query_preset.get_preset.run(
             GetPresetAction(preset_id=PrometheusQueryPresetID(preset_id))
         )
 

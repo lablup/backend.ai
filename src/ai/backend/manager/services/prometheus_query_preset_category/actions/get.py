@@ -4,11 +4,10 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
-    PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE,
     PrometheusQueryPresetCategoryID,
 )
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.actions.v2.ops.base import GetGlobalOpsAction
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,
 )
@@ -22,7 +21,7 @@ from ai.backend.manager.repositories.prometheus_query_preset_category.queriers i
 
 @dataclass
 class GetCategoryAction(
-    GetGlobalOpsAction[PrometheusQueryPresetCategoryRow, PrometheusQueryPresetCategoryData]
+    GetSingleEntityOpsAction[PrometheusQueryPresetCategoryRow, PrometheusQueryPresetCategoryData]
 ):
     """Read one category from the catalog."""
 
@@ -30,13 +29,12 @@ class GetCategoryAction(
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE
-
-    @override
-    @classmethod
     def action_name(cls) -> str:
         return "get_prometheus_query_preset_category"
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.category_id
 
     @override
     def to_querier(self) -> PrometheusQueryPresetCategoryQuerier:

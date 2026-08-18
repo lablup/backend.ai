@@ -108,7 +108,7 @@ class PrometheusQueryPresetHandler:
         path: PathParam[QueryDefinitionIdPathParam],
     ) -> APIResponse:
         """Get a preset by ID."""
-        action_result = await self._processor.global_get_preset.run(
+        action_result = await self._processor.get_preset.run(
             GetPresetAction(preset_id=PrometheusQueryPresetID(path.parsed.id))
         )
         resp = GetQueryDefinitionResponse(item=self._adapter.convert_to_dto(action_result.data))

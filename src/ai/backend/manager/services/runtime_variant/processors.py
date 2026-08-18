@@ -44,7 +44,7 @@ class RuntimeVariantProcessors:
     global_create: GlobalActionProcessor[
         CreateRuntimeVariantAction, CreatedEntityOpsResult[RuntimeVariantData]
     ]
-    global_update: GlobalActionProcessor[
+    update: SingleEntityActionProcessor[
         UpdateRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]
     ]
     purge: SingleEntityActionProcessor[
@@ -60,7 +60,7 @@ class RuntimeVariantProcessors:
     def __init__(self, group: ProcessorGroup[RuntimeVariantData]) -> None:
         self.public_get = group.public_get_ops(GetRuntimeVariantAction)
         self.global_create = group.global_create_ops(CreateRuntimeVariantAction)
-        self.global_update = group.global_update_ops(UpdateRuntimeVariantAction)
+        self.update = group.single_update_ops(UpdateRuntimeVariantAction)
         self.purge = group.entity_purge_ops(PurgeRuntimeVariantAction)
         self.public_search = group.public_search_ops(SearchRuntimeVariantsAction)
         self.public_lookup = group.public_lookup_ops(LookupRuntimeVariantAction)

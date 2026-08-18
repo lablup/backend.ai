@@ -45,22 +45,26 @@ class NotificationProcessors:
     create_channel: GlobalActionProcessor[
         CreateChannelAction, CreatedEntityOpsResult[NotificationChannelData]
     ]
-    update_channel: GlobalActionProcessor[
+    update_channel: SingleEntityActionProcessor[
         UpdateChannelAction, EntityOpsResult[NotificationChannelData]
     ]
     purge_channel: SingleEntityActionProcessor[
         PurgeChannelAction, EntityOpsResult[NotificationChannelData]
     ]
-    get_channel: GlobalActionProcessor[GetChannelAction, EntityOpsResult[NotificationChannelData]]
+    get_channel: SingleEntityActionProcessor[
+        GetChannelAction, EntityOpsResult[NotificationChannelData]
+    ]
     search_channels: GlobalActionProcessor[
         SearchChannelsAction, BatchOpsResult[NotificationChannelData]
     ]
     create_rule: GlobalActionProcessor[
         CreateRuleAction, CreatedEntityOpsResult[NotificationRuleData]
     ]
-    update_rule: GlobalActionProcessor[UpdateRuleAction, EntityOpsResult[NotificationRuleData]]
+    update_rule: SingleEntityActionProcessor[
+        UpdateRuleAction, EntityOpsResult[NotificationRuleData]
+    ]
     purge_rule: SingleEntityActionProcessor[PurgeRuleAction, EntityOpsResult[NotificationRuleData]]
-    get_rule: GlobalActionProcessor[GetRuleAction, EntityOpsResult[NotificationRuleData]]
+    get_rule: SingleEntityActionProcessor[GetRuleAction, EntityOpsResult[NotificationRuleData]]
     search_rules: GlobalActionProcessor[SearchRulesAction, BatchOpsResult[NotificationRuleData]]
     validate_channel: GlobalActionProcessor[ValidateChannelAction, ValidateChannelActionResult]
     validate_rule: GlobalActionProcessor[ValidateRuleAction, ValidateRuleActionResult]
@@ -75,14 +79,14 @@ class NotificationProcessors:
         rule_group: ProcessorGroup[NotificationRuleData],
     ) -> None:
         self.create_channel = channel_group.global_create_ops(CreateChannelAction)
-        self.update_channel = channel_group.global_update_ops(UpdateChannelAction)
+        self.update_channel = channel_group.single_update_ops(UpdateChannelAction)
         self.purge_channel = channel_group.entity_purge_ops(PurgeChannelAction)
-        self.get_channel = channel_group.global_get_ops(GetChannelAction)
+        self.get_channel = channel_group.single_get_ops(GetChannelAction)
         self.search_channels = channel_group.global_search_ops(SearchChannelsAction)
         self.create_rule = rule_group.global_create_ops(CreateRuleAction)
-        self.update_rule = rule_group.global_update_ops(UpdateRuleAction)
+        self.update_rule = rule_group.single_update_ops(UpdateRuleAction)
         self.purge_rule = rule_group.entity_purge_ops(PurgeRuleAction)
-        self.get_rule = rule_group.global_get_ops(GetRuleAction)
+        self.get_rule = rule_group.single_get_ops(GetRuleAction)
         self.search_rules = rule_group.global_search_ops(SearchRulesAction)
         self.validate_channel = channel_group.global_scope(
             ValidateChannelAction, service.validate_channel

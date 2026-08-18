@@ -139,7 +139,7 @@ class RuntimeVariantAdapter(BaseAdapter):
                 else TriState.update(input.description)
             ),
         )
-        result = await self._processors.runtime_variant.global_update.run(
+        result = await self._processors.runtime_variant.update.run(
             UpdateRuntimeVariantAction(updater=updater)
         )
         return UpdateRuntimeVariantPayload(

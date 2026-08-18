@@ -35,7 +35,7 @@ class RetentionPolicyProcessors:
         CreateRetentionPolicyAction,
         CreatedEntityOpsResult[RetentionPolicyData],
     ]
-    global_update: GlobalActionProcessor[
+    update: SingleEntityActionProcessor[
         UpdateRetentionPolicyAction,
         EntityOpsResult[RetentionPolicyData],
     ]
@@ -55,7 +55,7 @@ class RetentionPolicyProcessors:
     def __init__(self, group: ProcessorGroup[RetentionPolicyData]) -> None:
         self.get = group.single_get_ops(GetRetentionPolicyAction)
         self.global_create = group.global_create_ops(CreateRetentionPolicyAction)
-        self.global_update = group.global_update_ops(UpdateRetentionPolicyAction)
+        self.update = group.single_update_ops(UpdateRetentionPolicyAction)
         self.delete = group.entity_purge_ops(DeleteRetentionPolicyAction)
         self.purge = group.entity_purge_ops(PurgeRetentionPolicyAction)
         self.global_search = group.global_search_ops(SearchRetentionPoliciesAction)

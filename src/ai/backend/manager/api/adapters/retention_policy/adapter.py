@@ -130,7 +130,7 @@ class RetentionPolicyAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        result = await self._processors.retention_policy.global_update.run(
+        result = await self._processors.retention_policy.update.run(
             UpdateRetentionPolicyAction(updater=updater)
         )
         return UpdateRetentionPolicyPayload(policy=self._data_to_node(result.data))

@@ -36,7 +36,7 @@ class PrometheusQueryPresetProcessors:
     """The catalog CRUD runs against ops; what reads before writing or calls Prometheus stays."""
 
     global_create_preset: GlobalActionProcessor[CreatePresetAction, CreatePresetActionResult]
-    global_get_preset: GlobalActionProcessor[
+    get_preset: SingleEntityActionProcessor[
         GetPresetAction, EntityOpsResult[PrometheusQueryPresetData]
     ]
     global_search_presets: GlobalActionProcessor[
@@ -54,11 +54,7 @@ class PrometheusQueryPresetProcessors:
         service: PrometheusQueryPresetService,
         group: ProcessorGroup[PrometheusQueryPresetData],
     ) -> None:
-        # The create validates its query template, so it keeps a service method.
-        self.global_create_preset = group.global_scope(
             CreatePresetAction, service.create_preset
-        )
-        self.global_get_preset = group.global_get_ops(GetPresetAction)
         self.global_search_presets = group.global_search_ops(SearchPresetsAction)
         self.purge_preset = group.entity_purge_ops(PurgePresetAction)
         self.global_update_preset = group.global_scope(UpdatePresetAction, service.update_preset)
