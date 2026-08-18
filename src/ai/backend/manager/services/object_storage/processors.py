@@ -51,10 +51,10 @@ class ObjectStorageProcessors:
     global_search_object_storages: GlobalActionProcessor[
         SearchObjectStoragesAction, BatchOpsResult[ObjectStorageData]
     ]
-    global_get_presigned_download_url: GlobalActionProcessor[
+    get_presigned_download_url: SingleEntityActionProcessor[
         GetDownloadPresignedURLAction, GetDownloadPresignedURLActionResult
     ]
-    global_get_presigned_upload_url: GlobalActionProcessor[
+    get_presigned_upload_url: SingleEntityActionProcessor[
         GetUploadPresignedURLAction, GetUploadPresignedURLActionResult
     ]
 
@@ -69,9 +69,9 @@ class ObjectStorageProcessors:
         self.get = group.single_get_ops(GetObjectStorageAction)
         self.global_list_storages = group.global_search_ops(ListObjectStorageAction)
         self.global_search_object_storages = group.global_search_ops(SearchObjectStoragesAction)
-        self.global_get_presigned_download_url = group.global_scope(
+        self.get_presigned_download_url = group.single_entity(
             GetDownloadPresignedURLAction, service.get_presigned_download_url
         )
-        self.global_get_presigned_upload_url = group.global_scope(
+        self.get_presigned_upload_url = group.single_entity(
             GetUploadPresignedURLAction, service.get_presigned_upload_url
         )

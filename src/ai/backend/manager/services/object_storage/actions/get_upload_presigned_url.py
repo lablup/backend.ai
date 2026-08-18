@@ -2,22 +2,24 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 
 
 @dataclass
-class GetUploadPresignedURLAction(BaseGlobalAction):
-    artifact_revision_id: uuid.UUID
-    key: str
+class GetUploadPresignedURLAction(BaseSingleEntityAction):
+    """Hand out a URL that writes into one artifact revision's object.
 
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return OBJECT_STORAGE_ENTITY_TYPE
+    UPDATE rather than GET: what goes out is the ability to write that artifact, which
+    is why the readonly flag is checked. The storage is picked from the reservoir
+    config, not by the caller.
+    """
+
+    artifact_revision_id: ArtifactRevisionID
+    key: str
 
     @override
     @classmethod
@@ -27,7 +29,11 @@ class GetUploadPresignedURLAction(BaseGlobalAction):
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
+        return ActionOperationType.UPDATE
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.artifact_revision_id
 
 
 @dataclass

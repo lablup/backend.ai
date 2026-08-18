@@ -10,6 +10,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.dto.manager.request import (
     GetPresignedDownloadURLReq,
     GetPresignedUploadURLReq,
@@ -64,9 +65,9 @@ class ObjectStorageHandler:
         body: BodyParam[GetPresignedDownloadURLReq],
     ) -> APIResponse:
         """Generate a presigned URL for safely downloading artifact files."""
-        action_result = await self._object_storage.global_get_presigned_download_url.run(
+        action_result = await self._object_storage.get_presigned_download_url.run(
             GetDownloadPresignedURLAction(
-                artifact_revision_id=body.parsed.artifact_revision_id,
+                artifact_revision_id=ArtifactRevisionID(body.parsed.artifact_revision_id),
                 key=body.parsed.key,
                 expiration=body.parsed.expiration,
             )
@@ -80,9 +81,9 @@ class ObjectStorageHandler:
         body: BodyParam[GetPresignedUploadURLReq],
     ) -> APIResponse:
         """Generate a presigned URL for uploading artifact files."""
-        action_result = await self._object_storage.global_get_presigned_upload_url.run(
+        action_result = await self._object_storage.get_presigned_upload_url.run(
             GetUploadPresignedURLAction(
-                artifact_revision_id=body.parsed.artifact_revision_id,
+                artifact_revision_id=ArtifactRevisionID(body.parsed.artifact_revision_id),
                 key=body.parsed.key,
             )
         )

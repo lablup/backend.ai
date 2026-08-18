@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.dto.manager.v2.object_storage.request import (
     AdminSearchObjectStoragesInput,
@@ -222,9 +223,9 @@ class ObjectStorageAdapter(BaseAdapter):
         expiration: int | None = None,
     ) -> PresignedDownloadURLPayload:
         """Generate a presigned download URL for an artifact revision."""
-        action_result = await self._processors.object_storage.global_get_presigned_download_url.run(
+        action_result = await self._processors.object_storage.get_presigned_download_url.run(
             GetDownloadPresignedURLAction(
-                artifact_revision_id=artifact_revision_id,
+                artifact_revision_id=ArtifactRevisionID(artifact_revision_id),
                 key=key,
                 expiration=expiration,
             )
@@ -237,9 +238,9 @@ class ObjectStorageAdapter(BaseAdapter):
         key: str,
     ) -> PresignedUploadURLPayload:
         """Generate a presigned upload URL for an artifact revision."""
-        action_result = await self._processors.object_storage.global_get_presigned_upload_url.run(
+        action_result = await self._processors.object_storage.get_presigned_upload_url.run(
             GetUploadPresignedURLAction(
-                artifact_revision_id=artifact_revision_id,
+                artifact_revision_id=ArtifactRevisionID(artifact_revision_id),
                 key=key,
             )
         )

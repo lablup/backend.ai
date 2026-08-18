@@ -2,23 +2,24 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 
 
 @dataclass
-class GetDownloadPresignedURLAction(BaseGlobalAction):
-    artifact_revision_id: uuid.UUID
+class GetDownloadPresignedURLAction(BaseSingleEntityAction):
+    """Hand out a URL that reads one artifact revision's object.
+
+    Answered for by the revision: the storage is picked from the reservoir config,
+    not by the caller.
+    """
+
+    artifact_revision_id: ArtifactRevisionID
     key: str
     expiration: int | None = None
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return OBJECT_STORAGE_ENTITY_TYPE
 
     @override
     @classmethod
@@ -29,6 +30,10 @@ class GetDownloadPresignedURLAction(BaseGlobalAction):
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.artifact_revision_id
 
 
 @dataclass
