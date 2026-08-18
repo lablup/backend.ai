@@ -20,7 +20,6 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.base import GUID, KernelIDColumn, convention
-from ai.backend.manager.models.session import SessionDependencyRow
 
 # revision identifiers, used by Alembic.
 revision = "b6b884fbae1f"
@@ -61,6 +60,20 @@ mapper_registry = registry(metadata=metadata)
 Base = mapper_registry.generate_base()
 
 PAGE_SIZE = 100
+
+# Snapshot of "session_dependencies" as it exists at this revision: the table was renamed
+# from "kernel_dependencies" by e421c02cf9e4 and its columns, primary key and indexes have
+# not changed since. The naming convention above reproduces the historical constraint names
+# ("pk_session_dependencies", "ix_session_dependencies_session_id"). The foreign keys are
+# left out on purpose, since this migration swaps them between "kernels" and "sessions" and
+# a single declaration would contradict one of the two directions.
+session_dependencies = sa.Table(
+    "session_dependencies",
+    metadata,
+    sa.Column("session_id", GUID, nullable=False, index=True),
+    sa.Column("depends_on", GUID, nullable=False, index=True),
+    sa.PrimaryKeyConstraint("session_id", "depends_on"),
+)
 
 
 def default_hostname(context: Any) -> str:
@@ -436,22 +449,22 @@ def upgrade() -> None:
             # Since session_id and depends_on columns have primary constraint, we should not `update` them.
             kern_ids = list(single_kernel_ids.keys())
             insert_values = []
-            sess_dep_query = sa.select(SessionDependencyRow).where(
-                SessionDependencyRow.session_id.in_(kern_ids)
-                | SessionDependencyRow.depends_on.in_(kern_ids)
+            sess_dep_query = sa.select(session_dependencies).where(
+                session_dependencies.c.session_id.in_(kern_ids)
+                | session_dependencies.c.depends_on.in_(kern_ids)
             )
             for row in connection.execute(sess_dep_query).fetchall():
                 val: dict[str, Any] = {}
                 val["session_id"] = single_kernel_ids.get(row.session_id, row.session_id)
                 val["depends_on"] = single_kernel_ids.get(row.depends_on, row.depends_on)
                 insert_values.append(val)
-            dep_delete_query = sa.delete(SessionDependencyRow).where(
-                SessionDependencyRow.session_id.in_(kern_ids)
-                | SessionDependencyRow.depends_on.in_(kern_ids)
+            dep_delete_query = sa.delete(session_dependencies).where(
+                session_dependencies.c.session_id.in_(kern_ids)
+                | session_dependencies.c.depends_on.in_(kern_ids)
             )
             connection.execute(dep_delete_query)
             if insert_values:
-                connection.execute(sa.insert(SessionDependencyRow), insert_values)
+                connection.execute(sa.insert(session_dependencies), insert_values)
 
             # Update single-kernel session's kernel
             sess_query = (
@@ -642,9 +655,9 @@ def downgrade() -> None:
 
         # Session dependency table
         sess_ids = list(single_kern_sess.keys())
-        sess_dep_query = sa.select(SessionDependencyRow).where(
-            SessionDependencyRow.session_id.in_(sess_ids)
-            | SessionDependencyRow.depends_on.in_(sess_ids)
+        sess_dep_query = sa.select(session_dependencies).where(
+            session_dependencies.c.session_id.in_(sess_ids)
+            | session_dependencies.c.depends_on.in_(sess_ids)
         )
         insert_values: list[dict[str, Any]] = []
         for row in connection.execute(sess_dep_query).fetchall():
@@ -652,13 +665,13 @@ def downgrade() -> None:
             val["session_id"] = single_kern_sess.get(row.session_id, row.session_id)
             val["depends_on"] = single_kern_sess.get(row.depends_on, row.depends_on)
             insert_values.append(val)
-        dep_delete_query = sa.delete(SessionDependencyRow).where(
-            SessionDependencyRow.session_id.in_(sess_ids)
-            | SessionDependencyRow.depends_on.in_(sess_ids)
+        dep_delete_query = sa.delete(session_dependencies).where(
+            session_dependencies.c.session_id.in_(sess_ids)
+            | session_dependencies.c.depends_on.in_(sess_ids)
         )
         connection.execute(dep_delete_query)
         if insert_values:
-            connection.execute(sa.insert(SessionDependencyRow), insert_values)
+            connection.execute(sa.insert(session_dependencies), insert_values)
 
     # op.drop_column("kernels", "image_id")
     op.drop_column("kernels", "requested_slots")
