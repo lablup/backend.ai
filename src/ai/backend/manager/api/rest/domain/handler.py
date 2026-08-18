@@ -8,6 +8,7 @@ extracted by ``_wrap_api_handler`` and responses are returned as
 
 from __future__ import annotations
 
+from ai.backend.common.data.entity.domain import DomainName
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
@@ -36,13 +37,13 @@ from ai.backend.manager.dto.domain_request import (
     GetDomainPathParam,
     UpdateDomainPathParam,
 )
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
+from ai.backend.manager.models.domain.creators import DomainCreator
+from ai.backend.manager.models.domain.updaters import DomainSoftDeleteUpdater
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
-from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
+from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
-from ai.backend.manager.services.domain.actions.search_domains import SearchDomainsAction
+from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
 from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
 
 from .adapter import DomainAdapter
@@ -70,20 +71,18 @@ class DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         log.info("CREATE_DOMAIN (ak:{})", ctx.access_key)
-        creator = Creator(
-            spec=DomainCreatorSpec(
-                name=body.parsed.name,
-                description=body.parsed.description,
-                is_active=body.parsed.is_active,
-                total_resource_slots=(
-                    ResourceSlot(body.parsed.total_resource_slots)
-                    if body.parsed.total_resource_slots is not None
-                    else None
-                ),
-                allowed_vfolder_hosts=body.parsed.allowed_vfolder_hosts,
-                allowed_docker_registries=body.parsed.allowed_docker_registries,
-                integration_name=body.parsed.integration_id,  # v1 DTO uses integration_id
-            )
+        creator = DomainCreator(
+            name=body.parsed.name,
+            description=body.parsed.description,
+            is_active=body.parsed.is_active,
+            total_resource_slots=(
+                ResourceSlot(body.parsed.total_resource_slots)
+                if body.parsed.total_resource_slots is not None
+                else None
+            ),
+            allowed_vfolder_hosts=body.parsed.allowed_vfolder_hosts,
+            allowed_docker_registries=body.parsed.allowed_docker_registries,
+            integration_name=body.parsed.integration_id,  # v1 DTO uses integration_id
         )
         user_info = UserInfo(
             id=ctx.user_uuid,
@@ -91,7 +90,7 @@ class DomainHandler:
             domain_name=ctx.user_domain,
         )
 
-        action_result = await self._domain.create_domain.wait_for_complete(
+        action_result = await self._domain.create_domain.run(
             CreateDomainAction(creator=creator, user_info=user_info)
         )
 
@@ -108,8 +107,8 @@ class DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         log.info("GET_DOMAIN (ak:{}, d:{})", ctx.access_key, path.parsed.domain_name)
-        action_result = await self._domain.get_domain.wait_for_complete(
-            GetDomainAction(domain_name=path.parsed.domain_name)
+        action_result = await self._domain.lookup.run(
+            LookupDomainAction(name=DomainName(path.parsed.domain_name))
         )
 
         resp = GetDomainResponse(domain=self._adapter.convert_to_dto(action_result.data))
@@ -125,10 +124,10 @@ class DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         log.info("SEARCH_DOMAINS (ak:{})", ctx.access_key)
-        querier = self._adapter.build_querier(body.parsed)
+        searcher = self._adapter.build_searcher(body.parsed)
 
-        action_result = await self._domain.search_domains.wait_for_complete(
-            SearchDomainsAction(querier=querier)
+        action_result = await self._domain.global_search.run(
+            GlobalSearchDomainsAction(searcher=searcher)
         )
 
         resp = SearchDomainsResponse(
@@ -154,17 +153,13 @@ class DomainHandler:
         domain_name = path.parsed.domain_name
         log.info("UPDATE_DOMAIN (ak:{}, d:{})", ctx.access_key, domain_name)
         updater = self._adapter.build_updater(body.parsed, domain_name)
-        user_info = UserInfo(
-            id=ctx.user_uuid,
-            role=UserRole.SUPERADMIN,
-            domain_name=ctx.user_domain,
+        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+
+        action_result = await self._domain.update_domain.run(
+            UpdateDomainAction(domain_id=target.data.id, updater=updater)
         )
 
-        action_result = await self._domain.update_domain.wait_for_complete(
-            UpdateDomainAction(user_info=user_info, updater=updater)
-        )
-
-        resp = UpdateDomainResponse(domain=self._adapter.convert_to_dto(action_result.domain_data))
+        resp = UpdateDomainResponse(domain=self._adapter.convert_to_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     # ------------------------------------------------------------------
@@ -177,14 +172,12 @@ class DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         log.info("DELETE_DOMAIN (ak:{}, d:{})", ctx.access_key, body.parsed.name)
-        user_info = UserInfo(
-            id=ctx.user_uuid,
-            role=UserRole.SUPERADMIN,
-            domain_name=ctx.user_domain,
-        )
-
-        await self._domain.delete_domain.wait_for_complete(
-            DeleteDomainAction(name=body.parsed.name, user_info=user_info)
+        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(body.parsed.name)))
+        await self._domain.delete_domain.run(
+            DeleteDomainAction(
+                domain_id=target.data.id,
+                updater=DomainSoftDeleteUpdater(name=body.parsed.name),
+            )
         )
 
         resp = DeleteDomainResponse(deleted=True)
@@ -200,14 +193,9 @@ class DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         log.info("PURGE_DOMAIN (ak:{}, d:{})", ctx.access_key, body.parsed.name)
-        user_info = UserInfo(
-            id=ctx.user_uuid,
-            role=UserRole.SUPERADMIN,
-            domain_name=ctx.user_domain,
-        )
-
-        await self._domain.purge_domain.wait_for_complete(
-            PurgeDomainAction(name=body.parsed.name, user_info=user_info)
+        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(body.parsed.name)))
+        await self._domain.purge_domain.run(
+            PurgeDomainAction(domain_id=target.data.id, name=body.parsed.name)
         )
 
         resp = PurgeDomainResponse(purged=True)

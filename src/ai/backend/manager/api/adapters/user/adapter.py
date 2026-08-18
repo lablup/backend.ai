@@ -9,7 +9,7 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
@@ -126,7 +126,7 @@ from ai.backend.manager.repositories.user.types import (
     RoleUserOperationScope,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
-from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
+from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     CreateUserAction,
@@ -201,9 +201,7 @@ class UserAdapter(BaseAdapter):
         self._auth_config = auth_config
 
     async def _resolve_domain_id(self, domain_name: str) -> DomainID:
-        result = await self._processors.domain.get_domain.wait_for_complete(
-            GetDomainAction(domain_name=domain_name)
-        )
+        result = await self._processors.domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
         return result.data.id
 
     # ------------------------------------------------------------------ batch load (DataLoader)

@@ -3,18 +3,18 @@ from typing import override
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.manager.actions.v2.ops.base import DeleteSingleEntityOpsAction
+from ai.backend.manager.actions.v2.ops.base import RestoreSingleEntityOpsAction
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.domain.updaters import DomainSoftDeleteUpdater
+from ai.backend.manager.models.domain.updaters import DomainRestoreUpdater
 
 
 @dataclass(frozen=True)
-class DeleteDomainAction(DeleteSingleEntityOpsAction[DomainRow, DomainData]):
-    """Retire one domain."""
+class RestoreDomainAction(RestoreSingleEntityOpsAction[DomainRow, DomainData]):
+    """Put one retired domain back in service."""
 
     domain_id: DomainID
-    updater: DomainSoftDeleteUpdater
+    updater: DomainRestoreUpdater
 
     @override
     def entity_id(self) -> EntityIdentifier:
@@ -23,8 +23,8 @@ class DeleteDomainAction(DeleteSingleEntityOpsAction[DomainRow, DomainData]):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "delete_domain"
+        return "restore_domain"
 
     @override
-    def to_updater(self) -> DomainSoftDeleteUpdater:
+    def to_updater(self) -> DomainRestoreUpdater:
         return self.updater

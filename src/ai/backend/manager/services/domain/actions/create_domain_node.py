@@ -1,38 +1,39 @@
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.domain.types import (
-    DomainData,
-    UserInfo,
-)
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.domain.actions.base import DomainAction
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.data.domain.types import DomainData, UserInfo
+from ai.backend.manager.models.domain.creators import DomainCreator
 
 
-@dataclass
-class CreateDomainNodeAction(DomainAction):
+@dataclass(frozen=True)
+class CreateDomainNodeAction(BaseGlobalAction):
+    """Register a domain together with the resource groups it may schedule on."""
+
+    creator: DomainCreator
     user_info: UserInfo
-    creator: Creator[DomainRow]
     scaling_group_ids: list[ResourceGroupID] | None = None
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return DOMAIN_ENTITY_TYPE
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
-
-@dataclass
-class CreateDomainNodeActionResult(BaseActionResult):
-    domain_data: DomainData
-
     @override
-    def entity_id(self) -> str | None:
-        return self.domain_data.name
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_create_domain_node"
+
+
+@dataclass(frozen=True)
+class CreateDomainNodeActionResult:
+    domain_data: DomainData

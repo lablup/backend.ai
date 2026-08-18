@@ -171,7 +171,7 @@ def build_api_routes(
         deployment=processors.deployment,
         runtime_variant_adapter=adapters.runtime_variant,
     )
-    domainconfig_handler = DomainConfigHandler(dotfile=processors.dotfile)
+    domainconfig_handler = DomainConfigHandler(domain=processors.domain)
     error_log_handler = ErrorLogHandler(error_log=processors.error_log)
     etcd_handler = EtcdHandler(
         container_registry=processors.container_registry,

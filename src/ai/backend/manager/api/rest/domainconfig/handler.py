@@ -1,13 +1,12 @@
 """Domain config handler class using constructor dependency injection.
 
-All handlers use the new ApiHandler pattern: typed parameters
-(``BodyParam``, ``QueryParam``, ``UserContext``, ``RequestCtx``) are
-automatically extracted by ``_wrap_api_handler`` and responses are
-returned as ``APIResponse`` objects.
+A domain's dotfiles are a column of the domain row, so every operation here is a
+read or an update of that domain.
 """
 
 from __future__ import annotations
 
+from ai.backend.common.data.entity.domain import DomainName
 import logging
 from http import HTTPStatus
 from typing import Final
@@ -28,16 +27,19 @@ from ai.backend.common.dto.manager.config.response import (
     UpdateDotfileResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.dotfile.types import DotfileScope
+from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
 from ai.backend.manager.dto.context import UserContext
-from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.services.dotfile import (
-    CreateDotfileAction,
-    DeleteDotfileAction,
-    ListOrGetDotfilesAction,
-    UpdateDotfileAction,
+from ai.backend.manager.services.domain.actions.create_domain_dotfile import (
+    CreateDomainDotfileAction,
 )
-from ai.backend.manager.services.dotfile.processors import DotfileProcessors
+from ai.backend.manager.services.domain.actions.delete_domain_dotfile import (
+    DeleteDomainDotfileAction,
+)
+from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.domain.actions.update_domain_dotfile import (
+    UpdateDomainDotfileAction,
+)
+from ai.backend.manager.services.domain.processors import DomainProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -45,8 +47,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class DomainConfigHandler:
     """Domain config (dotfile) API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, dotfile: DotfileProcessors) -> None:
-        self._dotfile = dotfile
+    def __init__(self, *, domain: DomainProcessors) -> None:
+        self._domain = domain
 
     async def create(
         self,
@@ -55,16 +57,14 @@ class DomainConfigHandler:
     ) -> APIResponse:
         params = body.parsed
         log.info("DOMAINCONFIG.CREATE(domain:{})", params.domain)
-        if not ctx.is_superadmin and ctx.user_domain != params.domain:
-            raise GenericForbidden("Domain admins cannot create dotfiles of other domains")
-        action = CreateDotfileAction(
-            scope=DotfileScope.DOMAIN,
-            entity_key=params.domain,
-            path=params.path,
-            data=params.data,
-            permission=params.permission,
+        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
+        await self._domain.create_dotfile.run(
+            CreateDomainDotfileAction(
+                domain_id=target.data.id,
+                name=params.domain,
+                entry=DotfileEntry(path=params.path, perm=params.permission, data=params.data),
+            )
         )
-        await self._dotfile.create.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, CreateDotfileResponse())
 
     async def list_or_get(
@@ -74,22 +74,16 @@ class DomainConfigHandler:
     ) -> APIResponse:
         params = query.parsed
         log.info("DOMAINCONFIG.LIST_OR_GET(domain:{})", params.domain)
-        if not ctx.is_superadmin and ctx.user_domain != params.domain:
-            raise GenericForbidden("Users cannot access dotfiles of other domains")
-        action = ListOrGetDotfilesAction(
-            scope=DotfileScope.DOMAIN,
-            entity_key=params.domain,
-            path=params.path,
-        )
-        result = await self._dotfile.list_or_get.wait_for_complete(action)
+        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
+        entries = DotfileEntries.unpack(target.data.dotfiles)
         if params.path:
-            entry = result.entries[0]
+            entry = entries.get(params.path)
             return APIResponse.build(
                 HTTPStatus.OK,
                 GetDotfileResponse(path=entry.path, perm=entry.perm, data=entry.data),
             )
         items = [
-            DotfileListItem(path=e.path, permission=e.perm, data=e.data) for e in result.entries
+            DotfileListItem(path=e.path, permission=e.perm, data=e.data) for e in entries.entries
         ]
         return APIResponse.build(HTTPStatus.OK, ListDotfilesResponse(root=items))
 
@@ -100,16 +94,14 @@ class DomainConfigHandler:
     ) -> APIResponse:
         params = body.parsed
         log.info("DOMAINCONFIG.UPDATE(domain:{})", params.domain)
-        if not ctx.is_superadmin and ctx.user_domain != params.domain:
-            raise GenericForbidden("Domain admins cannot update dotfiles of other domains")
-        action = UpdateDotfileAction(
-            scope=DotfileScope.DOMAIN,
-            entity_key=params.domain,
-            path=params.path,
-            data=params.data,
-            permission=params.permission,
+        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
+        await self._domain.update_dotfile.run(
+            UpdateDomainDotfileAction(
+                domain_id=target.data.id,
+                name=params.domain,
+                entry=DotfileEntry(path=params.path, perm=params.permission, data=params.data),
+            )
         )
-        await self._dotfile.update.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, UpdateDotfileResponse())
 
     async def delete(
@@ -119,12 +111,10 @@ class DomainConfigHandler:
     ) -> APIResponse:
         params = query.parsed
         log.info("DOMAINCONFIG.DELETE(domain:{})", params.domain)
-        if not ctx.is_superadmin and ctx.user_domain != params.domain:
-            raise GenericForbidden("Domain admins cannot delete dotfiles of other domains")
-        action = DeleteDotfileAction(
-            scope=DotfileScope.DOMAIN,
-            entity_key=params.domain,
-            path=params.path,
+        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
+        await self._domain.delete_dotfile.run(
+            DeleteDomainDotfileAction(
+                domain_id=target.data.id, name=params.domain, path=params.path
+            )
         )
-        await self._dotfile.delete.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, DeleteDotfileResponse(success=True))

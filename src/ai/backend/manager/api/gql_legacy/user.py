@@ -18,7 +18,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
-from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UserNotFound
@@ -55,7 +55,7 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
-from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
+from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
 )
@@ -1111,8 +1111,8 @@ class CreateUser(graphene.Mutation):  # type: ignore[misc]
 
         graph_ctx: GraphQueryContext = info.context
         domain_data = (
-            await graph_ctx.processors.domain.get_domain.wait_for_complete(
-                GetDomainAction(domain_name=str(props.domain_name))
+            await graph_ctx.processors.domain.lookup.run(
+                LookupDomainAction(name=DomainName(str(props.domain_name)))
             )
         ).data
         action: CreateUserAction = props.to_action(email, graph_ctx, domain_data.id)

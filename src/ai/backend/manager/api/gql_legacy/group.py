@@ -17,7 +17,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
-from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.exception import (
     GroupNotFound,
@@ -46,7 +46,7 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
-from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
+from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
 from ai.backend.manager.services.group.actions.delete_group import (
     DeleteGroupAction,
@@ -684,9 +684,7 @@ class CreateGroup(graphene.Mutation):  # type: ignore[misc]
             )
 
         domain_data = (
-            await graph_ctx.processors.domain.get_domain.wait_for_complete(
-                GetDomainAction(domain_name=props.domain_name)
-            )
+            await graph_ctx.processors.domain.lookup.run(LookupDomainAction(name=DomainName(props.domain_name)))
         ).data
         action = props.to_action(name, domain_data.id)
         res = await graph_ctx.processors.group.create_group.wait_for_complete(action)

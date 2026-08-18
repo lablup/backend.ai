@@ -2,23 +2,23 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
-from ai.backend.manager.data.domain.types import DomainData, UserInfo
-from ai.backend.manager.models.domain.updaters import DomainUpdater
+from ai.backend.manager.data.dotfile.types import DotfileEntry
 
 
 @dataclass(frozen=True)
-class UpdateDomainNodeAction(BaseSingleEntityAction):
-    """Edit one domain and the resource groups it may schedule on."""
+class CreateDomainDotfileAction(BaseSingleEntityAction):
+    """Add one dotfile to a domain.
+
+    A dotfile is a column of the domain row, so the operation is an update of the
+    domain and is answered for by it.
+    """
 
     domain_id: DomainID
-    updater: DomainUpdater
-    user_info: UserInfo
-    sgroup_ids_to_add: set[ResourceGroupID] | None = None
-    sgroup_ids_to_remove: set[ResourceGroupID] | None = None
+    name: str
+    entry: DotfileEntry
 
     @override
     def entity_id(self) -> EntityIdentifier:
@@ -32,9 +32,9 @@ class UpdateDomainNodeAction(BaseSingleEntityAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "update_domain_node"
+        return "create_domain_dotfile"
 
 
 @dataclass(frozen=True)
-class UpdateDomainNodeActionResult:
-    domain_data: DomainData
+class CreateDomainDotfileActionResult:
+    entries: tuple[DotfileEntry, ...]

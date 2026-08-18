@@ -68,7 +68,7 @@ from ai.backend.manager.repositories.group.types import (
     UserProjectOperationScope,
 )
 from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
-from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
+from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.group.actions.assign_users_to_project import (
     AssignUsersToProjectAction,
 )
@@ -102,9 +102,7 @@ class ProjectAdapter(BaseAdapter):
     """Adapter for project (group) operations."""
 
     async def _resolve_domain_id(self, domain_name: str) -> DomainID:
-        result = await self._processors.domain.get_domain.wait_for_complete(
-            GetDomainAction(domain_name=domain_name)
-        )
+        result = await self._processors.domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
         return result.data.id
 
     # ------------------------------------------------------------------ batch load (DataLoader)

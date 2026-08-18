@@ -34,6 +34,22 @@ class DomainConditions:
     # ==================== ID Filters ====================
 
     @staticmethod
+    def by_resource_group_name(name: str) -> QueryCondition:
+        """Match the domains a resource group is associated with."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.id.in_(
+                sa.select(ScalingGroupForDomainRow.domain_id).where(
+                    ScalingGroupForDomainRow.resource_group_id
+                    == sa.select(ScalingGroupRow.id)
+                    .where(ScalingGroupRow.name == name)
+                    .scalar_subquery()
+                )
+            )
+
+        return inner
+
+    @staticmethod
     def by_ids(ids: Collection[DomainID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return DomainRow.id.in_(ids)

@@ -428,7 +428,7 @@ def create_processors(
             registry.group(),
             services.app_config,
         ),
-        domain=DomainProcessors(registry.group(), services.domain, action_monitors, validators),
+        domain=DomainProcessors(registry.group(), services.domain, action_monitors),
         dotfile=DotfileProcessors(services.dotfile, action_monitors, validators),
         error_log=ErrorLogProcessors(registry.group()),
         etcd_config=EtcdConfigProcessors(registry.group(), services.etcd_config),

@@ -8,6 +8,7 @@ extracted by ``_wrap_api_handler`` and responses are returned as
 
 from __future__ import annotations
 
+from ai.backend.common.data.entity.domain import DomainName
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
@@ -37,7 +38,7 @@ from ai.backend.manager.dto.user_request import GetUserPathParam, UpdateUserPath
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
-from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
+from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.user.actions.create_user import CreateUserAction
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
@@ -113,9 +114,7 @@ class UserHandler:
         )
 
         domain_data = (
-            await self._domain.get_domain.wait_for_complete(
-                GetDomainAction(domain_name=body.parsed.domain_name)
-            )
+            await self._domain.lookup.run(LookupDomainAction(name=DomainName(body.parsed.domain_name)))
         ).data
         action_result = await self._user.create_user.wait_for_complete(
             CreateUserAction(

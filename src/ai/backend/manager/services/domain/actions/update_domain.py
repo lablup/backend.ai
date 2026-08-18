@@ -1,33 +1,34 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.domain.types import DomainData, UserInfo
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.services.domain.actions.base import DomainAction
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import UpdateSingleEntityOpsAction
+from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain.updaters import DomainUpdater
 
 
-@dataclass
-class UpdateDomainAction(DomainAction):
-    user_info: UserInfo
-    updater: Updater[DomainRow]
+@dataclass(frozen=True)
+class UpdateDomainAction(UpdateSingleEntityOpsAction[DomainRow, DomainData]):
+    """Edit one domain's settings.
+
+    Takes both axes: ``domain_id`` is what the operation is answered for, while the
+    updater keys on the name, which is the table's primary key.
+    """
+
+    domain_id: DomainID
+    updater: DomainUpdater
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def entity_id(self) -> EntityIdentifier:
+        return self.domain_id
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-@dataclass
-class UpdateDomainActionResult(BaseActionResult):
-    domain_data: DomainData
+    def action_name(cls) -> str:
+        return "update_domain"
 
     @override
-    def entity_id(self) -> str | None:
-        return self.domain_data.name
+    def to_updater(self) -> DomainUpdater:
+        return self.updater
