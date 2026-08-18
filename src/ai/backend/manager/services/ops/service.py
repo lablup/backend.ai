@@ -65,6 +65,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     FieldsOpsResult,
     LookupOpsResult,
     ScopedBatchOpsResult,
+    ScopedFieldsOpsResult,
 )
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 
@@ -194,6 +195,30 @@ class SearchService[TData: EntityData]:
             action.operation_scopes(), action.to_searcher()
         )
         return ScopedBatchOpsResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+
+class SearchFieldsService[TData]:
+    """Runs the action's searcher over the owner scopes it names.
+
+    Same read as :class:`SearchService`; what differs is the result, which names no
+    entity because field rows are not entities.
+    """
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: SearchOpsAction[Any, TData]) -> ScopedFieldsOpsResult[TData]:
+        result = await self._repository.search_in_scopes(
+            action.operation_scopes(), action.to_searcher()
+        )
+        return ScopedFieldsOpsResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

@@ -41,7 +41,6 @@ from ai.backend.manager.actions.v2.field.ops import (
     PartialBulkPurgeFieldOpsAction,
     PurgeFieldOpsAction,
     RestoreFieldOpsAction,
-    SearchFieldOpsAction,
     UpdateFieldOpsAction,
 )
 from ai.backend.manager.actions.v2.field.processor import (
@@ -106,6 +105,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     FieldsOpsResult,
     LookupOpsResult,
     ScopedBatchOpsResult,
+    ScopedFieldsOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.monitor import ScopeActionMonitor
@@ -153,6 +153,7 @@ from ai.backend.manager.services.ops.service import (
     RestoreService,
     RoleManagedEntityAtomicCreateService,
     RoleManagedEntityCreateService,
+    SearchFieldsService,
     SearchService,
     UpdateService,
 )
@@ -834,23 +835,23 @@ class FieldProcessorGroup[TFieldData: FieldData]:
             validators=(*self._group.deps.validators.single_entity, *validators),
         )
 
-    def search_ops[TAction: SearchFieldOpsAction[Any, Any]](
+    def search_ops[TAction: OperationScopeOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
-        validators: Sequence[SingleEntityActionValidator] = (),
-        monitors: Sequence[SingleEntityActionMonitor] = (),
-    ) -> SingleEntityActionProcessor[TAction, BatchOpsResult[TFieldData]]:
-        """A page of one owner's field rows.
+        validators: Sequence[ScopeActionValidator] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[TAction, ScopedFieldsOpsResult[TFieldData]]:
+        """A page of the field rows inside one owner's scope.
 
-        The owner is named on the action, so nothing is looked up and the check is the
-        owner's own read. The searcher carries the owner filter.
+        Scope-shaped, like every other search that names where it looks: the owner is
+        the scope, so ops applies that condition and nothing is looked up.
         """
         self._group.record(action_cls)
-        return SingleEntityActionProcessor(
-            GlobalSearchService(self._group.deps.repository).execute,
-            monitors=(*self._group.deps.monitors.single_entity, *monitors),
-            validators=(*self._group.deps.validators.single_entity, *validators),
+        return ScopeActionProcessor(
+            SearchFieldsService(self._group.deps.repository).execute,
+            monitors=(*self._group.deps.monitors.scope, *monitors),
+            validators=(*self._group.deps.validators.scope, *validators),
         )
 
     def global_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](

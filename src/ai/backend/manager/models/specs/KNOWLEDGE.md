@@ -77,14 +77,14 @@ The create side removed the asymmetry of tearing down what was never built.
 
 ## Which end the operation starts from decides the check
 
-| Starting point | Owner known | Checked against |
-|---|---|---|
-| a field row's id | no | the owning entity, read first |
-| an entity's id | yes | that entity, directly |
+| Starting point | Owner known | Shape | Checked against |
+|---|---|---|---|
+| a field row's id | no | field | the owning entity, read first |
+| an entity's id | yes | scope | that entity, as the scope |
 
-- A read that comes back with several of that entity's field rows still started from the
-  entity. The work and the result are a search's; the validation, the record and the
-  response are single-entity.
+- A read that comes back with several of that entity's field rows started from the
+  entity, so it names where to look rather than what to touch — the scope shape, with
+  the owner as the scope.
 - Creating a field row takes the owning entity's id for the same reason.
 - The rules: `../../actions/AGENTS.md`.
 

@@ -218,6 +218,20 @@ class BatchOpsResult[TData]:
 
 
 @dataclass
+class ScopedFieldsOpsResult[TData](BatchOpsResult[TData], BaseScopeActionResult):
+    """A page of the field rows read within one owner's scope.
+
+    Names no entity: a field row is not one, so there is no id to report. Which owner
+    the read stayed inside is on the action's scope targets, which the audit row is
+    tied to. Unlike the entity page, the data type is therefore unconstrained.
+    """
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return ()
+
+
+@dataclass
 class ScopedBatchOpsResult[TData: EntityData](BatchOpsResult[TData], BaseScopeActionResult):
     """A page of entities read within a scope.
 

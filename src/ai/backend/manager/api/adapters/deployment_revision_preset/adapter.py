@@ -394,7 +394,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         input: SearchAllocatedResourceSlotsInput,
     ) -> SearchAllocatedResourceSlotsPayload:
         """Search resource slots allocated to a deployment revision preset."""
-        searcher = self._build_preset_resource_slot_searcher(input, preset_id=preset_id)
+        searcher = self._build_preset_resource_slot_searcher(input)
         action_result = await self._processors.deployment_revision_preset.search_resource_slots.run(
             SearchPresetResourceSlotsAction(
                 preset_id=DeploymentPresetID(preset_id),
@@ -414,7 +414,6 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
     def _build_preset_resource_slot_searcher(
         self,
         input: SearchAllocatedResourceSlotsInput,
-        preset_id: UUID,
     ) -> PresetResourceSlotSearcher:
         conditions: list[QueryCondition] = []
         if input.filter:
@@ -424,7 +423,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             if input.order
             else []
         )
-        searcher = self._build_searcher(
+        return self._build_searcher(
             PresetResourceSlotSearcher,
             conditions=conditions,
             orders=orders,
@@ -436,8 +435,6 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        searcher.preset_id = DeploymentPresetID(preset_id)
-        return searcher
 
     def _convert_allocated_slot_filter(
         self,

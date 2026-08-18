@@ -47,6 +47,9 @@ from ai.backend.manager.repositories.deployment_revision_preset.repository impor
 from ai.backend.manager.repositories.deployment_revision_preset.searchers import (
     PresetResourceSlotSearcher,
 )
+from ai.backend.manager.repositories.deployment_revision_preset.types import (
+    DeploymentPresetSlotOperationScope,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import OptionalState
@@ -134,8 +137,9 @@ async def _slot_map(
     database: ExtendedAsyncSAEngine, preset_id: DeploymentPresetID
 ) -> dict[str, Decimal]:
     async with V2DBOpsProvider(database).read_ops() as r:
-        result = await r.search_in_global(
-            PresetResourceSlotSearcher(pagination=NoPagination(), preset_id=preset_id)
+        result = await r.search_with_scopes(
+            (DeploymentPresetSlotOperationScope(preset_id=preset_id),),
+            PresetResourceSlotSearcher(pagination=NoPagination()),
         )
     return {item.slot_name: item.quantity for item in result.items}
 

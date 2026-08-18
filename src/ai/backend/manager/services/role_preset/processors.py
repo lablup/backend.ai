@@ -10,7 +10,9 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityWithFieldsOpsResult,
     EntityOpsResult,
     FieldsOpsResult,
+    ScopedFieldsOpsResult,
 )
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.role_preset.types import (
     RolePermissionPresetData,
@@ -67,8 +69,8 @@ class RolePresetProcessors:
     bulk_purge: BulkActionProcessor[BulkPurgeRolePresetsAction, BulkOpsResult[RolePresetData]]
 
     # Permission entries: field rows of a preset, answered for by the preset owning them
-    search_permission_presets: GlobalActionProcessor[
-        SearchRolePermissionPresetsAction, BatchOpsResult[RolePermissionPresetData]
+    search_permission_presets: ScopeActionProcessor[
+        SearchRolePermissionPresetsAction, ScopedFieldsOpsResult[RolePermissionPresetData]
     ]
     bulk_add_permissions: SingleEntityActionProcessor[
         BulkAddRolePermissionPresetsAction, FieldsOpsResult[RolePermissionPresetData]
@@ -94,9 +96,7 @@ class RolePresetProcessors:
             LookupRolePermissionPresetOwnerAction,
             LookupBulkRolePermissionPresetOwnerAction,
         )
-        self.search_permission_presets = permissions.global_search_ops(
-            SearchRolePermissionPresetsAction
-        )
+        self.search_permission_presets = permissions.search_ops(SearchRolePermissionPresetsAction)
         self.bulk_add_permissions = permissions.atomic_create_ops(
             BulkAddRolePermissionPresetsAction
         )

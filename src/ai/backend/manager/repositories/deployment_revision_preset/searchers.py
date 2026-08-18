@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, override
 
 import sqlalchemy as sa
@@ -33,13 +33,12 @@ class DeploymentPresetSearcher(Searcher[DeploymentRevisionPresetRow, DeploymentR
 
 @dataclass
 class PresetResourceSlotSearcher(Searcher[PresetResourceSlotRow, PresetResourceSlotData]):
-    """One preset's slot rows, in the slot catalog's own rank order.
+    """Slot rows in the slot catalog's own rank order.
 
     The order is built in rather than left to the caller: a slot list shown in any
-    other order would disagree with every other place slots appear.
+    other order would disagree with every other place slots appear. Which preset's
+    rows these are is the operation scope's to say.
     """
-
-    preset_id: DeploymentPresetID = field(default=None)  # type: ignore[assignment]
 
     @override
     def build_select(self) -> sa.sql.Select[Any]:
@@ -49,7 +48,6 @@ class PresetResourceSlotSearcher(Searcher[PresetResourceSlotRow, PresetResourceS
                 ResourceSlotTypeRow,
                 PresetResourceSlotRow.slot_name == ResourceSlotTypeRow.slot_name,
             )
-            .where(PresetResourceSlotRow.preset_id == self.preset_id)
             .order_by(ResourceSlotTypeRow.rank)
         )
 

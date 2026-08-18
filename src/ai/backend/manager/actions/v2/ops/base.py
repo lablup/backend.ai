@@ -152,13 +152,12 @@ class SearchOpsAction[TRow: Base, TData](OpsBackendAction):
 
 
 class GlobalSearchOpsAction[TRow: Base, TData](OpsBackendAction):
-    """A list read the ops layer runs with no scope filter of its own.
+    """A list read across an entire table, with no scope filter.
 
-    What answers for it is the shape it is mixed with: ``BaseGlobalAction`` puts the
-    SUPERADMIN gate behind an unscoped scan, while a field search names its owner and
-    is answered for by that owner's read. Kept apart from :class:`SearchOpsAction`
-    rather than signalled by an empty scope list, so the authority a query needs is
-    visible in the action's shape instead of in the value of one of its fields.
+    Mixed in alongside ``BaseGlobalAction``, whose SUPERADMIN gate is what makes an
+    unscoped scan answerable for. Kept apart from :class:`SearchOpsAction` rather than
+    signalled by an empty scope list, so the authority a query needs is visible in the
+    action's shape instead of in the value of one of its fields.
     """
 
     @abstractmethod

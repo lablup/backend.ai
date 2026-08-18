@@ -277,18 +277,14 @@ class RolePresetAdapter(BaseAdapter):
     ) -> SearchRolePermissionPresetsPayload:
         """Search the permission entries belonging to a single role preset.
 
-        Backs the ``permission_presets`` field resolver on ``RolePresetGQL``. The
-        parent preset id is always enforced as a base condition, so caller-supplied
-        filters can only narrow within that preset, never widen across presets.
+        Backs the ``permission_presets`` field resolver on ``RolePresetGQL``. The action
+        names the preset, so a caller-supplied filter can only narrow within it.
         """
         conditions = self._convert_permission_filter(input.filter) if input.filter else []
         orders = self._convert_permission_orders(input.order) if input.order else []
-        base_conditions: list[QueryCondition] = [
-            RolePermissionPresetConditions.by_role_preset_id_equals(role_preset_id)
-        ]
         searcher = self._build_searcher(
             RolePermissionPresetSearcher,
-            conditions=[*base_conditions, *conditions],
+            conditions=conditions,
             orders=orders,
             pagination_spec=_role_permission_preset_pagination_spec(),
             first=input.first,
@@ -299,7 +295,7 @@ class RolePresetAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._processors.role_preset.search_permission_presets.run(
-            SearchRolePermissionPresetsAction(searcher=searcher)
+            SearchRolePermissionPresetsAction(preset_id=role_preset_id, searcher=searcher)
         )
         return SearchRolePermissionPresetsPayload(
             items=[self._permission_data_to_node(d) for d in result.items],

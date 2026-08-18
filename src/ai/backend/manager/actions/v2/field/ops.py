@@ -12,10 +12,8 @@ from ai.backend.manager.actions.v2.ops.base import (
     FieldPartialBulkPurgeOpsAction,
     FieldPurgeOpsAction,
     GetOpsAction,
-    GlobalSearchOpsAction,
     UpdateOpsAction,
 )
-from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.models.base import Base
 
 __all__ = (
@@ -25,7 +23,6 @@ __all__ = (
     "RestoreFieldOpsAction",
     "PurgeFieldOpsAction",
     "PartialBulkPurgeFieldOpsAction",
-    "SearchFieldOpsAction",
 )
 
 
@@ -109,19 +106,3 @@ class PartialBulkPurgeFieldOpsAction[
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
-
-
-class SearchFieldOpsAction[TRow: Base, TData](
-    BaseSingleEntityAction, GlobalSearchOpsAction[TRow, TData], ABC
-):
-    """A page of the field rows one owner has.
-
-    Single-entity shaped, not field shaped: the caller names the owner, so there is no
-    row id to resolve one from and the check is the owner's own read. The searcher
-    carries the owner filter, which is what keeps the read inside that owner.
-    """
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET

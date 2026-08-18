@@ -41,10 +41,12 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 - So a field action names no entity directly — it names the **lookup action** that
   reads the owning one. The processor runs that lookup first, then runs the same
   `single_entity` / `bulk` validators and monitors against what came back.
-- The other direction — **an entity id and no field id** — is a `single_entity`
-  operation on that entity. It stays one even when it reads that entity's field rows as
-  a page: the work and the result are a search's, but the validation, the record and the
-  response are single-entity. Nothing was named, so there is no owner to read.
+- The other direction — **an entity id and no field id** — names where to look, not
+  what to touch, so it is `scope`-shaped: the owner is the scope. Reading one owner's
+  field rows is that, and ops applies the scope's condition rather than leaving it to
+  the searcher. Nothing was named, so there is no owner to read.
+- Its result names no entity: a field row is not one. Which owner the read stayed
+  inside is on the action's scope targets, which the audit row is tied to.
 - Creating a field row takes the owning entity's id for the same reason: it writes
   inside that entity's scope and is answered for by it.
 - Neither contradicts "an operation naming existing rows takes their ids and nothing

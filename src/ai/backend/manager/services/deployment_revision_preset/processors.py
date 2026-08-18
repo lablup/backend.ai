@@ -6,7 +6,9 @@ from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     CreatedEntityWithFieldsOpsResult,
     EntityOpsResult,
+    ScopedFieldsOpsResult,
 )
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotData
 from ai.backend.manager.data.deployment_revision_preset.types import (
@@ -58,8 +60,8 @@ class DeploymentPresetProcessors:
     purge: SingleEntityActionProcessor[
         PurgeDeploymentPresetAction, EntityOpsResult[DeploymentRevisionPresetData]
     ]
-    search_resource_slots: SingleEntityActionProcessor[
-        SearchPresetResourceSlotsAction, BatchOpsResult[PresetResourceSlotData]
+    search_resource_slots: ScopeActionProcessor[
+        SearchPresetResourceSlotsAction, ScopedFieldsOpsResult[PresetResourceSlotData]
     ]
 
     def __init__(
