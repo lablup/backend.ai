@@ -3,27 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.notification import (
-    NOTIFICATION_CHANNEL_ENTITY_TYPE,
-    NotificationChannelID,
-)
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.notification import NotificationChannelID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 
 
 @dataclass
-class ValidateChannelAction(BaseGlobalAction):
+class ValidateChannelAction(BaseSingleEntityAction):
     """Send a test message through a channel to prove it is reachable."""
 
     channel_id: NotificationChannelID
     test_message: str
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return NOTIFICATION_CHANNEL_ENTITY_TYPE
 
     @override
     @classmethod
@@ -34,6 +26,10 @@ class ValidateChannelAction(BaseGlobalAction):
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.channel_id
 
 
 @dataclass

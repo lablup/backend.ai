@@ -242,7 +242,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             ),
         )
         updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=input.id)
-        result = await self._processors.runtime_variant_preset.global_update.run(
+        result = await self._processors.runtime_variant_preset.update.run(
             UpdateRuntimeVariantPresetAction(id=RuntimeVariantPresetID(input.id), updater=updater)
         )
         return UpdateRuntimeVariantPresetPayload(preset=self._data_to_node(result.preset))

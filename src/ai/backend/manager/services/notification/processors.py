@@ -66,8 +66,10 @@ class NotificationProcessors:
     purge_rule: SingleEntityActionProcessor[PurgeRuleAction, EntityOpsResult[NotificationRuleData]]
     get_rule: SingleEntityActionProcessor[GetRuleAction, EntityOpsResult[NotificationRuleData]]
     search_rules: GlobalActionProcessor[SearchRulesAction, BatchOpsResult[NotificationRuleData]]
-    validate_channel: GlobalActionProcessor[ValidateChannelAction, ValidateChannelActionResult]
-    validate_rule: GlobalActionProcessor[ValidateRuleAction, ValidateRuleActionResult]
+    validate_channel: SingleEntityActionProcessor[
+        ValidateChannelAction, ValidateChannelActionResult
+    ]
+    validate_rule: SingleEntityActionProcessor[ValidateRuleAction, ValidateRuleActionResult]
     process_notification: GlobalActionProcessor[
         ProcessNotificationAction, ProcessNotificationActionResult
     ]
@@ -88,10 +90,10 @@ class NotificationProcessors:
         self.purge_rule = rule_group.entity_purge_ops(PurgeRuleAction)
         self.get_rule = rule_group.single_get_ops(GetRuleAction)
         self.search_rules = rule_group.global_search_ops(SearchRulesAction)
-        self.validate_channel = channel_group.global_scope(
+        self.validate_channel = channel_group.single_entity(
             ValidateChannelAction, service.validate_channel
         )
-        self.validate_rule = rule_group.global_scope(ValidateRuleAction, service.validate_rule)
+        self.validate_rule = rule_group.single_entity(ValidateRuleAction, service.validate_rule)
         self.process_notification = rule_group.global_scope(
             ProcessNotificationAction, service.process_notification
         )

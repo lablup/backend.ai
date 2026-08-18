@@ -45,9 +45,9 @@ class PrometheusQueryPresetProcessors:
     purge_preset: SingleEntityActionProcessor[
         PurgePresetAction, EntityOpsResult[PrometheusQueryPresetData]
     ]
-    global_update_preset: GlobalActionProcessor[UpdatePresetAction, UpdatePresetActionResult]
+    update_preset: SingleEntityActionProcessor[UpdatePresetAction, UpdatePresetActionResult]
     global_preview_preset: GlobalActionProcessor[PreviewPresetAction, PreviewPresetActionResult]
-    global_execute_preset: GlobalActionProcessor[ExecutePresetAction, ExecutePresetActionResult]
+    execute_preset: SingleEntityActionProcessor[ExecutePresetAction, ExecutePresetActionResult]
 
     def __init__(
         self,
@@ -57,6 +57,6 @@ class PrometheusQueryPresetProcessors:
             CreatePresetAction, service.create_preset
         self.global_search_presets = group.global_search_ops(SearchPresetsAction)
         self.purge_preset = group.entity_purge_ops(PurgePresetAction)
-        self.global_update_preset = group.global_scope(UpdatePresetAction, service.update_preset)
+        self.update_preset = group.single_entity(UpdatePresetAction, service.update_preset)
         self.global_preview_preset = group.global_scope(PreviewPresetAction, service.preview_preset)
-        self.global_execute_preset = group.global_scope(ExecutePresetAction, service.execute_preset)
+        self.execute_preset = group.single_entity(ExecutePresetAction, service.execute_preset)

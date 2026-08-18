@@ -42,7 +42,7 @@ class RuntimeVariantPresetProcessors:
     global_create: GlobalActionProcessor[
         CreateRuntimeVariantPresetAction, CreateRuntimeVariantPresetActionResult
     ]
-    global_update: GlobalActionProcessor[
+    update: SingleEntityActionProcessor[
         UpdateRuntimeVariantPresetAction, UpdateRuntimeVariantPresetActionResult
     ]
     purge: SingleEntityActionProcessor[
@@ -59,6 +59,6 @@ class RuntimeVariantPresetProcessors:
     ) -> None:
         self.public_get = group.public_get_ops(GetRuntimeVariantPresetAction)
         self.global_create = group.global_scope(CreateRuntimeVariantPresetAction, service.create)
-        self.global_update = group.global_scope(UpdateRuntimeVariantPresetAction, service.update)
+        self.update = group.single_entity(UpdateRuntimeVariantPresetAction, service.update)
         self.purge = group.entity_purge_ops(PurgeRuntimeVariantPresetAction)
         self.public_search = group.public_search_ops(SearchRuntimeVariantPresetsAction)

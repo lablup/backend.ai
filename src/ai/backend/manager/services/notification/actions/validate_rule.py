@@ -4,27 +4,19 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.notification import (
-    NOTIFICATION_RULE_ENTITY_TYPE,
-    NotificationRuleID,
-)
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.notification import NotificationRuleID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 
 
 @dataclass
-class ValidateRuleAction(BaseGlobalAction):
+class ValidateRuleAction(BaseSingleEntityAction):
     """Action to validate a notification rule by rendering its template with test data."""
 
     rule_id: NotificationRuleID
     notification_data: Mapping[str, Any]
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return NOTIFICATION_RULE_ENTITY_TYPE
 
     @override
     @classmethod
@@ -35,6 +27,10 @@ class ValidateRuleAction(BaseGlobalAction):
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.rule_id
 
 
 @dataclass

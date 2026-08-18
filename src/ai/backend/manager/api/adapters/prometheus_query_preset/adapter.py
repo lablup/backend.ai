@@ -156,7 +156,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             pk_value=preset_id,
         )
 
-        action_result = await self._processors.prometheus_query_preset.global_update_preset.run(
+        action_result = await self._processors.prometheus_query_preset.update_preset.run(
             UpdatePresetAction(preset_id=PrometheusQueryPresetID(preset_id), updater=updater)
         )
 
@@ -192,9 +192,9 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             if time_range is not None
             else None
         )
-        action_result = await self._processors.prometheus_query_preset.global_execute_preset.run(
+        action_result = await self._processors.prometheus_query_preset.execute_preset.run(
             ExecutePresetAction(
-                preset_id=preset_id,
+                preset_id=PrometheusQueryPresetID(preset_id),
                 options=execute_options,
                 time_window=time_window,
                 time_range=qtr,

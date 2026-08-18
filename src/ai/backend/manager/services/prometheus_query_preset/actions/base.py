@@ -12,7 +12,8 @@ from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
 @dataclass
 class PrometheusQueryPresetGlobalAction(BaseGlobalAction):
-    """Base for the preset operations the service still owns."""
+    """Base for the preset operations that name no preset: only the preview, which
+    renders a template the caller passes and touches nothing stored."""
 
     @override
     @classmethod

@@ -121,7 +121,7 @@ class PrometheusQueryPresetHandler:
     ) -> APIResponse:
         """Modify a preset."""
         updater = self._adapter.build_updater(body.parsed, path.parsed.id)
-        action_result = await self._processor.global_update_preset.run(
+        action_result = await self._processor.update_preset.run(
             UpdatePresetAction(preset_id=PrometheusQueryPresetID(path.parsed.id), updater=updater)
         )
         resp = ModifyQueryDefinitionResponse(
@@ -152,9 +152,9 @@ class PrometheusQueryPresetHandler:
             group_labels=body.parsed.options.group_labels,
         )
 
-        action_result = await self._processor.global_execute_preset.run(
+        action_result = await self._processor.execute_preset.run(
             ExecutePresetAction(
-                preset_id=path.parsed.id,
+                preset_id=PrometheusQueryPresetID(path.parsed.id),
                 options=options,
                 time_window=body.parsed.time_window,
                 time_range=body.parsed.time_range,
