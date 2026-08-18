@@ -852,8 +852,9 @@ class VirtualScopeSeeder:
         self, conn: AsyncConnection, group_id: uuid.UUID, user_uuid: UserID
     ) -> None:
         """Write the virtual-scope chain rows the enrollment path creates for a
-        user-project membership: the user joins the project's virtual scope and the
-        project is bound into the user's own virtual scope."""
+        user-project membership: the user joins the project's virtual scope. The project
+        is not bound into the user's own virtual scope — a member does not hand the
+        project its personal entities."""
         project_scope_id = (
             await conn.execute(
                 sa.select(VirtualScopeRow.__table__.c.id).where(
@@ -862,27 +863,11 @@ class VirtualScopeSeeder:
                 )
             )
         ).scalar_one()
-        user_scope_id = (
-            await conn.execute(
-                sa.select(VirtualScopeRow.__table__.c.id).where(
-                    VirtualScopeRow.__table__.c.scope_type == ScopeType.USER,
-                    VirtualScopeRow.__table__.c.scope_id == str(user_uuid),
-                )
-            )
-        ).scalar_one()
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_scope_id=project_scope_id,
                 entity_type=EntityType.USER,
                 entity_id=str(user_uuid),
-                permission_cap=None,
-            )
-        )
-        await conn.execute(
-            sa.insert(ScopeBindingRow.__table__).values(
-                virtual_scope_id=user_scope_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=group_id,
                 permission_cap=None,
             )
         )
