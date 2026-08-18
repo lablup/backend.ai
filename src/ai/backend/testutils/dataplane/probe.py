@@ -103,3 +103,85 @@ async def reaches(node: Node, pid: str, target: str) -> bool:
         ["nsenter", "-t", pid, "-n", "ping", "-c", "1", "-W", "2", target], check=False
     )
     return result.returncode == 0
+
+
+async def interface_mtu(node: Node, pid: str, ifname: str) -> int:
+    """The MTU of one interface inside a kernel's netns.
+
+    The overlay's MTU is the underlay's minus the vxlan overhead; a scenario that asserts a full-MTU
+    frame crosses reads the number the interface actually carries rather than hard-coding 1450, so a
+    future MTU change moves the assertion with it instead of quietly making it test the wrong size.
+    """
+    out = await node.run(["nsenter", "-t", pid, "-n", "ip", "-o", "link", "show", ifname])
+    tokens = out.stdout.split()
+    if "mtu" in tokens:
+        return int(tokens[tokens.index("mtu") + 1])
+    raise AssertionError(f"no mtu on {ifname} in pid {pid}: {out.stdout!r}")
+
+
+async def reaches_at_size(
+    node: Node, pid: str, target: str, *, payload: int, dont_fragment: bool = False
+) -> bool:
+    """Can ``pid`` reach ``target`` with an ICMP payload of ``payload`` bytes?
+
+    A minimal ping rides whatever small path a broken underlay still passes; a full-MTU frame is the
+    one that must survive encapsulation intact. ``dont_fragment`` sets DF, so a frame the overlay
+    advertises but whose encapsulation exceeds the underlay MTU is dropped here instead of being
+    silently fragmented -- the misconfiguration a plain reachability check sails straight through.
+    """
+    argv = ["nsenter", "-t", pid, "-n", "ping", "-c", "1", "-W", "2", "-s", str(payload)]
+    if dont_fragment:
+        argv += ["-M", "do"]
+    argv.append(target)
+    result = await node.run(argv, check=False)
+    return result.returncode == 0
+
+
+def _received_fraction(ping_stdout: str) -> float:
+    """Parse ``N packets transmitted, M received`` from ping's summary into ``M / N``.
+
+    Raises rather than defaulting: an unparsed summary is a harness fault, and either a 0.0 or a 1.0
+    default would silently turn it into a fail or a pass of the wrong test -- the empty-snapshot
+    failure mode the suite forbids, in miniature.
+    """
+    for line in ping_stdout.splitlines():
+        if "packets transmitted" in line and "received" in line:
+            fields = line.replace(",", " ").split()
+            transmitted = int(fields[0])
+            received = int(fields[fields.index("received") - 1])
+            if transmitted == 0:
+                raise AssertionError(f"ping reported zero packets transmitted: {line!r}")
+            return received / transmitted
+    raise AssertionError(f"no ping summary line to parse:\n{ping_stdout}")
+
+
+async def delivery_ratio(
+    node: Node, pid: str, target: str, *, count: int, payload: int, interval: float = 0.02
+) -> float:
+    """Fraction of a ``count``-packet, ``payload``-byte stream that makes the round trip.
+
+    A single ping can ride the first-packet path a broken underlay still passes -- a stateful
+    accelerator that mangles only an established flow, a checksum offload that misfires under load.
+    A sustained stream of full-size packets is what such a fault actually drops, so the caller
+    asserts the ratio is ~1.0: a healthy overlay loses none.
+    """
+    result = await node.run(
+        [
+            "nsenter",
+            "-t",
+            pid,
+            "-n",
+            "ping",
+            "-c",
+            str(count),
+            "-i",
+            str(interval),
+            "-W",
+            "2",
+            "-s",
+            str(payload),
+            target,
+        ],
+        check=False,
+    )
+    return _received_fraction(result.stdout)
