@@ -2,11 +2,14 @@ import enum
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Self, final, override
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic_core import PydanticSerializationError
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.message_queue.payload import BroadcastMessagePayload
 from ai.backend.common.message_queue.types import MessageName
 
+from .exceptions import EventPayloadDecodingError, EventPayloadEncodingError
 from .message import EventMessage
 from .user_event.user_event import UserEvent
 
@@ -81,19 +84,32 @@ class AbstractEvent(BaseModel, ABC):
     def to_message(self) -> EventMessage:
         """
         Render this event as the message it is handed to the queue as.
+
+        Raises:
+            EventPayloadEncodingError: If a field of this event is not JSON-representable
         """
-        return EventMessage(
-            name=MessageName(self.event_name()),
-            payload=self.model_dump_json(),
-        )
+        name = MessageName(self.event_name())
+        try:
+            payload = self.model_dump_json()
+        except PydanticSerializationError as e:
+            raise EventPayloadEncodingError(extra_msg=f"{name}: {e}") from e
+        return EventMessage(name=name, payload=payload)
 
     @final
     @classmethod
     def from_message(cls, message: EventMessage) -> Self:
         """
         Reconstruct the event from the message it was rendered as.
+
+        Raises:
+            EventPayloadDecodingError: If the body does not validate against this event
         """
-        return cls.model_validate_json(message.payload)
+        try:
+            return cls.model_validate_json(message.payload)
+        except (ValidationError, BackendAIError) as e:
+            # An event deriving `BackendAISchema` maps `ValidationError` to a
+            # `BackendAIError` of its own choosing, so both forms arrive here.
+            raise EventPayloadDecodingError(extra_msg=f"{message.name}: {e}") from e
 
     @classmethod
     @abstractmethod
