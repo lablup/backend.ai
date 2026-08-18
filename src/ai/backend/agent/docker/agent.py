@@ -41,6 +41,7 @@ from aiodocker.types import PortInfo
 from aiomonitor.task import preserve_termination_log
 from aiotools import TaskGroup
 from async_timeout import timeout
+from cachetools import LRUCache
 
 from ai.backend.agent.agent import (
     ACTIVE_STATUS_SET,
@@ -109,7 +110,11 @@ from ai.backend.agent.utils import (
     update_nested_dict,
 )
 from ai.backend.common.asyncio import current_loop
-from ai.backend.common.cgroup import get_cgroup_mount_point
+from ai.backend.common.cgroup import (
+    CgroupController,
+    get_cgroup_path_of_pid,
+    get_container_main_pid,
+)
 from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.docker import (
     MAX_KERNELSPEC,
@@ -168,6 +173,15 @@ eof_sentinel = Sentinel.TOKEN
 
 LDD_GLIBC_REGEX = re.compile(r"^ldd \([^\)]+\) (\d+(?:\.\d+)?)[\d\.]*$")
 LDD_MUSL_REGEX = re.compile(r"^musl libc .+$")
+
+# Cached per container, so the capacity is the number of containers an agent may host.
+_CGROUP_PATH_CACHE_SIZE: Final[int] = 2048
+# Controllers the intrinsic plugins read, resolved together from a single inspect.
+_TRACKED_CGROUP_CONTROLLERS: Final[tuple[CgroupController, ...]] = (
+    CgroupController.CPUACCT,
+    CgroupController.MEMORY,
+    CgroupController.BLKIO,
+)
 
 known_glibc_distros: Final[dict[float, str]] = {
     2.17: "centos7.6",
@@ -1475,6 +1489,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: str | None
     checked_invalid_images: set[str]
+    _cgroup_path_cache: LRUCache[ContainerId, dict[CgroupController, Path]]
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -1505,6 +1520,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             agent_class=agent_class,
         )
         self.checked_invalid_images = set()
+        self._cgroup_path_cache = LRUCache(maxsize=_CGROUP_PATH_CACHE_SIZE)
         pickle_loader_writer_creator = PickleBasedLoaderWriterCreator.create(
             PickleBasedKernelRegistryCreatorArgs(
                 scratch_root=local_config.container.scratch_root,
@@ -1655,19 +1671,28 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         await self._kernel_recovery.save_kernel_registry(kernel_registry, metadata)
 
     @override
-    def get_cgroup_path(self, controller: str, container_id: str) -> Path:
-        driver = self.docker_info["CgroupDriver"]
+    async def get_cgroup_path(
+        self, controller: CgroupController, container_id: ContainerId
+    ) -> Path:
+        cached_paths = self._cgroup_path_cache.get(container_id)
+        if cached_paths is not None and (cached_path := cached_paths.get(controller)) is not None:
+            return cached_path
+        # The PID is used immediately and never cached: it changes when the container
+        # restarts, while the resolved cgroup path does not.
+        pid = await get_container_main_pid(container_id)
         version = self.docker_info["CgroupVersion"]
-        mount_point = get_cgroup_mount_point(version, controller)
-        # See https://docs.docker.com/config/containers/runmetrics/#find-the-cgroup-for-a-given-container
-        match driver:
-            case "cgroupfs":
-                cgroup = f"docker/{container_id}"
-            case "systemd":
-                cgroup = f"system.slice/docker-{container_id}.scope"
-            case _:
-                raise ValueError(f"Unsupported cgroup driver: {driver!r}")
-        return mount_point / cgroup
+        resolved = {
+            each_controller: get_cgroup_path_of_pid(version, each_controller, pid)
+            for each_controller in {*_TRACKED_CGROUP_CONTROLLERS, controller}
+        }
+        if cached_paths is None:
+            self._cgroup_path_cache[container_id] = resolved
+        else:
+            cached_paths.update(resolved)
+        return resolved[controller]
+
+    def _invalidate_cgroup_path_cache(self, container_id: ContainerId) -> None:
+        self._cgroup_path_cache.pop(container_id, None)
 
     @override
     def get_cgroup_version(self) -> str:
@@ -2125,6 +2150,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         restarting: bool,
     ) -> None:
         loop = current_loop()
+        if container_id is not None:
+            self._invalidate_cgroup_path_cache(container_id)
         async with closing_async(Docker()) as docker:
             if container_id is not None:
                 container = docker.containers.container(container_id)
