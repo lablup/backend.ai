@@ -108,6 +108,24 @@ class EntityIdentifier(UUID):
         return core_schema.no_info_after_validator_function(cls, core_schema.uuid_schema())
 
 
+class SidecarIdentifier(UUID):
+    """A sidecar row's id.
+
+    It names no type, unlike the other two: a sidecar sits outside the graph, so there
+    is neither an entity type it is nor an owner type it belongs to. Subclassing `UUID`
+    is what keeps such ids apart from each other at the type level.
+    """
+
+    def __init__(self, value: UUID) -> None:
+        super().__init__(int=value.int)
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        """Validated as the uuid it is; pydantic builds no schema for a `UUID`
+        subclass on its own."""
+        return core_schema.no_info_after_validator_function(cls, core_schema.uuid_schema())
+
+
 class FieldIdentifier(UUID):
     """A field row's id, which knows the entity type that owns it.
 

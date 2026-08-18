@@ -1,9 +1,9 @@
 ---
 name: write-spec-design
 type: design-rationale
-description: write-spec selection criteria (Entity/Global/Field), why the four roots share no common ABC, why the role-managed root is not an EntityCreator subtype, why a global entity is provisioned in the graph, how a field row's owner is read, the distinction between member_of and cap-based sharing, open entity-type strings
+description: write-spec selection criteria (Entity/Global/Field/Sidecar), why the roots share no common ABC, what a sidecar row is and why it belongs to neither position, why the role-managed root is not an EntityCreator subtype, why a global entity is provisioned in the graph, how a field row's owner is read, the distinction between member_of and cap-based sharing, open entity-type strings
 scope: src/ai/backend/manager/models/specs
-keywords: [EntityCreator, GlobalEntityCreator, FieldCreator, RoleManagedEntityCreator, FieldOwnerLookup, RoleTemplateSource, member_of, entity_id, virtual-scope, preset-role, DataUpdater, soft-delete]
+keywords: [EntityCreator, GlobalEntityCreator, FieldCreator, RoleManagedEntityCreator, SidecarCreator, FieldOwnerLookup, RoleTemplateSource, member_of, entity_id, virtual-scope, preset-role, DataUpdater, soft-delete]
 sources:
   - src/ai/backend/manager/models/specs/creator.py
   - src/ai/backend/manager/models/specs/lookup.py
@@ -37,6 +37,19 @@ execution path.
 | Entity, role-managed | Entities that grant preset roles (domain/project/user) | Entity behavior + preset role creation — must be declared via the combined `RoleManagedEntity*` root |
 | Global | An entity that goes under no other entity | Entity behavior minus `member_of` — the node is provisioned the same way |
 | Field | A row another entity owns (even with its own get/delete API) | create requires `owner_id`; purge is a plain delete |
+| Sidecar | A row outside the graph — an audit record, an event log | create inserts and nothing else; the entity it names is read by, not belonged to |
+
+## A sidecar belongs to neither position
+
+- An entity can stand on its own and is woven to other entities through virtual scopes;
+  a field cannot stand on its own and is an extension of its owner's value, handled with
+  the owner's permission.
+- A sidecar takes the diagonal: it stands on its own, yet carries no node and is read
+  through an entity's permission the way a field is. An audit record outlives the entity
+  it is about, and some name no entity at all.
+- So its create settles nothing — no node, no owner. The entity it names is a value a
+  reader is authorized by, which is why the read is scope-shaped on that entity while
+  the row belongs to no one.
 
 ## The absence of a common ABC is itself the enforcement mechanism
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Collection, Sequence
 
-from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier, SidecarIdentifier
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.role_template import RoleTemplateSource
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -123,6 +123,58 @@ class FieldCreator[TOwnerID: EntityIdentifier, TRow: Base, TData](ABC):
     id), so a field row cannot be created standalone. It becomes no scope and
     joins nothing: writing a field row is authorized through the owner, like an
     update to the owning entity.
+    """
+
+    @abstractmethod
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def build_row(self, owner_id: TOwnerID) -> TRow:
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        raise NotImplementedError
+
+
+class SidecarCreator[TRow: Base, TData](ABC):
+    """Insert spec of a row that rides beside the entity graph rather than in it.
+
+    Stands on its own like an entity — nothing owns it and its lifetime is its own —
+    while being read through an entity's permission like a field. So there is neither a
+    node to provision nor an owner to build under: an entity the row names is what a
+    reader is authorized by, not what it belongs to.
+    """
+
+    @abstractmethod
+    def sidecar_id(self, row: TRow) -> SidecarIdentifier:
+        """The row's id, read off the settled row, for the rows it owns to be built under.
+
+        Takes the row because the id does not exist before the insert.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def build_row(self) -> TRow:
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        raise NotImplementedError
+
+
+class SidecarFieldCreator[TOwnerID: SidecarIdentifier, TRow: Base, TData](ABC):
+    """Insert spec of a row a sidecar owns.
+
+    What :class:`FieldCreator` is to an entity, this is to a sidecar: built only from
+    the owner's settled identifier, so it cannot be created standalone, and it becomes
+    no scope and joins nothing. The owner sits outside the graph, so the row is reached
+    the way the owner is.
     """
 
     @abstractmethod

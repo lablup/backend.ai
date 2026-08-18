@@ -168,6 +168,7 @@ __all__ = (
     "ProcessorDependencies",
     "ProcessorGroup",
     "FieldProcessorGroup",
+    "SidecarProcessorGroup",
     "ProcessorRegistry",
 )
 
@@ -361,6 +362,16 @@ class ProcessorGroup[TData: EntityData]:
             post_validators=self._deps.validators.bulk,
         )
         return FieldProcessorGroup(self, owner_lookup, bulk_owner_lookup)
+
+    def sidecar_group[TSidecarData](
+        self, data_cls: type[TSidecarData]
+    ) -> SidecarProcessorGroup[TSidecarData]:
+        """The reads over one kind of sidecar row.
+
+        Takes no owner lookup, unlike :meth:`field_group`: a sidecar has no owner, so
+        there is nothing to resolve before a read.
+        """
+        return SidecarProcessorGroup(self)
 
     def single_get_ops[TAction: GetSingleEntityOpsAction[Any, Any]](
         self,
@@ -796,6 +807,56 @@ class ProcessorGroup[TData: EntityData]:
             GlobalBatchPurgeService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
+        )
+
+
+class SidecarProcessorGroup[TSidecarData]:
+    """The reads over one kind of sidecar row.
+
+    A sidecar stands outside the graph, so there is no create or purge here — those go
+    through the repository, which is where the writers of such rows already are. What is
+    here is the two reads, and both report no entity: a sidecar row is not one.
+    """
+
+    _group: ProcessorGroup[Any]
+
+    def __init__(self, group: ProcessorGroup[Any]) -> None:
+        self._group = group
+
+    def search_ops[TAction: OperationScopeOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[ScopeActionValidator] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[TAction, ScopedFieldsOpsResult[TSidecarData]]:
+        """A page of the sidecar rows inside the scopes the action names.
+
+        Scope-shaped like every other search that names where it looks, and the scope's
+        condition is written against the row's own columns — there is no owner to look up.
+        """
+        self._group.record(action_cls)
+        return ScopeActionProcessor(
+            SearchFieldsService(self._group.deps.repository).execute,
+            monitors=(*self._group.deps.monitors.scope, *monitors),
+            validators=(*self._group.deps.validators.scope, *validators),
+        )
+
+    def global_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> GlobalActionProcessor[TAction, BatchOpsResult[TSidecarData]]:
+        """A read across every row of this sidecar type, behind the SUPERADMIN gate.
+
+        For the rows of named scopes use :meth:`search_ops`; this one names none."""
+        self._group.record(action_cls)
+        return GlobalActionProcessor(
+            GlobalSearchService(self._group.deps.repository).execute,
+            monitors=(*self._group.deps.monitors.global_scope, *monitors),
+            validators=(*self._group.deps.validators.global_scope, *validators),
         )
 
 

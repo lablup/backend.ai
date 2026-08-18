@@ -16,16 +16,17 @@ only; do not declare a new spec there.
 
 ## What a spec splits on depends on the operation
 
-A row is an entity or a field. There is nothing else, and which one it is comes from
-the table in `KNOWLEDGE.md`.
+A row in the graph is an entity or a field, and which one it is comes from the table
+in `KNOWLEDGE.md`. A row outside it is a sidecar — it stands on its own like an entity
+and is read through an entity's permission like a field, while belonging to neither.
 
 | Operation | Roots | Why |
 |---|---|---|
-| creator | `GlobalEntityCreator` / `EntityCreator` / `RoleManagedEntityCreator` / `FieldCreator` | only a create settles what a row belongs to |
+| creator | `GlobalEntityCreator` / `EntityCreator` / `RoleManagedEntityCreator` / `FieldCreator` / `SidecarCreator` | only a create settles what a row belongs to |
 | purger | `EntityPurger` / `FieldPurger` | removing an entity removes what it left in the graph |
 | updater | `DataUpdater` alone | an update never changes what a row belongs to |
 
-The four roots are deliberately unrelated. Do NOT extract a common base across them
+The roots are deliberately unrelated. Do NOT extract a common base across them
 or type any function against "any creator/purger" — the absence of a common supertype
 is the enforcement. Reuse execution logic through ops-layer helpers that take plain
 values (`row_class`, `pk_value`, ...).

@@ -22,6 +22,8 @@ from ai.backend.manager.models.specs.creator import (
     FieldCreator,
     GlobalEntityCreator,
     RoleManagedEntityCreator,
+    SidecarCreator,
+    SidecarFieldCreator,
 )
 from ai.backend.manager.models.specs.lookup import DataLookup, FieldOwnerLookup
 from ai.backend.manager.models.specs.purger import (
@@ -189,6 +191,24 @@ class OpsRepository[TData]:
         """Insert several field rows sharing one owner, atomically."""
         async with self._ops.write_ops() as w:
             return await w.atomic_create_field_entities(owner_id, creators)
+
+    async def create_sidecar(self, creator: SidecarCreator[Any, TData]) -> TData:
+        async with self._ops.write_ops() as w:
+            return await w.create_sidecar(creator)
+
+    async def atomic_create_sidecars(
+        self, creators: Sequence[SidecarCreator[Any, TData]]
+    ) -> list[TData]:
+        async with self._ops.write_ops() as w:
+            return await w.atomic_create_sidecars(creators)
+
+    async def atomic_create_sidecars_with_fields[TFieldData](
+        self,
+        creators: Sequence[SidecarCreator[Any, TData]],
+        field_creators: Sequence[SidecarFieldCreator[Any, Any, TFieldData]],
+    ) -> list[TData]:
+        async with self._ops.write_ops() as w:
+            return await w.atomic_create_sidecars_with_fields(creators, field_creators)
 
     async def purge_entity(self, purger: EntityPurger[Any, TData]) -> TData:
         """Hard-delete one entity row, tearing its scope down with it."""
