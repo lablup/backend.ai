@@ -16,6 +16,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack
+from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData, KeyPairSecrets
@@ -57,6 +58,13 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
         ),
     )
 
+    id: Mapped[KeyPairID] = mapped_column(
+        "id",
+        GUID(KeyPairID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
     user_id: Mapped[str] = mapped_column(
         "user_id", sa.String(length=256), index=True, nullable=False
     )
@@ -154,6 +162,7 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
 
     def to_data(self) -> KeyPairData:
         return KeyPairData(
+            id=self.id,
             user_id=self.user,
             access_key=AccessKey(self.access_key),
             secret_key=SecretKey(self.secret_key),

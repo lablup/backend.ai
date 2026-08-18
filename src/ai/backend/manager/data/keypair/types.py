@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import override
 
+from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.types import FieldData
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey, SecretKey
@@ -28,6 +29,7 @@ class KeyPairSecrets:
 
 @dataclass
 class KeyPairData(FieldData):
+    id: KeyPairID
     user_id: uuid.UUID
     access_key: AccessKey
     secret_key: SecretKey

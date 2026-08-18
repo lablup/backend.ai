@@ -5,7 +5,7 @@ from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.registry import FieldProcessorGroup, ProcessorGroup
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
 from ai.backend.manager.actions.validator.base import ActionValidator
@@ -13,6 +13,7 @@ from ai.backend.manager.actions.validator.scope import ScopeActionValidator
 from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators
+from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
@@ -63,6 +64,10 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     UpdateMyKeypairActionResult,
 )
 from ai.backend.manager.services.user.actions.lookup import LookupUserAction
+from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
+    LookupBulkKeypairOwnerAction,
+    LookupKeypairOwnerAction,
+)
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
     BulkPurgeUserActionResult,
@@ -152,6 +157,7 @@ class UserProcessors:
     ]
     admin_get_ssh_keypair: ActionProcessor[AdminGetSSHKeypairAction, AdminGetSSHKeypairActionResult]
     lookup: LookupActionProcessor[LookupUserAction, LookupOpsResult[UserData]]
+    keypair_group: FieldProcessorGroup[KeyPairData]
 
     def __init__(
         self,
@@ -172,6 +178,9 @@ class UserProcessors:
             legacy_scope_validator = validators.rbac.scope
             legacy_single_entity_validator = validators.rbac.single_entity
         self.lookup = group.public_lookup_ops(LookupUserAction)
+        self.keypair_group = group.field_group(
+            KeyPairData, LookupKeypairOwnerAction, LookupBulkKeypairOwnerAction
+        )
         self.create_user = ScopeActionProcessor(
             user_service.create_user,
             action_monitors,
