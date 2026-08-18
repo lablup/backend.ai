@@ -436,7 +436,7 @@ def create_processors(
         export=ExportProcessors(services.export, action_monitors, validators),
         fair_share=FairShareProcessors(services.fair_share, action_monitors, validators),
         group=GroupProcessors(registry.group(), services.group, action_monitors, validators),
-        user=UserProcessors(services.user, action_monitors, validators),
+        user=UserProcessors(registry.group(), services.user, action_monitors, validators),
         idle_checker=IdleCheckerProcessors(
             services.idle_checker, action_monitors, registry.group()
         ),

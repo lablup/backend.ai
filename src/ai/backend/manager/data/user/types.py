@@ -8,6 +8,8 @@ from typing import Any, Self, override
 from uuid import UUID
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
@@ -67,7 +69,7 @@ class SessionOwnerContext:
 
 
 @dataclass
-class UserData:
+class UserData(EntityData):
     id: UUID = field(compare=False)
     uuid: UUID = field(compare=False)  # legacy
     username: str
@@ -145,6 +147,10 @@ class UserData:
             container_gids=row.container_gids,
             integration_name=row.integration_id,  # DB column is integration_id
         )
+
+    @override
+    def entity_id(self) -> UserID:
+        return UserID(self.id)
 
 
 @dataclass
