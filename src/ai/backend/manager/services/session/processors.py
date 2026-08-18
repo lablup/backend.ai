@@ -4,8 +4,12 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.bulk import BulkActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
 from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
     BatchGetKernelResourceAllocationAction,
     BatchGetKernelResourceAllocationActionResult,
@@ -102,6 +106,7 @@ from ai.backend.manager.services.session.actions.list_files import (
     ListFilesAction,
     ListFilesActionResult,
 )
+from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
 from ai.backend.manager.services.session.actions.match_sessions import (
     MatchSessionsAction,
     MatchSessionsActionResult,
@@ -206,9 +211,11 @@ class SessionProcessors:
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
     get_session: SingleEntityActionProcessor[GetSessionAction, GetSessionActionResult]
     update_session: SingleEntityActionProcessor[UpdateSessionAction, UpdateSessionActionResult]
+    lookup: LookupActionProcessor[LookupSessionAction, LookupOpsResult[SessionData]]
 
     def __init__(
         self,
+        group: ProcessorGroup[SessionData],
         service: SessionService,
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
@@ -217,6 +224,7 @@ class SessionProcessors:
         single_entity_validator = validators.rbac.single_entity
 
         # Actions without RBAC validation (internal/legacy)
+        self.lookup = group.public_lookup_ops(LookupSessionAction)
         self.commit_session = ActionProcessor(service.commit_session, action_monitors)
         self.compute_schedule = ActionProcessor(service.compute_schedule, action_monitors)
         self.complete = ActionProcessor(service.complete, action_monitors)

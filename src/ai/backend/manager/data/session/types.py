@@ -5,9 +5,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.data.vfolder.types import VFolderMountData
 from ai.backend.common.types import (
     AccessKey,
@@ -172,7 +174,7 @@ class KernelMatchType(StrEnum):
 
 # TODO: Add proper types
 @dataclass
-class SessionData:
+class SessionData(EntityData):
     id: UUID
     session_type: SessionTypes
     priority: int
@@ -221,6 +223,10 @@ class SessionData:
 
     # The routing replica (RoutingRow.id) this session serves, if any.
     replica_id: UUID | None = None
+
+    @override
+    def entity_id(self) -> SessionID:
+        return SessionID(self.id)
 
 
 @dataclass(frozen=True)

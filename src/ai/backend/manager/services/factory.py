@@ -453,7 +453,7 @@ def create_processors(
         vfolder_sharing=VFolderSharingProcessors(
             services.vfolder_sharing, action_monitors, validators
         ),
-        session=SessionProcessors(services.session, action_monitors, validators),
+        session=SessionProcessors(registry.group(), services.session, action_monitors, validators),
         keypair_resource_policy=KeypairResourcePolicyProcessors(registry.group()),
         manager_admin=ManagerAdminProcessors(registry.group(), services.manager_admin),
         user_resource_policy=UserResourcePolicyProcessors(registry.group()),
