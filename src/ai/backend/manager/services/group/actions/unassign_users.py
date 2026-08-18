@@ -1,22 +1,25 @@
 from dataclasses import dataclass, field
 from typing import override
-from uuid import UUID
 
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.group.types import UnassignUserFailure
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
-from ai.backend.manager.services.group.actions.base import (
-    GroupSingleEntityAction,
-    GroupSingleEntityActionResult,
-)
 
 
-@dataclass
-class UnassignUsersFromProjectAction(GroupSingleEntityAction):
+@dataclass(frozen=True)
+class UnassignUsersFromProjectAction(BaseSingleEntityAction):
+    """Remove users from a project."""
+
+    project_id: ProjectID
     unbinder: UserProjectEntityUnbinder
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.project_id
 
     @override
     @classmethod
@@ -24,20 +27,13 @@ class UnassignUsersFromProjectAction(GroupSingleEntityAction):
         return ActionOperationType.UPDATE
 
     @override
-    def target_entity_id(self) -> str:
-        return str(self.unbinder.project_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.PROJECT, str(self.unbinder.project_id))
+    @classmethod
+    def action_name(cls) -> str:
+        return "unassign_users_from_project"
 
 
-@dataclass
-class UnassignUsersFromProjectActionResult(GroupSingleEntityActionResult):
-    project_id: UUID
+@dataclass(frozen=True)
+class UnassignUsersFromProjectActionResult:
+    project_id: ProjectID
     unassigned_users: list[UserData] = field(default_factory=list)
     failures: list[UnassignUserFailure] = field(default_factory=list)
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.project_id)

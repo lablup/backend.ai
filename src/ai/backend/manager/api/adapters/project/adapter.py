@@ -7,6 +7,8 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.group.request import (
@@ -51,23 +53,21 @@ from ai.backend.manager.data.group.types import ProjectType as DataProjectType
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.group.conditions import GroupConditions
+from ai.backend.manager.models.group.creators import GroupCreator
 from ai.backend.manager.models.group.orders import GroupOrders
 from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.group.searchers import GroupSearcher
+from ai.backend.manager.models.group.updaters import GroupSoftDeleteUpdater, GroupUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.group.types import (
     DomainProjectOperationScope,
     UserProjectOperationScope,
 )
-from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.group.actions.assign_users_to_project import (
     AssignUsersToProjectAction,
@@ -77,7 +77,7 @@ from ai.backend.manager.services.group.actions.delete_group import DeleteGroupAc
 from ai.backend.manager.services.group.actions.purge_group import PurgeGroupAction
 from ai.backend.manager.services.group.actions.search_projects import (
     GetProjectAction,
-    SearchProjectsAction,
+    GlobalSearchProjectsAction,
     SearchProjectsByDomainAction,
     SearchProjectsByUserAction,
 )
@@ -102,7 +102,9 @@ class ProjectAdapter(BaseAdapter):
     """Adapter for project (group) operations."""
 
     async def _resolve_domain_id(self, domain_name: str) -> DomainID:
-        result = await self._processors.domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        result = await self._processors.domain.lookup.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
         return result.data.id
 
     # ------------------------------------------------------------------ batch load (DataLoader)
@@ -114,24 +116,24 @@ class ProjectAdapter(BaseAdapter):
         """
         if not group_ids:
             return []
-        querier = BatchQuerier(
+        searcher = GroupSearcher(
             pagination=NoPagination(),
             conditions=[
                 GroupConditions.by_id_in(UUIDInMatchSpec(values=list(group_ids), negated=False))
             ],
         )
-        action_result = await self._processors.group.search_projects.wait_for_complete(
-            SearchProjectsAction(querier=querier)
+        result = await self._processors.group.global_search.run(
+            GlobalSearchProjectsAction(searcher=searcher)
         )
-        project_map = {group.id: self._group_data_to_node(group) for group in action_result.items}
+        project_map = {group.id: self._group_data_to_node(group) for group in result.items}
         return [project_map.get(group_id) for group_id in group_ids]
 
     # ------------------------------------------------------------------ get
 
     async def get(self, project_id: UUID) -> ProjectNode:
         """Retrieve a single project by UUID."""
-        action_result = await self._processors.group.get_project.wait_for_complete(
-            GetProjectAction(project_id=project_id)
+        action_result = await self._processors.group.get_project.run(
+            GetProjectAction(project_id=ProjectID(project_id))
         )
         return self._group_data_to_node(action_result.data)
 
@@ -142,7 +144,8 @@ class ProjectAdapter(BaseAdapter):
         """Search projects (admin, no scope) with filters, orders, and pagination."""
         conditions = self._convert_group_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            GroupSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_PROJECT_PAGINATION_SPEC,
@@ -154,42 +157,40 @@ class ProjectAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        action_result = await self._processors.group.search_projects.wait_for_complete(
-            SearchProjectsAction(querier=querier)
+        result = await self._processors.group.global_search.run(
+            GlobalSearchProjectsAction(searcher=searcher)
         )
 
         return AdminSearchGroupsPayload(
-            items=[self._group_data_to_node(item) for item in action_result.items],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+            items=[self._group_data_to_node(item) for item in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def admin_create(self, input: CreateProjectInput) -> ProjectPayload:
         """Create a new project (superadmin only)."""
-        spec = GroupCreatorSpec(
-            name=input.name,
-            domain_name=input.domain_name,
-            type=DataProjectType(input.type.value) if input.type else None,
-            description=input.description,
-            integration_name=input.integration_name,
-            resource_policy=input.resource_policy,
-        )
         domain_id = await self._resolve_domain_id(input.domain_name)
-        result = await self._processors.group.create_group.wait_for_complete(
+        result = await self._processors.group.create_group.run(
             CreateGroupAction(
-                creator=Creator(spec=spec),
-                _domain_name=input.domain_name,
-                _domain_id=domain_id,
+                domain_id=domain_id,
+                creator=GroupCreator(
+                    name=input.name,
+                    domain_id=domain_id,
+                    domain_name=input.domain_name,
+                    type=DataProjectType(input.type.value) if input.type else None,
+                    description=input.description,
+                    integration_name=input.integration_name,
+                    resource_policy=input.resource_policy,
+                ),
             )
         )
-        if result.data is None:
-            raise UnreachableError("create_group must return data")
         return ProjectPayload(project=self._group_data_to_node(result.data))
 
     async def admin_update(self, project_id: UUID, input: UpdateProjectInput) -> ProjectPayload:
         """Update an existing project (superadmin only)."""
-        spec = GroupUpdaterSpec(
+        updater = GroupUpdater(
+            project_id=ProjectID(project_id),
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
@@ -218,9 +219,8 @@ class ProjectAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        updater: Updater[GroupRow] = Updater(spec=spec, pk_value=project_id)
-        result = await self._processors.group.update_group.wait_for_complete(
-            UpdateGroupAction(updater=updater)
+        result = await self._processors.group.update_group.run(
+            UpdateGroupAction(project_id=ProjectID(project_id), updater=updater)
         )
         if result.data is None:
             raise UnreachableError("modify_group must return data")
@@ -228,15 +228,18 @@ class ProjectAdapter(BaseAdapter):
 
     async def admin_delete(self, input: DeleteProjectInput) -> DeleteProjectPayload:
         """Soft-delete a project (superadmin only)."""
-        await self._processors.group.delete_group.wait_for_complete(
-            DeleteGroupAction(group_id=input.group_id)
+        project_id = ProjectID(input.group_id)
+        await self._processors.group.delete_group.run(
+            DeleteGroupAction(
+                project_id=project_id, updater=GroupSoftDeleteUpdater(project_id=project_id)
+            )
         )
         return DeleteProjectPayload(deleted=True)
 
     async def admin_purge(self, input: PurgeProjectInput) -> PurgeProjectPayload:
         """Permanently purge a project (superadmin only)."""
-        await self._processors.group.purge_group.wait_for_complete(
-            PurgeGroupAction(group_id=input.group_id)
+        await self._processors.group.purge_group.run(
+            PurgeGroupAction(project_id=ProjectID(input.group_id))
         )
         return PurgeProjectPayload(purged=True)
 
@@ -244,8 +247,9 @@ class ProjectAdapter(BaseAdapter):
         self, project_id: UUID, input: UnassignUsersFromProjectInput
     ) -> UnassignUsersFromProjectPayload:
         """Unassign users from a project."""
-        result = await self._processors.group.unassign_users_from_project.wait_for_complete(
+        result = await self._processors.group.unassign_users_from_project.run(
             UnassignUsersFromProjectAction(
+                project_id=ProjectID(project_id),
                 unbinder=UserProjectEntityUnbinder(
                     user_uuids=input.user_ids, project_id=project_id
                 ),
@@ -270,8 +274,8 @@ class ProjectAdapter(BaseAdapter):
         scope = DomainProjectOperationScope(domain_id=domain_id)
         conditions = self._convert_group_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        base_conditions: list[QueryCondition] = [scope.to_condition()]
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            GroupSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_PROJECT_PAGINATION_SPEC,
@@ -281,18 +285,17 @@ class ProjectAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=base_conditions,
         )
 
-        action_result = await self._processors.group.search_projects_by_domain.wait_for_complete(
-            SearchProjectsByDomainAction(scope=scope, querier=querier)
+        result = await self._processors.group.search_projects_by_domain.run(
+            SearchProjectsByDomainAction(domain_id=scope.domain_id, searcher=searcher)
         )
 
         return AdminSearchGroupsPayload(
-            items=[self._group_data_to_node(item) for item in action_result.items],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+            items=[self._group_data_to_node(item) for item in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def search_by_user(
@@ -303,8 +306,8 @@ class ProjectAdapter(BaseAdapter):
         """Search projects a user is a member of."""
         conditions = self._convert_group_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        base_conditions: list[QueryCondition] = [scope.to_condition()]
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            GroupSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_PROJECT_PAGINATION_SPEC,
@@ -314,18 +317,17 @@ class ProjectAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=base_conditions,
         )
 
-        action_result = await self._processors.group.search_projects_by_user.wait_for_complete(
-            SearchProjectsByUserAction(scope=scope, querier=querier)
+        result = await self._processors.group.search_projects_by_user.run(
+            SearchProjectsByUserAction(user_id=UserID(scope.user_uuid), searcher=searcher)
         )
 
         return AdminSearchGroupsPayload(
-            items=[self._group_data_to_node(item) for item in action_result.items],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+            items=[self._group_data_to_node(item) for item in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def assign_users(
@@ -334,9 +336,9 @@ class ProjectAdapter(BaseAdapter):
         input: AssignUsersToProjectInput,
     ) -> AssignUsersToProjectPayload:
         """Assign users to a project."""
-        result = await self._processors.group.assign_users_to_project.wait_for_complete(
+        result = await self._processors.group.assign_users_to_project.run(
             AssignUsersToProjectAction(
-                project_id=project_id, user_ids=input.user_ids, role_id=input.role_id
+                project_id=ProjectID(project_id), user_ids=input.user_ids, role_id=input.role_id
             )
         )
         return AssignUsersToProjectPayload(

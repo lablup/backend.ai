@@ -6,12 +6,12 @@ read or an update of that domain.
 
 from __future__ import annotations
 
-from ai.backend.common.data.entity.domain import DomainName
 import logging
 from http import HTTPStatus
 from typing import Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
+from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.dto.manager.config.request import (
     CreateDomainDotfileRequest,
     DeleteDomainDotfileRequest,

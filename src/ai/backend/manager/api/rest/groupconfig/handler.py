@@ -1,9 +1,7 @@
 """Group config handler class using constructor dependency injection.
 
-All handlers use the new ApiHandler pattern: typed parameters
-(``BodyParam``, ``QueryParam``, ``UserContext``, ``RequestCtx``) are
-automatically extracted by ``_wrap_api_handler`` and responses are
-returned as ``APIResponse`` objects.
+A project's dotfiles are a column of the project row, so every operation here is a
+read or an update of that project.
 """
 
 from __future__ import annotations
@@ -11,8 +9,11 @@ from __future__ import annotations
 import logging
 from http import HTTPStatus
 from typing import Final
+from uuid import UUID
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.config.request import (
     CreateGroupDotfileRequest,
     DeleteGroupDotfileRequest,
@@ -28,18 +29,20 @@ from ai.backend.common.dto.manager.config.response import (
     UpdateDotfileResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.dotfile.types import DotfileScope
+from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
 from ai.backend.manager.dto.context import UserContext
-from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.services.dotfile import (
-    CheckGroupMembershipAction,
-    CreateDotfileAction,
-    DeleteDotfileAction,
-    ListOrGetDotfilesAction,
-    ResolveGroupAction,
-    UpdateDotfileAction,
+from ai.backend.manager.services.group.actions.create_project_dotfile import (
+    CreateProjectDotfileAction,
 )
-from ai.backend.manager.services.dotfile.processors import DotfileProcessors
+from ai.backend.manager.services.group.actions.delete_project_dotfile import (
+    DeleteProjectDotfileAction,
+)
+from ai.backend.manager.services.group.actions.lookup import LookupProjectAction
+from ai.backend.manager.services.group.actions.search_projects import GetProjectAction
+from ai.backend.manager.services.group.actions.update_project_dotfile import (
+    UpdateProjectDotfileAction,
+)
+from ai.backend.manager.services.group.processors import GroupProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -47,8 +50,18 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class GroupConfigHandler:
     """Group config (dotfile) API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, dotfile: DotfileProcessors) -> None:
-        self._dotfile = dotfile
+    def __init__(self, *, group: GroupProcessors) -> None:
+        self._group = group
+
+    async def _resolve(self, group: UUID | str, domain: str | None, ctx: UserContext) -> ProjectID:
+        if isinstance(group, UUID):
+            return ProjectID(group)
+        result = await self._group.lookup.run(
+            LookupProjectAction(
+                domain_name=DomainName(domain or ctx.user_domain), project_name=group
+            )
+        )
+        return result.data.entity_id()
 
     async def create(
         self,
@@ -57,23 +70,13 @@ class GroupConfigHandler:
     ) -> APIResponse:
         params = body.parsed
         log.info("GROUPCONFIG.CREATE(group:{})", params.group)
-        resolve_result = await self._dotfile.resolve_group.wait_for_complete(
-            ResolveGroupAction(
-                group_id_or_name=params.group,
-                group_domain=params.domain,
-                user_domain=ctx.user_domain,
+        project_id = await self._resolve(params.group, params.domain, ctx)
+        await self._group.create_dotfile.run(
+            CreateProjectDotfileAction(
+                project_id=project_id,
+                entry=DotfileEntry(path=params.path, perm=params.permission, data=params.data),
             )
         )
-        if not ctx.is_superadmin and ctx.user_domain != resolve_result.domain:
-            raise GenericForbidden("Admins cannot create group dotfiles of other domains")
-        action = CreateDotfileAction(
-            scope=DotfileScope.GROUP,
-            entity_key=resolve_result.group_id,
-            path=params.path,
-            data=params.data,
-            permission=params.permission,
-        )
-        await self._dotfile.create.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, CreateDotfileResponse())
 
     async def list_or_get(
@@ -83,39 +86,17 @@ class GroupConfigHandler:
     ) -> APIResponse:
         params = query.parsed
         log.info("GROUPCONFIG.LIST_OR_GET(group:{})", params.group)
-        resolve_result = await self._dotfile.resolve_group.wait_for_complete(
-            ResolveGroupAction(
-                group_id_or_name=params.group,
-                group_domain=params.domain,
-                user_domain=ctx.user_domain,
-            )
-        )
-        if not ctx.is_superadmin:
-            if ctx.is_admin:
-                if ctx.user_domain != resolve_result.domain:
-                    raise GenericForbidden(
-                        "Domain admins cannot access group dotfiles of other domains"
-                    )
-            else:
-                membership = await self._dotfile.check_group_membership.wait_for_complete(
-                    CheckGroupMembershipAction(user_uuid=ctx.user_uuid)
-                )
-                if resolve_result.group_id not in membership.group_ids:
-                    raise GenericForbidden("Users cannot access group dotfiles of other groups")
-        action = ListOrGetDotfilesAction(
-            scope=DotfileScope.GROUP,
-            entity_key=resolve_result.group_id,
-            path=params.path,
-        )
-        result = await self._dotfile.list_or_get.wait_for_complete(action)
+        project_id = await self._resolve(params.group, params.domain, ctx)
+        project = await self._group.get_project.run(GetProjectAction(project_id=project_id))
+        entries = DotfileEntries.unpack(project.data.dotfiles)
         if params.path:
-            entry = result.entries[0]
+            entry = entries.get(params.path)
             return APIResponse.build(
                 HTTPStatus.OK,
                 GetDotfileResponse(path=entry.path, perm=entry.perm, data=entry.data),
             )
         items = [
-            DotfileListItem(path=e.path, permission=e.perm, data=e.data) for e in result.entries
+            DotfileListItem(path=e.path, permission=e.perm, data=e.data) for e in entries.entries
         ]
         return APIResponse.build(HTTPStatus.OK, ListDotfilesResponse(root=items))
 
@@ -126,23 +107,13 @@ class GroupConfigHandler:
     ) -> APIResponse:
         params = body.parsed
         log.info("GROUPCONFIG.UPDATE(group:{})", params.group)
-        resolve_result = await self._dotfile.resolve_group.wait_for_complete(
-            ResolveGroupAction(
-                group_id_or_name=params.group,
-                group_domain=params.domain,
-                user_domain=ctx.user_domain,
+        project_id = await self._resolve(params.group, params.domain, ctx)
+        await self._group.update_dotfile.run(
+            UpdateProjectDotfileAction(
+                project_id=project_id,
+                entry=DotfileEntry(path=params.path, perm=params.permission, data=params.data),
             )
         )
-        if not ctx.is_superadmin and ctx.user_domain != resolve_result.domain:
-            raise GenericForbidden("Admins cannot update group dotfiles of other domains")
-        action = UpdateDotfileAction(
-            scope=DotfileScope.GROUP,
-            entity_key=resolve_result.group_id,
-            path=params.path,
-            data=params.data,
-            permission=params.permission,
-        )
-        await self._dotfile.update.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, UpdateDotfileResponse())
 
     async def delete(
@@ -152,19 +123,8 @@ class GroupConfigHandler:
     ) -> APIResponse:
         params = query.parsed
         log.info("GROUPCONFIG.DELETE(group:{})", params.group)
-        resolve_result = await self._dotfile.resolve_group.wait_for_complete(
-            ResolveGroupAction(
-                group_id_or_name=params.group,
-                group_domain=params.domain,
-                user_domain=ctx.user_domain,
-            )
+        project_id = await self._resolve(params.group, params.domain, ctx)
+        await self._group.delete_dotfile.run(
+            DeleteProjectDotfileAction(project_id=project_id, path=params.path)
         )
-        if not ctx.is_superadmin and ctx.user_domain != resolve_result.domain:
-            raise GenericForbidden("Admins cannot delete dotfiles of other domains")
-        action = DeleteDotfileAction(
-            scope=DotfileScope.GROUP,
-            entity_key=resolve_result.group_id,
-            path=params.path,
-        )
-        await self._dotfile.delete.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, DeleteDotfileResponse(success=True))

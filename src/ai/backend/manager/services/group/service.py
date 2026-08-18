@@ -8,12 +8,16 @@ from uuid import UUID
 from dateutil.relativedelta import relativedelta
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.dotfile.types import DotfileEntries
+from ai.backend.manager.models.domain.row import verify_dotfile_name
+from ai.backend.manager.models.group.updaters import GroupDotfilesUpdater
 from ai.backend.manager.models.resource_usage import (
     ProjectResourceUsage,
     parse_resource_usage_groups,
@@ -25,26 +29,17 @@ from ai.backend.manager.services.group.actions.assign_users_to_project import (
     AssignUsersToProjectAction,
     AssignUsersToProjectActionResult,
 )
-from ai.backend.manager.services.group.actions.create_group import (
-    CreateGroupAction,
-    CreateGroupActionResult,
+from ai.backend.manager.services.group.actions.create_project_dotfile import (
+    CreateProjectDotfileAction,
+    CreateProjectDotfileActionResult,
 )
-from ai.backend.manager.services.group.actions.delete_group import (
-    DeleteGroupAction,
-    DeleteGroupActionResult,
+from ai.backend.manager.services.group.actions.delete_project_dotfile import (
+    DeleteProjectDotfileAction,
+    DeleteProjectDotfileActionResult,
 )
 from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
     PurgeGroupActionResult,
-)
-from ai.backend.manager.services.group.actions.search_projects import (
-    GetProjectAction,
-    GetProjectActionResult,
-    ScopedSearchProjectsActionResult,
-    SearchProjectsAction,
-    SearchProjectsActionResult,
-    SearchProjectsByDomainAction,
-    SearchProjectsByUserAction,
 )
 from ai.backend.manager.services.group.actions.unassign_users import (
     UnassignUsersFromProjectAction,
@@ -53,6 +48,10 @@ from ai.backend.manager.services.group.actions.unassign_users import (
 from ai.backend.manager.services.group.actions.update_group import (
     UpdateGroupAction,
     UpdateGroupActionResult,
+)
+from ai.backend.manager.services.group.actions.update_project_dotfile import (
+    UpdateProjectDotfileAction,
+    UpdateProjectDotfileActionResult,
 )
 from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
@@ -84,10 +83,6 @@ class GroupService:
         self._valkey_stat_client = valkey_stat_client
         self._group_repository = group_repositories.repository
 
-    async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
-        group_data = await self._group_repository.create(action.creator)
-        return CreateGroupActionResult(data=group_data, _domain_name=action._domain_name)
-
     async def update_group(self, action: UpdateGroupAction) -> UpdateGroupActionResult:
         # Convert user_uuids from list[str] to list[UUID] if provided
         user_uuids_converted = None
@@ -96,6 +91,7 @@ class GroupService:
             user_uuids_converted = [UUID(user_uuid) for user_uuid in user_uuids_list]
 
         group_data = await self._group_repository.modify_validated(
+            action.project_id,
             action.updater,
             action.user_update_mode.optional_value(),
             user_uuids_converted,
@@ -103,20 +99,16 @@ class GroupService:
         # If no group data is returned, it means only user updates were performed or no updates at all
         return UpdateGroupActionResult(data=group_data)
 
-    async def delete_group(self, action: DeleteGroupAction) -> DeleteGroupActionResult:
-        await self._group_repository.mark_inactive(action.group_id)
-        return DeleteGroupActionResult(group_id=action.group_id)
-
     async def purge_group(self, action: PurgeGroupAction) -> PurgeGroupActionResult:
-        await self._group_repository.purge_group(action.group_id)
-        return PurgeGroupActionResult(group_id=action.group_id)
+        await self._group_repository.purge_group(action.project_id)
+        return PurgeGroupActionResult(project_id=action.project_id)
 
     async def unassign_users_from_project(
         self, action: UnassignUsersFromProjectAction
     ) -> UnassignUsersFromProjectActionResult:
         result = await self._group_repository.unassign_users_from_project(action.unbinder)
         return UnassignUsersFromProjectActionResult(
-            project_id=action.unbinder.project_id,
+            project_id=action.project_id,
             unassigned_users=result.unassigned_users,
             failures=result.failures,
         )
@@ -179,71 +171,6 @@ class GroupService:
         log.debug("container list are retrieved from {0} to {1}", start_date, end_date)
         return UsagePerPeriodActionResult(result=result)
 
-    async def search_projects(self, action: SearchProjectsAction) -> SearchProjectsActionResult:
-        """Search all projects (admin only - no scope filter).
-
-        Args:
-            action: SearchProjectsAction with querier.
-
-        Returns:
-            SearchProjectsActionResult with items and pagination info.
-        """
-        result = await self._group_repository.search_projects(querier=action.querier)
-        return SearchProjectsActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def search_projects_by_domain(
-        self, action: SearchProjectsByDomainAction
-    ) -> ScopedSearchProjectsActionResult:
-        """Search projects within a domain.
-
-        Scope validation (domain existence) is done in repository layer.
-
-        Args:
-            action: SearchProjectsByDomainAction with scope and querier.
-
-        Returns:
-            ScopedSearchProjectsActionResult with domain-scoped items.
-        """
-        result = await self._group_repository.search_projects_by_domain(
-            action.scope, action.querier
-        )
-        return ScopedSearchProjectsActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-            _scope_type=action.scope_type(),
-            _scope_id=action.scope_id(),
-        )
-
-    async def search_projects_by_user(
-        self, action: SearchProjectsByUserAction
-    ) -> ScopedSearchProjectsActionResult:
-        """Search projects a user is member of.
-
-        Filters by association_scopes_entities (PROJECT scope, USER entity).
-
-        Args:
-            action: SearchProjectsByUserAction with scope and querier.
-
-        Returns:
-            ScopedSearchProjectsActionResult with user's projects.
-        """
-        result = await self._group_repository.search_projects_by_user(action.scope, action.querier)
-        return ScopedSearchProjectsActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-            _scope_type=action.scope_type(),
-            _scope_id=action.scope_id(),
-        )
-
     async def assign_users_to_project(
         self, action: AssignUsersToProjectAction
     ) -> AssignUsersToProjectActionResult:
@@ -254,17 +181,34 @@ class GroupService:
             project_id=action.project_id, assigned_users=assigned_users
         )
 
-    async def get_project(self, action: GetProjectAction) -> GetProjectActionResult:
-        """Get a single project by UUID.
+    async def create_dotfile(
+        self, action: CreateProjectDotfileAction
+    ) -> CreateProjectDotfileActionResult:
+        if not verify_dotfile_name(action.entry.path):
+            raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
+        entries = (await self._read_dotfiles(action.project_id)).added(action.entry)
+        await self._write_dotfiles(action.project_id, entries)
+        return CreateProjectDotfileActionResult(entries=entries.entries)
 
-        Args:
-            action: GetProjectAction with project_id.
+    async def update_dotfile(
+        self, action: UpdateProjectDotfileAction
+    ) -> UpdateProjectDotfileActionResult:
+        entries = (await self._read_dotfiles(action.project_id)).replaced(action.entry)
+        await self._write_dotfiles(action.project_id, entries)
+        return UpdateProjectDotfileActionResult(entries=entries.entries)
 
-        Returns:
-            GetProjectActionResult with project data.
+    async def delete_dotfile(
+        self, action: DeleteProjectDotfileAction
+    ) -> DeleteProjectDotfileActionResult:
+        entries = (await self._read_dotfiles(action.project_id)).removed(action.path)
+        await self._write_dotfiles(action.project_id, entries)
+        return DeleteProjectDotfileActionResult(entries=entries.entries)
 
-        Raises:
-            ProjectNotFound: If project does not exist.
-        """
-        data = await self._group_repository.get_project(action.project_id)
-        return GetProjectActionResult(data=data)
+    async def _read_dotfiles(self, project_id: ProjectID) -> DotfileEntries:
+        data = await self._group_repository.get_project(project_id)
+        return DotfileEntries.unpack(data.dotfiles)
+
+    async def _write_dotfiles(self, project_id: ProjectID, entries: DotfileEntries) -> None:
+        await self._group_repository.update_dotfiles(
+            GroupDotfilesUpdater(project_id=project_id, dotfiles=entries.pack())
+        )

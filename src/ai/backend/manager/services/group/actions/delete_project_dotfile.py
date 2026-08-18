@@ -5,13 +5,19 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
+from ai.backend.manager.data.dotfile.types import DotfileEntry
 
 
 @dataclass(frozen=True)
-class PurgeGroupAction(BaseSingleEntityAction):
-    """Remove one project for good, with the vfolders and sessions it held."""
+class DeleteProjectDotfileAction(BaseSingleEntityAction):
+    """Drop one of a project's dotfiles.
+
+    A dotfile is a column of the project row, so the operation is an update of the
+    project and is answered for by it.
+    """
 
     project_id: ProjectID
+    path: str
 
     @override
     def entity_id(self) -> EntityIdentifier:
@@ -20,14 +26,14 @@ class PurgeGroupAction(BaseSingleEntityAction):
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.PURGE
+        return ActionOperationType.UPDATE
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "purge_project"
+        return "delete_project_dotfile"
 
 
 @dataclass(frozen=True)
-class PurgeGroupActionResult:
-    project_id: ProjectID
+class DeleteProjectDotfileActionResult:
+    entries: tuple[DotfileEntry, ...]

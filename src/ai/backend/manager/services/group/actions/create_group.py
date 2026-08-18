@@ -1,52 +1,37 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType, ScopeRef
+from ai.backend.manager.actions.v2.ops.base import CreateRoleManagedEntityOpsAction
 from ai.backend.manager.data.group.types import GroupData
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.group.actions.base import (
-    GroupScopeAction,
-    GroupScopeActionResult,
-)
+from ai.backend.manager.models.group.creators import GroupCreator
+from ai.backend.manager.models.group.row import GroupRow
 
 
-@dataclass
-class CreateGroupAction(GroupScopeAction):
-    creator: Creator[GroupRow]
-    _domain_name: str
-    _domain_id: DomainID
+@dataclass(frozen=True)
+class CreateGroupAction(CreateRoleManagedEntityOpsAction[GroupRow, GroupData]):
+    """Register a project under a domain."""
+
+    domain_id: DomainID
+    creator: GroupCreator
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
+    def entity_type(cls) -> EntityType:
+        return PROJECT_ENTITY_TYPE
 
     @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.DOMAIN
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=self.domain_id),)
 
     @override
-    def scope_id(self) -> str:
-        return self._domain_name
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_project"
 
     @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.DOMAIN, str(self._domain_id))
-
-
-@dataclass
-class CreateGroupActionResult(GroupScopeActionResult):
-    data: GroupData | None
-    _domain_name: str
-
-    @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.DOMAIN
-
-    @override
-    def scope_id(self) -> str:
-        return self._domain_name
+    def to_creator(self) -> GroupCreator:
+        return self.creator

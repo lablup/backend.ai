@@ -177,7 +177,7 @@ class ResourceHandler:
             ",".join(str(gid) for gid in params.group_ids) if params.group_ids else "",
             params.month,
         )
-        result = await self._group.usage_per_month.wait_for_complete(
+        result = await self._group.usage_per_month.run(
             UsagePerMonthAction(
                 group_ids=params.group_ids,
                 month=params.month,
@@ -195,7 +195,7 @@ class ResourceHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        result = await self._group.usage_per_period.wait_for_complete(
+        result = await self._group.usage_per_period.run(
             UsagePerPeriodAction(
                 project_id=params.project_id,
                 start_date=params.start_date,

@@ -20,20 +20,13 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import GroupData, UnassignUsersResult
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.errors.resource import InvalidUserUpdateMode
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.errors.resource import InvalidUserUpdateMode, ProjectNotFound
+from ai.backend.manager.models.group.updaters import GroupDotfilesUpdater, GroupUpdater
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
-from ai.backend.manager.repositories.group.types import (
-    DomainProjectOperationScope,
-    GroupSearchResult,
-    UserProjectOperationScope,
-)
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -62,37 +55,43 @@ class GroupRepository:
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
         config_provider: ManagerConfigProvider,
         valkey_stat_client: ValkeyStatClient,
         storage_manager: StorageSessionManager,
     ) -> None:
         self._db_source = GroupDBSource(db)
+        self._v2_ops = v2_ops_provider
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
         self._storage_manager = storage_manager
 
     @group_repository_resilience.apply()
-    async def create(self, creator: Creator[GroupRow]) -> GroupData:
-        """Create a new group."""
-        return await self._db_source.create(creator)
-
-    @group_repository_resilience.apply()
     async def modify_validated(
         self,
-        updater: Updater[GroupRow],
+        project_id: ProjectID,
+        updater: GroupUpdater,
         user_update_mode: str | None = None,
         user_uuids: list[uuid.UUID] | None = None,
     ) -> GroupData | None:
-        """Modify a group with validation."""
+        """Modify a project, optionally rewriting its membership first."""
         if user_update_mode not in (None, "add", "remove"):
             raise InvalidUserUpdateMode("invalid user_update_mode")
-        user_ids = [UserID(uid) for uid in user_uuids] if user_uuids is not None else None
-        return await self._db_source.modify_validated(updater, user_update_mode, user_ids)
+        if user_uuids and user_update_mode:
+            await self._db_source.update_members(
+                project_id, user_update_mode, [UserID(uid) for uid in user_uuids]
+            )
+        async with self._v2_ops.write_ops() as w:
+            return await w.update_data(updater)
 
     @group_repository_resilience.apply()
-    async def mark_inactive(self, group_id: uuid.UUID) -> None:
-        """Mark a group as inactive (soft delete)."""
-        await self._db_source.mark_inactive(group_id)
+    async def update_dotfiles(self, updater: GroupDotfilesUpdater) -> GroupData:
+        """Replace a project's packed dotfile entries."""
+        async with self._v2_ops.write_ops() as w:
+            data = await w.update_data(updater)
+            if data is None:
+                raise ProjectNotFound(f"Project not found: {updater.pk_value()}")
+            return data
 
     @group_repository_resilience.apply()
     async def get_container_stats_for_period(
@@ -187,52 +186,3 @@ class GroupRepository:
             The project UUID if found, or ``None`` if no matching active project exists.
         """
         return await self._db_source.project_id_by_name_in_domain(domain_name, project_name)
-
-    @group_repository_resilience.apply()
-    async def search_projects(
-        self,
-        querier: BatchQuerier,
-    ) -> GroupSearchResult:
-        """Search all projects (admin only).
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            GroupSearchResult with items, total_count, and pagination flags.
-        """
-        return await self._db_source.search_projects(querier)
-
-    @group_repository_resilience.apply()
-    async def search_projects_by_domain(
-        self,
-        scope: DomainProjectOperationScope,
-        querier: BatchQuerier,
-    ) -> GroupSearchResult:
-        """Search projects within a domain.
-
-        Args:
-            scope: DomainProjectOperationScope defining the domain to search within.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            GroupSearchResult with items, total_count, and pagination flags.
-        """
-        return await self._db_source.search_projects_by_domain(scope, querier)
-
-    @group_repository_resilience.apply()
-    async def search_projects_by_user(
-        self,
-        scope: UserProjectOperationScope,
-        querier: BatchQuerier,
-    ) -> GroupSearchResult:
-        """Search projects a user is member of.
-
-        Args:
-            scope: UserProjectOperationScope defining the user to search for.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            GroupSearchResult with items, total_count, and pagination flags.
-        """
-        return await self._db_source.search_projects_by_user(scope, querier)

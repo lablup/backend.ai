@@ -1,24 +1,25 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.services.group.actions.base import (
-    GroupSingleEntityAction,
-    GroupSingleEntityActionResult,
-)
 
 
-@dataclass
-class AssignUsersToProjectAction(GroupSingleEntityAction):
-    project_id: UUID
+@dataclass(frozen=True)
+class AssignUsersToProjectAction(BaseSingleEntityAction):
+    """Enroll users in a project. Membership is a change to the project."""
+
+    project_id: ProjectID
     user_ids: list[UUID]
     role_id: UUID
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.project_id
 
     @override
     @classmethod
@@ -26,19 +27,12 @@ class AssignUsersToProjectAction(GroupSingleEntityAction):
         return ActionOperationType.UPDATE
 
     @override
-    def target_entity_id(self) -> str:
-        return str(self.project_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.PROJECT, str(self.project_id))
+    @classmethod
+    def action_name(cls) -> str:
+        return "assign_users_to_project"
 
 
-@dataclass
-class AssignUsersToProjectActionResult(GroupSingleEntityActionResult):
-    project_id: UUID
+@dataclass(frozen=True)
+class AssignUsersToProjectActionResult:
+    project_id: ProjectID
     assigned_users: list[UserData]
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.project_id)

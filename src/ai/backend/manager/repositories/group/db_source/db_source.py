@@ -3,11 +3,10 @@ from __future__ import annotations
 import copy
 import logging
 import uuid
-from collections.abc import Collection, Sequence
-from dataclasses import dataclass
+from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, cast, override
+from typing import Any, cast
 from uuid import UUID
 
 import aiotools
@@ -17,11 +16,10 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import joinedload
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityRef, ScopeRef
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.common.types import SlotName, VFolderID
 from ai.backend.common.utils import nmget
@@ -30,12 +28,8 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import (
     GroupData,
-    ProjectMemberRoleSpec,
     UnassignUserFailure,
     UnassignUsersResult,
-)
-from ai.backend.manager.data.permission.types import (
-    RBACElementRef,
 )
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
@@ -69,22 +63,15 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
 )
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
-from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import BatchPurger
 from ai.backend.manager.repositories.base.querier import (
     BatchQuerier,
     Querier,
     execute_batch_querier,
 )
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-)
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityPurger,
-)
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.group.creators import (
-    GroupCreatorSpec,
 )
 from ai.backend.manager.repositories.group.purgers import (
     GroupEndpointBatchPurgerSpec,
@@ -103,47 +90,13 @@ from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
     RBACOpsProvider,
     RBACWriteOps,
-    ScopeCreation,
     ScopeDeletion,
-    ScopeEntityMember,
     ScopeUserMember,
 )
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.repositories.permission_controller.role_manager import (
-    ScopeSystemRoleData,
-)
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-@dataclass
-class ProjectScopeCreation(ScopeCreation[GroupRow]):
-    """Creates a project row under its domain, and the scope the project becomes."""
-
-    spec: GroupCreatorSpec
-    domain_id: DomainID
-
-    @override
-    def creator(self) -> RBACEntityCreator[GroupRow]:
-        return RBACEntityCreator(
-            spec=self.spec,
-            element_type=RBACElementType.PROJECT,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.DOMAIN, element_id=str(self.domain_id)
-            ),
-        )
-
-    @override
-    def scope_of(self, row: GroupRow) -> ScopeRef:
-        return ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(row.id))
-
-    @override
-    def system_roles_of(self, row: GroupRow) -> Collection[ScopeSystemRoleData]:
-        """A project starts with an admin role (via GroupData) and a member role
-        (read-only access for project members)."""
-        data = row.to_data()
-        return (data, ProjectMemberRoleSpec(project_id=data.id))
 
 
 class GroupDBSource:
@@ -154,35 +107,6 @@ class GroupDBSource:
         self._db = db
         self._rbac_ops_provider = RBACOpsProvider(db)
 
-    async def create(self, creator: Creator[GroupRow]) -> GroupData:
-        """Create a new group.
-
-        Domain/resource-policy existence and name-uniqueness are enforced by the group
-        row's DB constraints, mapped to domain errors via the spec's
-        integrity_error_checks. The new project joins its domain scope as an inheriting
-        member, so domain-scoped permissions reach the project's entities.
-        """
-        spec = cast(GroupCreatorSpec, creator.spec)
-        async with self._rbac_ops_provider.write_ops() as w:
-            domain_id = await self._get_domain_id(w, spec.domain_name)
-            creation = ProjectScopeCreation(spec=spec, domain_id=domain_id)
-            domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_id)
-            data = (await w.create_scope(creation)).row.to_data()
-            await w.ensure_scope(domain_scope)
-            await w.add_bulk_inheriting_members(
-                EntityMembersAddition(
-                    scope=domain_scope,
-                    members=[
-                        ScopeEntityMember(
-                            ref=EntityRef(
-                                entity_type=PROJECT_ENTITY_TYPE, entity_id=ProjectID(data.id)
-                            )
-                        )
-                    ],
-                )
-            )
-            return data
-
     async def _get_domain_id(self, w: RBACWriteOps, domain_name: str) -> DomainID:
         result = await w.batch_query_in_global(
             sa.select(DomainRow.id).where(DomainRow.name == domain_name),
@@ -192,40 +116,28 @@ class GroupDBSource:
             raise DomainNotFound(f"Domain '{domain_name}' not found")
         return DomainID(result.rows[0].id)
 
-    async def modify_validated(
+    async def update_members(
         self,
-        updater: Updater[GroupRow],
-        user_update_mode: str | None = None,
-        user_ids: list[UserID] | None = None,
-    ) -> GroupData | None:
-        """Modify a group with validation."""
-        group_id = cast(UUID, updater.pk_value)
-        project_id = ProjectID(group_id)
+        project_id: ProjectID,
+        user_update_mode: str,
+        user_ids: list[UserID],
+    ) -> None:
+        """Add or remove project members.
 
+        Membership is an association row, which the v2 ops layer has no primitive for,
+        so this stays on the legacy write ops.
+        """
         async with self._rbac_ops_provider.write_ops() as w:
-            existing_group = await w.query(Querier(row_class=GroupRow, pk_value=group_id))
+            existing_group = await w.query(Querier(row_class=GroupRow, pk_value=project_id))
             if existing_group is None:
-                raise ProjectNotFound(f"Group not found: {group_id}")
-
-            if user_ids and user_update_mode:
-                if user_update_mode == "add":
-                    await self._add_users_to_project(w, project_id, user_ids)
-                elif user_update_mode == "remove":
-                    await w.remove_bulk_members(
-                        ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                        [
-                            EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=uid)
-                            for uid in user_ids
-                        ],
-                    )
-
-            # Update group data (returns None if no values to update)
-            result = await w.update(updater)
-            if result is not None:
-                return result.row.to_data()
-
-            # No group updates or only user updates were performed
-            return None
+                raise ProjectNotFound(f"Group not found: {project_id}")
+            if user_update_mode == "add":
+                await self._add_users_to_project(w, project_id, user_ids)
+            elif user_update_mode == "remove":
+                await w.remove_bulk_members(
+                    ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
+                    [EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=uid) for uid in user_ids],
+                )
 
     async def _users_addable_to_project(
         self,

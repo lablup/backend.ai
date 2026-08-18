@@ -1,159 +1,127 @@
-"""Actions for searching projects."""
+"""Actions for reading projects."""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.manager.actions.v2.ops.base import (
+    GetSingleEntityOpsAction,
+    OperationScopeOpsAction,
+    SearchGlobalOpsAction,
+)
 from ai.backend.manager.data.group.types import GroupData
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.models.group.queriers import GroupQuerier
+from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.group.searchers import GroupSearcher
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.group.types import (
     DomainProjectOperationScope,
     UserProjectOperationScope,
 )
-from ai.backend.manager.services.group.actions.base import (
-    GroupAction,
-    ProjectScopeAction,
-    ProjectScopeActionResult,
-    ProjectSingleEntityAction,
-    ProjectSingleEntityActionResult,
-)
 
 
-@dataclass
-class SearchProjectsAction(GroupAction):
-    """Search all projects (admin scope - no scope filter)."""
+@dataclass(frozen=True)
+class GlobalSearchProjectsAction(SearchGlobalOpsAction[GroupRow, GroupData]):
+    """Page through every project in the installation."""
 
-    querier: BatchQuerier
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    searcher: GroupSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchProjectsByDomainAction(ProjectScopeAction):
-    """Search projects within a domain."""
-
-    scope: DomainProjectOperationScope
-    querier: BatchQuerier
+    def entity_type(cls) -> EntityType:
+        return PROJECT_ENTITY_TYPE
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def action_name(cls) -> str:
+        return "global_search_projects"
 
     @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.DOMAIN
-
-    @override
-    def scope_id(self) -> str:
-        return str(self.scope.domain_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.DOMAIN, str(self.scope.domain_id))
+    def to_searcher(self) -> GroupSearcher:
+        return self.searcher
 
 
-@dataclass
-class SearchProjectsByUserAction(ProjectScopeAction):
-    """Search projects a user is member of."""
+@dataclass(frozen=True)
+class SearchProjectsByDomainAction(OperationScopeOpsAction[GroupRow, GroupData]):
+    """Page through the projects of a domain."""
 
-    scope: UserProjectOperationScope
-    querier: BatchQuerier
+    domain_id: DomainID
+    searcher: GroupSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def entity_type(cls) -> EntityType:
+        return PROJECT_ENTITY_TYPE
 
     @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.USER
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=self.domain_id),)
 
     @override
-    def scope_id(self) -> str:
-        return str(self.scope.user_uuid)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.USER, str(self.scope.user_uuid))
-
-
-@dataclass
-class GetProjectAction(ProjectSingleEntityAction):
-    """Get a single project by UUID."""
-
-    project_id: UUID
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return (DomainProjectOperationScope(domain_id=self.domain_id),)
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
+    def action_name(cls) -> str:
+        return "search_projects_by_domain"
 
     @override
-    def target_entity_id(self) -> str:
-        return str(self.project_id)
+    def to_searcher(self) -> GroupSearcher:
+        return self.searcher
+
+
+@dataclass(frozen=True)
+class SearchProjectsByUserAction(OperationScopeOpsAction[GroupRow, GroupData]):
+    """Page through the projects a user belongs to."""
+
+    user_id: UserID
+    searcher: GroupSearcher
 
     @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.PROJECT, str(self.project_id))
-
-
-# Result types
-
-
-@dataclass
-class SearchProjectsActionResult(BaseActionResult):
-    """Result from searching projects (admin scope)."""
-
-    items: list[GroupData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return PROJECT_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-@dataclass
-class ScopedSearchProjectsActionResult(ProjectScopeActionResult):
-    """Result from searching projects within a scope."""
-
-    items: list[GroupData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-    _scope_type: ScopeType
-    _scope_id: str
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id),)
 
     @override
-    def scope_type(self) -> ScopeType:
-        return self._scope_type
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return (UserProjectOperationScope(user_uuid=self.user_id),)
 
     @override
-    def scope_id(self) -> str:
-        return self._scope_id
-
-
-@dataclass
-class GetProjectActionResult(ProjectSingleEntityActionResult):
-    """Result from getting a single project."""
-
-    data: GroupData
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_projects_by_user"
 
     @override
-    def target_entity_id(self) -> str:
-        return str(self.data.id)
+    def to_searcher(self) -> GroupSearcher:
+        return self.searcher
+
+
+@dataclass(frozen=True)
+class GetProjectAction(GetSingleEntityOpsAction[GroupRow, GroupData]):
+    """Read one project by its id."""
+
+    project_id: ProjectID
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.project_id
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_project"
+
+    @override
+    def to_querier(self) -> GroupQuerier:
+        return GroupQuerier(project_id=self.project_id)

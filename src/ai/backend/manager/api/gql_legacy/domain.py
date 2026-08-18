@@ -562,7 +562,9 @@ class ModifyDomainNode(graphene.Mutation):  # type: ignore[misc]
             role=graph_ctx.user["role"],
             domain_name=graph_ctx.user["domain_name"],
         )
-        target = await graph_ctx.processors.domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        target = await graph_ctx.processors.domain.lookup.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
         sgroup_ids_to_add: set[ResourceGroupID] | None = None
         if input.sgroups_to_add is not Undefined and input.sgroups_to_add is not None:
             sgroup_ids_to_add = set(await _resolve_sgroup_ids(graph_ctx, input.sgroups_to_add))

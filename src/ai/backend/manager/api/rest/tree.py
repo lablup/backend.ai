@@ -187,7 +187,7 @@ def build_api_routes(
         scaling_group=processors.scaling_group,
     )
     group_handler = GroupHandler(container_registry=processors.container_registry)
-    groupconfig_handler = GroupConfigHandler(dotfile=processors.dotfile)
+    groupconfig_handler = GroupConfigHandler(group=processors.group)
     manager_handler = ManagerHandler(manager_admin=processors.manager_admin)
     notification_handler = NotificationHandler(notification=processors.notification)
     object_storage_handler = ObjectStorageHandler(

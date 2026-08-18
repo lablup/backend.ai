@@ -8,12 +8,12 @@ extracted by ``_wrap_api_handler`` and responses are returned as
 
 from __future__ import annotations
 
-from ai.backend.common.data.entity.domain import DomainName
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.domain import (
     CreateDomainRequest,
@@ -172,7 +172,9 @@ class DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         log.info("DELETE_DOMAIN (ak:{}, d:{})", ctx.access_key, body.parsed.name)
-        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(body.parsed.name)))
+        target = await self._domain.lookup.run(
+            LookupDomainAction(name=DomainName(body.parsed.name))
+        )
         await self._domain.delete_domain.run(
             DeleteDomainAction(
                 domain_id=target.data.id,
@@ -193,7 +195,9 @@ class DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         log.info("PURGE_DOMAIN (ak:{}, d:{})", ctx.access_key, body.parsed.name)
-        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(body.parsed.name)))
+        target = await self._domain.lookup.run(
+            LookupDomainAction(name=DomainName(body.parsed.name))
+        )
         await self._domain.purge_domain.run(
             PurgeDomainAction(domain_id=target.data.id, name=body.parsed.name)
         )

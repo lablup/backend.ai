@@ -18,7 +18,7 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.exception import (
     GroupNotFound,
     InvalidAPIParameters,
@@ -32,6 +32,8 @@ from ai.backend.manager.models.group import (
     get_permission_ctx,
     groups,
 )
+from ai.backend.manager.models.group.creators import GroupCreator
+from ai.backend.manager.models.group.updaters import GroupSoftDeleteUpdater, GroupUpdater
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
@@ -42,10 +44,6 @@ from ai.backend.manager.models.virtual_scope.queries import (
     user_scope_membership_exists,
     user_scope_membership_query,
 )
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
-from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
 from ai.backend.manager.services.group.actions.delete_group import (
@@ -577,22 +575,20 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
         container_registry_val = value_or_none(self.container_registry)
 
         return CreateGroupAction(
-            creator=Creator(
-                spec=GroupCreatorSpec(
-                    name=name,
-                    domain_name=self.domain_name,
-                    type=type_val,
-                    description=description_val,
-                    is_active=is_active_val,
-                    total_resource_slots=total_resource_slots_val,
-                    allowed_vfolder_hosts=allowed_vfolder_hosts_val,
-                    integration_name=integration_id_val,
-                    resource_policy=resource_policy_val,
-                    container_registry=container_registry_val,
-                )
+            domain_id=domain_id,
+            creator=GroupCreator(
+                name=name,
+                domain_id=domain_id,
+                domain_name=self.domain_name,
+                type=type_val,
+                description=description_val,
+                is_active=is_active_val,
+                total_resource_slots=total_resource_slots_val,
+                allowed_vfolder_hosts=allowed_vfolder_hosts_val,
+                integration_name=integration_id_val,
+                resource_policy=resource_policy_val,
+                container_registry=container_registry_val,
             ),
-            _domain_name=self.domain_name,
-            _domain_id=domain_id,
         )
 
 
@@ -612,7 +608,8 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     )
 
     def to_action(self, group_id: uuid.UUID) -> UpdateGroupAction:
-        spec = GroupUpdaterSpec(
+        updater = GroupUpdater(
+            project_id=ProjectID(group_id),
             name=OptionalState[str].from_graphql(
                 self.name,
             ),
@@ -644,7 +641,8 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             ),
         )
         return UpdateGroupAction(
-            updater=Updater[GroupRow](spec=spec, pk_value=group_id),
+            project_id=ProjectID(group_id),
+            updater=updater,
             user_update_mode=OptionalState[str].from_graphql(
                 self.user_update_mode,
             ),
@@ -684,10 +682,12 @@ class CreateGroup(graphene.Mutation):  # type: ignore[misc]
             )
 
         domain_data = (
-            await graph_ctx.processors.domain.lookup.run(LookupDomainAction(name=DomainName(props.domain_name)))
+            await graph_ctx.processors.domain.lookup.run(
+                LookupDomainAction(name=DomainName(props.domain_name))
+            )
         ).data
         action = props.to_action(name, domain_data.id)
-        res = await graph_ctx.processors.group.create_group.wait_for_complete(action)
+        res = await graph_ctx.processors.group.create_group.run(action)
         return cls(
             ok=True,
             msg="success",
@@ -721,7 +721,7 @@ class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
         graph_ctx: GraphQueryContext = info.context
 
         action = props.to_action(gid)
-        res = await graph_ctx.processors.group.update_group.wait_for_complete(action)
+        res = await graph_ctx.processors.group.update_group.run(action)
         return cls(
             ok=True,
             msg="success",
@@ -749,7 +749,12 @@ class DeleteGroup(graphene.Mutation):  # type: ignore[misc]
     )
     async def mutate(cls, root: Any, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteGroup:
         ctx: GraphQueryContext = info.context
-        await ctx.processors.group.delete_group.wait_for_complete(DeleteGroupAction(gid))
+        project_id = ProjectID(gid)
+        await ctx.processors.group.delete_group.run(
+            DeleteGroupAction(
+                project_id=project_id, updater=GroupSoftDeleteUpdater(project_id=project_id)
+            )
+        )
         return cls(ok=True, msg="success")
 
 
@@ -778,5 +783,7 @@ class PurgeGroup(graphene.Mutation):  # type: ignore[misc]
     async def mutate(cls, root: Any, info: graphene.ResolveInfo, gid: uuid.UUID) -> PurgeGroup:
         graph_ctx: GraphQueryContext = info.context
 
-        await graph_ctx.processors.group.purge_group.wait_for_complete(PurgeGroupAction(gid))
+        await graph_ctx.processors.group.purge_group.run(
+            PurgeGroupAction(project_id=ProjectID(gid))
+        )
         return cls(ok=True, msg="success")

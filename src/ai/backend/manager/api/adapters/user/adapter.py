@@ -201,7 +201,9 @@ class UserAdapter(BaseAdapter):
         self._auth_config = auth_config
 
     async def _resolve_domain_id(self, domain_name: str) -> DomainID:
-        result = await self._processors.domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        result = await self._processors.domain.lookup.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
         return result.data.id
 
     # ------------------------------------------------------------------ batch load (DataLoader)

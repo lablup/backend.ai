@@ -8,12 +8,12 @@ extracted by ``_wrap_api_handler`` and responses are returned as
 
 from __future__ import annotations
 
-from ai.backend.common.data.entity.domain import DomainName
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
@@ -114,7 +114,9 @@ class UserHandler:
         )
 
         domain_data = (
-            await self._domain.lookup.run(LookupDomainAction(name=DomainName(body.parsed.domain_name)))
+            await self._domain.lookup.run(
+                LookupDomainAction(name=DomainName(body.parsed.domain_name))
+            )
         ).data
         action_result = await self._user.create_user.wait_for_complete(
             CreateUserAction(

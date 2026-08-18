@@ -99,7 +99,9 @@ class DomainAdapter(BaseAdapter):
 
     async def get(self, domain_name: str) -> DomainNode:
         """Retrieve a single domain by name."""
-        result = await self._processors.domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        result = await self._processors.domain.lookup.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
         return self._domain_data_to_node(result.data)
 
     async def admin_search(
@@ -193,7 +195,9 @@ class DomainAdapter(BaseAdapter):
         user_info: UserInfo,
     ) -> DomainPayload:
         """Update an existing domain (superadmin only)."""
-        target = await self._processors.domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        target = await self._processors.domain.lookup.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
         updater = DomainUpdater(
             name=domain_name,
             description=(
@@ -238,7 +242,9 @@ class DomainAdapter(BaseAdapter):
         user_info: UserInfo,
     ) -> DeleteDomainPayload:
         """Soft-delete a domain (superadmin only)."""
-        target = await self._processors.domain.lookup.run(LookupDomainAction(name=DomainName(input.name)))
+        target = await self._processors.domain.lookup.run(
+            LookupDomainAction(name=DomainName(input.name))
+        )
         await self._processors.domain.delete_domain.run(
             DeleteDomainAction(
                 domain_id=target.data.id,
@@ -253,7 +259,9 @@ class DomainAdapter(BaseAdapter):
         user_info: UserInfo,
     ) -> PurgeDomainPayload:
         """Permanently purge a domain (superadmin only)."""
-        target = await self._processors.domain.lookup.run(LookupDomainAction(name=DomainName(input.name)))
+        target = await self._processors.domain.lookup.run(
+            LookupDomainAction(name=DomainName(input.name))
+        )
         await self._processors.domain.purge_domain.run(
             PurgeDomainAction(domain_id=target.data.id, name=input.name)
         )
