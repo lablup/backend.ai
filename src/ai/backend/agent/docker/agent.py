@@ -40,6 +40,7 @@ from aiodocker.types import PortInfo
 from aiomonitor.task import preserve_termination_log
 from aiotools import TaskGroup
 from async_timeout import timeout
+from cachetools import LRUCache
 
 from ai.backend.agent.agent import (
     ACTIVE_STATUS_SET,
@@ -108,7 +109,7 @@ from ai.backend.agent.utils import (
     update_nested_dict,
 )
 from ai.backend.common.asyncio import current_loop
-from ai.backend.common.cgroup import get_cgroup_mount_point
+from ai.backend.common.cgroup import CgroupController, get_container_cgroup_path
 from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.docker import (
     MAX_KERNELSPEC,
@@ -175,6 +176,7 @@ _SECCOMP_PROFILE_FILENAME: Final[str] = "seccomp.json"
 # document, others open it as a path, and neither accepts the other form. These engine
 # components, as reported by the version API, are the ones that require a path.
 _SECCOMP_PATH_ENGINES: Final[frozenset[str]] = frozenset({"Podman Engine"})
+_CGROUP_PATH_CACHE_SIZE: Final[int] = 256
 
 known_glibc_distros: Final[dict[float, str]] = {
     2.17: "centos7.6",
@@ -1495,6 +1497,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     gwbridge_subnet: str | None
     checked_invalid_images: set[str]
     _seccomp_profile_as_path: bool
+    _cgroup_path_cache: LRUCache[tuple[CgroupController, ContainerId], Path]
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -1526,6 +1529,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         )
         self.checked_invalid_images = set()
         self._seccomp_profile_as_path = False
+        self._cgroup_path_cache = LRUCache(maxsize=_CGROUP_PATH_CACHE_SIZE)
         pickle_loader_writer_creator = PickleBasedLoaderWriterCreator.create(
             PickleBasedKernelRegistryCreatorArgs(
                 scratch_root=local_config.container.scratch_root,
@@ -1685,19 +1689,16 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         await self._kernel_recovery.save_kernel_registry(kernel_registry, metadata)
 
     @override
-    def get_cgroup_path(self, controller: str, container_id: str) -> Path:
-        driver = self.docker_info["CgroupDriver"]
+    async def get_cgroup_path(
+        self, controller: CgroupController, container_id: ContainerId
+    ) -> Path:
+        cache_key = (controller, container_id)
+        if (cached_path := self._cgroup_path_cache.get(cache_key)) is not None:
+            return cached_path
         version = self.docker_info["CgroupVersion"]
-        mount_point = get_cgroup_mount_point(version, controller)
-        # See https://docs.docker.com/config/containers/runmetrics/#find-the-cgroup-for-a-given-container
-        match driver:
-            case "cgroupfs":
-                cgroup = f"docker/{container_id}"
-            case "systemd":
-                cgroup = f"system.slice/docker-{container_id}.scope"
-            case _:
-                raise ValueError(f"Unsupported cgroup driver: {driver!r}")
-        return mount_point / cgroup
+        cgroup_path = await get_container_cgroup_path(version, controller, container_id)
+        self._cgroup_path_cache[cache_key] = cgroup_path
+        return cgroup_path
 
     @override
     def get_cgroup_version(self) -> str:
