@@ -432,7 +432,7 @@ def create_processors(
         domain=DomainProcessors(services.domain, action_monitors, validators),
         dotfile=DotfileProcessors(services.dotfile, action_monitors, validators),
         error_log=ErrorLogProcessors(registry.group()),
-        etcd_config=EtcdConfigProcessors(services.etcd_config, action_monitors, validators),
+        etcd_config=EtcdConfigProcessors(registry.group(), services.etcd_config),
         export=ExportProcessors(services.export, action_monitors, validators),
         fair_share=FairShareProcessors(services.fair_share, action_monitors, validators),
         group=GroupProcessors(services.group, action_monitors, validators),

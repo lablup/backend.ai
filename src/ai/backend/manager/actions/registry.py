@@ -275,6 +275,27 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.bulk, *validators),
         )
 
+    def public[TAction: BaseGlobalAction, TResult](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[TResult]],
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> PublicActionProcessor[TAction, TResult]:
+        """Global state every authenticated caller may read.
+
+        The SUPERADMIN gate is replaced by an authentication check; the constructor
+        rejects anything that is not a read, so a write cannot reach this path.
+        """
+        self._record(action_cls)
+        return PublicActionProcessor(
+            action_cls,
+            func,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
+            validators=list(validators),
+        )
+
     def global_scope[TAction: BaseGlobalAction, TResult](
         self,
         action_cls: type[TAction],
