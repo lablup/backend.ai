@@ -9,9 +9,9 @@ from ai.backend.manager.actions.types import BLANK_ID
 from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.result import BulkActionProcessResult
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
-from ai.backend.manager.repositories.audit_log.creators import BulkAuditLogCreatorSpec
-from ai.backend.manager.repositories.audit_log.repository import AuditLogRepository
-from ai.backend.manager.repositories.base import BulkCreator
+from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.models.audit_log.creators import BulkAuditLogCreator
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = ("BulkActionAuditLogMonitor",)
 
@@ -25,10 +25,10 @@ class BulkActionAuditLogMonitor(BulkActionMonitor):
     create rather than one round-trip per target.
     """
 
-    _repository: AuditLogRepository
+    _repository: OpsRepository[AuditLogData]
     _policy: AuditLogPolicy
 
-    def __init__(self, repository: AuditLogRepository, policy: AuditLogPolicy) -> None:
+    def __init__(self, repository: OpsRepository[AuditLogData], policy: AuditLogPolicy) -> None:
         self._repository = repository
         self._policy = policy
 
@@ -41,24 +41,22 @@ class BulkActionAuditLogMonitor(BulkActionMonitor):
         trigger = triggered_user()
         acting = current_user()
         request_id = current_request_id() or BLANK_ID
-        bulk_creator = BulkCreator(
-            specs=[
-                BulkAuditLogCreatorSpec(
-                    action_id=result.meta.action_id,
-                    entity_type=meta.entity_type,
-                    operation=meta.operation_type,
-                    action_name=meta.action_name,
-                    created_at=result.meta.started_at,
-                    description=entity_result.description,
-                    status=entity_result.status,
-                    entity_id=entity_result.entity_id,
-                    request_id=request_id,
-                    triggered_by=str(trigger.user_id) if trigger else None,
-                    acted_as=acting.user_id if acting else None,
-                    duration=result.meta.duration,
-                )
-                for entity_result in result.meta.entity_results
-                if self._policy.should_record(meta.operation_type, entity_result.status)
-            ]
-        )
-        await self._repository.bulk_create(bulk_creator)
+        creators = [
+            BulkAuditLogCreator(
+                action_id=result.meta.action_id,
+                entity_type=meta.entity_type,
+                operation=meta.operation_type,
+                action_name=meta.action_name,
+                created_at=result.meta.started_at,
+                description=entity_result.description,
+                status=entity_result.status,
+                entity_id=entity_result.entity_id,
+                request_id=request_id,
+                triggered_by=str(trigger.user_id) if trigger else None,
+                acted_as=acting.user_id if acting else None,
+                duration=result.meta.duration,
+            )
+            for entity_result in result.meta.entity_results
+            if self._policy.should_record(meta.operation_type, entity_result.status)
+        ]
+        await self._repository.atomic_create_sidecars(creators)

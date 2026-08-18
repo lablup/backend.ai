@@ -137,7 +137,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     PrometheusQueryPresetCategoryProcessors(registry.group())
     RuntimeVariantPresetProcessors(MagicMock(), registry.group())
     ErrorLogProcessors(registry.group())
-    AuditLogProcessors(MagicMock(), MagicMock(), registry.group())
+    AuditLogProcessors(registry.group())
     PrometheusQueryPresetProcessors(MagicMock(), registry.group())
     StorageNamespaceProcessors(registry.group())
     DeploymentPresetProcessors(registry.group(), MagicMock())

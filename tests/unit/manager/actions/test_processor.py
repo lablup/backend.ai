@@ -25,7 +25,7 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
-from ai.backend.manager.repositories.audit_log import AuditLogCreatorSpec
+from ai.backend.manager.models.audit_log.creators import AuditLogCreator
 
 _MOCK_ACTION_TYPE: Final[str] = "test"
 _MOCK_OPERATION_TYPE: Final[str] = "create"
@@ -178,7 +178,7 @@ class TestAuditLogMonitorExclusionAtSetupTime:
     @pytest.fixture
     def mock_audit_log_repository(self) -> MagicMock:
         repo = MagicMock()
-        repo.create = AsyncMock(return_value=None)
+        repo.create_sidecar = AsyncMock(return_value=None)
         return repo
 
     @pytest.fixture
@@ -204,7 +204,7 @@ class TestAuditLogMonitorExclusionAtSetupTime:
 
         await processor.wait_for_complete(mock_action)
 
-        mock_audit_log_repository.create.assert_not_called()
+        mock_audit_log_repository.create_sidecar.assert_not_called()
 
 
 def _make_user(user_id: UUID, is_superadmin: bool = False) -> UserData:
@@ -226,7 +226,7 @@ class TestAuditLogMonitorActorIdentities:
     @pytest.fixture
     def mock_audit_log_repository(self) -> MagicMock:
         repo = MagicMock()
-        repo.create = AsyncMock(return_value=None)
+        repo.create_sidecar = AsyncMock(return_value=None)
         return repo
 
     @pytest.fixture
@@ -248,9 +248,9 @@ class TestAuditLogMonitorActorIdentities:
             ),
         )
 
-    def _recorded_spec(self, mock_audit_log_repository: MagicMock) -> AuditLogCreatorSpec:
-        mock_audit_log_repository.create.assert_called_once()
-        spec: AuditLogCreatorSpec = mock_audit_log_repository.create.call_args.args[0].spec
+    def _recorded_spec(self, mock_audit_log_repository: MagicMock) -> AuditLogCreator:
+        mock_audit_log_repository.create_sidecar.assert_called_once()
+        spec: AuditLogCreator = mock_audit_log_repository.create_sidecar.call_args.args[0]
         return spec
 
     async def test_normal_context_triggered_by_equals_acted_as(

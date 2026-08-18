@@ -6,7 +6,6 @@ from ai.backend.manager.repositories.artifact.repositories import ArtifactReposi
 from ai.backend.manager.repositories.artifact_registry.repositories import (
     ArtifactRegistryRepositories,
 )
-from ai.backend.manager.repositories.audit_log.repositories import AuditLogRepositories
 from ai.backend.manager.repositories.auth.repositories import AuthRepositories
 from ai.backend.manager.repositories.container_registry.repositories import (
     ContainerRegistryRepositories,
@@ -124,7 +123,6 @@ class Repositories:
     stream: StreamRepositories
     events: EventsRepositories
     storage_namespace: StorageNamespaceRepositories
-    audit_log: AuditLogRepositories
     retention: RetentionRepositories
 
     @classmethod
@@ -173,7 +171,6 @@ class Repositories:
         stream_repositories = StreamRepositories.create(args)
         events_repositories = EventsRepositories.create(args)
         storage_namespace_repositories = StorageNamespaceRepositories.create(args)
-        audit_log_repositories = AuditLogRepositories.create(args)
         retention_repositories = RetentionRepositories.create(args)
 
         return cls(
@@ -223,6 +220,5 @@ class Repositories:
             stream=stream_repositories,
             events=events_repositories,
             storage_namespace=storage_namespace_repositories,
-            audit_log=audit_log_repositories,
             retention=retention_repositories,
         )

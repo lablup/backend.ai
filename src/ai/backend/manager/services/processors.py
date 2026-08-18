@@ -71,7 +71,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.audit_log.processors import (
         AuditLogProcessors,
     )
-    from ai.backend.manager.services.audit_log.service import AuditLogService
     from ai.backend.manager.services.auth.processors import AuthProcessors
     from ai.backend.manager.services.auth.service import AuthService
     from ai.backend.manager.services.container_registry.processors import (
@@ -389,7 +388,6 @@ class Services:
     artifact_revision: ArtifactRevisionService
     artifact_registry: ArtifactRegistryService
     deployment: DeploymentService
-    audit_log: AuditLogService
     idle_checker_assignment: IdleCheckerAssignmentService
     scheduling_history: SchedulingHistoryService
     template: TemplateService

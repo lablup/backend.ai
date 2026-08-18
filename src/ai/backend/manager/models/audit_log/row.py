@@ -8,7 +8,6 @@ from typing import override
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.entity.action import ActionID
 from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
@@ -78,40 +77,6 @@ class AuditLogRow(Base):
         StrEnumType(OperationStatus),
         nullable=False,
     )
-
-    def __init__(
-        self,
-        entity_type: str,
-        operation: str,
-        action_name: str,
-        action_id: ActionID,
-        description: str,
-        created_at: datetime,
-        status: OperationStatus,
-        action_kind: ActionKind | None = None,
-        entity_id: str | uuid.UUID | None = None,
-        lookup_kind: str | None = None,
-        lookup_key: str | None = None,
-        request_id: str | None = None,
-        triggered_by: str | None = None,
-        acted_as: uuid.UUID | None = None,
-        duration: timedelta | None = None,
-    ) -> None:
-        self.entity_type = entity_type
-        self.operation = operation
-        self.action_id = action_id
-        self.action_kind = action_kind
-        self.action_name = action_name
-        self.entity_id = str(entity_id) if isinstance(entity_id, uuid.UUID) else entity_id
-        self.lookup_kind = lookup_kind
-        self.lookup_key = lookup_key
-        self.request_id = request_id
-        self.triggered_by = triggered_by
-        self.acted_as = acted_as
-        self.description = description
-        self.duration = duration
-        self.status = status
-        self.created_at = created_at
 
     @override
     def __str__(self) -> str:

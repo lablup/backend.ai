@@ -92,6 +92,7 @@ from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.event_dispatcher.dispatch import DispatcherArgs, Dispatchers
 from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import StreamCleanupEventHandler
 from ai.backend.manager.idle import IdleCheckerHost
@@ -102,6 +103,7 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.reporters.base import AbstractReporter
 from ai.backend.manager.reporters.hub import ReporterHub, ReporterHubArgs
 from ai.backend.manager.reporters.smtp import SMTPReporter, SMTPSenderArgs
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.service.container_registry.harbor import (
@@ -270,7 +272,9 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         reporter_hub = ReporterHub(ReporterHubArgs(reporters=action_reporters))
         reporter_monitor = ReporterMonitor(reporter_hub)
         prometheus_monitor = PrometheusMonitor()
-        audit_log_repository = setup_input.repositories.audit_log.repository
+        audit_log_repository: OpsRepository[AuditLogData] = OpsRepository(
+            setup_input.repositories.v2_ops_provider
+        )
         audit_log_policy = AuditLogPolicy(
             setup_input.config_provider.config.audit_log.record_read_operations
         )

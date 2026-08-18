@@ -11,11 +11,11 @@ from ai.backend.manager.actions.v2.single_entity.result import SingleEntityActio
 from ai.backend.manager.actions.v2.single_entity.trigger import (
     SingleEntityActionTriggerMeta,
 )
-from ai.backend.manager.repositories.audit_log.creators import (
-    SingleEntityAuditLogCreatorSpec,
+from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.models.audit_log.creators import (
+    SingleEntityAuditLogCreator,
 )
-from ai.backend.manager.repositories.audit_log.repository import AuditLogRepository
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = ("SingleEntityActionAuditLogMonitor",)
 
@@ -27,10 +27,10 @@ class SingleEntityActionAuditLogMonitor(SingleEntityActionMonitor):
     operates on an identified entity.
     """
 
-    _repository: AuditLogRepository
+    _repository: OpsRepository[AuditLogData]
     _policy: AuditLogPolicy
 
-    def __init__(self, repository: AuditLogRepository, policy: AuditLogPolicy) -> None:
+    def __init__(self, repository: OpsRepository[AuditLogData], policy: AuditLogPolicy) -> None:
         self._repository = repository
         self._policy = policy
 
@@ -46,20 +46,18 @@ class SingleEntityActionAuditLogMonitor(SingleEntityActionMonitor):
             return
         trigger = triggered_user()
         acting = current_user()
-        creator = Creator(
-            spec=SingleEntityAuditLogCreatorSpec(
-                action_id=meta.action_id,
-                entity_type=meta.entity.entity_type,
-                operation=meta.operation_type,
-                action_name=meta.action_name,
-                created_at=meta.started_at,
-                description=result.meta.description,
-                status=result.meta.status,
-                entity_id=meta.entity.entity_id,
-                request_id=current_request_id() or BLANK_ID,
-                triggered_by=str(trigger.user_id) if trigger else None,
-                acted_as=acting.user_id if acting else None,
-                duration=result.meta.duration,
-            )
+        creator = SingleEntityAuditLogCreator(
+            action_id=meta.action_id,
+            entity_type=meta.entity.entity_type,
+            operation=meta.operation_type,
+            action_name=meta.action_name,
+            created_at=meta.started_at,
+            description=result.meta.description,
+            status=result.meta.status,
+            entity_id=meta.entity.entity_id,
+            request_id=current_request_id() or BLANK_ID,
+            triggered_by=str(trigger.user_id) if trigger else None,
+            acted_as=acting.user_id if acting else None,
+            duration=result.meta.duration,
         )
-        await self._repository.create(creator)
+        await self._repository.create_sidecar(creator)

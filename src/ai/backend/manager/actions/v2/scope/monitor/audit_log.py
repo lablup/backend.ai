@@ -11,12 +11,12 @@ from ai.backend.manager.actions.types import BLANK_ID
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.monitor.base import ScopeActionMonitor
 from ai.backend.manager.actions.v2.scope.result import ScopeActionProcessResult
-from ai.backend.manager.repositories.audit_log.creators import (
-    AuditLogScopeCreatorSpec,
-    ScopeAuditLogCreatorSpec,
+from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.models.audit_log.creators import (
+    AuditLogScopeCreator,
+    ScopeAuditLogCreator,
 )
-from ai.backend.manager.repositories.audit_log.repository import AuditLogRepository
-from ai.backend.manager.repositories.base import BulkCreator
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = ("ScopeActionAuditLogMonitor",)
 
@@ -29,10 +29,10 @@ class ScopeActionAuditLogMonitor(ScopeActionMonitor):
     row via ``audit_log_scopes``. A run that affected nothing still leaves one row.
     """
 
-    _repository: AuditLogRepository
+    _repository: OpsRepository[AuditLogData]
     _policy: AuditLogPolicy
 
-    def __init__(self, repository: AuditLogRepository, policy: AuditLogPolicy) -> None:
+    def __init__(self, repository: OpsRepository[AuditLogData], policy: AuditLogPolicy) -> None:
         self._repository = repository
         self._policy = policy
 
@@ -49,10 +49,10 @@ class ScopeActionAuditLogMonitor(ScopeActionMonitor):
         if not specs:
             # Nothing was touched, but the run still has to leave a trace.
             specs = [self._build_spec(action, result, None)]
-        await self._repository.bulk_create_with_scopes(
-            BulkCreator(specs=specs),
+        await self._repository.atomic_create_sidecars_with_fields(
+            specs,
             [
-                AuditLogScopeCreatorSpec(scope_type=str(s.scope_type), scope_id=s.scope_id)
+                AuditLogScopeCreator(scope_type=str(s.scope_type), scope_id=s.scope_id)
                 for s in meta.scope_targets
             ],
         )
@@ -62,11 +62,11 @@ class ScopeActionAuditLogMonitor(ScopeActionMonitor):
         action: BaseScopeAction,
         result: ScopeActionProcessResult,
         entity_id: EntityIdentifier | None,
-    ) -> ScopeAuditLogCreatorSpec:
+    ) -> ScopeAuditLogCreator:
         trigger = triggered_user()
         acting = current_user()
         meta = result.meta
-        return ScopeAuditLogCreatorSpec(
+        return ScopeAuditLogCreator(
             action_id=meta.action_id,
             entity_type=action.entity_type(),
             operation=action.operation_type(),

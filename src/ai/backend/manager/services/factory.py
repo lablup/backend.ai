@@ -24,7 +24,6 @@ from ai.backend.manager.services.artifact_registry.service import ArtifactRegist
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
-from ai.backend.manager.services.audit_log.service import AuditLogService
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
@@ -380,7 +379,6 @@ def create_services(args: ServiceArgs) -> Services:
             runtime_variant_preset_repository=repositories.runtime_variant_preset.repository,
             appproxy_client_pool=args.appproxy_client_pool,
         ),
-        audit_log=AuditLogService(repositories.audit_log.repository),
         idle_checker_assignment=IdleCheckerAssignmentService(repositories.idle_checker.repository),
         scheduling_history=SchedulingHistoryService(repositories.scheduling_history.repository),
         template=TemplateService(
@@ -515,7 +513,7 @@ def create_processors(
         ),
         deployment=DeploymentProcessors(services.deployment, action_monitors, validators),
         storage_namespace=StorageNamespaceProcessors(registry.group()),
-        audit_log=AuditLogProcessors(services.audit_log, validators, registry.group()),
+        audit_log=AuditLogProcessors(registry.group()),
         idle_checker_assignment=IdleCheckerAssignmentProcessors(
             services.idle_checker_assignment, action_monitors, validators
         ),

@@ -61,7 +61,11 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.specs.creator import EntityCreator, RoleManagedEntityCreator
+from ai.backend.manager.models.specs.creator import (
+    EntityCreator,
+    RoleManagedEntityCreator,
+    SidecarCreator,
+)
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
@@ -723,6 +727,51 @@ class TestEntityPurge:
 # =============================================================================
 # Upsert: the scope stays provisioned idempotently
 # =============================================================================
+
+
+class _Sidecar(SidecarCreator[EntityLifecycleTestRow, _EntityData]):
+    """A row that rides beside the graph: no node, no owner."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_row(self) -> EntityLifecycleTestRow:
+        return EntityLifecycleTestRow(name=self.name)
+
+    @override
+    def to_data(self, row: EntityLifecycleTestRow) -> _EntityData:
+        return _EntityData(id=row.id, name=row.name, note=row.note)
+
+
+class TestSidecarCreate:
+    async def test_create_provisions_no_scope_and_joins_nothing(
+        self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
+    ) -> None:
+        data = await repository.create_sidecar(_Sidecar(name="a"))
+
+        assert await _virtual_scope_id(database, data.id) is None
+        assert not await _self_membership_exists(database, data.id)
+
+    async def test_atomic_create_writes_every_row(
+        self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
+    ) -> None:
+        items = await repository.atomic_create_sidecars([_Sidecar(name="a"), _Sidecar(name="b")])
+
+        assert [item.name for item in items] == ["a", "b"]
+        assert await _row_count(database) == 2
+
+    async def test_atomic_create_is_all_or_nothing(
+        self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
+    ) -> None:
+        with pytest.raises(RepositoryIntegrityError):
+            await repository.atomic_create_sidecars([_Sidecar(name="a"), _Sidecar(name="a")])
+
+        assert await _row_count(database) == 0
 
 
 class TestEntityUpsert:

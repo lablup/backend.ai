@@ -10,9 +10,9 @@ from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.lookup.bulk_monitor.base import BulkLookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.bulk_result import BulkLookupActionProcessResult
 from ai.backend.manager.actions.v2.lookup.bulk_trigger import BulkLookupActionTriggerMeta
-from ai.backend.manager.repositories.audit_log.creators import LookupAuditLogCreatorSpec
-from ai.backend.manager.repositories.audit_log.repository import AuditLogRepository
-from ai.backend.manager.repositories.base import BulkCreator
+from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.models.audit_log.creators import LookupAuditLogCreator
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = ("BulkLookupActionAuditLogMonitor",)
 
@@ -25,10 +25,10 @@ class BulkLookupActionAuditLogMonitor(BulkLookupActionMonitor):
     which ties them back to the same run.
     """
 
-    _repository: AuditLogRepository
+    _repository: OpsRepository[AuditLogData]
     _policy: AuditLogPolicy
 
-    def __init__(self, repository: AuditLogRepository, policy: AuditLogPolicy) -> None:
+    def __init__(self, repository: OpsRepository[AuditLogData], policy: AuditLogPolicy) -> None:
         self._repository = repository
         self._policy = policy
 
@@ -44,7 +44,7 @@ class BulkLookupActionAuditLogMonitor(BulkLookupActionMonitor):
         acting = current_user()
         request_id = current_request_id() or BLANK_ID
         specs = [
-            LookupAuditLogCreatorSpec(
+            LookupAuditLogCreator(
                 action_id=result.meta.action_id,
                 entity_type=meta.entity_type,
                 operation=meta.operation_type,
@@ -65,7 +65,7 @@ class BulkLookupActionAuditLogMonitor(BulkLookupActionMonitor):
         ]
         if not specs:
             return
-        await self._repository.bulk_create(BulkCreator(specs=specs))
+        await self._repository.atomic_create_sidecars(specs)
 
     def _render_key(self, key: LookupKey) -> str:
         """Rendered as the single lookup's is, so both are filterable the same way."""

@@ -10,9 +10,9 @@ from ai.backend.manager.actions.types import BLANK_ID
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, LookupKey
 from ai.backend.manager.actions.v2.lookup.monitor.base import LookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.result import LookupActionProcessResult
-from ai.backend.manager.repositories.audit_log.creators import LookupAuditLogCreatorSpec
-from ai.backend.manager.repositories.audit_log.repository import AuditLogRepository
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.models.audit_log.creators import LookupAuditLogCreator
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = ("LookupActionAuditLogMonitor",)
 
@@ -29,10 +29,10 @@ class LookupActionAuditLogMonitor(LookupActionMonitor):
     lookup reads, so the ordinary rule for reads applies to it unchanged.
     """
 
-    _repository: AuditLogRepository
+    _repository: OpsRepository[AuditLogData]
     _policy: AuditLogPolicy
 
-    def __init__(self, repository: AuditLogRepository, policy: AuditLogPolicy) -> None:
+    def __init__(self, repository: OpsRepository[AuditLogData], policy: AuditLogPolicy) -> None:
         self._repository = repository
         self._policy = policy
 
@@ -48,25 +48,23 @@ class LookupActionAuditLogMonitor(LookupActionMonitor):
         key = action.lookup_key()
         trigger = triggered_user()
         acting = current_user()
-        creator = Creator(
-            spec=LookupAuditLogCreatorSpec(
-                action_id=meta.action_id,
-                entity_type=action.entity_type(),
-                operation=action.operation_type(),
-                action_name=action.action_name(),
-                created_at=meta.started_at,
-                description=meta.description,
-                status=meta.status,
-                lookup_kind=key.kind(),
-                lookup_key=self._render_key(key),
-                entity_id=meta.entity_id,
-                request_id=current_request_id() or BLANK_ID,
-                triggered_by=str(trigger.user_id) if trigger else None,
-                acted_as=acting.user_id if acting else None,
-                duration=meta.duration,
-            )
+        creator = LookupAuditLogCreator(
+            action_id=meta.action_id,
+            entity_type=action.entity_type(),
+            operation=action.operation_type(),
+            action_name=action.action_name(),
+            created_at=meta.started_at,
+            description=meta.description,
+            status=meta.status,
+            lookup_kind=key.kind(),
+            lookup_key=self._render_key(key),
+            entity_id=meta.entity_id,
+            request_id=current_request_id() or BLANK_ID,
+            triggered_by=str(trigger.user_id) if trigger else None,
+            acted_as=acting.user_id if acting else None,
+            duration=meta.duration,
         )
-        await self._repository.create(creator)
+        await self._repository.create_sidecar(creator)
 
     def _render_key(self, key: LookupKey) -> str:
         """Render the key as one filterable string.

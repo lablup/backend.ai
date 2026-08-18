@@ -1,31 +1,38 @@
+"""Insert specs for audit rows, which ride beside the entity graph."""
+
 from __future__ import annotations
 
 import uuid
 from abc import abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import override
 
 from ai.backend.common.data.entity.action import ActionID
+from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.common.data.entity.types import EntityID, ScopeID
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
-from ai.backend.manager.models.audit_log import AuditLogRow, AuditLogScopeRow
-from ai.backend.manager.repositories.base import CreatorSpec, DependentCreatorSpec
+from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
+from ai.backend.manager.models.audit_log.row import AuditLogRow
+from ai.backend.manager.models.audit_log.scope_row import AuditLogScopeRow
+from ai.backend.manager.models.specs.creator import SidecarCreator, SidecarFieldCreator
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 __all__ = (
-    "AuditLogCreatorSpec",
-    "SingleEntityAuditLogCreatorSpec",
-    "BulkAuditLogCreatorSpec",
-    "ScopeAuditLogCreatorSpec",
-    "LookupAuditLogCreatorSpec",
-    "GlobalAuditLogCreatorSpec",
-    "LegacyAuditLogCreatorSpec",
-    "AuditLogScopeCreatorSpec",
+    "AuditLogCreator",
+    "SingleEntityAuditLogCreator",
+    "BulkAuditLogCreator",
+    "ScopeAuditLogCreator",
+    "LookupAuditLogCreator",
+    "GlobalAuditLogCreator",
+    "LegacyAuditLogCreator",
+    "AuditLogScopeCreator",
 )
 
 
 @dataclass
-class AuditLogCreatorSpec(CreatorSpec[AuditLogRow]):
+class AuditLogCreator(SidecarCreator[AuditLogRow, AuditLogData]):
     """Fields every audit row is written with.
 
     Subclasses add the one target field their shape has and declare their
@@ -49,6 +56,18 @@ class AuditLogCreatorSpec(CreatorSpec[AuditLogRow]):
     def action_kind(cls) -> ActionKind:
         raise NotImplementedError
 
+    @override
+    def sidecar_id(self, row: AuditLogRow) -> AuditLogID:
+        return AuditLogID(row.id)
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: AuditLogRow) -> AuditLogData:
+        return row.to_dataclass()
+
     def _build_row(
         self,
         *,
@@ -65,7 +84,7 @@ class AuditLogCreatorSpec(CreatorSpec[AuditLogRow]):
             created_at=self.created_at,
             description=self.description,
             status=self.status,
-            entity_id=entity_id,
+            entity_id=None if entity_id is None else str(entity_id),
             lookup_kind=lookup_kind,
             lookup_key=lookup_key,
             request_id=self.request_id,
@@ -76,7 +95,7 @@ class AuditLogCreatorSpec(CreatorSpec[AuditLogRow]):
 
 
 @dataclass
-class SingleEntityAuditLogCreatorSpec(AuditLogCreatorSpec):
+class SingleEntityAuditLogCreator(AuditLogCreator):
     entity_id: EntityID
 
     @classmethod
@@ -90,7 +109,7 @@ class SingleEntityAuditLogCreatorSpec(AuditLogCreatorSpec):
 
 
 @dataclass
-class BulkAuditLogCreatorSpec(AuditLogCreatorSpec):
+class BulkAuditLogCreator(AuditLogCreator):
     entity_id: EntityID
 
     @classmethod
@@ -104,10 +123,10 @@ class BulkAuditLogCreatorSpec(AuditLogCreatorSpec):
 
 
 @dataclass
-class ScopeAuditLogCreatorSpec(AuditLogCreatorSpec):
+class ScopeAuditLogCreator(AuditLogCreator):
     """One entity a scope action affected; ``None`` when it affected nothing.
 
-    The scopes go to ``audit_log_scopes`` via :class:`AuditLogScopeCreatorSpec`.
+    The scopes go to ``audit_log_scopes`` via :class:`AuditLogScopeCreator`.
     """
 
     entity_id: EntityID | None
@@ -123,7 +142,7 @@ class ScopeAuditLogCreatorSpec(AuditLogCreatorSpec):
 
 
 @dataclass
-class LookupAuditLogCreatorSpec(AuditLogCreatorSpec):
+class LookupAuditLogCreator(AuditLogCreator):
     lookup_kind: str
     lookup_key: str
     entity_id: EntityID | None
@@ -143,7 +162,7 @@ class LookupAuditLogCreatorSpec(AuditLogCreatorSpec):
 
 
 @dataclass
-class GlobalAuditLogCreatorSpec(AuditLogCreatorSpec):
+class GlobalAuditLogCreator(AuditLogCreator):
     @classmethod
     @override
     def action_kind(cls) -> ActionKind:
@@ -155,7 +174,7 @@ class GlobalAuditLogCreatorSpec(AuditLogCreatorSpec):
 
 
 @dataclass
-class LegacyAuditLogCreatorSpec(AuditLogCreatorSpec):
+class LegacyAuditLogCreator(AuditLogCreator):
     """An action on the legacy ``BaseAction`` base, which declares no shape.
 
     ``entity_id`` is whatever the runner resolved, often nothing. Goes away with
@@ -175,16 +194,28 @@ class LegacyAuditLogCreatorSpec(AuditLogCreatorSpec):
 
 
 @dataclass
-class AuditLogScopeCreatorSpec(DependentCreatorSpec[uuid.UUID, AuditLogScopeRow]):
-    """A scope of the audited entity, attached to its audit row once that row exists."""
+class AuditLogScopeCreator(SidecarFieldCreator[AuditLogID, AuditLogScopeRow, AuditLogScopeData]):
+    """A scope the audited run covered, owned by the audit row it is written under."""
 
     scope_type: str
     scope_id: ScopeID
 
     @override
-    def build_row(self, dependency: uuid.UUID) -> AuditLogScopeRow:
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_row(self, owner_id: AuditLogID) -> AuditLogScopeRow:
         return AuditLogScopeRow(
-            audit_log_id=dependency,
+            audit_log_id=owner_id,
             scope_type=self.scope_type,
             scope_id=self.scope_id,
+        )
+
+    @override
+    def to_data(self, row: AuditLogScopeRow) -> AuditLogScopeData:
+        return AuditLogScopeData(
+            audit_log_id=AuditLogID(row.audit_log_id),
+            scope_type=row.scope_type,
+            scope_id=row.scope_id,
         )

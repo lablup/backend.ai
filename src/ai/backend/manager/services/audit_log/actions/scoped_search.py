@@ -1,95 +1,111 @@
-"""Scoped audit-log search action and its searchable targets."""
+"""Scoped audit-log search action and the scopes it reads within."""
 
 from __future__ import annotations
 
 import uuid
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType, RBACElementType
-from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
-from ai.backend.manager.actions.action.types import SearchableActionTarget
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.audit_log import AUDIT_LOG_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.audit_log.types import AuditLogData
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.repositories.audit_log.searchers import AuditLogSearcher
 from ai.backend.manager.repositories.audit_log.types import (
     EntityAuditLogOperationScope,
     TriggeredByAuditLogOperationScope,
 )
-from ai.backend.manager.repositories.base import BatchQuerier
+
+
+class AuditLogScopeItem(ABC):
+    """One scope a scoped audit-log read runs within.
+
+    Answers the two axes separately: which scope authorizes the read, and which rows it
+    selects. They differ here — an actor's records are authorized at that user but
+    matched on a different column than an entity's own.
+    """
+
+    @abstractmethod
+    def scope_ref(self) -> ScopeRef:
+        """The scope the read is answered for."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def operation_scope(self) -> OperationScope:
+        """The rows the read is restricted to."""
+        raise NotImplementedError
 
 
 @dataclass(frozen=True)
-class EntityAuditLogTarget(SearchableActionTarget):
-    """Scope item keyed by a target entity ``(element_type, element_id)``."""
+class EntityAuditLogScopeItem(AuditLogScopeItem):
+    """The records tagged with one entity — a session, a deployment, a user."""
 
-    element_type: RBACElementType
-    element_id: str
-
-    @override
-    def to_rbac_element_ref(self) -> RBACElementRef:
-        return RBACElementRef(element_type=self.element_type, element_id=self.element_id)
+    entity_type: RBACElementType
+    entity_id: uuid.UUID
 
     @override
-    def to_search_scope(self) -> OperationScope:
+    def scope_ref(self) -> ScopeRef:
+        return ScopeRef(
+            scope_type=ScopeType(EntityType(self.entity_type.value)), scope_id=self.entity_id
+        )
+
+    @override
+    def operation_scope(self) -> OperationScope:
         return EntityAuditLogOperationScope(
-            entity_type=self.element_type,
-            entity_id=self.element_id,
+            entity_type=self.entity_type, entity_id=str(self.entity_id)
         )
 
 
 @dataclass(frozen=True)
-class TriggeredByAuditLogTarget(SearchableActionTarget):
-    """Scope item keyed by the actor (triggered_by) user."""
+class TriggeredByAuditLogScopeItem(AuditLogScopeItem):
+    """The records one user triggered, whoever they were about."""
 
     user_id: uuid.UUID
 
     @override
-    def to_rbac_element_ref(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.USER,
-            element_id=str(self.user_id),
-        )
+    def scope_ref(self) -> ScopeRef:
+        return ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id)
 
     @override
-    def to_search_scope(self) -> OperationScope:
+    def operation_scope(self) -> OperationScope:
         return TriggeredByAuditLogOperationScope(triggered_by=str(self.user_id))
 
 
 @dataclass
-class ScopedSearchAuditLogsAction(BaseBulkAction[SearchableActionTarget]):
-    items: list[SearchableActionTarget]
-    querier: BatchQuerier
+class ScopedSearchAuditLogsAction(OperationScopeOpsAction[AuditLogRow, AuditLogData]):
+    """Page through the records of the scopes named, combined with OR.
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    Every scope is authorized before the read runs, so a caller reaching for one they
+    cannot see is refused rather than served the rest.
+    """
+
+    items: Sequence[AuditLogScopeItem]
+    searcher: AuditLogSearcher
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.AUDIT_LOG
+        return AUDIT_LOG_ENTITY_TYPE
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def action_name(cls) -> str:
+        return "scoped_search_audit_logs"
 
     @override
-    def targets(self) -> Sequence[SearchableActionTarget]:
-        return list(self.items)
-
-
-@dataclass
-class ScopedSearchAuditLogsActionResult(BaseBulkActionResult):
-    data: list[AuditLogData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-    queried_refs: list[RBACElementRef]
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return [item.scope_ref() for item in self.items]
 
     @override
-    def element_refs(self) -> list[RBACElementRef]:
-        return list(self.queried_refs)
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return [item.operation_scope() for item in self.items]
+
+    @override
+    def to_searcher(self) -> AuditLogSearcher:
+        return self.searcher

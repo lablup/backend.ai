@@ -9,7 +9,8 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.models.audit_log import AuditLogRow
+from ai.backend.manager.models.audit_log.row import AuditLogRow
+from ai.backend.manager.models.audit_log.scope_row import AuditLogScopeRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
@@ -21,14 +22,13 @@ __all__ = (
 
 @dataclass(frozen=True)
 class EntityAuditLogOperationScope(OperationScope):
-    """Audit log rows tagged with one ``(entity_type, entity_id)`` pair.
+    """Audit log rows about one entity, or run within it as a scope.
 
-    One scope = one item of a scoped audit-log query; the repository layer
-    combines multiple scopes with ``OR`` to realize the ``AuditLogScope``
-    union semantics.
+    Both, because a scope action is recorded against the entities it touched while the
+    scopes it ran in go to ``audit_log_scopes``. Matching only the first would hide every
+    run that named this entity as its scope.
 
-    ``existence_checks`` is empty by ``SearchableActionTarget`` convention —
-    RBAC validation already gates entity reachability.
+    ``existence_checks`` is empty — RBAC validation already gates entity reachability.
     """
 
     entity_type: RBACElementType
@@ -40,9 +40,18 @@ class EntityAuditLogOperationScope(OperationScope):
         entity_id = self.entity_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.and_(
-                AuditLogRow.entity_type == entity_type,
-                AuditLogRow.entity_id == entity_id,
+            return sa.or_(
+                sa.and_(
+                    AuditLogRow.entity_type == entity_type,
+                    AuditLogRow.entity_id == entity_id,
+                ),
+                sa.exists().where(
+                    sa.and_(
+                        AuditLogScopeRow.audit_log_id == AuditLogRow.id,
+                        AuditLogScopeRow.scope_type == entity_type,
+                        AuditLogScopeRow.scope_id == entity_id,
+                    )
+                ),
             )
 
         return inner

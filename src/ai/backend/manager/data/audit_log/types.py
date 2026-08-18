@@ -3,16 +3,14 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import override
 
 from ai.backend.common.data.entity.action import ActionID
 from ai.backend.common.data.entity.audit_log import AuditLogID
-from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 
 
 @dataclass
-class AuditLogData(EntityData):
+class AuditLogData:
     """One audit record, mirroring the row.
 
     ``action_kind`` says which shape wrote it; only that shape's target columns are
@@ -36,10 +34,6 @@ class AuditLogData(EntityData):
     acted_as: uuid.UUID | None
     duration: timedelta | None
 
-    @override
-    def entity_id(self) -> EntityIdentifier:
-        return self.id
-
 
 @dataclass
 class AuditLogListResult:
@@ -49,3 +43,12 @@ class AuditLogListResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass(frozen=True)
+class AuditLogScopeData:
+    """One scope an audited run covered."""
+
+    audit_log_id: AuditLogID
+    scope_type: str
+    scope_id: str
