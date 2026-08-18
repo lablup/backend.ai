@@ -1,32 +1,41 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.stream.actions.base import StreamAction
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 
 
 @dataclass(frozen=True)
-class GetStreamingSessionAction(StreamAction):
-    session_name: str
-    user_uuid: uuid.UUID
+class GetStreamingSessionAction(BaseSingleEntityAction):
+    session_id: SessionId
 
     @override
-    def entity_id(self) -> str | None:
-        return self.session_name
+    def entity_id(self) -> SessionID:
+        return SessionID(self.session_id)
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return SESSION_ENTITY_TYPE
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_streaming_session"
+
 
 @dataclass(frozen=True)
-class GetStreamingSessionActionResult(BaseActionResult):
+class GetStreamingSessionActionResult:
     session_id: SessionId
     kernel_id: KernelId
     kernel_host: str | None
@@ -34,7 +43,3 @@ class GetStreamingSessionActionResult(BaseActionResult):
     repl_in_port: int
     repl_out_port: int
     service_ports: list[dict[str, Any]]
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.session_id)

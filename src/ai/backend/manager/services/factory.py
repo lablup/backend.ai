@@ -518,6 +518,6 @@ def create_processors(
         resource_allocation=ResourceAllocationProcessors(
             services.resource_allocation, action_monitors, validators
         ),
-        stream=StreamProcessors(services.stream, action_monitors),
+        stream=StreamProcessors(registry.group(), services.stream, action_monitors),
     )
     return ProcessorsBundle(processors=processors, registry=registry)

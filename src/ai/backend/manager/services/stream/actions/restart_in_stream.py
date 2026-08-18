@@ -1,31 +1,39 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.types import SessionId
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.stream.actions.base import StreamAction
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 
 
 @dataclass(frozen=True)
-class RestartInStreamAction(StreamAction):
-    session_name: str
-    user_uuid: uuid.UUID
+class RestartInStreamAction(BaseSingleEntityAction):
+    session_id: SessionId
 
     @override
-    def entity_id(self) -> str | None:
-        return self.session_name
+    def entity_id(self) -> SessionID:
+        return SessionID(self.session_id)
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return SESSION_ENTITY_TYPE
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "restart_in_stream"
+
 
 @dataclass(frozen=True)
-class RestartInStreamActionResult(BaseActionResult):
-    @override
-    def entity_id(self) -> str | None:
-        return None
+class RestartInStreamActionResult:
+    pass
