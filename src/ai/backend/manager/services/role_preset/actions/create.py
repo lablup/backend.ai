@@ -19,15 +19,13 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.creators import RolePresetCreator
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.services.role_preset.actions.base import RoleNameTemplateCarrier
 
 
 @dataclass
 class CreateRolePresetAction(
     CreateGlobalWithFieldsOpsAction[
         RolePresetRow, RolePresetData, RolePermissionPresetRow, RolePermissionPresetData
-    ],
-    RoleNameTemplateCarrier,
+    ]
 ):
     """Register a role preset together with the permissions it grants.
 
@@ -47,10 +45,6 @@ class CreateRolePresetAction(
     @classmethod
     def action_name(cls) -> str:
         return "create_role_preset"
-
-    @override
-    def role_name_template(self) -> str | None:
-        return self.creator.role_name_template
 
     @override
     def to_creator(self) -> RolePresetCreator:

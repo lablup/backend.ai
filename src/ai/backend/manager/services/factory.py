@@ -133,6 +133,7 @@ from ai.backend.manager.services.resource_usage.processors import ResourceUsageP
 from ai.backend.manager.services.resource_usage.service import ResourceUsageService
 from ai.backend.manager.services.retention_policy.processors import RetentionPolicyProcessors
 from ai.backend.manager.services.role_preset.processors import RolePresetProcessors
+from ai.backend.manager.services.role_preset.service import RolePresetService
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
 from ai.backend.manager.services.runtime_variant_preset.processors import (
     RuntimeVariantPresetProcessors,
@@ -290,6 +291,7 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.resource_preset.repository,
         ),
         resource_slot=ResourceSlotService(repositories.resource_slot.repository),
+        role_preset=RolePresetService(OpsRepository(repositories.v2_ops_provider)),
         runtime_variant_preset=RuntimeVariantPresetService(
             repositories.runtime_variant_preset.repository,
         ),
@@ -491,7 +493,7 @@ def create_processors(
             registry.group(),
         ),
         retention_policy=RetentionPolicyProcessors(registry.group()),
-        role_preset=RolePresetProcessors(registry.group()),
+        role_preset=RolePresetProcessors(registry.group(), services.role_preset),
         runtime_variant=RuntimeVariantProcessors(registry.group()),
         runtime_variant_preset=RuntimeVariantPresetProcessors(
             services.runtime_variant_preset, registry.group()

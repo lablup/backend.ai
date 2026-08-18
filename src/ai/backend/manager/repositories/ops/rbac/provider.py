@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-import uuid
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import AsyncIterator, Collection, Iterable, Mapping, Sequence
@@ -358,17 +357,6 @@ class RBACWriteOps(WriteOps):
                 f"Rendered role name exceeds {MAX_ROLE_NAME_LENGTH} characters: {rendered!r}"
             )
         return rendered
-
-    def validate_role_name_template(self, template: str) -> None:
-        """Validate a preset's ``role_name_template`` by rendering it against
-        representative dummy values, so syntax errors and undefined variables
-        are rejected before the preset is stored."""
-        dummy = ScopeTemplateValue(
-            id=uuid.UUID(int=0),
-            name="name",
-            type="user",
-        )
-        self._render_role_name(template, dummy)
 
     # -- Spec-based idempotent inserts --------------------------------------------
 

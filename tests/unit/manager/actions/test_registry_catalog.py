@@ -129,7 +129,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     ProjectResourcePolicyProcessors(registry.group())
     UserResourcePolicyProcessors(registry.group())
     KeypairResourcePolicyProcessors(registry.group())
-    RolePresetProcessors(registry.group())
+    RolePresetProcessors(registry.group(), MagicMock())
     RuntimeVariantProcessors(registry.group())
     ObjectStorageProcessors(MagicMock(), registry.group())
     VFSStorageProcessors(MagicMock(), registry.group())

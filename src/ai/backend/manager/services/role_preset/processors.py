@@ -43,11 +43,12 @@ from ai.backend.manager.services.role_preset.actions.search_permission_presets i
     SearchRolePermissionPresetsAction,
 )
 from ai.backend.manager.services.role_preset.actions.update import UpdateRolePresetAction
-from ai.backend.manager.services.role_preset.validators import RoleNameTemplateValidator
+from ai.backend.manager.services.role_preset.service import RolePresetService
 
 
 class RolePresetProcessors:
-    """Every operation runs straight against ops, so this domain has no service.
+    """The two template-settling writes go through the service; the rest run straight
+    against ops.
 
     One group: the preset is the entity, and its permission entries are field rows of
     it, wired through the field group the preset's group hands out.
@@ -57,9 +58,9 @@ class RolePresetProcessors:
         CreateRolePresetAction,
         CreatedEntityWithFieldsOpsResult[RolePresetData, RolePermissionPresetData],
     ]
-    get: GlobalActionProcessor[GetRolePresetAction, EntityOpsResult[RolePresetData]]
+    get: SingleEntityActionProcessor[GetRolePresetAction, EntityOpsResult[RolePresetData]]
     search: GlobalActionProcessor[SearchRolePresetsAction, BatchOpsResult[RolePresetData]]
-    update: GlobalActionProcessor[UpdateRolePresetAction, EntityOpsResult[RolePresetData]]
+    update: SingleEntityActionProcessor[UpdateRolePresetAction, EntityOpsResult[RolePresetData]]
     bulk_delete: BulkActionProcessor[BulkDeleteRolePresetsAction, BulkOpsResult[RolePresetData]]
     bulk_restore: BulkActionProcessor[BulkRestoreRolePresetsAction, BulkOpsResult[RolePresetData]]
     purge: SingleEntityActionProcessor[PurgeRolePresetAction, EntityOpsResult[RolePresetData]]
@@ -76,15 +77,13 @@ class RolePresetProcessors:
         BulkRemoveRolePermissionPresetsAction, RolePermissionPresetData
     ]
 
-    def __init__(self, preset_group: ProcessorGroup[RolePresetData]) -> None:
-        self.create = preset_group.global_create_with_fields_ops(
-            CreateRolePresetAction, validators=[RoleNameTemplateValidator()]
-        )
-        self.get = preset_group.global_get_ops(GetRolePresetAction)
+    def __init__(
+        self, preset_group: ProcessorGroup[RolePresetData], service: RolePresetService
+    ) -> None:
+        self.create = preset_group.global_scope(CreateRolePresetAction, service.create)
+        self.get = preset_group.single_get_ops(GetRolePresetAction)
         self.search = preset_group.global_search_ops(SearchRolePresetsAction)
-        self.update = preset_group.global_update_ops(
-            UpdateRolePresetAction, validators=[RoleNameTemplateValidator()]
-        )
+        self.update = preset_group.single_entity(UpdateRolePresetAction, service.update)
         self.bulk_delete = preset_group.partial_bulk_delete_ops(BulkDeleteRolePresetsAction)
         self.bulk_restore = preset_group.partial_bulk_restore_ops(BulkRestoreRolePresetsAction)
         self.purge = preset_group.entity_purge_ops(PurgeRolePresetAction)
