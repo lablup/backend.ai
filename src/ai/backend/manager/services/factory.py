@@ -43,7 +43,6 @@ from ai.backend.manager.services.dotfile.service import DotfileService
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
 from ai.backend.manager.services.etcd_config.service import EtcdConfigService
-from ai.backend.manager.services.events.processors import EventsProcessors
 from ai.backend.manager.services.events.service import EventsService
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.export.service import ExportService
@@ -393,10 +392,7 @@ def create_services(args: ServiceArgs) -> Services:
             valkey_live=args.valkey_live,
             etcd=args.etcd,
         ),
-        events=EventsService(
-            repository=repositories.events.repository,
-            db=args.db,
-        ),
+        events=EventsService(args.db),
     )
 
 
@@ -421,6 +417,9 @@ def create_processors(
         )
     )
     processors = Processors(
+        event_hub=args.event_hub,
+        event_fetcher=args.event_fetcher,
+        events_service=services.events,
         agent=AgentProcessors(registry.group(), services.agent, action_monitors, validators),
         app_config=AppConfigProcessors(
             registry.group(),
@@ -520,11 +519,5 @@ def create_processors(
             services.resource_allocation, action_monitors, validators
         ),
         stream=StreamProcessors(services.stream, action_monitors),
-        events=EventsProcessors(
-            services.events,
-            action_monitors,
-            event_hub=args.event_hub,
-            event_fetcher=args.event_fetcher,
-        ),
     )
     return ProcessorsBundle(processors=processors, registry=registry)

@@ -283,13 +283,14 @@ def build_api_routes(
     spec_handler = SpecHandler(config_provider=config_provider, root_app=root_app)
 
     # Events handler
-    events_processors = processors.events
-    event_hub = events_processors.event_hub
-    event_fetcher = events_processors.event_fetcher
+    event_hub = processors.event_hub
+    event_fetcher = processors.event_fetcher
     events_ctx = EventsPrivateContext()
     events_handler = EventsHandler(
         private_ctx=events_ctx,
-        events_processors=events_processors,
+        events_service=processors.events_service,
+        session_processors=processors.session,
+        group_processors=processors.group,
         event_hub=event_hub,
         event_fetcher=event_fetcher,
     )

@@ -108,9 +108,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.etcd_config.service import (
         EtcdConfigService,
     )
-    from ai.backend.manager.services.events.processors import (
-        EventsProcessors,
-    )
     from ai.backend.manager.services.events.service import EventsService
     from ai.backend.manager.services.export.processors import (
         ExportProcessors,
@@ -402,6 +399,9 @@ class ProcessorArgs:
 
 @dataclass
 class Processors:
+    event_hub: EventHub
+    event_fetcher: EventFetcher
+    events_service: EventsService
     agent: AgentProcessors
     app_config: AppConfigProcessors
     domain: DomainProcessors
@@ -457,7 +457,6 @@ class Processors:
     template: TemplateProcessors
     resource_allocation: ResourceAllocationProcessors
     stream: StreamProcessors
-    events: EventsProcessors
     login_client_type: LoginClientTypeProcessors
 
 
