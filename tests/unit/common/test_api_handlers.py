@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from http import HTTPStatus
 from typing import Any, Self
 
+import pytest
 from aiohttp import web
 from pydantic import AliasChoices, Field
 
 from ai.backend.common.api_handlers import (
     APIResponse,
+    APIStreamResponse,
     BaseRequestModel,
     BaseResponseModel,
     BodyParam,
@@ -18,7 +20,9 @@ from ai.backend.common.api_handlers import (
     PathParam,
     QueryParam,
     api_handler,
+    stream_api_handler,
 )
+from ai.backend.common.types import StreamReader
 
 
 class TestEmptyResponseModel(BaseResponseModel):
@@ -572,3 +576,98 @@ async def test_repeated_uuid_list_query_parameter_via_alias(aiohttp_client: Any)
     assert resp.status == HTTPStatus.OK
     data = await resp.json()
     assert data["group_ids"] == [g1, g2]
+
+
+class _ChunkStreamReader(StreamReader):
+    """Yields the given chunks, optionally raising after `raise_after` chunks."""
+
+    _chunks: list[bytes]
+    _raise_after: int | None
+
+    def __init__(self, chunks: list[bytes], raise_after: int | None = None) -> None:
+        self._chunks = chunks
+        self._raise_after = raise_after
+
+    @override
+    async def read(self) -> AsyncIterator[bytes]:
+        for idx, chunk in enumerate(self._chunks):
+            if self._raise_after is not None and idx == self._raise_after:
+                raise RuntimeError("stream source failure")
+            yield chunk
+        if self._raise_after is not None and self._raise_after == len(self._chunks):
+            raise RuntimeError("stream source failure")
+
+    @override
+    def content_type(self) -> str | None:
+        return "application/octet-stream"
+
+
+class TestStreamHandler:
+    _reader: StreamReader
+
+    def __init__(self, reader: StreamReader) -> None:
+        self._reader = reader
+
+    @stream_api_handler
+    async def handle_stream(self) -> APIStreamResponse:
+        return APIStreamResponse(body=self._reader, status=HTTPStatus.OK)
+
+
+async def _make_stream_client(aiohttp_client: Any, reader: StreamReader) -> Any:
+    handler = TestStreamHandler(reader)
+    app = web.Application()
+    app.router.add_get("/stream", handler.handle_stream)
+    return await aiohttp_client(app)
+
+
+async def test_empty_stream_returns_empty_body(aiohttp_client: Any) -> None:
+    client = await _make_stream_client(aiohttp_client, _ChunkStreamReader([]))
+    resp = await client.get("/stream")
+
+    assert resp.status == HTTPStatus.OK
+    assert await resp.read() == b""
+    assert resp.headers["Content-Length"] == "0"
+
+
+async def test_non_empty_stream_delivers_all_chunks(aiohttp_client: Any) -> None:
+    client = await _make_stream_client(aiohttp_client, _ChunkStreamReader([b"foo", b"bar", b"baz"]))
+    resp = await client.get("/stream")
+
+    assert resp.status == HTTPStatus.OK
+    assert await resp.read() == b"foobarbaz"
+
+
+async def test_stream_failing_before_first_chunk_returns_500(aiohttp_client: Any) -> None:
+    client = await _make_stream_client(aiohttp_client, _ChunkStreamReader([b"foo"], raise_after=0))
+    resp = await client.get("/stream")
+
+    assert resp.status == HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+async def test_stream_failing_midway_is_not_seen_as_complete(
+    aiohttp_client: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    force_close_calls: list[web.StreamResponse] = []
+    original_force_close = web.StreamResponse.force_close
+
+    def spy_force_close(self: web.StreamResponse) -> None:
+        force_close_calls.append(self)
+        original_force_close(self)
+
+    monkeypatch.setattr(web.StreamResponse, "force_close", spy_force_close)
+
+    client = await _make_stream_client(
+        aiohttp_client, _ChunkStreamReader([b"foo", b"bar"], raise_after=1)
+    )
+    resp = await client.get("/stream")
+
+    # Headers are already sent, so the status stays 200; the connection is force-closed
+    # without `write_eof()` so the client sees a truncated payload instead of a
+    # successfully completed body.
+    # Headers are already sent, so the status stays 200. Only the chunks written
+    # before the failure are delivered and the connection is force-closed instead
+    # of completing normally.
+    assert resp.status == HTTPStatus.OK
+    assert await resp.read() == b"foo"
+    assert force_close_calls
