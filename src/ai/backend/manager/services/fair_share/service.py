@@ -35,18 +35,18 @@ from .actions import (
     GetProjectFairShareActionResult,
     GetUserFairShareAction,
     GetUserFairShareActionResult,
-    SearchDomainFairSharesAction,
-    SearchDomainFairSharesActionResult,
-    SearchProjectFairSharesAction,
-    SearchProjectFairSharesActionResult,
+    GlobalSearchDomainFairSharesAction,
+    GlobalSearchDomainFairSharesActionResult,
+    GlobalSearchProjectFairSharesAction,
+    GlobalSearchProjectFairSharesActionResult,
+    GlobalSearchUserFairSharesAction,
+    GlobalSearchUserFairSharesActionResult,
     SearchRGDomainFairSharesAction,
     SearchRGDomainFairSharesActionResult,
     SearchRGProjectFairSharesAction,
     SearchRGProjectFairSharesActionResult,
     SearchRGUserFairSharesAction,
     SearchRGUserFairSharesActionResult,
-    SearchUserFairSharesAction,
-    SearchUserFairSharesActionResult,
     UpsertDomainFairShareWeightAction,
     UpsertDomainFairShareWeightActionResult,
     UpsertProjectFairShareWeightAction,
@@ -99,8 +99,8 @@ class FairShareService:
         return GetDomainFairShareActionResult(data=result)
 
     async def search_domain_fair_shares(
-        self, action: SearchDomainFairSharesAction
-    ) -> SearchDomainFairSharesActionResult:
+        self, action: GlobalSearchDomainFairSharesAction
+    ) -> GlobalSearchDomainFairSharesActionResult:
         """Search domain fair shares with pagination."""
         querier = BatchQuerier(
             pagination=action.pagination,
@@ -108,7 +108,7 @@ class FairShareService:
             orders=action.orders,
         )
         result = await self._repository.search_domain_fair_shares(querier)
-        return SearchDomainFairSharesActionResult(
+        return GlobalSearchDomainFairSharesActionResult(
             items=result.items,
             total_count=result.total_count,
         )
@@ -146,8 +146,8 @@ class FairShareService:
         return GetProjectFairShareActionResult(data=result)
 
     async def search_project_fair_shares(
-        self, action: SearchProjectFairSharesAction
-    ) -> SearchProjectFairSharesActionResult:
+        self, action: GlobalSearchProjectFairSharesAction
+    ) -> GlobalSearchProjectFairSharesActionResult:
         """Search project fair shares with pagination."""
         querier = BatchQuerier(
             pagination=action.pagination,
@@ -155,7 +155,7 @@ class FairShareService:
             orders=action.orders,
         )
         result = await self._repository.search_project_fair_shares(querier)
-        return SearchProjectFairSharesActionResult(
+        return GlobalSearchProjectFairSharesActionResult(
             items=result.items,
             total_count=result.total_count,
         )
@@ -194,8 +194,8 @@ class FairShareService:
         return GetUserFairShareActionResult(data=result)
 
     async def search_user_fair_shares(
-        self, action: SearchUserFairSharesAction
-    ) -> SearchUserFairSharesActionResult:
+        self, action: GlobalSearchUserFairSharesAction
+    ) -> GlobalSearchUserFairSharesActionResult:
         """Search user fair shares with pagination."""
         querier = BatchQuerier(
             pagination=action.pagination,
@@ -203,7 +203,7 @@ class FairShareService:
             orders=action.orders,
         )
         result = await self._repository.search_user_fair_shares(querier)
-        return SearchUserFairSharesActionResult(
+        return GlobalSearchUserFairSharesActionResult(
             items=result.items,
             total_count=result.total_count,
         )

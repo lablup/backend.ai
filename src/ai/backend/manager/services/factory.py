@@ -427,7 +427,7 @@ def create_processors(
         error_log=ErrorLogProcessors(registry.group()),
         etcd_config=EtcdConfigProcessors(registry.group(), services.etcd_config),
         export=ExportProcessors(services.export, action_monitors, validators),
-        fair_share=FairShareProcessors(services.fair_share, action_monitors, validators),
+        fair_share=FairShareProcessors(registry.group(), services.fair_share),
         group=GroupProcessors(registry.group(), services.group),
         user=UserProcessors(registry.group(), services.user),
         idle_checker=IdleCheckerProcessors(
