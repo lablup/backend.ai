@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any, override
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
@@ -27,7 +28,7 @@ class UserInfo:
 
 
 @dataclass
-class DomainData:
+class DomainData(EntityData):
     id: DomainID
     name: str
     description: str | None
@@ -40,6 +41,10 @@ class DomainData:
     allowed_docker_registries: list[str]
     dotfiles: bytes
     integration_name: str | None
+
+    @override
+    def entity_id(self) -> DomainID:
+        return self.id
 
     def scope_id(self) -> ScopeId:
         return ScopeId(
