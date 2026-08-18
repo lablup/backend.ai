@@ -7,9 +7,9 @@ import pytest
 
 from ai.backend.common.events.event_types.kernel.types import (
     KernelCreationInfo,
-    OccupiedDevice,
-    OccupiedDevices,
     ServicePortInfo,
+    UsedDevice,
+    UsedDevices,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
@@ -23,22 +23,22 @@ from ai.backend.common.types import (
 
 
 def _device(
-    allocated: dict[str, Decimal],
+    used: dict[str, Decimal],
     *,
     model_name: str | None = None,
     processing_units: int | None = None,
     memory_size: int | None = None,
-) -> OccupiedDevice:
-    return OccupiedDevice(
+) -> UsedDevice:
+    return UsedDevice(
         model_name=model_name,
-        allocated={ResourceSlotName(slot): amount for slot, amount in allocated.items()},
+        used={ResourceSlotName(slot): amount for slot, amount in used.items()},
         processing_units=processing_units,
         memory_size=memory_size,
     )
 
 
 def _info_with(
-    occupied_devices: OccupiedDevices,
+    used_devices: UsedDevices,
     service_ports: list[ServicePortInfo] | None = None,
 ) -> KernelCreationInfo:
     return KernelCreationInfo(
@@ -47,7 +47,7 @@ def _info_with(
         repl_in_port=2000,
         repl_out_port=2001,
         service_ports=service_ports if service_ports is not None else [],
-        occupied_devices=occupied_devices,
+        used_devices=used_devices,
     )
 
 
@@ -55,7 +55,7 @@ def _info_with(
 def creation_info() -> KernelCreationInfo:
     """A kernel holding one cpu core, 1 GiB, and half of one GPU."""
     return _info_with(
-        OccupiedDevices(
+        UsedDevices(
             units={
                 DeviceName("cpu"): {DeviceId("0"): _device({"cpu": Decimal("1")})},
                 DeviceName("mem"): {DeviceId("root"): _device({"mem": Decimal("1073741824")})},
@@ -89,24 +89,24 @@ class TestKernelCreationInfo:
 
         assert restored == creation_info
         assert restored.service_ports[0].protocol is ServicePortProtocols.HTTP
-        cuda = restored.occupied_devices.units[DeviceName("cuda")][DeviceId("0")]
+        cuda = restored.used_devices.units[DeviceName("cuda")][DeviceId("0")]
         assert cuda.model_name == "A100"
         assert (cuda.processing_units, cuda.memory_size) == (54, 21474836480)
-        assert cuda.allocated[ResourceSlotName("cuda.shares")] == Decimal("0.5")
+        assert cuda.used[ResourceSlotName("cuda.shares")] == Decimal("0.5")
 
     def test_one_unit_is_described_once(self, creation_info: KernelCreationInfo) -> None:
         """The unit metered along two axes appears once, with both amounts under it —
-        which is what merging the attached devices into the occupancy buys."""
-        cuda = creation_info.occupied_devices.units[DeviceName("cuda")]
+        which is what merging the attached devices into the usage buys."""
+        cuda = creation_info.used_devices.units[DeviceName("cuda")]
 
         assert list(cuda) == [DeviceId("0")]
-        assert set(cuda[DeviceId("0")].allocated) == {"cuda.device", "cuda.shares"}
+        assert set(cuda[DeviceId("0")].used) == {"cuda.device", "cuda.shares"}
 
     def test_an_intrinsic_device_reports_neither_unit(
         self, creation_info: KernelCreationInfo
     ) -> None:
         """Only an accelerator measures itself; the cpu and mem plugins report nothing."""
-        cpu = creation_info.occupied_devices.units[DeviceName("cpu")][DeviceId("0")]
+        cpu = creation_info.used_devices.units[DeviceName("cpu")][DeviceId("0")]
 
         assert (cpu.model_name, cpu.processing_units, cpu.memory_size) == (None, None, None)
 
@@ -118,10 +118,10 @@ class TestKernelCreationInfo:
 
 
 class TestSlotTotals:
-    """`slot_totals` is what a caller records as the kernel's occupancy."""
+    """`slot_totals` is what a caller records as the kernel's usage."""
 
     def test_amounts_are_summed_across_units(self) -> None:
-        occupied = OccupiedDevices(
+        used = UsedDevices(
             units={
                 DeviceName("cuda"): {
                     DeviceId("0"): _device({"cuda.shares": Decimal("0.5")}),
@@ -130,12 +130,12 @@ class TestSlotTotals:
             }
         )
 
-        totals = {e.resource_type: e.quantity for e in occupied.slot_totals}
+        totals = {e.resource_type: e.quantity for e in used.slot_totals}
 
         assert totals == {"cuda.shares": "0.75"}
 
     def test_a_unit_reports_each_of_its_slots(self, creation_info: KernelCreationInfo) -> None:
-        totals = {e.resource_type: e.quantity for e in creation_info.occupied_devices.slot_totals}
+        totals = {e.resource_type: e.quantity for e in creation_info.used_devices.slot_totals}
 
         assert totals == {
             "cpu": "1",
@@ -155,12 +155,12 @@ class TestSlotTotals:
     )
     def test_amounts_survive_the_wire_exactly(self, slot: str, amount: Decimal) -> None:
         info = _info_with(
-            OccupiedDevices(units={DeviceName(slot): {DeviceId("0"): _device({slot: amount})}})
+            UsedDevices(units={DeviceName(slot): {DeviceId("0"): _device({slot: amount})}})
         )
 
         restored = KernelCreationInfo.model_validate_json(info.model_dump_json())
 
-        assert restored.occupied_devices.slot_totals == [
+        assert restored.used_devices.slot_totals == [
             ResourceSlotEntry(resource_type=ResourceSlotName(slot), quantity=str(amount))
         ]
 
@@ -173,7 +173,7 @@ class TestSlotTotals:
                 "cpu": {
                     "0": {
                         "model_name": None,
-                        "allocated": {"cpu": amount},
+                        "used": {"cpu": amount},
                         "processing_units": None,
                         "memory_size": None,
                     }
@@ -182,7 +182,7 @@ class TestSlotTotals:
         })
 
         with pytest.raises(BackendAISchemaValidationFailed):
-            OccupiedDevices.model_validate_json(payload)
+            UsedDevices.model_validate_json(payload)
 
     def test_a_kernel_holding_nothing_totals_nothing(self) -> None:
-        assert OccupiedDevices(units={}).slot_totals == []
+        assert UsedDevices(units={}).slot_totals == []

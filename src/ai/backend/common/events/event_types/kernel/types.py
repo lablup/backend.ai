@@ -57,46 +57,46 @@ class KernelLifecycleEventReason(enum.StrEnum):
         return None
 
 
-class OccupiedDevice(BackendAISchema):
+class UsedDevice(BackendAISchema):
     """
     One device unit the kernel holds, and how much of it.
 
-    `allocated` is in the scheduler's units — the slots it accounts by, of which a unit
+    `used` is in the scheduler's units — the slots it accounts by, of which a unit
     supplies more than one when it is metered along more than one axis, as a `cuda`
     device does with `cuda.device` and `cuda.shares`. `processing_units` and
-    `memory_size` are that same allocation in the device's own units, mirroring
+    `memory_size` are that same amount in the device's own units, mirroring
     `AbstractComputeDevice`; only an accelerator reports them.
     """
 
     model_name: str | None  # kept for the GPU usage stats, which aggregate device models
-    allocated: Mapping[ResourceSlotName, Decimal]
+    used: Mapping[ResourceSlotName, Decimal]
     processing_units: int | None
     memory_size: int | None
 
 
-class OccupiedDevices(BackendAISchema):
+class UsedDevices(BackendAISchema):
     """
-    The devices the kernel occupies.
+    The devices the kernel uses.
 
     Keyed by device name (`cuda`) and then by unit (`0`): `DeviceName` names a kind of
     device, `DeviceId` one of its units.
     """
 
-    units: Mapping[DeviceName, Mapping[DeviceId, OccupiedDevice]]
+    units: Mapping[DeviceName, Mapping[DeviceId, UsedDevice]]
 
     @property
     def slot_totals(self) -> list[ResourceSlotEntry]:
         """
-        The per-unit allocations summed per slot — what a caller records as occupancy.
+        The per-unit amounts summed per slot — what a caller records as the kernel's usage.
 
-        Not a `computed_field`: it would be written into the payload beside the allocations
+        Not a `computed_field`: it would be written into the payload beside the amounts
         it is derived from, where nothing reads it — a receiver recomputes it — and it
         can disagree with the value next to it.
         """
         totals: dict[ResourceSlotName, Decimal] = {}
         for units in self.units.values():
             for device in units.values():
-                for slot_name, amount in device.allocated.items():
+                for slot_name, amount in device.used.items():
                     totals[slot_name] = totals.get(slot_name, Decimal(0)) + amount
         return [
             ResourceSlotEntry(resource_type=slot_name, quantity=str(total))
@@ -125,4 +125,4 @@ class KernelCreationInfo(BackendAISchema):
     repl_in_port: int
     repl_out_port: int
     service_ports: list[ServicePortInfo]
-    occupied_devices: OccupiedDevices
+    used_devices: UsedDevices
