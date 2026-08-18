@@ -568,19 +568,24 @@ def stream_api_handler(handler: StreamBaseHandler) -> ParsedRequestHandler:
 
         body_iter = body_stream.read()
 
-        # Send first chunk, and check if it raises an exception
+        # Pull the first chunk before sending headers so that a failing source
+        # can still be reported with an error status code.
         try:
-            first_chunk = await body_iter.__anext__()
-            await resp.prepare(request)
-            await resp.write(first_chunk)
+            first_chunk = await anext(body_iter, None)
         except Exception as e:
             raise web.HTTPInternalServerError(
-                reason=f"Failed to send first chunk from stream: {e!r}"
+                reason=f"Failed to read first chunk from stream: {e!r}"
             ) from e
 
+        if first_chunk is None:
+            resp.content_length = 0
+
         try:
-            async for chunk in body_iter:
-                await resp.write(chunk)
+            await resp.prepare(request)
+            if first_chunk is not None:
+                await resp.write(first_chunk)
+                async for chunk in body_iter:
+                    await resp.write(chunk)
             # Normal completion - send chunked transfer encoding terminator
             await resp.write_eof()
         except Exception:
