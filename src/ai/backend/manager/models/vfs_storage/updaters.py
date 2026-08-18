@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
@@ -16,7 +16,7 @@ from ai.backend.manager.types import OptionalState
 
 @dataclass
 class VFSStorageUpdater(DataUpdater[VFSStorageRow, VFSStorageData]):
-    storage_id: uuid.UUID
+    storage_id: VFSStorageID
     name: OptionalState[str] = field(default_factory=OptionalState.nop)
     host: OptionalState[str] = field(default_factory=OptionalState.nop)
     base_path: OptionalState[str] = field(default_factory=OptionalState.nop)
@@ -27,7 +27,7 @@ class VFSStorageUpdater(DataUpdater[VFSStorageRow, VFSStorageData]):
         return VFSStorageRow
 
     @override
-    def pk_value(self) -> uuid.UUID:
+    def pk_value(self) -> VFSStorageID:
         return self.storage_id
 
     @property

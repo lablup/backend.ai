@@ -155,8 +155,8 @@ class ObjectStorageAdapter(BaseAdapter):
 
     async def get(self, storage_id: UUID) -> ObjectStorageNode:
         """Retrieve a single object storage by ID."""
-        action_result = await self._processors.object_storage.global_get.run(
-            GetObjectStorageAction(storage_id=storage_id)
+        action_result = await self._processors.object_storage.get.run(
+            GetObjectStorageAction(storage_id=ObjectStorageID(storage_id))
         )
         return self._data_to_dto(action_result.data)
 
@@ -179,7 +179,7 @@ class ObjectStorageAdapter(BaseAdapter):
     async def update(self, input: UpdateObjectStorageInput) -> UpdateObjectStoragePayload:
         """Update an existing object storage."""
         updater = ObjectStorageUpdater(
-            storage_id=input.id,
+            storage_id=ObjectStorageID(input.id),
             name=OptionalState.update(input.name)
             if input.name is not None
             else OptionalState.nop(),
@@ -203,7 +203,7 @@ class ObjectStorageAdapter(BaseAdapter):
                 else TriState.update(input.region)
             ),
         )
-        action_result = await self._processors.object_storage.global_update.run(
+        action_result = await self._processors.object_storage.update.run(
             UpdateObjectStorageAction(updater=updater)
         )
         return UpdateObjectStoragePayload(object_storage=self._data_to_dto(action_result.data))

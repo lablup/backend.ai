@@ -250,7 +250,7 @@ class TestVFSStorageCRUD:
     ) -> None:
         """Get VFS storage by ID returns correct data."""
         action = GetVFSStorageAction(storage_id=target_vfs_storage["id"])
-        result = await vfs_storage_processors.global_get.run(action)
+        result = await vfs_storage_processors.get.run(action)
         assert result.data.id == target_vfs_storage["id"]
         assert result.data.name == target_vfs_storage["name"]
         assert result.data.host == target_vfs_storage["host"]
@@ -323,13 +323,13 @@ class TestVFSStorageCRUD:
                 host=OptionalState.update("nfs:updated-host"),
             )
         )
-        update_result = await vfs_storage_processors.global_update.run(update_action)
+        update_result = await vfs_storage_processors.update.run(update_action)
         assert update_result.data.name == "updated-name"
         assert update_result.data.host == "nfs:updated-host"
 
         # Verify via get by ID
         get_action = GetVFSStorageAction(storage_id=target_vfs_storage["id"])
-        get_result = await vfs_storage_processors.global_get.run(get_action)
+        get_result = await vfs_storage_processors.get.run(get_action)
         assert get_result.data.name == "updated-name"
         assert get_result.data.host == "nfs:updated-host"
 
@@ -370,7 +370,7 @@ class TestVFSStorageCRUD:
         storage_id = create_result.data.id
 
         # Get by ID
-        get_result = await vfs_storage_processors.global_get.run(
+        get_result = await vfs_storage_processors.get.run(
             GetVFSStorageAction(storage_id=storage_id)
         )
         assert get_result.data.name == "lifecycle-test"
@@ -380,7 +380,7 @@ class TestVFSStorageCRUD:
         assert http_result.storage.host == "local:lifecycle"
 
         # Update
-        await vfs_storage_processors.global_update.run(
+        await vfs_storage_processors.update.run(
             UpdateVFSStorageAction(
                 updater=VFSStorageUpdater(
                     storage_id=storage_id,

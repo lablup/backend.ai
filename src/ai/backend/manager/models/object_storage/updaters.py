@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage.row import ObjectStorageRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -16,7 +16,7 @@ from ai.backend.manager.types import OptionalState, TriState
 
 @dataclass
 class ObjectStorageUpdater(DataUpdater[ObjectStorageRow, ObjectStorageData]):
-    storage_id: uuid.UUID
+    storage_id: ObjectStorageID
     name: OptionalState[str] = field(default_factory=OptionalState.nop)
     host: OptionalState[str] = field(default_factory=OptionalState.nop)
     access_key: OptionalState[str] = field(default_factory=OptionalState.nop)
@@ -30,7 +30,7 @@ class ObjectStorageUpdater(DataUpdater[ObjectStorageRow, ObjectStorageData]):
         return ObjectStorageRow
 
     @override
-    def pk_value(self) -> uuid.UUID:
+    def pk_value(self) -> ObjectStorageID:
         return self.storage_id
 
     @property

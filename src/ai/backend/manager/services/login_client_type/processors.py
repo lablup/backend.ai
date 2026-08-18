@@ -48,7 +48,7 @@ class LoginClientTypeProcessors:
     global_create: GlobalActionProcessor[
         CreateLoginClientTypeAction, CreatedEntityOpsResult[LoginClientTypeData]
     ]
-    global_update: GlobalActionProcessor[
+    update: SingleEntityActionProcessor[
         UpdateLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]
     ]
     purge: SingleEntityActionProcessor[
@@ -59,5 +59,5 @@ class LoginClientTypeProcessors:
         self.public_get = group.public_get_ops(GetLoginClientTypeAction)
         self.public_search = group.public_search_ops(SearchLoginClientTypesAction)
         self.global_create = group.global_create_ops(CreateLoginClientTypeAction)
-        self.global_update = group.global_update_ops(UpdateLoginClientTypeAction)
+        self.update = group.single_update_ops(UpdateLoginClientTypeAction)
         self.purge = group.entity_purge_ops(PurgeLoginClientTypeAction)

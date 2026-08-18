@@ -5,8 +5,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
+from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -16,7 +16,7 @@ from ai.backend.manager.types import OptionalState, TriState
 
 @dataclass
 class LoginClientTypeUpdater(DataUpdater[LoginClientTypeRow, LoginClientTypeData]):
-    login_client_type_id: UUID
+    login_client_type_id: LoginClientTypeID
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
 
@@ -26,7 +26,7 @@ class LoginClientTypeUpdater(DataUpdater[LoginClientTypeRow, LoginClientTypeData
         return LoginClientTypeRow
 
     @override
-    def pk_value(self) -> UUID:
+    def pk_value(self) -> LoginClientTypeID:
         return self.login_client_type_id
 
     @property

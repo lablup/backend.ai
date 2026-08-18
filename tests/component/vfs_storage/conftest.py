@@ -8,6 +8,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -62,10 +63,10 @@ async def vfs_storage_factory(
 
     Yields a factory callable and cleans up all created storages on teardown.
     """
-    created_ids: list[uuid.UUID] = []
+    created_ids: list[VFSStorageID] = []
 
     async def _create(**overrides: Any) -> VFSStorageFixtureData:
-        storage_id = uuid.uuid4()
+        storage_id = VFSStorageID(uuid.uuid4())
         defaults: dict[str, Any] = {
             "id": storage_id,
             "name": f"test-vfs-{storage_id.hex[:8]}",

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage.row import ObjectStorageRow
 from ai.backend.manager.models.specs.querier import DataQuerier
@@ -13,14 +13,14 @@ from ai.backend.manager.models.specs.querier import DataQuerier
 
 @dataclass
 class ObjectStorageQuerier(DataQuerier[ObjectStorageRow, ObjectStorageData]):
-    storage_id: uuid.UUID
+    storage_id: ObjectStorageID
 
     @override
     def row_class(self) -> type[ObjectStorageRow]:
         return ObjectStorageRow
 
     @override
-    def pk_value(self) -> uuid.UUID:
+    def pk_value(self) -> ObjectStorageID:
         return self.storage_id
 
     @override

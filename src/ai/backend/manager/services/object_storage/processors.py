@@ -40,11 +40,11 @@ class ObjectStorageProcessors:
     global_create: GlobalActionProcessor[
         CreateObjectStorageAction, CreatedEntityOpsResult[ObjectStorageData]
     ]
-    global_update: GlobalActionProcessor[
+    update: SingleEntityActionProcessor[
         UpdateObjectStorageAction, EntityOpsResult[ObjectStorageData]
     ]
     purge: SingleEntityActionProcessor[PurgeObjectStorageAction, EntityOpsResult[ObjectStorageData]]
-    global_get: GlobalActionProcessor[GetObjectStorageAction, EntityOpsResult[ObjectStorageData]]
+    get: SingleEntityActionProcessor[GetObjectStorageAction, EntityOpsResult[ObjectStorageData]]
     global_list_storages: GlobalActionProcessor[
         ListObjectStorageAction, BatchOpsResult[ObjectStorageData]
     ]
@@ -64,9 +64,9 @@ class ObjectStorageProcessors:
         group: ProcessorGroup[ObjectStorageData],
     ) -> None:
         self.global_create = group.global_create_ops(CreateObjectStorageAction)
-        self.global_update = group.global_update_ops(UpdateObjectStorageAction)
+        self.update = group.single_update_ops(UpdateObjectStorageAction)
         self.purge = group.entity_purge_ops(PurgeObjectStorageAction)
-        self.global_get = group.global_get_ops(GetObjectStorageAction)
+        self.get = group.single_get_ops(GetObjectStorageAction)
         self.global_list_storages = group.global_search_ops(ListObjectStorageAction)
         self.global_search_object_storages = group.global_search_ops(SearchObjectStoragesAction)
         self.global_get_presigned_download_url = group.global_scope(

@@ -50,9 +50,9 @@ class VFSStorageProcessors:
     global_create: GlobalActionProcessor[
         CreateVFSStorageAction, CreatedEntityOpsResult[VFSStorageData]
     ]
-    global_update: GlobalActionProcessor[UpdateVFSStorageAction, EntityOpsResult[VFSStorageData]]
+    update: SingleEntityActionProcessor[UpdateVFSStorageAction, EntityOpsResult[VFSStorageData]]
     purge: SingleEntityActionProcessor[PurgeVFSStorageAction, EntityOpsResult[VFSStorageData]]
-    global_get: GlobalActionProcessor[GetVFSStorageAction, EntityOpsResult[VFSStorageData]]
+    get: SingleEntityActionProcessor[GetVFSStorageAction, EntityOpsResult[VFSStorageData]]
     lookup: LookupActionProcessor[LookupVFSStorageAction, LookupOpsResult[VFSStorageData]]
     global_list_storages: GlobalActionProcessor[
         ListVFSStorageAction, BatchOpsResult[VFSStorageData]
@@ -78,9 +78,9 @@ class VFSStorageProcessors:
     ) -> None:
         self._service = service
         self.global_create = group.global_create_ops(CreateVFSStorageAction)
-        self.global_update = group.global_update_ops(UpdateVFSStorageAction)
+        self.update = group.single_update_ops(UpdateVFSStorageAction)
         self.purge = group.entity_purge_ops(PurgeVFSStorageAction)
-        self.global_get = group.global_get_ops(GetVFSStorageAction)
+        self.get = group.single_get_ops(GetVFSStorageAction)
         self.lookup = group.lookup_ops(LookupVFSStorageAction)
         self.global_list_storages = group.global_search_ops(ListVFSStorageAction)
         self.global_search_vfs_storages = group.global_search_ops(SearchVFSStoragesAction)

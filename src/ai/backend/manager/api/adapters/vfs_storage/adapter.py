@@ -91,8 +91,8 @@ class VFSStorageAdapter(BaseAdapter):
 
     async def get(self, storage_id: UUID) -> VFSStorageNode:
         """Retrieve a single VFS storage by ID."""
-        action_result = await self._processors.vfs_storage.global_get.run(
-            GetVFSStorageAction(storage_id=storage_id)
+        action_result = await self._processors.vfs_storage.get.run(
+            GetVFSStorageAction(storage_id=VFSStorageID(storage_id))
         )
         return self._vfs_storage_data_to_dto(action_result.data)
 
@@ -106,7 +106,7 @@ class VFSStorageAdapter(BaseAdapter):
     async def update(self, input: UpdateVFSStorageInput) -> UpdateVFSStoragePayload:
         """Update an existing VFS storage."""
         updater = VFSStorageUpdater(
-            storage_id=input.id,
+            storage_id=VFSStorageID(input.id),
             name=OptionalState.update(input.name)
             if input.name is not None
             else OptionalState.nop(),
@@ -119,7 +119,7 @@ class VFSStorageAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        action_result = await self._processors.vfs_storage.global_update.run(
+        action_result = await self._processors.vfs_storage.update.run(
             UpdateVFSStorageAction(updater=updater)
         )
         return UpdateVFSStoragePayload(

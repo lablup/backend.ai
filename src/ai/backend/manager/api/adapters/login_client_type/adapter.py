@@ -127,7 +127,7 @@ class LoginClientTypeAdapter(BaseAdapter):
         self, type_id: UUID, input: UpdateLoginClientTypeInput
     ) -> UpdateLoginClientTypePayload:
         updater = LoginClientTypeUpdater(
-            login_client_type_id=type_id,
+            login_client_type_id=LoginClientTypeID(type_id),
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
@@ -139,7 +139,7 @@ class LoginClientTypeAdapter(BaseAdapter):
                 else TriState.update(input.description)
             ),
         )
-        action_result = await self._processors.login_client_type.global_update.run(
+        action_result = await self._processors.login_client_type.update.run(
             UpdateLoginClientTypeAction(updater=updater)
         )
         return UpdateLoginClientTypePayload(
