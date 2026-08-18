@@ -25,7 +25,11 @@ from ai.backend.manager.models.specs.creator import (
     SidecarCreator,
     SidecarFieldCreator,
 )
-from ai.backend.manager.models.specs.lookup import DataLookup, FieldOwnerLookup
+from ai.backend.manager.models.specs.lookup import (
+    DataLookup,
+    FieldOwnerKeyLookup,
+    FieldOwnerLookup,
+)
 from ai.backend.manager.models.specs.purger import (
     DataBatchPurger,
     EntityPurger,
@@ -97,6 +101,20 @@ class OpsRepository[TData]:
         owner = owners.get(field_id)
         if owner is None:
             raise EntityNotFoundError("No field row matches the given id")
+        return owner
+
+    async def field_owner_by_key[TOwnerID: EntityIdentifier](
+        self, lookup: FieldOwnerKeyLookup[TOwnerID]
+    ) -> TOwnerID:
+        """Read the owner the key names, raising if nothing matches.
+
+        A lookup has to produce an id, so an absent row cannot be reported by returning
+        ``None`` — the same contract the other lookups keep.
+        """
+        async with self._ops.read_ops() as r:
+            owner = await r.lookup_field_owner_by_key(lookup)
+        if owner is None:
+            raise EntityNotFoundError("No field row matches the given key")
         return owner
 
     async def search_in_scopes(

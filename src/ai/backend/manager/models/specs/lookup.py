@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -90,6 +91,29 @@ class FieldOwnerLookup[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](AB
         self, field_ids: Sequence[TFieldID]
     ) -> sa.sql.Select[tuple[TFieldID, TOwnerID]]:
         """Build the query selecting each named row's id and its owning entity's id."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_entity_id(self, value: UUID) -> TOwnerID:
+        """Convert the selected value into the owning entity's identifier."""
+        raise NotImplementedError
+
+
+class FieldOwnerKeyLookup[TOwnerID: EntityIdentifier](ABC):
+    """Resolves a field row's caller-facing key into the entity that owns it.
+
+    The counterpart of :class:`FieldOwnerLookup` for the other direction a field row is
+    reached from: an access key, a name — something a request carries instead of the
+    row's id. What comes back is the owner alone, because that is what the operation
+    that follows is checked and recorded against.
+
+    A query rather than conditions, for the same reason the id-keyed one is: an owner
+    reached through a join is expressible.
+    """
+
+    @abstractmethod
+    def build_query(self) -> sa.sql.Select[Any]:
+        """Build the query selecting the owning entity's id for the key this carries."""
         raise NotImplementedError
 
     @abstractmethod

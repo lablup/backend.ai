@@ -35,7 +35,10 @@ from ai.backend.manager.actions.v2.field.bulk_processor import (
     BulkFieldActionProcessor,
     OwnerBulkLookupProcessor,
 )
-from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerOpsAction
+from ai.backend.manager.actions.v2.field.lookup import (
+    LookupFieldOwnerByKeyOpsAction,
+    LookupFieldOwnerOpsAction,
+)
 from ai.backend.manager.actions.v2.field.ops import (
     DeleteFieldOpsAction,
     GetFieldOpsAction,
@@ -105,6 +108,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedFieldOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
+    FieldOwnerLookupOpsResult,
     FieldsOpsResult,
     LookupOpsResult,
     ScopedBatchOpsResult,
@@ -138,6 +142,7 @@ from ai.backend.manager.services.ops.service import (
     EntityUpsertService,
     FieldAtomicCreateService,
     FieldCreateService,
+    FieldOwnerKeyLookupService,
     FieldOwnerLookupService,
     FieldPartialBulkPurgeService,
     FieldPurgeService,
@@ -356,6 +361,25 @@ class ProcessorGroup[TData: EntityData]:
             LookupService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.lookup, *monitors),
             validators=(*self._deps.validators.lookup, *validators),
+        )
+
+    def key_owner_lookup_ops[TAction: LookupFieldOwnerByKeyOpsAction[Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        monitors: Sequence[LookupActionMonitor] = (),
+    ) -> LookupActionProcessor[TAction, FieldOwnerLookupOpsResult]:
+        """The owner of the field row a caller-facing key names.
+
+        Authentication is the only gate, as with every lookup: what the key resolved to
+        is what the operation following it is checked against.
+        """
+        self._record(action_cls)
+        return LookupActionProcessor(
+            FieldOwnerKeyLookupService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.lookup, *monitors),
+            validators=self._deps.validators.lookup,
+            post_validators=(),
         )
 
     def field_group[TFieldData: FieldData](

@@ -15,7 +15,11 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.specs.lookup import DataLookup, FieldOwnerLookup
+from ai.backend.manager.models.specs.lookup import (
+    DataLookup,
+    FieldOwnerKeyLookup,
+    FieldOwnerLookup,
+)
 
 
 @dataclass
@@ -48,6 +52,21 @@ class KeypairOwnerLookup(FieldOwnerLookup[KeyPairID, UserID]):
     @override
     def build_query(self, field_ids: Sequence[KeyPairID]) -> sa.sql.Select[Any]:
         return sa.select(KeyPairRow.id, KeyPairRow.user).where(KeyPairRow.id.in_(field_ids))
+
+    @override
+    def to_entity_id(self, value: UUID) -> UserID:
+        return UserID(value)
+
+
+@dataclass
+class KeypairAccessKeyOwnerLookup(FieldOwnerKeyLookup[UserID]):
+    """Reads the user that owns the keypair an access key names."""
+
+    access_key: AccessKey
+
+    @override
+    def build_query(self) -> sa.sql.Select[Any]:
+        return sa.select(KeyPairRow.user).where(KeyPairRow.access_key == self.access_key)
 
     @override
     def to_entity_id(self, value: UUID) -> UserID:

@@ -7,7 +7,10 @@ from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.registry import FieldProcessorGroup, ProcessorGroup
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
-from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
+from ai.backend.manager.actions.v2.ops.result import (
+    FieldOwnerLookupOpsResult,
+    LookupOpsResult,
+)
 from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validator.scope import ScopeActionValidator
 from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
@@ -67,6 +70,7 @@ from ai.backend.manager.services.user.actions.lookup import LookupUserAction
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupBulkKeypairOwnerAction,
     LookupKeypairOwnerAction,
+    LookupKeypairOwnerByAccessKeyAction,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
@@ -158,6 +162,9 @@ class UserProcessors:
     admin_get_ssh_keypair: ActionProcessor[AdminGetSSHKeypairAction, AdminGetSSHKeypairActionResult]
     lookup: LookupActionProcessor[LookupUserAction, LookupOpsResult[UserData]]
     keypair_group: FieldProcessorGroup[KeyPairData]
+    lookup_keypair_owner: LookupActionProcessor[
+        LookupKeypairOwnerByAccessKeyAction, FieldOwnerLookupOpsResult
+    ]
 
     def __init__(
         self,
@@ -178,6 +185,7 @@ class UserProcessors:
             legacy_scope_validator = validators.rbac.scope
             legacy_single_entity_validator = validators.rbac.single_entity
         self.lookup = group.public_lookup_ops(LookupUserAction)
+        self.lookup_keypair_owner = group.key_owner_lookup_ops(LookupKeypairOwnerByAccessKeyAction)
         self.keypair_group = group.field_group(
             KeyPairData, LookupKeypairOwnerAction, LookupBulkKeypairOwnerAction
         )

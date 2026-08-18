@@ -15,7 +15,11 @@ from ai.backend.manager.errors.repository import (
 )
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.models.specs.lookup import DataLookup, FieldOwnerLookup
+from ai.backend.manager.models.specs.lookup import (
+    DataLookup,
+    FieldOwnerKeyLookup,
+    FieldOwnerLookup,
+)
 from ai.backend.manager.models.specs.querier import DataQuerier
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
 from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
@@ -77,6 +81,19 @@ class V2ReadOps(V2OpsBase):
         rows = (await self._sess.execute(lookup.build_query(field_ids))).all()
         owners = {row[0]: lookup.to_entity_id(row[1]) for row in rows}
         return {field_id: owners[field_id] for field_id in field_ids if field_id in owners}
+
+    async def lookup_field_owner_by_key[TOwnerID: EntityIdentifier](
+        self, lookup: FieldOwnerKeyLookup[TOwnerID]
+    ) -> TOwnerID | None:
+        """Read the entity owning the field row the key names; ``None`` if nothing matches."""
+        rows = (await self._sess.execute(lookup.build_query().limit(2))).all()
+        if not rows:
+            return None
+        if len(rows) > 1:
+            raise AmbiguousEntityKeyError(
+                "A field owner key matched more than one row, so it is not a key."
+            )
+        return lookup.to_entity_id(rows[0][0])
 
     async def search_with_scopes[TRow: Base, TData](
         self,

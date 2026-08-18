@@ -7,10 +7,17 @@ from typing import Any, override
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
-from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerOpsAction
+from ai.backend.manager.actions.v2.field.lookup import (
+    LookupFieldOwnerByKeyOpsAction,
+    LookupFieldOwnerOpsAction,
+)
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
-from ai.backend.manager.models.keypair.lookups import KeypairOwnerLookup
+from ai.backend.manager.models.keypair.lookups import (
+    KeypairAccessKeyOwnerLookup,
+    KeypairOwnerLookup,
+)
 
 
 @dataclass(frozen=True)
@@ -84,3 +91,43 @@ class LookupBulkKeypairOwnerAction(LookupBulkFieldOwnerOpsAction[KeyPairID, User
     @override
     def to_owner_lookup(self) -> KeypairOwnerLookup:
         return KeypairOwnerLookup()
+
+
+@dataclass(frozen=True)
+class KeypairAccessKeyLookupKey(LookupKey):
+    """The access key a request carries to reach a keypair."""
+
+    access_key: AccessKey
+
+    @override
+    def kind(self) -> str:
+        return "keypair_access_key"
+
+    @override
+    def to_dict(self) -> dict[str, Any]:
+        return {"access_key": str(self.access_key)}
+
+
+@dataclass
+class LookupKeypairOwnerByAccessKeyAction(LookupFieldOwnerByKeyOpsAction[UserID]):
+    """The user that owns the keypair an access key names."""
+
+    access_key: AccessKey
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return USER_ENTITY_TYPE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "lookup_keypair_owner_by_access_key"
+
+    @override
+    def lookup_key(self) -> LookupKey:
+        return KeypairAccessKeyLookupKey(self.access_key)
+
+    @override
+    def to_owner_lookup(self) -> KeypairAccessKeyOwnerLookup:
+        return KeypairAccessKeyOwnerLookup(access_key=self.access_key)
