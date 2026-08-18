@@ -172,7 +172,7 @@ async def read_tail(path: Path, nbytes: int) -> bytes:
 
 async def get_kernel_id_from_container(val: str | DockerContainer) -> KernelId | None:
     if isinstance(val, DockerContainer):
-        if "Name" not in val._container:
+        if not val._container.get("Name"):
             await val.show()
         name = val["Name"]
     elif isinstance(val, str):
