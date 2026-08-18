@@ -19,14 +19,23 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.events.event_types.kernel.types import (
+    KernelCreationInfo,
+    UsedDevice,
+    UsedDevices,
+)
 from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
+    ContainerId,
     DefaultForUnspecified,
+    DeviceId,
+    DeviceName,
     KernelId,
     ResourceSlot,
     SecretKey,
@@ -68,7 +77,6 @@ from ai.backend.manager.views.sokovan.allocation import (
     KernelAllocation,
     SessionAllocation,
 )
-from ai.backend.manager.views.sokovan.lifecycle import KernelCreationInfo
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -345,19 +353,33 @@ async def resource_slot_types(
 
 
 def make_creation_info(cpu: str = "2", mem: str = "4096") -> KernelCreationInfo:
-    """Build a KernelCreationInfo whose get_resource_allocations() returns the given slots."""
+    """Build a KernelCreationInfo whose used devices aggregate to the given slots."""
     return KernelCreationInfo(
-        container_id=f"container-{uuid.uuid4().hex[:8]}",
-        resource_spec={
-            "allocations": {
-                "cpu": {"cpu": {"0": cpu}},
-                "mem": {"mem": {"0": mem}},
-            },
-        },
+        container_id=ContainerId(f"container-{uuid.uuid4().hex[:8]}"),
+        kernel_host="127.0.0.1",
         repl_in_port=2001,
         repl_out_port=2002,
-        stdin_port=2003,
-        stdout_port=2004,
+        service_ports=[],
+        used_devices=UsedDevices(
+            units={
+                DeviceName("cpu"): {
+                    DeviceId("0"): UsedDevice(
+                        model_name=None,
+                        used={ResourceSlotName("cpu"): Decimal(cpu)},
+                        processing_units=None,
+                        memory_size=None,
+                    )
+                },
+                DeviceName("mem"): {
+                    DeviceId("0"): UsedDevice(
+                        model_name=None,
+                        used={ResourceSlotName("mem"): Decimal(mem)},
+                        processing_units=None,
+                        memory_size=None,
+                    )
+                },
+            }
+        ),
     )
 
 

@@ -1,19 +1,10 @@
-from typing import Any, Self, override
+from typing import override
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 
 
 class BaseScheduleEvent(AbstractAnycastEvent):
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return tuple()
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls()
-
     @classmethod
     @override
     def event_domain(cls) -> EventDomain:
@@ -32,15 +23,6 @@ class DoSokovanProcessIfNeededEvent(AbstractAnycastEvent):
     """Event to trigger Sokovan scheduler to process if marks are present (short cycle)."""
 
     schedule_type: str
-
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return (self.schedule_type,)
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(schedule_type=value[0])
 
     @classmethod
     @override
@@ -65,15 +47,6 @@ class DoSokovanProcessScheduleEvent(AbstractAnycastEvent):
     """Event to trigger Sokovan scheduler to process unconditionally (long cycle)."""
 
     schedule_type: str
-
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return (self.schedule_type,)
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(schedule_type=value[0])
 
     @classmethod
     @override
@@ -100,15 +73,6 @@ class DoDeploymentLifecycleIfNeededEvent(AbstractAnycastEvent):
     lifecycle_type: str
     sub_step: str | None = None
 
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return (self.lifecycle_type, self.sub_step)
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(lifecycle_type=value[0], sub_step=value[1] if len(value) > 1 else None)
-
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -134,15 +98,6 @@ class DoDeploymentLifecycleEvent(AbstractAnycastEvent):
     lifecycle_type: str
     sub_step: str | None = None
 
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return (self.lifecycle_type, self.sub_step)
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(lifecycle_type=value[0], sub_step=value[1] if len(value) > 1 else None)
-
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -166,15 +121,6 @@ class DoRouteLifecycleIfNeededEvent(AbstractAnycastEvent):
     """Event to trigger route lifecycle processing if needed (short cycle)."""
 
     lifecycle_type: str
-
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return (self.lifecycle_type,)
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(lifecycle_type=value[0])
 
     @classmethod
     @override
@@ -200,15 +146,6 @@ class DoRouteLifecycleEvent(AbstractAnycastEvent):
 
     lifecycle_type: str
 
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return (self.lifecycle_type,)
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(lifecycle_type=value[0])
-
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -233,15 +170,6 @@ class DoReconcileProcessIfNeededEvent(AbstractAnycastEvent):
 
     reconcile_type: str
 
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return (self.reconcile_type,)
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(reconcile_type=value[0])
-
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -265,15 +193,6 @@ class DoReconcileProcessEvent(AbstractAnycastEvent):
     """Event to trigger a generic reconcile stage unconditionally (long cycle)."""
 
     reconcile_type: str
-
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return (self.reconcile_type,)
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(reconcile_type=value[0])
 
     @classmethod
     @override

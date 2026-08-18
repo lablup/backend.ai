@@ -14,11 +14,14 @@ from ai.backend.common.events.event_types.kernel.types import (
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
+    BinarySize,
     ContainerId,
     DeviceId,
+    DeviceModelInfo,
     DeviceName,
     ResourceSlotEntry,
     ServicePortProtocols,
+    SlotName,
 )
 
 
@@ -186,3 +189,62 @@ class TestSlotTotals:
 
     def test_a_kernel_holding_nothing_totals_nothing(self) -> None:
         assert UsedDevices(units={}).slot_totals == []
+
+
+class TestFromAllocations:
+    """`from_allocations()` is where the agent's two views of a kernel's devices meet."""
+
+    ALLOCATIONS = {
+        DeviceName("cpu"): {SlotName("cpu"): {DeviceId("0"): Decimal(2)}},
+        DeviceName("cuda"): {
+            SlotName("cuda.device"): {DeviceId("0"): Decimal(1)},
+            SlotName("cuda.shares"): {DeviceId("0"): Decimal("0.5")},
+        },
+    }
+
+    def test_a_unit_metered_on_two_axes_is_described_once(self) -> None:
+        """The spec keys amounts by slot and then by unit; the payload keys them the
+        other way round, so the unit on two axes has to collapse into one entry."""
+        cuda = UsedDevices.from_allocations(self.ALLOCATIONS, {}).units[DeviceName("cuda")]
+
+        assert list(cuda) == [DeviceId("0")]
+        assert cuda[DeviceId("0")].used == {
+            "cuda.device": Decimal(1),
+            "cuda.shares": Decimal("0.5"),
+        }
+
+    def test_the_reported_device_facts_are_joined_by_device_id(self) -> None:
+        attached: dict[DeviceName, list[DeviceModelInfo]] = {
+            DeviceName("cuda"): [
+                {
+                    "device_id": DeviceId("0"),
+                    "model_name": "A100",
+                    "data": {"mem": BinarySize(21474836480), "proc": 54},
+                }
+            ]
+        }
+
+        cuda = UsedDevices.from_allocations(self.ALLOCATIONS, attached).units[DeviceName("cuda")]
+
+        assert (
+            cuda[DeviceId("0")].model_name,
+            cuda[DeviceId("0")].processing_units,
+            cuda[DeviceId("0")].memory_size,
+        ) == ("A100", 54, 21474836480)
+
+    def test_an_intrinsic_device_reports_no_model(self) -> None:
+        """A cpu or mem plugin attaches nothing, so its units carry the amounts alone."""
+        cpu = UsedDevices.from_allocations(self.ALLOCATIONS, {DeviceName("cpu"): []}).units[
+            DeviceName("cpu")
+        ][DeviceId("0")]
+
+        assert (cpu.model_name, cpu.processing_units, cpu.memory_size) == (None, None, None)
+        assert cpu.used == {"cpu": Decimal(2)}
+
+    def test_the_totals_are_what_the_manager_records_as_occupancy(self) -> None:
+        totals = {
+            entry.resource_type: entry.quantity
+            for entry in UsedDevices.from_allocations(self.ALLOCATIONS, {}).slot_totals
+        }
+
+        assert totals == {"cpu": "2", "cuda.device": "1", "cuda.shares": "0.5"}

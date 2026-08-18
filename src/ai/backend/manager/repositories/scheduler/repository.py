@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
@@ -55,7 +56,6 @@ from ai.backend.manager.types import UserScope
 from ai.backend.manager.views.sokovan.agent import AgentLimit, ResourceGroupResource
 from ai.backend.manager.views.sokovan.allocation import SessionAllocation
 from ai.backend.manager.views.sokovan.lifecycle import (
-    KernelCreationInfo,
     SessionsForPullWithImages,
     SessionWithKernels,
 )

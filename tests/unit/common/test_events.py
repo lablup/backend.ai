@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from types import TracebackType
-from typing import Any, override
+from typing import override
 
 import aiotools
 
@@ -23,15 +23,6 @@ from ai.backend.common.types import AgentId
 
 class DummyBroadcastEvent(AbstractBroadcastEvent):
     value: int
-
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return (self.value + 1,)
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> DummyBroadcastEvent:
-        return cls(value=value[0] + 1)
 
     @classmethod
     @override
@@ -70,7 +61,7 @@ async def test_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id: str) ->
         assert source == AgentId("i-test")
         assert isinstance(event, DummyBroadcastEvent)
         assert event.event_name() == "testing"
-        assert event.value == 1001
+        assert event.value == 999
         await asyncio.sleep(0.01)
         records.add("async")
 
@@ -79,7 +70,7 @@ async def test_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id: str) ->
         assert source == AgentId("i-test")
         assert isinstance(event, DummyBroadcastEvent)
         assert event.event_name() == "testing"
-        assert event.value == 1001
+        assert event.value == 999
         records.add("sync")
 
     dispatcher.subscribe(DummyBroadcastEvent, app, acb)

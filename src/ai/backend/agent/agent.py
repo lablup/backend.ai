@@ -146,7 +146,12 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelStartedBroadcastEvent,
     KernelTerminatedBroadcastEvent,
 )
-from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.events.event_types.kernel.types import (
+    KernelCreationInfo,
+    KernelLifecycleEventReason,
+    ServicePortInfo,
+    UsedDevices,
+)
 from ai.backend.common.events.event_types.session.anycast import (
     ExecutionFinishedAnycastEvent,
     ExecutionStartedAnycastEvent,
@@ -3301,24 +3306,29 @@ class AbstractAgent[
                             )
 
                     # Finally we are done.
+                    creation_info = KernelCreationInfo(
+                        container_id=ContainerId(str(kernel_obj["container_id"])),
+                        kernel_host=str(kernel_obj["kernel_host"]),
+                        repl_in_port=kernel_obj["repl_in_port"],
+                        repl_out_port=kernel_obj["repl_out_port"],
+                        service_ports=[
+                            ServicePortInfo.model_validate(service_port)
+                            for service_port in public_service_ports
+                        ],
+                        used_devices=UsedDevices.from_allocations(
+                            resource_spec.allocations, attached_devices
+                        ),
+                    )
                     await self.anycast_and_broadcast_event(
                         KernelStartedAnycastEvent(
                             kernel_id=kernel_id,
                             session_id=session_id,
-                            creation_info={
-                                **kernel_creation_info,
-                                "id": str(KernelId(kernel_id)),
-                                "container_id": str(kernel_obj["container_id"]),
-                            },
+                            creation_info=creation_info,
                         ),
                         KernelStartedBroadcastEvent(
                             kernel_id=kernel_id,
                             session_id=session_id,
-                            creation_info={
-                                **kernel_creation_info,
-                                "id": str(KernelId(kernel_id)),
-                                "container_id": str(kernel_obj["container_id"]),
-                            },
+                            creation_info=creation_info,
                         ),
                     )
                     async with self.registry_lock:

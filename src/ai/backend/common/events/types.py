@@ -119,21 +119,6 @@ class AbstractEvent(BaseModel, ABC):
         """
         raise NotImplementedError
 
-    @abstractmethod
-    def serialize(self) -> tuple[bytes, ...]:
-        """
-        Return a msgpack-serializable tuple.
-        """
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def deserialize(cls, value: tuple[bytes, ...]) -> Self:
-        """
-        Construct the event args from a tuple deserialized from msgpack.
-        """
-        raise NotImplementedError
-
     @classmethod
     @abstractmethod
     def event_domain(cls) -> EventDomain:
@@ -198,14 +183,18 @@ class AbstractBroadcastEvent(AbstractEvent):
             return
 
     @classmethod
-    def deserialize_from_wrapper(cls, payload: BroadcastMessagePayload) -> "AbstractBroadcastEvent":
+    def from_broadcast_payload(cls, payload: BroadcastMessagePayload) -> "AbstractBroadcastEvent":
         """
-        Deserialize the event from its broadcast payload.
+        Reconstruct the event a broadcast payload carries.
+
+        A payload names its event but does not carry its class, so this is where the
+        name is resolved against the registry — the one place a subscriber that holds
+        only a payload can get back to a typed event.
         """
         event_class = cls._register_dict.get(payload.name)
         if not event_class:
             raise ValueError(f"Event class for name {payload.name} not found")
-        return event_class.deserialize(payload.decode_args())
+        return event_class.from_message(EventMessage(name=payload.name, payload=payload.payload))
 
     @classmethod
     @override
