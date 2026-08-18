@@ -6,10 +6,12 @@ and AgentDetailData to AgentDTO.
 
 from __future__ import annotations
 
+import uuid
 from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.dto.manager.agent.request import (
     AgentFilter,
     AgentOrder,
@@ -327,6 +329,7 @@ class TestAgentAdapterConvertToDTO:
         if occupied_slots is None:
             occupied_slots = ResourceSlot()
         agent = AgentData(
+            uuid=AgentUUID(uuid.uuid4()),
             id=agent_id,
             status=status,
             status_changed=None,

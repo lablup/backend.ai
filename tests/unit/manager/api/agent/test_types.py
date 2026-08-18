@@ -6,11 +6,13 @@ Tests the GraphQL type layer for agent-related queries.
 
 from __future__ import annotations
 
+import uuid
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.types import AgentId, ResourceSlot, SlotName
 from ai.backend.manager.api.gql_legacy.agent import AgentSummary
 from ai.backend.manager.data.agent.types import AgentData, AgentStatus
@@ -23,6 +25,7 @@ def create_mock_agent_data(
 ) -> AgentData:
     """Create a mock AgentData for testing."""
     return AgentData(
+        uuid=AgentUUID(uuid.uuid4()),
         id=AgentId(agent_id),
         status=status,
         status_changed=None,

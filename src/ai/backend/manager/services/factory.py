@@ -421,7 +421,7 @@ def create_processors(
         )
     )
     processors = Processors(
-        agent=AgentProcessors(services.agent, action_monitors, validators),
+        agent=AgentProcessors(registry.group(), services.agent, action_monitors, validators),
         app_config=AppConfigProcessors(
             registry.group(),
             registry.group(),

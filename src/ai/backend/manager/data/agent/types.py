@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any, Self, override
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.types import (
     AgentId,
     DeviceName,
@@ -70,7 +72,8 @@ class AgentDataForHeartbeatUpdate:
 
 
 @dataclass
-class AgentData:
+class AgentData(EntityData):
+    uuid: AgentUUID
     id: AgentId
     status: AgentStatus
     status_changed: datetime | None
@@ -89,6 +92,10 @@ class AgentData:
     compute_plugins: Mapping[str, Any]
     public_key: PublicKey | None
     auto_terminate_abusing_kernel: bool
+
+    @override
+    def entity_id(self) -> AgentUUID:
+        return self.uuid
 
 
 @dataclass
