@@ -7,15 +7,18 @@ from functools import lru_cache
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.app_config.types import AppConfigScopeType as AppConfigScopeTypeDTO
 from ai.backend.common.data.entity.app_config import AppConfigScopeID
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
     AppConfigFragmentFilter,
     AppConfigFragmentOrder,
     AppConfigFragmentScope,
     AppConfigFragmentUpsertItem,
+    AppConfigScopeRef,
     BulkPurgeAppConfigFragmentInput,
     MyAppConfigFragmentsByNamesInput,
     MyUpsertAppConfigFragmentsInput,
@@ -26,7 +29,6 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentBulkErrorInfo,
     AppConfigFragmentNode,
-    AppConfigFragmentUpsertErrorInfo,
     BulkPurgeAppConfigFragmentPayload,
     PurgeAppConfigFragmentPayload,
     SearchAppConfigFragmentPayload,
@@ -46,15 +48,17 @@ from ai.backend.manager.data.app_config_fragment.types import (
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.orders import AppConfigFragmentOrders
+from ai.backend.manager.models.app_config_fragment.purgers import AppConfigFragmentPurger
+from ai.backend.manager.models.app_config_fragment.upserters import (
+    AppConfigFragmentUpserter,
+    PublicAppConfigFragmentUpserter,
+)
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.app_config_fragment.purgers import (
-    AppConfigFragmentPurgerSpec,
+from ai.backend.manager.repositories.app_config_fragment.queriers import (
+    AppConfigFragmentQuerier,
 )
-from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigFragmentOperationScope,
-)
-from ai.backend.manager.repositories.app_config_fragment.upserters import (
-    AppConfigFragmentUpserterSpec,
+from ai.backend.manager.repositories.app_config_fragment.searchers import (
+    AppConfigFragmentSearcher,
 )
 from ai.backend.manager.repositories.base import (
     combine_conditions_or,
@@ -71,6 +75,9 @@ from ai.backend.manager.services.app_config_fragment.actions.bulk_upsert import 
 )
 from ai.backend.manager.services.app_config_fragment.actions.get import (
     GetAppConfigFragmentAction,
+)
+from ai.backend.manager.services.app_config_fragment.actions.global_bulk_upsert import (
+    GlobalBulkUpsertAppConfigFragmentsAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.purge import (
     PurgeAppConfigFragmentAction,
@@ -100,12 +107,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
         self, input: ScopedUpsertAppConfigFragmentsInput
     ) -> UpsertAppConfigFragmentsPayload:
         """Upsert many fragments at the scope named in ``input`` (RBAC-authorized there)."""
-        return await self._upsert(
-            AppConfigFragmentOperationScope(
-                scope_type=input.scope.scope_type, scope_id=input.scope.scope_id
-            ),
-            input.items,
-        )
+        return await self._upsert(self._ref_owner(input.scope), input.items)
 
     async def my_upsert_app_config_fragments(
         self, input: MyUpsertAppConfigFragmentsInput
@@ -117,65 +119,72 @@ class AppConfigFragmentAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = AppConfigFragmentOperationScope(
-            scope_type=AppConfigScopeType.USER, scope_id=AppConfigScopeID(me.user_id)
-        )
-        return await self._upsert(scope, input.items)
+        return await self._upsert(UserID(me.user_id), input.items)
 
     async def _upsert(
         self,
-        scope: AppConfigFragmentOperationScope,
+        owner: EntityIdentifier | None,
         items: Sequence[AppConfigFragmentUpsertItem],
     ) -> UpsertAppConfigFragmentsPayload:
-        specs = [
-            AppConfigFragmentUpserterSpec(
-                config_name=item.config_name,
-                scope_type=scope.scope_type,
-                scope_id=scope.scope_id,
-                config=item.config,
-            )
-            for item in items
-        ]
-        action_result = await self._processors.app_config_fragment.bulk_upsert.wait_for_complete(
-            BulkUpsertAppConfigFragmentsAction(scope=scope, upserter_specs=specs)
-        )
-        return UpsertAppConfigFragmentsPayload(
-            items=[self._fragment_to_node(fragment) for fragment in action_result.items],
-            failed=[
-                AppConfigFragmentUpsertErrorInfo(
-                    config_name=error.config_name, message=error.message
+        """Route by who owns the fragments: a public write answers to no scope, so it runs
+        behind the SUPERADMIN gate instead."""
+        if owner is None:
+            written = await self._processors.app_config_fragment.global_bulk_upsert.run(
+                GlobalBulkUpsertAppConfigFragmentsAction(
+                    upserters=[
+                        PublicAppConfigFragmentUpserter(
+                            config_name=item.config_name, config=item.config
+                        )
+                        for item in items
+                    ]
                 )
-                for error in action_result.failed
-            ],
+            )
+        else:
+            written = await self._processors.app_config_fragment.bulk_upsert.run(
+                BulkUpsertAppConfigFragmentsAction(
+                    owner=owner,
+                    upserters=[
+                        AppConfigFragmentUpserter(
+                            config_name=item.config_name, owner=owner, config=item.config
+                        )
+                        for item in items
+                    ],
+                )
+            )
+        return UpsertAppConfigFragmentsPayload(
+            items=[self._fragment_to_node(fragment) for fragment in written.items],
+            failed=[],
         )
 
     async def get(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentNode:
-        action_result = await self._processors.app_config_fragment.get.wait_for_complete(
-            GetAppConfigFragmentAction(fragment_id=fragment_id)
+        action_result = await self._processors.app_config_fragment.get.run(
+            GetAppConfigFragmentAction(querier=AppConfigFragmentQuerier(fragment_id=fragment_id))
         )
-        return self._fragment_to_node(action_result.fragment)
+        return self._fragment_to_node(action_result.data)
 
     async def purge(self, fragment_id: AppConfigFragmentID) -> PurgeAppConfigFragmentPayload:
-        purger_spec = AppConfigFragmentPurgerSpec(fragment_id=fragment_id)
-        action_result = await self._processors.app_config_fragment.purge.wait_for_complete(
-            PurgeAppConfigFragmentAction(purger_spec=purger_spec)
+        action_result = await self._processors.app_config_fragment.purge.run(
+            PurgeAppConfigFragmentAction(purger=AppConfigFragmentPurger(fragment_id=fragment_id))
         )
-        return PurgeAppConfigFragmentPayload(id=action_result.fragment.id)
+        return PurgeAppConfigFragmentPayload(id=action_result.data.id)
 
     async def bulk_purge(
         self, input: BulkPurgeAppConfigFragmentInput
     ) -> BulkPurgeAppConfigFragmentPayload:
-        purger_specs = [
-            AppConfigFragmentPurgerSpec(fragment_id=fragment_id) for fragment_id in input.ids
-        ]
-        action_result = await self._processors.app_config_fragment.bulk_purge.wait_for_complete(
-            BulkPurgeAppConfigFragmentAction(purger_specs=purger_specs)
+        action_result = await self._processors.app_config_fragment.bulk_purge.run(
+            BulkPurgeAppConfigFragmentAction(
+                purgers=[
+                    AppConfigFragmentPurger(fragment_id=fragment_id) for fragment_id in input.ids
+                ]
+            )
         )
         return BulkPurgeAppConfigFragmentPayload(
-            items=[fragment.id for fragment in action_result.succeeded],
+            items=[fragment.id for fragment in action_result.successes.values()],
             failed=[
-                AppConfigFragmentBulkErrorInfo(id=error.id, message=error.message)
-                for error in action_result.failed
+                AppConfigFragmentBulkErrorInfo(
+                    id=AppConfigFragmentID(entity_id), message=str(error)
+                )
+                for entity_id, error in action_result.errors.items()
             ],
         )
 
@@ -193,20 +202,17 @@ class AppConfigFragmentAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            AppConfigFragmentSearcher,
             conditions=[AppConfigFragmentConditions.by_ids(list(fragment_ids))],
             orders=[],
             pagination_spec=_get_app_config_fragment_pagination_spec(),
             limit=len(fragment_ids),
         )
-        scope = AppConfigFragmentOperationScope(
-            scope_type=AppConfigScopeType.USER,
-            scope_id=AppConfigScopeID(me.user_id),
+        action_result = await self._processors.app_config_fragment.scoped_search.run(
+            ScopedSearchAppConfigFragmentAction(owner=UserID(me.user_id), searcher=searcher)
         )
-        action_result = await self._processors.app_config_fragment.scoped_search.wait_for_complete(
-            ScopedSearchAppConfigFragmentAction(scope=scope, querier=querier)
-        )
-        node_map = {node.id: node for node in map(self._fragment_to_node, action_result.data)}
+        node_map = {node.id: node for node in map(self._fragment_to_node, action_result.items)}
         return [node_map.get(fragment_id) for fragment_id in fragment_ids]
 
     # --- read fragments by config name (one scope, RBAC-authorized) ---
@@ -218,12 +224,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
 
         Meant for fetching the current fragment values before editing them.
         """
-        return await self._fragments_by_names(
-            AppConfigFragmentOperationScope(
-                scope_type=input.scope.scope_type, scope_id=input.scope.scope_id
-            ),
-            input.config_names,
-        )
+        return await self._fragments_by_names(self._ref_owner(input.scope), input.config_names)
 
     async def my_app_config_fragments_by_names(
         self, input: MyAppConfigFragmentsByNamesInput
@@ -235,32 +236,28 @@ class AppConfigFragmentAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        return await self._fragments_by_names(
-            AppConfigFragmentOperationScope(
-                scope_type=AppConfigScopeType.USER, scope_id=AppConfigScopeID(me.user_id)
-            ),
-            input.config_names,
-        )
+        return await self._fragments_by_names(UserID(me.user_id), input.config_names)
 
     async def _fragments_by_names(
-        self, scope: AppConfigFragmentOperationScope, config_names: list[str]
+        self, owner: EntityIdentifier | None, config_names: list[str]
     ) -> list[AppConfigFragmentNode | None]:
         if not config_names:
             return []
         # A scope holds at most one fragment per config name, so the result is bounded by the
         # number of names requested.
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            AppConfigFragmentSearcher,
             conditions=[AppConfigFragmentConditions.by_config_names(config_names)],
             orders=[],
             pagination_spec=_get_app_config_fragment_pagination_spec(),
             limit=len(config_names),
         )
-        action_result = await self._processors.app_config_fragment.scoped_search.wait_for_complete(
-            ScopedSearchAppConfigFragmentAction(scope=scope, querier=querier)
+        action_result = await self._processors.app_config_fragment.scoped_search.run(
+            ScopedSearchAppConfigFragmentAction(owner=owner, searcher=searcher)
         )
         # Answer at the position each name was asked for, so a name with no fragment at this
         # scope holds its place as a null.
-        fragment_map = {fragment.config_name: fragment for fragment in action_result.data}
+        fragment_map = {fragment.config_name: fragment for fragment in action_result.items}
         return [
             self._fragment_to_node(fragment_map[config_name])
             if config_name in fragment_map
@@ -275,7 +272,8 @@ class AppConfigFragmentAdapter(BaseAdapter):
     ) -> SearchAppConfigFragmentPayload:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            AppConfigFragmentSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_get_app_config_fragment_pagination_spec(),
@@ -286,8 +284,8 @@ class AppConfigFragmentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.app_config_fragment.admin_search.wait_for_complete(
-            AdminSearchAppConfigFragmentAction(querier=querier)
+        action_result = await self._processors.app_config_fragment.admin_search.run(
+            AdminSearchAppConfigFragmentAction(searcher=searcher)
         )
         return SearchAppConfigFragmentPayload(
             items=[self._fragment_to_node(item) for item in action_result.items],
@@ -303,7 +301,8 @@ class AppConfigFragmentAdapter(BaseAdapter):
     ) -> SearchAppConfigFragmentPayload:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            AppConfigFragmentSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_get_app_config_fragment_pagination_spec(),
@@ -314,51 +313,38 @@ class AppConfigFragmentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        scope = self._scope_to_search_scope(input.scope)
-        action_result = await self._processors.app_config_fragment.scoped_search.wait_for_complete(
-            ScopedSearchAppConfigFragmentAction(scope=scope, querier=querier)
+        action_result = await self._processors.app_config_fragment.scoped_search.run(
+            ScopedSearchAppConfigFragmentAction(
+                owner=self._scope_owner(input.scope), searcher=searcher
+            )
         )
         return SearchAppConfigFragmentPayload(
-            items=[self._fragment_to_node(item) for item in action_result.data],
+            items=[self._fragment_to_node(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
 
     @staticmethod
-    def _scope_to_search_scope(scope: AppConfigFragmentScope) -> AppConfigFragmentOperationScope:
-        """Reduce the scope item lists to the single scope the scope action takes.
+    def _ref_owner(ref: AppConfigScopeRef) -> EntityIdentifier | None:
+        """The owner a scope reference names; ``public`` names none."""
+        return ref.scope_type.to_owner(ref.scope_id)
 
-        ``ScopedSearchAppConfigFragmentAction`` is a ``BaseScopeAction``, so it authorizes and
-        queries exactly one scope; reject a multi-scope request instead of silently dropping
-        the rest.
+    @staticmethod
+    def _scope_owner(scope: AppConfigFragmentScope) -> EntityIdentifier | None:
+        """Reduce the scope item lists to the one owner an action takes; ``None`` is ``public``.
+
+        Both the write and the scoped read act at exactly one scope, so a request carrying
+        more than one item is rejected rather than having the rest silently dropped.
         """
-        selected = [
-            AppConfigFragmentOperationScope(
-                scope_type=AppConfigScopeType.DOMAIN,
-                scope_id=AppConfigScopeID(item.value),
-            )
-            for item in scope.domain or []
+        selected: list[EntityIdentifier | None] = [
+            DomainID(item.value) for item in scope.domain or []
         ]
-        selected += [
-            AppConfigFragmentOperationScope(
-                scope_type=AppConfigScopeType.USER,
-                scope_id=AppConfigScopeID(item.value),
-            )
-            for item in scope.user or []
-        ]
+        selected += [UserID(item.value) for item in scope.user or []]
         if scope.public:
-            selected.append(
-                AppConfigFragmentOperationScope(scope_type=AppConfigScopeType.PUBLIC, scope_id=None)
-            )
-        # TODO(BA-7003): temporary single-scope restriction. The underlying
-        # ScopedSearchAppConfigFragmentAction is a single-scope BaseScopeAction, so a request
-        # carrying more than one scope item is rejected here rather than silently dropping the
-        # rest. Multi-scope scoped search will be implemented in BA-7003.
-        if len(selected) > 1:
-            raise InvalidAPIParameters(
-                "App config fragment scoped search accepts at most one scope item"
-            )
+            selected.append(None)
+        if len(selected) != 1:
+            raise InvalidAPIParameters("An app config fragment scope names exactly one owner")
         return selected[0]
 
     # --- converters ---
@@ -368,8 +354,8 @@ class AppConfigFragmentAdapter(BaseAdapter):
         return AppConfigFragmentNode(
             id=data.id,
             config_name=data.config_name,
-            scope_type=AppConfigScopeTypeDTO(data.scope_type.value),
-            scope_id=data.scope_id,
+            scope_type=AppConfigScopeType.of_owner(data.scope_id),
+            scope_id=AppConfigScopeID(data.scope_id) if data.scope_id is not None else None,
             config=data.config,
             created_at=data.created_at,
             updated_at=data.updated_at,

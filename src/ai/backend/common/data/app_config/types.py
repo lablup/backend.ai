@@ -5,7 +5,11 @@ from __future__ import annotations
 import enum
 
 from ai.backend.common.data.entity.app_config import AppConfigScopeID
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DomainID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.exception import UnreachableError
 
 __all__ = ("AppConfigScopeType",)
 
@@ -19,6 +23,39 @@ class AppConfigScopeType(enum.StrEnum):
     PUBLIC = "public"
     DOMAIN = "domain"
     USER = "user"
+
+    @classmethod
+    def of_owner(cls, owner: EntityIdentifier | None) -> AppConfigScopeType:
+        """The scope a fragment owned by ``owner`` is written at; ``None`` is ``public``.
+
+        The inverse of what a fragment's owner id carries: the owner answers its own
+        entity type, so the scope does not have to be stored beside it.
+        """
+        match owner:
+            case None:
+                return cls.PUBLIC
+            case _ if owner.entity_type() == DOMAIN_ENTITY_TYPE:
+                return cls.DOMAIN
+            case _ if owner.entity_type() == USER_ENTITY_TYPE:
+                return cls.USER
+            case _:
+                raise UnreachableError(f"No app config scope owns a {owner.entity_type()}")
+
+    def to_owner(self, scope_id: AppConfigScopeID | None) -> EntityIdentifier | None:
+        """The entity ``scope_id`` names at this scope; ``public`` names none.
+
+        ``scope_id`` is one value across scope kinds, so its type is settled here, against
+        the scope that discriminates it.
+        """
+        if scope_id is None:
+            return None
+        match self:
+            case AppConfigScopeType.PUBLIC:
+                return None
+            case AppConfigScopeType.DOMAIN:
+                return DomainID(scope_id)
+            case AppConfigScopeType.USER:
+                return UserID(scope_id)
 
     def to_rbac_scope_type(self) -> ScopeType:
         """The RBAC scope a write at this fragment scope acts on.

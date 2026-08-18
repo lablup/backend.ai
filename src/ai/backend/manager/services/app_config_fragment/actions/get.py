@@ -3,39 +3,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.services.app_config_fragment.actions.base import (
-    AppConfigFragmentSingleEntityAction,
-    AppConfigFragmentSingleEntityActionResult,
+from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.repositories.app_config_fragment.queriers import (
+    AppConfigFragmentQuerier,
 )
 
 
 @dataclass
-class GetAppConfigFragmentAction(AppConfigFragmentSingleEntityAction):
-    fragment_id: AppConfigFragmentID
+class GetAppConfigFragmentAction(
+    GetSingleEntityOpsAction[AppConfigFragmentRow, AppConfigFragmentData]
+):
+    querier: AppConfigFragmentQuerier
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
+    def action_name(cls) -> str:
+        return "get_app_config_fragment"
 
     @override
-    def target_entity_id(self) -> str:
-        return str(self.fragment_id)
+    def entity_id(self) -> EntityIdentifier:
+        return self.querier.fragment_id
 
     @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.APP_CONFIG_FRAGMENT, str(self.fragment_id))
-
-
-@dataclass
-class GetAppConfigFragmentActionResult(AppConfigFragmentSingleEntityActionResult):
-    fragment: AppConfigFragmentData
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.fragment.id)
+    def to_querier(self) -> AppConfigFragmentQuerier:
+        return self.querier

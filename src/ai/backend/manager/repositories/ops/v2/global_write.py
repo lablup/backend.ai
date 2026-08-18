@@ -39,6 +39,33 @@ class V2GlobalWriteOps(V2WriteOpsBase):
         ])
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
+    async def atomic_upsert_global_entities[TRow: Base, TData](
+        self, upserters: Sequence[GlobalEntityUpserter[TRow, TData]]
+    ) -> list[TData]:
+        """Insert-or-update every global row atomically, provisioning each as
+        :meth:`upsert_global_entity` does for one.
+
+        One statement per row: each carries its own update values, so they cannot be
+        folded into a single insert the way :meth:`atomic_create_global_entities` folds
+        its rows.
+        """
+        if not upserters:
+            return []
+        rows = [
+            await self._upsert_row_returning(
+                upserter.row_class(),
+                upserter.index_elements(),
+                upserter.build_insert_values(),
+                upserter.build_update_values(),
+                upserter.integrity_error_checks(),
+            )
+            for upserter in upserters
+        ]
+        await self._provision_entities([
+            upserter.entity_id(row) for upserter, row in zip(upserters, rows, strict=True)
+        ])
+        return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]
+
     async def upsert_global_entity[TRow: Base, TData](
         self, upserter: GlobalEntityUpserter[TRow, TData]
     ) -> TData:

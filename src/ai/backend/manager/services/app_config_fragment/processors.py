@@ -1,81 +1,78 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor.bulk import BulkActionProcessor
-from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
-from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
-from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    BulkOpsResult,
+    EntitiesOpsResult,
+    EntityOpsResult,
+    ScopedBatchOpsResult,
+)
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
-    AdminSearchAppConfigFragmentActionResult,
 )
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
-    BulkPurgeAppConfigFragmentActionResult,
 )
 from ai.backend.manager.services.app_config_fragment.actions.bulk_upsert import (
     BulkUpsertAppConfigFragmentsAction,
-    BulkUpsertAppConfigFragmentsActionResult,
 )
 from ai.backend.manager.services.app_config_fragment.actions.get import (
     GetAppConfigFragmentAction,
-    GetAppConfigFragmentActionResult,
+)
+from ai.backend.manager.services.app_config_fragment.actions.global_bulk_upsert import (
+    GlobalBulkUpsertAppConfigFragmentsAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.purge import (
     PurgeAppConfigFragmentAction,
-    PurgeAppConfigFragmentActionResult,
 )
 from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
     ScopedSearchAppConfigFragmentAction,
-    ScopedSearchAppConfigFragmentActionResult,
-)
-from ai.backend.manager.services.app_config_fragment.service import (
-    AppConfigFragmentService,
 )
 
 
 class AppConfigFragmentProcessors:
+    """Fragment writes and reads, none of them admin-only except the ``public`` write.
+
+    A write is gated by the fragment's FK to ``app_config_allow_list``: an insert with no
+    allow-list row for its ``(config_name, scope_type)`` is rejected as write-not-allowed.
+    An allow-listed user may therefore manage their own fragment without admin rights.
+    """
+
     bulk_upsert: ScopeActionProcessor[
-        BulkUpsertAppConfigFragmentsAction, BulkUpsertAppConfigFragmentsActionResult
+        BulkUpsertAppConfigFragmentsAction, EntitiesOpsResult[AppConfigFragmentData]
     ]
-    get: SingleEntityActionProcessor[GetAppConfigFragmentAction, GetAppConfigFragmentActionResult]
+    global_bulk_upsert: GlobalActionProcessor[
+        GlobalBulkUpsertAppConfigFragmentsAction, EntitiesOpsResult[AppConfigFragmentData]
+    ]
+    get: SingleEntityActionProcessor[
+        GetAppConfigFragmentAction, EntityOpsResult[AppConfigFragmentData]
+    ]
     admin_search: GlobalActionProcessor[
-        AdminSearchAppConfigFragmentAction, AdminSearchAppConfigFragmentActionResult
+        AdminSearchAppConfigFragmentAction, BatchOpsResult[AppConfigFragmentData]
     ]
     scoped_search: ScopeActionProcessor[
-        ScopedSearchAppConfigFragmentAction, ScopedSearchAppConfigFragmentActionResult
+        ScopedSearchAppConfigFragmentAction, ScopedBatchOpsResult[AppConfigFragmentData]
     ]
     purge: SingleEntityActionProcessor[
-        PurgeAppConfigFragmentAction, PurgeAppConfigFragmentActionResult
+        PurgeAppConfigFragmentAction, EntityOpsResult[AppConfigFragmentData]
     ]
     bulk_purge: BulkActionProcessor[
-        BulkPurgeAppConfigFragmentAction, BulkPurgeAppConfigFragmentActionResult
+        BulkPurgeAppConfigFragmentAction, BulkOpsResult[AppConfigFragmentData]
     ]
 
-    def __init__(
-        self,
-        service: AppConfigFragmentService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        # Fragment writes are open to any authenticated user and gated by RBAC: a user
-        # writes their own user-scope fragment, a domain admin their domain's, a superadmin
-        # any (public is superadmin-only). The scope / single-entity / bulk RBAC validators
-        # enforce that per operation.
-        self.bulk_upsert = ScopeActionProcessor(
-            service.bulk_upsert, action_monitors, validators=[validators.rbac.scope]
+    def __init__(self, group: ProcessorGroup[AppConfigFragmentData]) -> None:
+        self.bulk_upsert = group.entity_atomic_upsert_ops(BulkUpsertAppConfigFragmentsAction)
+        self.global_bulk_upsert = group.global_atomic_upsert_ops(
+            GlobalBulkUpsertAppConfigFragmentsAction
         )
-        self.get = SingleEntityActionProcessor(
-            service.get, action_monitors, validators=[validators.rbac.single_entity]
-        )
-        self.admin_search = GlobalActionProcessor(service.admin_search, action_monitors)
-        self.scoped_search = ScopeActionProcessor(
-            service.scoped_search, action_monitors, validators=[validators.rbac.scope]
-        )
-        self.purge = SingleEntityActionProcessor(
-            service.purge, action_monitors, validators=[validators.rbac.single_entity]
-        )
-        self.bulk_purge = BulkActionProcessor(
-            service.bulk_purge, monitors=action_monitors, validators=[validators.rbac.bulk]
-        )
+        self.get = group.single_get_ops(GetAppConfigFragmentAction)
+        self.admin_search = group.global_search_ops(AdminSearchAppConfigFragmentAction)
+        self.scoped_search = group.scope_search_ops(ScopedSearchAppConfigFragmentAction)
+        self.purge = group.entity_purge_ops(PurgeAppConfigFragmentAction)
+        self.bulk_purge = group.entity_partial_bulk_purge_ops(BulkPurgeAppConfigFragmentAction)

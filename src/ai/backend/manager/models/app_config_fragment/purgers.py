@@ -1,5 +1,3 @@
-"""Purger specs for app config fragment repository."""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -7,16 +5,16 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurgerSpec
 
 
 @dataclass
-class AppConfigFragmentPurgerSpec(RBACEntityPurgerSpec[AppConfigFragmentRow]):
-    """RBAC purge info for one fragment: identifies it so its scope association is cleared."""
+class AppConfigFragmentPurger(EntityPurger[AppConfigFragmentRow, AppConfigFragmentData]):
+    """Purger for one app config fragment."""
 
     fragment_id: AppConfigFragmentID
 
@@ -29,13 +27,13 @@ class AppConfigFragmentPurgerSpec(RBACEntityPurgerSpec[AppConfigFragmentRow]):
         return self.fragment_id
 
     @override
-    def element_type(self) -> RBACElementType:
-        return RBACElementType.APP_CONFIG_FRAGMENT
-
-    @override
-    def entity_ref(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.APP_CONFIG_FRAGMENT, str(self.fragment_id))
+    def entity_id(self) -> EntityIdentifier:
+        return self.fragment_id
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
         return ()
+
+    @override
+    def to_data(self, row: AppConfigFragmentRow) -> AppConfigFragmentData:
+        return row.to_data()

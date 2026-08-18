@@ -346,6 +346,16 @@ class EntityUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
+class GlobalEntityAtomicUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
+    """A create-or-update of several global rows at once, atomically; each node stays
+    provisioned, and none belongs under another scope."""
+
+    @abstractmethod
+    def to_upserters(self) -> Sequence[GlobalEntityUpserter[TRow, TData]]:
+        """Return one upsert spec per row this action writes."""
+        raise NotImplementedError
+
+
 class EntityAtomicUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
     """A create-or-update of several entity rows at once, atomically; each row's scope is
     provisioned with it."""
@@ -658,6 +668,17 @@ class UpsertEntityOpsAction[TRow: Base, TData](
     BaseSingleEntityAction, EntityUpsertOpsAction[TRow, TData], ABC
 ):
     """A single-entity create-or-update, backed by ops."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPSERT
+
+
+class AtomicUpsertGlobalEntityOpsAction[TRow: Base, TData](
+    BaseGlobalAction, GlobalEntityAtomicUpsertOpsAction[TRow, TData], ABC
+):
+    """An atomic create-or-update of several rows of system-wide state."""
 
     @override
     @classmethod

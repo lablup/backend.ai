@@ -26,9 +26,6 @@ from ai.backend.manager.services.app_config_definition.processors import (
 from ai.backend.manager.services.app_config_fragment.processors import (
     AppConfigFragmentProcessors,
 )
-from ai.backend.manager.services.app_config_fragment.service import (
-    AppConfigFragmentService,
-)
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
@@ -185,9 +182,6 @@ def create_services(args: ServiceArgs) -> Services:
             args.agent_cache,
         ),
         app_config=AppConfigService(OpsRepository(repositories.v2_ops_provider)),
-        app_config_fragment=AppConfigFragmentService(
-            repository=repositories.app_config_fragment.repository,
-        ),
         domain=DomainService(repositories.domain.repository),
         dotfile=DotfileService(
             repository=repositories.dotfile.repository,
@@ -445,9 +439,7 @@ def create_processors(
         agent=AgentProcessors(services.agent, action_monitors, validators),
         app_config=AppConfigProcessors(registry.group(), services.app_config),
         app_config_allow_list=AppConfigAllowListProcessors(registry.group()),
-        app_config_fragment=AppConfigFragmentProcessors(
-            services.app_config_fragment, action_monitors, validators
-        ),
+        app_config_fragment=AppConfigFragmentProcessors(registry.group()),
         domain=DomainProcessors(services.domain, action_monitors, validators),
         dotfile=DotfileProcessors(services.dotfile, action_monitors, validators),
         error_log=ErrorLogProcessors(registry.group()),

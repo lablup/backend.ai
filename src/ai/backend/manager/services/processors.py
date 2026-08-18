@@ -61,9 +61,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.app_config_fragment.processors import (
         AppConfigFragmentProcessors,
     )
-    from ai.backend.manager.services.app_config_fragment.service import (
-        AppConfigFragmentService,
-    )
     from ai.backend.manager.services.artifact.processors import (
         ArtifactProcessors,
     )
@@ -363,7 +360,6 @@ class ServiceArgs:
 class Services:
     agent: AgentService
     app_config: AppConfigService
-    app_config_fragment: AppConfigFragmentService
     domain: DomainService
     dotfile: DotfileService
     etcd_config: EtcdConfigService

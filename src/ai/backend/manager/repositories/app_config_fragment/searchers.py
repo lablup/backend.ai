@@ -13,7 +13,21 @@ from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentR
 from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.specs.searcher import Searcher
 
-__all__ = ("RankedAppConfigFragmentSearcher",)
+__all__ = (
+    "AppConfigFragmentSearcher",
+    "RankedAppConfigFragmentSearcher",
+)
+
+
+@dataclass
+class AppConfigFragmentSearcher(Searcher[AppConfigFragmentRow, AppConfigFragmentData]):
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(AppConfigFragmentRow)
+
+    @override
+    def to_data(self, row: AppConfigFragmentRow) -> AppConfigFragmentData:
+        return row.to_data()
 
 
 @dataclass

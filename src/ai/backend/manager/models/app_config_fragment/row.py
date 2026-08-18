@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config import AppConfigScopeID
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
 )
@@ -75,12 +76,15 @@ class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):
         nullable=False,
     )
 
+    def scope_owner(self) -> EntityIdentifier | None:
+        """The entity this fragment belongs to; ``None`` for ``public``, which has no owner."""
+        return self.scope_type.to_owner(self.scope_id)
+
     def to_data(self) -> AppConfigFragmentData:
         return AppConfigFragmentData(
             id=self.id,
             config_name=self.config_name,
-            scope_type=self.scope_type,
-            scope_id=self.scope_id,
+            scope_id=self.scope_owner(),
             config=self.config,
             created_at=self.created_at,
             updated_at=self.updated_at,

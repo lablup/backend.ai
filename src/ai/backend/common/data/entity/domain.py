@@ -1,7 +1,11 @@
-import uuid
-from typing import NewType, override
+from typing import override
 
-from ai.backend.common.data.entity.types import EntityType, NaturalKey, ScopeType
+from ai.backend.common.data.entity.types import (
+    EntityIdentifier,
+    EntityType,
+    NaturalKey,
+    ScopeType,
+)
 
 __all__ = (
     "DOMAIN_ENTITY_TYPE",
@@ -15,7 +19,12 @@ __all__ = (
 DOMAIN_ENTITY_TYPE = EntityType("domain")
 DOMAIN_SCOPE_TYPE = ScopeType(DOMAIN_ENTITY_TYPE)
 
-DomainID = NewType("DomainID", uuid.UUID)
+
+class DomainID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return DOMAIN_ENTITY_TYPE
 
 
 class DomainName(NaturalKey):
