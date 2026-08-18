@@ -346,6 +346,16 @@ class EntityUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
+class EntityAtomicUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
+    """A create-or-update of several entity rows at once, atomically; each row's scope is
+    provisioned with it."""
+
+    @abstractmethod
+    def to_upserters(self) -> Sequence[EntityUpserter[TRow, TData]]:
+        """Return one upsert spec per row this action writes."""
+        raise NotImplementedError
+
+
 class FieldUpsertOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](OpsBackendAction):
     """A create-or-update of a field row under its owner's settled identifier."""
 
@@ -648,6 +658,21 @@ class UpsertEntityOpsAction[TRow: Base, TData](
     BaseSingleEntityAction, EntityUpsertOpsAction[TRow, TData], ABC
 ):
     """A single-entity create-or-update, backed by ops."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPSERT
+
+
+class AtomicUpsertEntityOpsAction[TRow: Base, TData](
+    BaseScopeAction, EntityAtomicUpsertOpsAction[TRow, TData], ABC
+):
+    """An atomic create-or-update of several entity rows.
+
+    Scope-shaped like :class:`AtomicCreateEntityOpsAction`: a row that does not exist yet
+    has no entity to be answered for, so the scope the rows are written in answers.
+    """
 
     @override
     @classmethod

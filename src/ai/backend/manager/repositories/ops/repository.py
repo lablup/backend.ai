@@ -235,6 +235,12 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.upsert_entity(upserter)
 
+    async def atomic_upsert_entities(
+        self, upserters: Sequence[EntityUpserter[Any, TData]]
+    ) -> list[TData]:
+        async with self._ops.write_ops() as w:
+            return await w.atomic_upsert_entities(upserters)
+
     async def upsert_field_entity(
         self, owner_id: Any, upserter: FieldUpserter[Any, Any, TData]
     ) -> TData:

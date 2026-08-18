@@ -67,6 +67,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     AtomicCreateFieldOpsAction,
     AtomicCreateGlobalEntityOpsAction,
     AtomicCreateRoleManagedEntityOpsAction,
+    AtomicUpsertEntityOpsAction,
     BatchPurgeGlobalOpsAction,
     BatchPurgeScopeOpsAction,
     BatchUpdateGlobalOpsAction,
@@ -129,6 +130,7 @@ from ai.backend.manager.services.ops.service import (
     BulkFieldOwnerLookupService,
     DeleteService,
     EntityAtomicCreateService,
+    EntityAtomicUpsertService,
     EntityCreateService,
     EntityPartialBulkPurgeService,
     EntityPurgeService,
@@ -610,6 +612,20 @@ class ProcessorGroup[TData: EntityData]:
             EntityUpsertService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.single_entity, *monitors),
             validators=(*self._deps.validators.single_entity, *validators),
+        )
+
+    def entity_atomic_upsert_ops[TAction: AtomicUpsertEntityOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[ScopeActionValidator] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[TAction, EntitiesOpsResult[TData]]:
+        self._record(action_cls)
+        return ScopeActionProcessor(
+            EntityAtomicUpsertService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(*self._deps.validators.scope, *validators),
         )
 
     def global_update_ops[TAction: UpdateGlobalOpsAction[Any, Any]](

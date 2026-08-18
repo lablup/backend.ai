@@ -202,6 +202,33 @@ class V2EntityWriteOps(V2WriteOpsBase):
         await self._enroll_member(entity, upserter.member_of(row))
         return upserter.to_data(row)
 
+    async def atomic_upsert_entities[TRow: Base, TData](
+        self, upserters: Sequence[EntityUpserter[TRow, TData]]
+    ) -> list[TData]:
+        """Insert-or-update every entity row atomically, provisioning each row's scope as
+        :meth:`upsert_entity` does for one.
+
+        One statement per row: each carries its own update values, so they cannot be
+        folded into a single insert the way :meth:`atomic_create_entities` folds its rows.
+        """
+        if not upserters:
+            return []
+        rows = [
+            await self._upsert_row_returning(
+                upserter.row_class(),
+                upserter.index_elements(),
+                upserter.build_insert_values(),
+                upserter.build_update_values(),
+                upserter.integrity_error_checks(),
+            )
+            for upserter in upserters
+        ]
+        entities = [upserter.entity_id(row) for upserter, row in zip(upserters, rows, strict=True)]
+        await self._provision_entities(entities)
+        for upserter, row, entity in zip(upserters, rows, entities, strict=True):
+            await self._enroll_member(entity, upserter.member_of(row))
+        return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]
+
     async def _enroll_member(
         self, member: EntityIdentifier, parents: Collection[EntityIdentifier]
     ) -> None:

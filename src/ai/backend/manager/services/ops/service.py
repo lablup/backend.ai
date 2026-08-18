@@ -27,6 +27,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
     BatchUpdateOpsAction,
     EntityAtomicCreateOpsAction,
+    EntityAtomicUpsertOpsAction,
     EntityCreateOpsAction,
     EntityPartialBulkPurgeOpsAction,
     EntityPurgeOpsAction,
@@ -93,6 +94,7 @@ __all__ = (
     "FieldPartialBulkPurgeService",
     "GlobalUpsertService",
     "EntityUpsertService",
+    "EntityAtomicUpsertService",
     "FieldUpsertService",
     "UpdateService",
     "DeleteService",
@@ -504,6 +506,22 @@ class EntityUpsertService[TData]:
 
     async def execute(self, action: EntityUpsertOpsAction[Any, TData]) -> EntityOpsResult[TData]:
         return EntityOpsResult(data=await self._repository.upsert_entity(action.to_upserter()))
+
+
+class EntityAtomicUpsertService[TData: EntityData]:
+    """Inserts or updates every entity row the action's upserters describe, atomically."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: EntityAtomicUpsertOpsAction[Any, TData]
+    ) -> EntitiesOpsResult[TData]:
+        return EntitiesOpsResult(
+            items=await self._repository.atomic_upsert_entities(action.to_upserters())
+        )
 
 
 class FieldUpsertService[TData]:
