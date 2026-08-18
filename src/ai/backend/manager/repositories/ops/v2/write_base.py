@@ -1,9 +1,9 @@
 """Write primitives every v2 write concern shares.
 
 Row insert/delete/upsert with spec-declared check execution, integrity-error
-parsing and matching, membership recording/removal with the transitional
-dual-write, and the legacy type conversions. No public operation lives here —
-the per-concern write ops inherit these on top of :class:`~.base.V2OpsBase`.
+parsing and matching, and membership recording/removal with the transitional
+dual-write. No public operation lives here — the per-concern write ops inherit
+these on top of :class:`~.base.V2OpsBase`.
 """
 
 from __future__ import annotations
@@ -19,14 +19,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
     EntityType,
-    ScopeRef,
-    ScopeType,
 )
 from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.data.permission.types import (
-    ScopeType as LegacyScopeType,
-)
 from ai.backend.manager.errors.permission import VirtualScopeNotFound
 from ai.backend.manager.errors.repository import (
     CheckConstraintViolationError,
@@ -102,43 +96,32 @@ class V2WriteOpsBase(V2OpsBase):
 
     async def _teardown_entity(self, entity: EntityIdentifier) -> None:
         """Remove what the entity left in the RBAC graph: permissions granted on it,
-        its virtual scope node if it provisioned one, and its membership edges."""
-        scope = ScopeRef(scope_type=ScopeType(entity.entity_type()), scope_id=entity)
-        permission_scope_type = self._permission_scope_type(scope.scope_type)
-        if permission_scope_type is not None:
-            # Types outside the RBAC element enum can never have carried permissions.
-            await self._sess.execute(
-                sa.delete(PermissionRow).where(
-                    PermissionRow.scope_type == permission_scope_type,
-                    PermissionRow.scope_id == str(scope.scope_id),
-                )
-            )
+        its virtual scope node if it provisioned one, and its membership edges.
+
+        The permission delete keys on the id alone, which is a UUID and so already
+        names one entity; the type would only narrow it to what it already is.
+        """
+        await self._sess.execute(
+            sa.delete(PermissionRow).where(PermissionRow.scope_id == str(entity))
+        )
         await self._sess.execute(
             sa.delete(VirtualScopeRow).where(
-                VirtualScopeRow.scope_type == scope.scope_type,
-                VirtualScopeRow.scope_id == scope.scope_id,
+                VirtualScopeRow.scope_type == entity.entity_type(),
+                VirtualScopeRow.scope_id == entity,
             )
         )
         await self._sess.execute(
             sa.delete(ScopeBindingRow).where(
-                ScopeBindingRow.scope_type == scope.scope_type,
-                ScopeBindingRow.scope_id == scope.scope_id,
+                ScopeBindingRow.scope_type == entity.entity_type(),
+                ScopeBindingRow.scope_id == entity,
             )
         )
         await self._sess.execute(
             sa.delete(EntityMembershipRow).where(
-                EntityMembershipRow.entity_type == scope.scope_type,
-                EntityMembershipRow.entity_id == scope.scope_id,
+                EntityMembershipRow.entity_type == entity.entity_type(),
+                EntityMembershipRow.entity_id == entity,
             )
         )
-
-    def _permission_scope_type(self, scope_type: ScopeType) -> LegacyScopeType | None:
-        """The ``permissions.scope_type`` value for ``scope_type``, or ``None`` for
-        types outside the RBAC element enum (which can carry no permissions)."""
-        try:
-            return RBACElementType(scope_type).to_scope_type()
-        except ValueError:
-            return None
 
     _SQLSTATE_TO_ERROR: ClassVar[Mapping[str, type[RepositoryIntegrityError]]] = {
         "23505": UniqueConstraintViolationError,

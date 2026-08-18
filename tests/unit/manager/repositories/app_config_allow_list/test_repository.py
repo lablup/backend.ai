@@ -42,6 +42,8 @@ from ai.backend.manager.models.app_config_definition.purgers import (
 )
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.specs.pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
@@ -75,6 +77,8 @@ async def database(
             VirtualScopeRow,
             EntityMembershipRow,
             ScopeBindingRow,
+            RoleRow,
+            PermissionRow,
             AppConfigDefinitionRow,
             AppConfigAllowListRow,
             AppConfigFragmentRow,

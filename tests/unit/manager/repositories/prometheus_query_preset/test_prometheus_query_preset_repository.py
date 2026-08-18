@@ -35,6 +35,8 @@ from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
 from ai.backend.manager.models.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryRow,
 )
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
@@ -70,6 +72,8 @@ class TestPrometheusQueryPresetRepository:
                 VirtualScopeRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
+                RoleRow,
+                PermissionRow,
                 PrometheusQueryPresetCategoryRow,
                 PrometheusQueryPresetRow,
             ],

@@ -42,6 +42,8 @@ from ai.backend.manager.errors.repository import (
     EntityNotFoundError,
 )
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.purgers import RolePresetPurger
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.role_preset.updaters import (
@@ -260,7 +262,15 @@ async def database(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(
-        database_connection, [VirtualScopeRow, EntityMembershipRow, ScopeBindingRow, RolePresetRow]
+        database_connection,
+        [
+            VirtualScopeRow,
+            EntityMembershipRow,
+            ScopeBindingRow,
+            RoleRow,
+            PermissionRow,
+            RolePresetRow,
+        ],
     ):
         yield database_connection
 
