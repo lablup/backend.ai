@@ -6,24 +6,19 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-import sqlalchemy as sa
-
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 from ai.backend.manager.models.specs.lookup import DataLookup
-from ai.backend.manager.models.user.row import UserRow
+
+__all__ = ("UserResourcePolicyNameLookup",)
 
 
 @dataclass
-class UserResourcePolicyLookup(DataLookup[UserResourcePolicyRow, UserResourcePolicyData]):
-    """Resolves the user a policy applies to into the policy itself.
+class UserResourcePolicyNameLookup(DataLookup[UserResourcePolicyRow, UserResourcePolicyData]):
+    """Resolves a policy's name into the policy it names."""
 
-    The policy row carries no owner column, so the key is read off the user.
-    """
-
-    user_id: UserID
+    name: str
 
     @override
     def row_class(self) -> type[UserResourcePolicyRow]:
@@ -31,14 +26,7 @@ class UserResourcePolicyLookup(DataLookup[UserResourcePolicyRow, UserResourcePol
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:
-        return [
-            lambda: UserResourcePolicyRow.name
-            == (
-                sa.select(UserRow.resource_policy)
-                .where(UserRow.uuid == self.user_id)
-                .scalar_subquery()
-            )
-        ]
+        return [lambda: UserResourcePolicyRow.name == self.name]
 
     @override
     def to_data(self, row: UserResourcePolicyRow) -> UserResourcePolicyData:

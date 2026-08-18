@@ -4,10 +4,10 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.resource_policy import (
-    USER_RESOURCE_POLICY_ENTITY_TYPE,
+    UserResourcePolicyUUID,
 )
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.actions.v2.ops.base import UpdateGlobalOpsAction
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import UpdateSingleEntityOpsAction
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 from ai.backend.manager.models.resource_policy.updaters import (
@@ -17,21 +17,26 @@ from ai.backend.manager.models.resource_policy.updaters import (
 
 @dataclass
 class UpdateUserResourcePolicyAction(
-    UpdateGlobalOpsAction[UserResourcePolicyRow, UserResourcePolicyData]
+    UpdateSingleEntityOpsAction[UserResourcePolicyRow, UserResourcePolicyData]
 ):
-    """Retune one user resource policy; the name stays the key."""
+    """Retune one user resource policy.
 
+    Takes both axes: ``policy_id`` is what the operation is answered for, while the
+    updater still keys on ``name``, which is the table's primary key until the id
+    replaces it.
+    """
+
+    policy_id: UserResourcePolicyUUID
     updater: UserResourcePolicyUpdater
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return USER_RESOURCE_POLICY_ENTITY_TYPE
+    def action_name(cls) -> str:
+        return "update_user_resource_policy"
 
     @override
-    @classmethod
-    def action_name(cls) -> str:
-        return "global_update_user_resource_policy"
+    def entity_id(self) -> EntityIdentifier:
+        return self.policy_id
 
     @override
     def to_updater(self) -> UserResourcePolicyUpdater:
