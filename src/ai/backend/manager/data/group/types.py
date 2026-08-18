@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, override
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.permission.id import ScopeId
@@ -41,7 +43,7 @@ class ProjectType(enum.StrEnum):
 
 
 @dataclass
-class GroupData:
+class GroupData(EntityData):
     id: uuid.UUID = field(compare=False)
     name: str
     description: str | None
@@ -56,6 +58,10 @@ class GroupData:
     resource_policy: str
     type: ProjectType
     container_registry: dict[str, str] | None
+
+    @override
+    def entity_id(self) -> ProjectID:
+        return ProjectID(self.id)
 
     def scope_id(self) -> ScopeId:
         return ScopeId(

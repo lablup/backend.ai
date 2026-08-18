@@ -2,7 +2,11 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.services.group.actions.assign_users_to_project import (
     AssignUsersToProjectAction,
     AssignUsersToProjectActionResult,
@@ -15,13 +19,10 @@ from ai.backend.manager.services.group.actions.delete_group import (
     DeleteGroupAction,
     DeleteGroupActionResult,
 )
+from ai.backend.manager.services.group.actions.lookup import LookupProjectAction
 from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
     PurgeGroupActionResult,
-)
-from ai.backend.manager.services.group.actions.resolve_project_id_by_name import (
-    ResolveProjectIdByNameAction,
-    ResolveProjectIdByNameActionResult,
 )
 from ai.backend.manager.services.group.actions.search_projects import (
     GetProjectAction,
@@ -72,12 +73,11 @@ class GroupProcessors:
     unassign_users_from_project: SingleEntityActionProcessor[
         UnassignUsersFromProjectAction, UnassignUsersFromProjectActionResult
     ]
-    resolve_project_id_by_name: ActionProcessor[
-        ResolveProjectIdByNameAction, ResolveProjectIdByNameActionResult
-    ]
+    lookup: LookupActionProcessor[LookupProjectAction, LookupOpsResult[GroupData]]
 
     def __init__(
         self,
+        group: ProcessorGroup[GroupData],
         group_service: GroupService,
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
@@ -118,6 +118,4 @@ class GroupProcessors:
             action_monitors,
             validators=rbac_single_entity_validators,
         )
-        self.resolve_project_id_by_name = ActionProcessor(
-            group_service.resolve_project_id_by_name, action_monitors
-        )
+        self.lookup = group.public_lookup_ops(LookupProjectAction)

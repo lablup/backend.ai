@@ -21,6 +21,7 @@ from ai.backend.common.api_handlers import (
     PathParam,
     QueryParam,
 )
+from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.template.request import (
     CreateSessionTemplateRequest,
@@ -43,9 +44,7 @@ from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.services.group.actions.resolve_project_id_by_name import (
-    ResolveProjectIdByNameAction,
-)
+from ai.backend.manager.services.group.actions.lookup import LookupProjectAction
 from ai.backend.manager.services.template.actions.create_task_template import (
     CreateTaskTemplateAction,
     TaskTemplateItemInput,
@@ -83,14 +82,10 @@ class SessionTemplateHandler:
         self._group = group
 
     async def _resolve_project_id(self, domain_name: str, project_name: str) -> ProjectID:
-        result = await self._group.resolve_project_id_by_name.wait_for_complete(
-            ResolveProjectIdByNameAction(domain_name=domain_name, project_name=project_name)
+        result = await self._group.lookup.run(
+            LookupProjectAction(domain_name=DomainName(domain_name), project_name=project_name)
         )
-        if result.project_id is None:
-            raise InvalidAPIParameters(
-                f"No active group named {project_name!r} exists in domain {domain_name!r}"
-            )
-        return result.project_id
+        return ProjectID(result.data.id)
 
     async def create(
         self,
