@@ -15,7 +15,10 @@ from ai.backend.common.dto.manager.v2.app_config.response import (
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.app_config.types import AppConfigData
-from ai.backend.manager.services.app_config.actions.get import GetAppConfigsAction
+from ai.backend.manager.services.app_config.actions.search import (
+    AnonymousSearchAppConfigsAction,
+    SearchAppConfigsAction,
+)
 
 
 class AppConfigAdapter(BaseAdapter):
@@ -23,14 +26,14 @@ class AppConfigAdapter(BaseAdapter):
 
     # --- merged AppConfig read ---
 
-    async def my_get_app_configs(self, input: MyGetAppConfigsInput) -> GetAppConfigsPayload:
+    async def my_app_configs(self, input: MyGetAppConfigsInput) -> GetAppConfigsPayload:
         """The acting user's merged AppConfigs; the scope comes from the session, not the caller."""
         me = current_user()
         if me is None:
             # ``auth_required`` guarantees a session on this route, so this is never hit.
             raise UnreachableError("User context is not available")
-        action_result = await self._processors.app_config.get_app_configs.wait_for_complete(
-            GetAppConfigsAction(
+        action_result = await self._processors.app_config.search_app_configs.run(
+            SearchAppConfigsAction(
                 config_names=input.config_names,
                 user_id=UserID(me.user_id),
                 domain_id=me.domain_id,
@@ -42,10 +45,10 @@ class AppConfigAdapter(BaseAdapter):
             ]
         )
 
-    async def public_get_app_configs(self, input: PublicGetAppConfigsInput) -> GetAppConfigsPayload:
+    async def public_app_configs(self, input: PublicGetAppConfigsInput) -> GetAppConfigsPayload:
         """Merged AppConfigs from public fragments only; naming no principal is what makes it anonymous."""
-        action_result = await self._processors.app_config.get_app_configs.wait_for_complete(
-            GetAppConfigsAction(config_names=input.config_names)
+        action_result = await self._processors.app_config.anonymous_search_app_configs.run(
+            AnonymousSearchAppConfigsAction(config_names=input.config_names)
         )
         return GetAppConfigsPayload(
             app_configs=[

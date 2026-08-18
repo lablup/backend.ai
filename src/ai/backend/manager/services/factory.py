@@ -184,9 +184,7 @@ def create_services(args: ServiceArgs) -> Services:
             args.event_producer,
             args.agent_cache,
         ),
-        app_config=AppConfigService(
-            fragment_repository=repositories.app_config_fragment.repository,
-        ),
+        app_config=AppConfigService(OpsRepository(repositories.v2_ops_provider)),
         app_config_fragment=AppConfigFragmentService(
             repository=repositories.app_config_fragment.repository,
         ),
@@ -445,7 +443,7 @@ def create_processors(
     )
     processors = Processors(
         agent=AgentProcessors(services.agent, action_monitors, validators),
-        app_config=AppConfigProcessors(services.app_config, action_monitors),
+        app_config=AppConfigProcessors(registry.group(), services.app_config),
         app_config_allow_list=AppConfigAllowListProcessors(registry.group()),
         app_config_fragment=AppConfigFragmentProcessors(
             services.app_config_fragment, action_monitors, validators

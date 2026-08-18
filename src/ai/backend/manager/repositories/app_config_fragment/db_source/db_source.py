@@ -7,8 +7,6 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -26,11 +24,8 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.app_config import (
     AppConfigFragmentNotFound,
 )
-from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
-from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
 )
@@ -182,42 +177,3 @@ class AppConfigFragmentDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
-
-    @app_config_fragment_db_source_resilience.apply()
-    async def list_visible_fragments_bulk(
-        self, config_names: list[str], user_id: UserID | None, domain_id: DomainID | None
-    ) -> list[AppConfigFragmentData]:
-        """Visible fragments for several ``config_names``, ordered by ascending ``rank``.
-
-        ``public`` always contributes; a ``user_id`` additionally admits that user's own
-        overlay and a ``domain_id`` its domain's, while naming neither (anonymous) sees only
-        ``public``. Both come from the session, so neither is looked up here. Rank-ordered so
-        the caller can group by name and deep-merge each name's fragments in order.
-        """
-        if not config_names:
-            return []
-        # Join each fragment to its allow-list entry (indexed ``(config_name, scope_type)`` FK
-        # pair), which carries the merge ``rank`` the result is ordered by.
-        selector = sa.select(AppConfigFragmentRow).join(
-            AppConfigAllowListRow,
-            sa.and_(
-                AppConfigAllowListRow.config_name == AppConfigFragmentRow.config_name,
-                AppConfigAllowListRow.scope_type == AppConfigFragmentRow.scope_type,
-            ),
-        )
-        async with self._rbac_ops_provider.read_ops() as r:
-            scope_visibility = [AppConfigFragmentConditions.by_public_visibility()]
-            if user_id is not None:
-                scope_visibility.append(AppConfigFragmentConditions.by_user_visibility(user_id))
-            if domain_id is not None:
-                scope_visibility.append(AppConfigFragmentConditions.by_domain_visibility(domain_id))
-            querier = BatchQuerier(
-                pagination=NoPagination(),
-                conditions=[
-                    AppConfigFragmentConditions.by_config_names(config_names),
-                    lambda: sa.or_(*(visibility() for visibility in scope_visibility)),
-                ],
-                orders=[AppConfigAllowListRow.rank.asc()],
-            )
-            result = await r.batch_query_in_global(selector, querier)
-            return [row.AppConfigFragmentRow.to_data() for row in result.rows]

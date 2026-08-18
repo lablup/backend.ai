@@ -3,8 +3,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -91,9 +89,3 @@ class AppConfigFragmentRepository:
         purger_specs: Sequence[AppConfigFragmentPurgerSpec],
     ) -> AppConfigFragmentBulkResult:
         return await self._db_source.bulk_purge(purger_specs)
-
-    @app_config_fragment_repository_resilience.apply()
-    async def list_visible_fragments_bulk(
-        self, config_names: list[str], user_id: UserID | None, domain_id: DomainID | None
-    ) -> list[AppConfigFragmentData]:
-        return await self._db_source.list_visible_fragments_bulk(config_names, user_id, domain_id)

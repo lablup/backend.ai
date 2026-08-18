@@ -3,7 +3,7 @@ name: action-framework-design
 type: design-rationale
 description: v2 action shapes and derived permissions, why a field row's operations are answered for by its owning entity, why a bulk field answers per row but records per entity, audit recording principles (writes always, reads on subscription, failures always, DENIED), lookup existence-leak handling, public read gate, ops-backed backing axis
 scope: src/ai/backend/manager/actions
-keywords: [BaseSingleEntityAction, BaseScopeAction, BaseGlobalAction, BaseLookupAction, BaseBulkLookupAction, BaseSingleFieldAction, BaseBulkFieldAction, FieldOwnerLookup, PublicActionProcessor, AuditLogPolicy, ProcessorRegistry, wired_actions, RESTORE, soft-delete]
+keywords: [BaseSingleEntityAction, BaseScopeAction, BaseGlobalAction, BaseLookupAction, BaseBulkLookupAction, BaseSingleFieldAction, BaseBulkFieldAction, FieldOwnerLookup, PublicActionProcessor, anonymous_scope, AuditLogPolicy, ProcessorRegistry, wired_actions, RESTORE, soft-delete]
 sources:
   - src/ai/backend/manager/actions/v2
   - src/ai/backend/manager/actions/registry.py
@@ -121,6 +121,7 @@ which is why handlers call processors, not services.
 
 - `PublicActionProcessor` replaces the SUPERADMIN gate with an authentication check and does nothing else.
 - It is the only processor constructed together with the action class, so it rejects write operations at wiring time, not at request time.
+- A read that runs before anyone has signed in therefore has no processor of its own: `ScopeActionProcessor` pins no gate, so `ProcessorGroup.anonymous_scope` wires one without adding a class. It takes read operations only, checked at wiring time.
 
 ## The registry is the catalog
 

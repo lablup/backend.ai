@@ -23,6 +23,7 @@ from typing import Any
 
 from ai.backend.common.data.entity.types import EntityData, FieldData
 from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
@@ -120,6 +121,7 @@ from ai.backend.manager.actions.v2.single_entity.processor import (
 )
 from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
 from ai.backend.manager.actions.v2.validators import ActionValidators
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.ops.service import (
     BatchPurgeService,
@@ -223,6 +225,34 @@ class ProcessorGroup[TData: EntityData]:
             func,
             monitors=(*self._deps.monitors.scope, *monitors),
             validators=(*self._deps.validators.scope, *validators),
+        )
+
+    def anonymous_scope[TAction: BaseScopeAction, TResult: BaseScopeActionResult](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[TResult]],
+        *,
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[TAction, TResult]:
+        """A scope read that runs before anyone has signed in.
+
+        No gate at all, not even authentication -- ``public`` in this layer means every
+        authenticated caller, which is still one step narrower. What keeps it safe is
+        the read itself: naming no principal is what limits it to what is published.
+
+        Reads only, checked here: a write must never reach an ungated path.
+        """
+        operation_type = action_cls.operation_type()
+        if operation_type not in ActionOperationType.read_operations():
+            raise ServerMisconfiguredError(
+                f"{action_cls.__name__} declares operation_type()={operation_type}, "
+                "but the anonymous path only accepts read actions."
+            )
+        self._record(action_cls)
+        return ScopeActionProcessor(
+            func,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(),
         )
 
     def bulk[TAction: BaseBulkAction, TResult: BaseBulkActionResult](

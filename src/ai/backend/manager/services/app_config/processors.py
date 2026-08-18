@@ -1,22 +1,36 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
-from ai.backend.manager.services.app_config.actions.get import (
-    GetAppConfigsAction,
-    GetAppConfigsActionResult,
+from typing import Any
+
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.services.app_config.actions.search import (
+    AnonymousSearchAppConfigsAction,
+    SearchAppConfigsAction,
+    SearchAppConfigsActionResult,
 )
 from ai.backend.manager.services.app_config.service import AppConfigService
 
 
 class AppConfigProcessors:
-    get_app_configs: ScopeActionProcessor[GetAppConfigsAction, GetAppConfigsActionResult]
+    """Two reads of the same merge, told apart by who may ask.
+
+    The signed-in read is answered for by the user's scope; the anonymous one names no
+    principal, which is what limits it to the published fragments.
+    """
+
+    search_app_configs: ScopeActionProcessor[SearchAppConfigsAction, SearchAppConfigsActionResult]
+    anonymous_search_app_configs: ScopeActionProcessor[
+        AnonymousSearchAppConfigsAction, SearchAppConfigsActionResult
+    ]
 
     def __init__(
         self,
+        # No ops here, so the group's data type is unused.
+        group: ProcessorGroup[Any],
         service: AppConfigService,
-        action_monitors: list[ActionMonitor],
     ) -> None:
-        # No RBAC validator on purpose: the adapter fills the action's user_id from the
-        # session, so a get is only ever for the acting user.
-        self.get_app_configs = ScopeActionProcessor(service.get_app_configs, action_monitors)
+        self.search_app_configs = group.scope(SearchAppConfigsAction, service.search_app_configs)
+        self.anonymous_search_app_configs = group.anonymous_scope(
+            AnonymousSearchAppConfigsAction, service.anonymous_search_app_configs
+        )
