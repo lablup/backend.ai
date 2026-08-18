@@ -1,9 +1,9 @@
 ---
 name: role-preset-service-shapes
 type: decision-table
-description: role preset processor fields and their entity/operation/scope, why a preset is global state that owns field rows, why creation is one action, why delete and purge both exist, where the name template is validated
+description: role preset processor fields and their entity/operation/scope, why a preset is global state that owns field rows, why creation is one action, why delete and purge both exist, why the two template-settling writes have a service
 scope: src/ai/backend/manager/services/role_preset
-keywords: [CreateRolePresetAction, BulkDeleteRolePresetsAction, BulkRestoreRolePresetsAction, RolePresetCreator, RolePermissionPresetCreator, RoleNameTemplateCarrier, global_create_with_fields_ops, field_atomic_create_ops, partial_bulk_delete_ops, deleted]
+keywords: [CreateRolePresetAction, BulkDeleteRolePresetsAction, BulkRestoreRolePresetsAction, RolePresetCreator, RolePermissionPresetCreator, RolePresetService, role_name_template, field_atomic_create_ops, partial_bulk_delete_ops, deleted]
 sources:
   - src/ai/backend/manager/services/role_preset
   - src/ai/backend/manager/models/rbac_models/role_preset
@@ -28,12 +28,12 @@ the preset that owns them.
 | Field | Action | Entity type | Shape | Operation |
 |---|---|---|---|---|
 | `create` | `CreateRolePresetAction` | ROLE_PRESET | global + fields | CREATE |
-| `get` | `GetRolePresetAction` | ROLE_PRESET | global | GET |
+| `get` | `GetRolePresetAction` | ROLE_PRESET | single entity | GET |
 | `search` | `SearchRolePresetsAction` | ROLE_PRESET | global | SEARCH |
-| `update` | `UpdateRolePresetAction` | ROLE_PRESET | global | UPDATE |
+| `update` | `UpdateRolePresetAction` | ROLE_PRESET | single entity | UPDATE |
 | `bulk_delete` | `BulkDeleteRolePresetsAction` | ROLE_PRESET | partial bulk | DELETE |
 | `bulk_restore` | `BulkRestoreRolePresetsAction` | ROLE_PRESET | partial bulk | RESTORE |
-| `purge` | `PurgeRolePresetAction` | ROLE_PRESET | global | PURGE |
+| `purge` | `PurgeRolePresetAction` | ROLE_PRESET | single entity | PURGE |
 | `bulk_purge` | `BulkPurgeRolePresetsAction` | ROLE_PRESET | partial bulk | PURGE |
 | `search_permission_presets` | `SearchRolePermissionPresetsAction` | ROLE_PRESET | global | SEARCH |
 | `bulk_add_permissions` | `BulkAddRolePermissionPresetsAction` | ROLE_PRESET | single entity, atomic | UPDATE |
@@ -82,10 +82,14 @@ out. The entity recorded is always the preset.
 - The lifecycle column is not exposed on the general updater, so an ordinary edit
   cannot make the transition.
 
-## The name template is validated at the action layer
+## Only the two writes that settle the template have a service
 
-- `RoleNameTemplateCarrier` is a separate mixin, and the validator picks actions
-  out by `isinstance` — create and update both carry a template, and neither
-  should reach a transaction with a malformed one.
-- Rendering happens in a sandboxed Jinja environment against a dummy scope, so a
-  template that cannot render is refused and recorded like any other denial.
+- The render at use time swallows its own failure and falls back to a generated name,
+  because entity creation must not fail on role naming. That makes the write the only
+  point a caller learns the template is broken.
+- Create and update are the only operations that take a template, so they are the only
+  ones that branch. The rest still run straight against ops.
+- The check renders the template against a dummy scope in a sandboxed Jinja
+  environment, refusing syntax errors, undefined variables and an empty result.
+- Length is not checked: the render truncates to the column limit, so there is nothing
+  to refuse.

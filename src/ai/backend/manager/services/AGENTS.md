@@ -59,6 +59,8 @@ grows a branch; the generic services take no hook or callback to hide one in.
 - Wrap every service method in an `ActionProcessor`. Do NOT expose raw service methods to handlers.
 - Framework-level rules — v2 bases, `ProcessorGroup` wiring, gates, registry test —
   live in `actions/AGENTS.md`.
+- `Processors.__init__` takes its `ProcessorGroup`s first and the service after them.
+  Several groups are listed together, before the service.
 - A change to a domain's processor composition — a field added or removed, a different
   factory, a different action base — updates that domain's `KNOWLEDGE.md` in the same
   change. Its field table states the entity type, shape and operation each field runs
