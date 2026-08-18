@@ -5,8 +5,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-import sqlalchemy as sa
-
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
@@ -34,14 +32,8 @@ class V2GlobalWriteOps(V2WriteOpsBase):
         if not creators:
             return []
         rows = [creator.build_row() for creator in creators]
-        self._sess.add_all(rows)
-        try:
-            await self._sess.flush()
-        except sa.exc.IntegrityError as e:
-            # Use first creator's checks (all specs share the same creator subclass)
-            self._match_integrity_error(
-                self._parse_integrity_error(e), creators[0].integrity_error_checks()
-            )
+        # First creator's checks: all specs share the same creator subclass.
+        await self._insert_rows(rows, creators[0].integrity_error_checks())
         await self._provision_entities([
             creator.entity_id(row) for creator, row in zip(creators, rows, strict=True)
         ])

@@ -6,8 +6,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-import sqlalchemy as sa
-
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.errors.repository import EntityNotFoundError
@@ -36,14 +34,8 @@ class V2FieldWriteOps(V2WriteOpsBase):
         if not creators:
             return []
         rows = [creator.build_row(owner_id) for creator in creators]
-        self._sess.add_all(rows)
-        try:
-            await self._sess.flush()
-        except sa.exc.IntegrityError as e:
-            # Use first creator's checks (all specs share the same creator subclass)
-            self._match_integrity_error(
-                self._parse_integrity_error(e), creators[0].integrity_error_checks()
-            )
+        # First creator's checks: all specs share the same creator subclass.
+        await self._insert_rows(rows, creators[0].integrity_error_checks())
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
     async def purge_field_entity[TRow: Base, TData](

@@ -226,11 +226,40 @@ class V2WriteOpsBase(V2OpsBase):
         raise parsed
 
     async def _insert_row(self, row: Base, checks: Sequence[IntegrityErrorCheck]) -> None:
-        self._sess.add(row)
+        await self._insert_rows((row,), checks)
+
+    async def _insert_rows(
+        self, rows: Sequence[Base], checks: Sequence[IntegrityErrorCheck]
+    ) -> None:
+        """Flush rows in one batch, then read back whatever the database computed.
+
+        Each row is refreshed on its own: the values differ per row, and ``refresh``
+        is what keeps composite keys and the identity map right. Rows that left
+        nothing to SQL — every ordinary insert — are skipped, so this costs nothing
+        until a spec asks for it.
+        """
+        computed = [self._sql_valued_columns(row) for row in rows]
+        self._sess.add_all(rows)
         try:
             await self._sess.flush()
         except sa.exc.IntegrityError as e:
             self._match_integrity_error(self._parse_integrity_error(e), checks)
+        for row, names in zip(rows, computed, strict=True):
+            if names:
+                await self._sess.refresh(row, names)
+
+    def _sql_valued_columns(self, row: Base) -> list[str]:
+        """The columns the spec left to SQL, read before the insert.
+
+        A value given as an expression is computed by the database, so reading it back
+        needs a SELECT — and after the flush the attribute is expired, which in an
+        async session raises rather than loading.
+        """
+        return [
+            attr.key
+            for attr in sa.inspect(type(row)).column_attrs
+            if isinstance(getattr(row, attr.key, None), sa.sql.ColumnElement)
+        ]
 
     async def _update_row_returning[TRow: Base](
         self,

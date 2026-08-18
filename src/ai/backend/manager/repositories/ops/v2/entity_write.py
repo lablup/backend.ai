@@ -54,7 +54,7 @@ from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.specs.creator import EntityCreator, RoleManagedEntityCreator
 from ai.backend.manager.models.specs.membership import EntityMembershipEntry
 from ai.backend.manager.models.specs.purger import EntityPurger
-from ai.backend.manager.models.specs.types import BulkResultWithFailures, IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.specs.upserter import EntityUpserter
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
@@ -127,7 +127,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
         if not creators:
             return []
         rows = [creator.build_row() for creator in creators]
-        await self._bulk_insert_rows(rows, creators[0].integrity_error_checks())
+        await self._insert_rows(rows, creators[0].integrity_error_checks())
         entities = [creator.entity_id(row) for creator, row in zip(creators, rows, strict=True)]
         await self._provision_entities(entities)
         for creator, row, entity in zip(creators, rows, entities, strict=True):
@@ -142,7 +142,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
         if not creators:
             return []
         rows = [creator.build_row() for creator in creators]
-        await self._bulk_insert_rows(rows, creators[0].integrity_error_checks())
+        await self._insert_rows(rows, creators[0].integrity_error_checks())
         entities = [creator.entity_id(row) for creator, row in zip(creators, rows, strict=True)]
         await self._provision_entities(entities)
         await self._create_preset_roles({
@@ -201,17 +201,6 @@ class V2EntityWriteOps(V2WriteOpsBase):
         await self._provision_entities([entity])
         await self._enroll_member(entity, upserter.member_of(row))
         return upserter.to_data(row)
-
-    async def _bulk_insert_rows[TRow: Base](
-        self, rows: Sequence[TRow], checks: Sequence[IntegrityErrorCheck]
-    ) -> None:
-        """Flush pre-built rows in one batch. Takes plain values so both entity
-        the creators share it without a common spec supertype."""
-        self._sess.add_all(rows)
-        try:
-            await self._sess.flush()
-        except sa.exc.IntegrityError as e:
-            self._match_integrity_error(self._parse_integrity_error(e), checks)
 
     async def _enroll_member(
         self, member: EntityIdentifier, parents: Collection[EntityIdentifier]

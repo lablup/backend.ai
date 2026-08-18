@@ -71,6 +71,16 @@ joins nothing.
 - Enrollment writes graph edges only. Granting a joining user the target's auto_assign
   roles is an explicit ops primitive — never an implicit side effect keyed on the type.
 
+## Values left for the database to compute
+
+- A creator may put a SQL expression on a column in `build_row()`; the value is then
+  computed inside the INSERT, with no lock and no SELECT before it. A rank asking for
+  "one past the last" is what this is for.
+- Concurrent inserts can land on the same value. Do NOT use it where the order has to
+  be deterministic.
+- Such a column is read back once after the insert. ops works that out from the row, so
+  a spec declares nothing.
+
 ## A field row's owner
 
 - A field row carries no membership of its own. What it belongs to is only knowable
