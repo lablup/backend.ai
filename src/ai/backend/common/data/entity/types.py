@@ -20,7 +20,7 @@ type ScopeID = EntityID
 class EntityType(str):
     """The type of an entity.
 
-    A class rather than a `NewType` so a `FieldType` cannot be passed where this is
+    A class rather than a `NewType` so a `NaturalKey` cannot be passed where this is
     expected: two `NewType`s over `str` are mutually assignable.
     """
 
@@ -34,25 +34,6 @@ class EntityType(str):
 # Every entity doubles as a scope, so a scope type IS an entity type; the
 # reverse direction stays an explicit declaration (`ScopeType(<entity type>)`).
 ScopeType = NewType("ScopeType", EntityType)
-
-
-class FieldType(str):
-    """The type of a field row, which knows the type of entity that owns it.
-
-    A class rather than a `NewType` for the same reason `EntityType` is one: the two
-    must not be assignable to each other.
-    """
-
-    @classmethod
-    @abstractmethod
-    def owner_entity_type(cls) -> EntityType:
-        raise NotImplementedError
-
-    @classmethod
-    def __get_pydantic_core_schema__(cls, source: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
-        """Validated as the string it is; pydantic builds no schema for a `str`
-        subclass on its own."""
-        return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
 
 
 class NaturalKey(str):
@@ -128,7 +109,7 @@ class EntityIdentifier(UUID):
 
 
 class FieldIdentifier(UUID):
-    """A field row's id, which knows its own type and the entity that owns it.
+    """A field row's id, which knows the entity type that owns it.
 
     No `entity_ref()`: a field row carries no membership of its own, so what it belongs
     to is only knowable through the entity that owns it.
@@ -139,13 +120,9 @@ class FieldIdentifier(UUID):
 
     @classmethod
     @abstractmethod
-    def field_type(cls) -> FieldType:
-        raise NotImplementedError
-
-    @classmethod
     def owner_entity_type(cls) -> EntityType:
-        """Derived from the field type, which is where the ownership is declared."""
-        return cls.field_type().owner_entity_type()
+        """Return the type of entity that owns rows this id names."""
+        raise NotImplementedError
 
     @classmethod
     def __get_pydantic_core_schema__(cls, source: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
