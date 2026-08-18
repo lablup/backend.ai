@@ -22,7 +22,7 @@ from ai.backend.common.dto.manager.object_storage.response import (
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.storage_namespace.creators import StorageNamespaceCreator
-from ai.backend.manager.repositories.storage_namespace.searchers import StorageNamespaceSearcher
+from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.lookup import (
     LookupStorageNamespaceAction,

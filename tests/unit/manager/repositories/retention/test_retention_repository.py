@@ -59,7 +59,7 @@ from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
-from ai.backend.manager.models.error_logs import ErrorLogRow
+from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.event_log.row import EventLogRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo

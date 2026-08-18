@@ -76,6 +76,10 @@ from ai.backend.manager.models.deployment_revision_preset.orders import (
     DeploymentRevisionPresetOrders,
 )
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.deployment_revision_preset.searchers import (
+    DeploymentPresetSearcher,
+    PresetResourceSlotSearcher,
+)
 from ai.backend.manager.models.deployment_revision_preset.updaters import DeploymentPresetUpdater
 from ai.backend.manager.models.resource_slot.conditions import PresetResourceSlotConditions
 from ai.backend.manager.models.resource_slot.orders import (
@@ -90,10 +94,6 @@ from ai.backend.manager.models.runtime_variant_preset.types import (
 from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.deployment_revision_preset.searchers import (
-    DeploymentPresetSearcher,
-    PresetResourceSlotSearcher,
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.create import (
     CreateDeploymentPresetAction,

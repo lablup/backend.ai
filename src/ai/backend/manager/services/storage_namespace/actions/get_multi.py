@@ -11,7 +11,7 @@ from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.storage_namespace.conditions import StorageNamespaceConditions
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
-from ai.backend.manager.repositories.storage_namespace.searchers import StorageNamespaceSearcher
+from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 
 
 @dataclass

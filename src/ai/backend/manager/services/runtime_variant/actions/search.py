@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.repositories.runtime_variant.searchers import RuntimeVariantSearcher
+from ai.backend.manager.models.runtime_variant.searchers import RuntimeVariantSearcher
 
 
 @dataclass

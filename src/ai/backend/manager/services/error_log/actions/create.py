@@ -10,7 +10,7 @@ from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.manager.actions.v2.ops.base import CreateEntityOpsAction
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.models.error_log.creators import ErrorLogCreator
-from ai.backend.manager.models.error_logs import ErrorLogRow
+from ai.backend.manager.models.error_log.row import ErrorLogRow
 
 
 @dataclass

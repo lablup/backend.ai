@@ -7,10 +7,10 @@ from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantP
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
-from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.repositories.runtime_variant_preset.queriers import (
+from ai.backend.manager.models.runtime_variant_preset.queriers import (
     RuntimeVariantPresetQuerier,
 )
+from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 
 
 @dataclass

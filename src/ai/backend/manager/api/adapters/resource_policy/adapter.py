@@ -97,6 +97,11 @@ from ai.backend.manager.models.resource_policy.orders import (
     ProjectResourcePolicyOrders,
     UserResourcePolicyOrders,
 )
+from ai.backend.manager.models.resource_policy.searchers import (
+    KeyPairResourcePolicySearcher,
+    ProjectResourcePolicySearcher,
+    UserResourcePolicySearcher,
+)
 from ai.backend.manager.models.resource_policy.updaters import (
     KeyPairResourcePolicyUpdater,
     ProjectResourcePolicyUpdater,
@@ -106,15 +111,6 @@ from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.keypair_resource_policy.searchers import (
-    KeyPairResourcePolicySearcher,
-)
-from ai.backend.manager.repositories.project_resource_policy.searchers import (
-    ProjectResourcePolicySearcher,
-)
-from ai.backend.manager.repositories.user_resource_policy.searchers import (
-    UserResourcePolicySearcher,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,

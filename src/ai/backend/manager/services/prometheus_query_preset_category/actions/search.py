@@ -14,7 +14,7 @@ from ai.backend.manager.data.prometheus_query_preset_category.types import (
 from ai.backend.manager.models.prometheus_query_preset_category.row import (
     PrometheusQueryPresetCategoryRow,
 )
-from ai.backend.manager.repositories.prometheus_query_preset_category.searchers import (
+from ai.backend.manager.models.prometheus_query_preset_category.searchers import (
     PrometheusQueryPresetCategorySearcher,
 )
 

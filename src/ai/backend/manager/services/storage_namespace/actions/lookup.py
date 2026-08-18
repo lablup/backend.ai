@@ -10,7 +10,7 @@ from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
-from ai.backend.manager.repositories.storage_namespace.lookups import (
+from ai.backend.manager.models.storage_namespace.lookups import (
     StorageNamespaceLookup,
 )
 

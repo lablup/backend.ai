@@ -30,7 +30,13 @@ from ai.backend.manager.models.app_config_allow_list.orders import AppConfigAllo
 from ai.backend.manager.models.app_config_allow_list.purgers import (
     AppConfigAllowListPurger,
 )
+from ai.backend.manager.models.app_config_allow_list.queriers import (
+    AppConfigAllowListQuerier,
+)
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
+from ai.backend.manager.models.app_config_allow_list.searchers import (
+    AppConfigAllowListSearcher,
+)
 from ai.backend.manager.models.app_config_allow_list.updaters import (
     AppConfigAllowListUpdater,
 )
@@ -53,12 +59,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
-from ai.backend.manager.repositories.app_config_allow_list.queriers import (
-    AppConfigAllowListQuerier,
-)
-from ai.backend.manager.repositories.app_config_allow_list.searchers import (
-    AppConfigAllowListSearcher,
-)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import OptionalState

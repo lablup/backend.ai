@@ -24,9 +24,9 @@ from ai.backend.common.dto.manager.response import (
     ObjectStorageListResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.object_storage.searchers import ObjectStorageSearcher
-from ai.backend.manager.repositories.storage_namespace.searchers import StorageNamespaceSearcher
+from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
 )

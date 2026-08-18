@@ -10,7 +10,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.repositories.runtime_variant_preset.searchers import (
+from ai.backend.manager.models.runtime_variant_preset.searchers import (
     RuntimeVariantPresetSearcher,
 )
 

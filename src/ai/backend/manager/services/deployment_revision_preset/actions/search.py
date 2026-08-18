@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.repositories.deployment_revision_preset.searchers import (
+from ai.backend.manager.models.deployment_revision_preset.searchers import (
     DeploymentPresetSearcher,
 )
 

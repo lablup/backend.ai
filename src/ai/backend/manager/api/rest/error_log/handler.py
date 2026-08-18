@@ -28,9 +28,9 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.error_log.types import ErrorLogSeverity
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.error_log.creators import ErrorLogCreator
-from ai.backend.manager.models.error_logs import ErrorLogRow
+from ai.backend.manager.models.error_log.row import ErrorLogRow
+from ai.backend.manager.models.error_log.searchers import ErrorLogSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.error_log.searchers import ErrorLogSearcher
 from ai.backend.manager.services.error_log.actions.create import CreateErrorLogAction
 from ai.backend.manager.services.error_log.actions.delete import DeleteErrorLogAction
 from ai.backend.manager.services.error_log.actions.global_search import GlobalSearchErrorLogsAction

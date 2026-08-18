@@ -9,8 +9,8 @@ from ai.backend.common.data.entity.runtime_variant import (
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
+from ai.backend.manager.models.runtime_variant.queriers import RuntimeVariantQuerier
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.repositories.runtime_variant.queriers import RuntimeVariantQuerier
 
 
 @dataclass

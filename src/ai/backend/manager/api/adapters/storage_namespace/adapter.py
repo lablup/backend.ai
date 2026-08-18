@@ -22,7 +22,7 @@ from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.storage_namespace.conditions import StorageNamespaceConditions
 from ai.backend.manager.models.storage_namespace.creators import StorageNamespaceCreator
-from ai.backend.manager.repositories.storage_namespace.searchers import StorageNamespaceSearcher
+from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.lookup import (
     LookupStorageNamespaceAction,

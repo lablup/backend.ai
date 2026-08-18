@@ -10,7 +10,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
-from ai.backend.manager.repositories.app_config_definition.searchers import (
+from ai.backend.manager.models.app_config_definition.searchers import (
     AppConfigDefinitionSearcher,
 )
 

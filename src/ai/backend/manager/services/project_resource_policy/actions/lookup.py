@@ -10,10 +10,10 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
-from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
-from ai.backend.manager.repositories.project_resource_policy.lookups import (
+from ai.backend.manager.models.resource_policy.lookups import (
     ProjectResourcePolicyNameLookup,
 )
+from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 
 
 @dataclass(frozen=True)

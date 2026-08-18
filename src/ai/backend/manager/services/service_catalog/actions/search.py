@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.service_catalog.types import ServiceCatalogData
 from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
-from ai.backend.manager.repositories.service_catalog.searchers import ServiceCatalogSearcher
+from ai.backend.manager.models.service_catalog.searchers import ServiceCatalogSearcher
 
 
 @dataclass

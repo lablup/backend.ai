@@ -11,10 +11,10 @@ from ai.backend.manager.models.deployment_revision_preset.creators import (
 from ai.backend.manager.models.deployment_revision_preset.purgers import (
     PresetResourceSlotBatchPurger,
 )
-from ai.backend.manager.models.deployment_revision_preset.updaters import DeploymentPresetUpdater
-from ai.backend.manager.repositories.deployment_revision_preset.queriers import (
+from ai.backend.manager.models.deployment_revision_preset.queriers import (
     DeploymentPresetQuerier,
 )
+from ai.backend.manager.models.deployment_revision_preset.updaters import DeploymentPresetUpdater
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 __all__ = ("DeploymentPresetRepository",)

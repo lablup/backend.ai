@@ -33,10 +33,10 @@ from ai.backend.manager.models.app_config_definition.creators import (
     AppConfigDefinitionCreator,
 )
 from ai.backend.manager.models.app_config_definition.orders import AppConfigDefinitionOrders
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.app_config_definition.searchers import (
+from ai.backend.manager.models.app_config_definition.searchers import (
     AppConfigDefinitionSearcher,
 )
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,

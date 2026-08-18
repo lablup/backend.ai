@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.app_config.types import AppConfigAllowListData
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
-from ai.backend.manager.repositories.app_config_allow_list.searchers import (
+from ai.backend.manager.models.app_config_allow_list.searchers import (
     AppConfigAllowListSearcher,
 )
 

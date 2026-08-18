@@ -7,10 +7,10 @@ from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
-from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.repositories.deployment_revision_preset.queriers import (
+from ai.backend.manager.models.deployment_revision_preset.queriers import (
     DeploymentPresetQuerier,
 )
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 
 
 @dataclass

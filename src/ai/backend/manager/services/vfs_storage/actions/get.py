@@ -7,8 +7,8 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
+from ai.backend.manager.models.vfs_storage.queriers import VFSStorageQuerier
 from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
-from ai.backend.manager.repositories.vfs_storage.queriers import VFSStorageQuerier
 
 
 @dataclass

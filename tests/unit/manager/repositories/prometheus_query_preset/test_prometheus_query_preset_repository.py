@@ -32,6 +32,9 @@ from ai.backend.manager.models.prometheus_query_preset.purgers import (
     PrometheusQueryPresetPurger,
 )
 from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
+from ai.backend.manager.models.prometheus_query_preset.searchers import (
+    PrometheusQueryPresetSearcher,
+)
 from ai.backend.manager.models.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryRow,
 )
@@ -47,9 +50,6 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
-)
-from ai.backend.manager.repositories.prometheus_query_preset.searchers import (
-    PrometheusQueryPresetSearcher,
 )
 from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
     PrometheusQueryPresetUpdaterSpec,

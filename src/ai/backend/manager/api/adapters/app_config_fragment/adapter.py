@@ -49,17 +49,17 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.orders import AppConfigFragmentOrders
 from ai.backend.manager.models.app_config_fragment.purgers import AppConfigFragmentPurger
+from ai.backend.manager.models.app_config_fragment.queriers import (
+    AppConfigFragmentQuerier,
+)
+from ai.backend.manager.models.app_config_fragment.searchers import (
+    AppConfigFragmentSearcher,
+)
 from ai.backend.manager.models.app_config_fragment.upserters import (
     AppConfigFragmentUpserter,
     PublicAppConfigFragmentUpserter,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.app_config_fragment.queriers import (
-    AppConfigFragmentQuerier,
-)
-from ai.backend.manager.repositories.app_config_fragment.searchers import (
-    AppConfigFragmentSearcher,
-)
 from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,

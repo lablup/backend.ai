@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.notification.types import NotificationRuleData
 from ai.backend.manager.models.notification.row import NotificationRuleRow
-from ai.backend.manager.repositories.notification.searchers import NotificationRuleSearcher
+from ai.backend.manager.models.notification.searchers import NotificationRuleSearcher
 
 
 @dataclass

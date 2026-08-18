@@ -14,9 +14,8 @@ from ai.backend.manager.data.error_log.types import (
     ErrorLogMeta,
     ErrorLogSeverity,
 )
-
-from .base import GUID, Base
-from .mixins.timestamp import CreatedAtMixin
+from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 __all__ = [
     "ErrorLogRow",

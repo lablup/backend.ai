@@ -12,7 +12,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.error_log.types import ErrorLogData, ErrorLogListResult
 from ai.backend.manager.models.error_log.creators import ErrorLogCreator
-from ai.backend.manager.models.error_logs import ErrorLogRow
+from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.group.row import AssocGroupUserRow, GroupRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,

@@ -7,8 +7,8 @@ from ai.backend.common.data.entity.error_log import ErrorLogID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import DeleteSingleEntityOpsAction
 from ai.backend.manager.data.error_log.types import ErrorLogData
+from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.error_log.updaters import ErrorLogSoftDeleteUpdater
-from ai.backend.manager.models.error_logs import ErrorLogRow
 
 
 @dataclass

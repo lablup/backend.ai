@@ -11,11 +11,11 @@ from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,
 )
+from ai.backend.manager.models.prometheus_query_preset_category.queriers import (
+    PrometheusQueryPresetCategoryQuerier,
+)
 from ai.backend.manager.models.prometheus_query_preset_category.row import (
     PrometheusQueryPresetCategoryRow,
-)
-from ai.backend.manager.repositories.prometheus_query_preset_category.queriers import (
-    PrometheusQueryPresetCategoryQuerier,
 )
 
 

@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.app_config.types import AppConfigFragmentData
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.repositories.app_config_fragment.searchers import (
+from ai.backend.manager.models.app_config_fragment.searchers import (
     AppConfigFragmentSearcher,
 )
 

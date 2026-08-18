@@ -7,8 +7,8 @@ from ai.backend.common.data.entity.error_log import ERROR_LOG_ENTITY_TYPE
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.error_log.types import ErrorLogData
-from ai.backend.manager.models.error_logs import ErrorLogRow
-from ai.backend.manager.repositories.error_log.searchers import ErrorLogSearcher
+from ai.backend.manager.models.error_log.row import ErrorLogRow
+from ai.backend.manager.models.error_log.searchers import ErrorLogSearcher
 
 
 @dataclass

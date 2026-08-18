@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.audit_log.row import AuditLogRow
-from ai.backend.manager.repositories.audit_log.searchers import AuditLogSearcher
+from ai.backend.manager.models.audit_log.searchers import AuditLogSearcher
 
 
 @dataclass

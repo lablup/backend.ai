@@ -26,14 +26,14 @@ from ai.backend.manager.models.prometheus_query_preset.conditions import (
     PrometheusQueryPresetConditions,
 )
 from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
+from ai.backend.manager.models.prometheus_query_preset.searchers import (
+    PrometheusQueryPresetSearcher,
+)
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
     Updater,
 )
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
-from ai.backend.manager.repositories.prometheus_query_preset.searchers import (
-    PrometheusQueryPresetSearcher,
-)
 from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
     PrometheusQueryPresetUpdaterSpec,
 )

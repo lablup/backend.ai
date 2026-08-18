@@ -6,10 +6,10 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.app_config.types import AppConfigFragmentData
-from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.repositories.app_config_fragment.queriers import (
+from ai.backend.manager.models.app_config_fragment.queriers import (
     AppConfigFragmentQuerier,
 )
+from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 
 
 @dataclass

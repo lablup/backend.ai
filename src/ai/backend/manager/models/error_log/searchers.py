@@ -8,7 +8,7 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.manager.data.error_log.types import ErrorLogData
-from ai.backend.manager.models.error_logs import ErrorLogRow
+from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.specs.searcher import Searcher
 
 

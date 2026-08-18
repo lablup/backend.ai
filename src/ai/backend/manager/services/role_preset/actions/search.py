@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.repositories.role_preset.searchers import RolePresetSearcher
+from ai.backend.manager.models.rbac_models.role_preset.searchers import RolePresetSearcher
 
 
 @dataclass

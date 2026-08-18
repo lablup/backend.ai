@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
-from ai.backend.manager.repositories.retention_policy.searchers import RetentionPolicySearcher
+from ai.backend.manager.models.retention.searchers import RetentionPolicySearcher
 
 
 @dataclass

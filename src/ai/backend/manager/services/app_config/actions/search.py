@@ -13,12 +13,12 @@ from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigFragmentData
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.models.app_config_fragment.searchers import (
+    RankedAppConfigFragmentSearcher,
+)
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.searcher import Searcher
-from ai.backend.manager.repositories.app_config_fragment.searchers import (
-    RankedAppConfigFragmentSearcher,
-)
 from ai.backend.manager.repositories.app_config_fragment.types import (
     PublicAppConfigFragmentOperationScope,
     VisibleAppConfigFragmentOperationScope,

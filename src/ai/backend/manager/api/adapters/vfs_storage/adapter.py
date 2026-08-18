@@ -24,8 +24,8 @@ from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.vfs_storage.conditions import VFSStorageConditions
 from ai.backend.manager.models.vfs_storage.creators import VFSStorageCreator
+from ai.backend.manager.models.vfs_storage.searchers import VFSStorageSearcher
 from ai.backend.manager.models.vfs_storage.updaters import VFSStorageUpdater
-from ai.backend.manager.repositories.vfs_storage.searchers import VFSStorageSearcher
 from ai.backend.manager.services.vfs_storage.actions.create import CreateVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.get import GetVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageAction

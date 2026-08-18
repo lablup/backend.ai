@@ -10,7 +10,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow
-from ai.backend.manager.repositories.prometheus_query_preset.searchers import (
+from ai.backend.manager.models.prometheus_query_preset.searchers import (
     PrometheusQueryPresetSearcher,
 )
 

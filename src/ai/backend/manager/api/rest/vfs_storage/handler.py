@@ -27,7 +27,7 @@ from ai.backend.manager.dto.response import (
     VFSStorage,
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.vfs_storage.searchers import VFSStorageSearcher
+from ai.backend.manager.models.vfs_storage.searchers import VFSStorageSearcher
 from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.lookup import (
     LookupVFSStorageAction,

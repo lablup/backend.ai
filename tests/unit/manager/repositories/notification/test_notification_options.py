@@ -48,6 +48,10 @@ from ai.backend.manager.models.notification.orders import (
     NotificationChannelOrders,
     NotificationRuleOrders,
 )
+from ai.backend.manager.models.notification.searchers import (
+    NotificationChannelSearcher,
+    NotificationRuleSearcher,
+)
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
@@ -74,10 +78,6 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.notification.searchers import (
-    NotificationChannelSearcher,
-    NotificationRuleSearcher,
-)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables

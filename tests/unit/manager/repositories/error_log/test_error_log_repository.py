@@ -25,7 +25,8 @@ from ai.backend.manager.models.deployment_revision_preset import DeploymentRevis
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.error_log.creators import ErrorLogCreator
-from ai.backend.manager.models.error_logs import ErrorLogRow
+from ai.backend.manager.models.error_log.row import ErrorLogRow
+from ai.backend.manager.models.error_log.searchers import ErrorLogSearcher
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -49,7 +50,6 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.error_log import ErrorLogRepository
-from ai.backend.manager.repositories.error_log.searchers import ErrorLogSearcher
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables

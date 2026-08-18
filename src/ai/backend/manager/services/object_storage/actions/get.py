@@ -7,8 +7,8 @@ from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.models.object_storage.queriers import ObjectStorageQuerier
 from ai.backend.manager.models.object_storage.row import ObjectStorageRow
-from ai.backend.manager.repositories.object_storage.queriers import ObjectStorageQuerier
 
 
 @dataclass

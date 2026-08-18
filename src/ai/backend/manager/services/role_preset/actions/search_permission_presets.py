@@ -11,10 +11,10 @@ from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
-from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.repositories.role_preset.searchers import (
+from ai.backend.manager.models.rbac_models.role_preset.searchers import (
     RolePermissionPresetSearcher,
 )
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.role_preset.types import (
     RolePresetPermissionOperationScope,
 )

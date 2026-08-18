@@ -27,12 +27,12 @@ from ai.backend.manager.models.service_catalog.orders import (
     TIEBREAKER_ORDER,
     resolve_order,
 )
+from ai.backend.manager.models.service_catalog.searchers import ServiceCatalogSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.service_catalog.searchers import ServiceCatalogSearcher
 from ai.backend.manager.services.service_catalog.actions.search import (
     SearchServiceCatalogsAction,
 )

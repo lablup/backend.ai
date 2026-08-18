@@ -9,8 +9,8 @@ from ai.backend.common.data.entity.retention_policy import (
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.retention.types import RetentionPolicyData
+from ai.backend.manager.models.retention.queriers import RetentionPolicyQuerier
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
-from ai.backend.manager.repositories.retention_policy.queriers import RetentionPolicyQuerier
 
 
 @dataclass

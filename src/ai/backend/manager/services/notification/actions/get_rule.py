@@ -7,8 +7,8 @@ from ai.backend.common.data.entity.notification import NotificationRuleID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.notification.types import NotificationRuleData
+from ai.backend.manager.models.notification.queriers import NotificationRuleQuerier
 from ai.backend.manager.models.notification.row import NotificationRuleRow
-from ai.backend.manager.repositories.notification.queriers import NotificationRuleQuerier
 
 
 @dataclass

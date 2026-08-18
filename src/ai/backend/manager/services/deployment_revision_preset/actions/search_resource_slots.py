@@ -11,11 +11,11 @@ from ai.backend.common.data.entity.deployment_preset import (
 from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotData
-from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
-from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.repositories.deployment_revision_preset.searchers import (
+from ai.backend.manager.models.deployment_revision_preset.searchers import (
     PresetResourceSlotSearcher,
 )
+from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.deployment_revision_preset.types import (
     DeploymentPresetSlotOperationScope,
 )

@@ -11,7 +11,7 @@ from ai.backend.manager.api.rest.error_log.handler import ErrorLogHandler
 from ai.backend.manager.api.rest.error_log.registry import register_error_log_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
-from ai.backend.manager.models.error_logs import ErrorLogRow
+from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.testutils.processors import ops_processor_group

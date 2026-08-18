@@ -31,13 +31,13 @@ from ai.backend.manager.models.runtime_variant.conditions import RuntimeVariantC
 from ai.backend.manager.models.runtime_variant.creators import RuntimeVariantCreator
 from ai.backend.manager.models.runtime_variant.orders import RuntimeVariantOrders
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.runtime_variant.searchers import RuntimeVariantSearcher
 from ai.backend.manager.models.runtime_variant.updaters import RuntimeVariantUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.runtime_variant.searchers import RuntimeVariantSearcher
 from ai.backend.manager.services.runtime_variant.actions.create import CreateRuntimeVariantAction
 from ai.backend.manager.services.runtime_variant.actions.get import GetRuntimeVariantAction
 from ai.backend.manager.services.runtime_variant.actions.lookup import (
