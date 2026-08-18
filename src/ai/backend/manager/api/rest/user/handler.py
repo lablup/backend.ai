@@ -31,7 +31,6 @@ from ai.backend.common.dto.manager.user import (
 )
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.user.types import UserInfoContext
 from ai.backend.manager.data.user.types import UserStatus as ManagerUserStatus
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.user_request import GetUserPathParam, UpdateUserPathParam
@@ -44,7 +43,7 @@ from ai.backend.manager.services.user.actions.delete_user import DeleteUserActio
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.keypair_ops import SwitchDefaultAccessKeyAction
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
-from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
+from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
 from ai.backend.manager.services.user.actions.update_user import UpdateUserAction
 from ai.backend.manager.types import OptionalState
 
@@ -118,10 +117,10 @@ class UserHandler:
                 LookupDomainAction(name=DomainName(body.parsed.domain_name))
             )
         ).data
-        action_result = await self._user.create_user.wait_for_complete(
+        action_result = await self._user.create_user.run(
             CreateUserAction(
+                domain_id=domain_data.id,
                 creator=creator,
-                _domain_id=domain_data.id,
                 group_ids=body.parsed.group_ids,
             )
         )
@@ -139,8 +138,8 @@ class UserHandler:
         ctx: UserContext,
     ) -> APIResponse:
         log.info("GET_USER (ak:{}, u:{})", ctx.access_key, path.parsed.user_id)
-        action_result = await self._user.get_user.wait_for_complete(
-            GetUserAction(user_uuid=path.parsed.user_id)
+        action_result = await self._user.get_user.run(
+            GetUserAction(user_id=UserID(path.parsed.user_id))
         )
 
         resp = GetUserResponse(user=self._adapter.convert_to_dto(action_result.user))
@@ -156,14 +155,14 @@ class UserHandler:
         ctx: UserContext,
     ) -> APIResponse:
         log.info("SEARCH_USERS (ak:{})", ctx.access_key)
-        querier = self._adapter.build_querier(body.parsed)
+        searcher = self._adapter.build_searcher(body.parsed)
 
-        action_result = await self._user.search_users.wait_for_complete(
-            SearchUsersAction(querier=querier)
+        action_result = await self._user.global_search.run(
+            GlobalSearchUsersAction(searcher=searcher)
         )
 
         resp = SearchUsersResponse(
-            items=[self._adapter.convert_to_dto(u) for u in action_result.users],
+            items=[self._adapter.convert_to_dto(u) for u in action_result.items],
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,
@@ -185,8 +184,8 @@ class UserHandler:
         log.info("UPDATE_USER (ak:{}, u:{})", ctx.access_key, path.parsed.user_id)
 
         # First get the user to obtain email (required by UpdateUserAction)
-        get_result = await self._user.get_user.wait_for_complete(
-            GetUserAction(user_uuid=path.parsed.user_id)
+        get_result = await self._user.get_user.run(
+            GetUserAction(user_id=UserID(path.parsed.user_id))
         )
         email = get_result.user.email
 
@@ -202,12 +201,12 @@ class UserHandler:
 
         updater = self._adapter.build_updater(body.parsed, email, password_info)
 
-        action_result = await self._user.update_user.wait_for_complete(
-            UpdateUserAction(user_uuid=path.parsed.user_id, email=email, updater=updater)
+        action_result = await self._user.update_user.run(
+            UpdateUserAction(user_id=UserID(path.parsed.user_id), updater=updater)
         )
 
         if body.parsed.main_access_key is not None:
-            await self._user.switch_default_access_key.wait_for_complete(
+            await self._user.switch_default_access_key.run(
                 SwitchDefaultAccessKeyAction(
                     user_id=UserID(path.parsed.user_id),
                     access_key=AccessKey(body.parsed.main_access_key),
@@ -228,14 +227,7 @@ class UserHandler:
     ) -> APIResponse:
         log.info("DELETE_USER (ak:{}, u:{})", ctx.access_key, body.parsed.user_id)
 
-        # Get user email from UUID
-        get_result = await self._user.get_user.wait_for_complete(
-            GetUserAction(user_uuid=body.parsed.user_id)
-        )
-
-        await self._user.delete_user.wait_for_complete(
-            DeleteUserAction(email=get_result.user.email)
-        )
+        await self._user.delete_user.run(DeleteUserAction(user_id=UserID(body.parsed.user_id)))
 
         resp = DeleteUserResponse(success=True)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
@@ -251,21 +243,6 @@ class UserHandler:
     ) -> APIResponse:
         log.info("PURGE_USER (ak:{}, u:{})", ctx.access_key, body.parsed.user_id)
 
-        # Get user data for purge context
-        get_result = await self._user.get_user.wait_for_complete(
-            GetUserAction(user_uuid=body.parsed.user_id)
-        )
-
-        # Get caller's info for delegation context
-        caller_result = await self._user.get_user.wait_for_complete(
-            GetUserAction(user_uuid=ctx.user_uuid)
-        )
-
-        user_info_ctx = UserInfoContext(
-            uuid=caller_result.user.uuid,
-            email=caller_result.user.email,
-        )
-
         purge_shared = OptionalState[bool].nop()
         delegate_endpoint = OptionalState[bool].nop()
         if body.parsed.purge_shared_vfolders:
@@ -273,11 +250,10 @@ class UserHandler:
         if body.parsed.delegate_endpoint_ownership:
             delegate_endpoint = OptionalState.update(body.parsed.delegate_endpoint_ownership)
 
-        await self._user.purge_user.wait_for_complete(
+        await self._user.purge_user.run(
             PurgeUserAction(
-                user_uuid=body.parsed.user_id,
-                user_info_ctx=user_info_ctx,
-                email=get_result.user.email,
+                user_id=UserID(body.parsed.user_id),
+                admin_user_id=ctx.user_uuid,
                 purge_shared_vfolders=purge_shared,
                 delegate_endpoint_ownership=delegate_endpoint,
             )

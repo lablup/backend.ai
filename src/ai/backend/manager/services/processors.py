@@ -95,10 +95,6 @@ if TYPE_CHECKING:
         DomainProcessors,
     )
     from ai.backend.manager.services.domain.service import DomainService
-    from ai.backend.manager.services.dotfile.processors import (
-        DotfileProcessors,
-    )
-    from ai.backend.manager.services.dotfile.service import DotfileService
     from ai.backend.manager.services.error_log.processors import (
         ErrorLogProcessors,
     )
@@ -345,7 +341,6 @@ class Services:
     agent: AgentService
     app_config: AppConfigService
     domain: DomainService
-    dotfile: DotfileService
     etcd_config: EtcdConfigService
     export: ExportService
     fair_share: FairShareService
@@ -405,7 +400,6 @@ class Processors:
     agent: AgentProcessors
     app_config: AppConfigProcessors
     domain: DomainProcessors
-    dotfile: DotfileProcessors
     error_log: ErrorLogProcessors
     etcd_config: EtcdConfigProcessors
     export: ExportProcessors

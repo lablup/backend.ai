@@ -15,7 +15,6 @@ from ai.backend.manager.repositories.deployment_revision_preset.repositories imp
     DeploymentPresetRepositories,
 )
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
-from ai.backend.manager.repositories.dotfile.repositories import DotfileRepositories
 from ai.backend.manager.repositories.error_log.repositories import ErrorLogRepositories
 from ai.backend.manager.repositories.etcd_config.repositories import EtcdConfigRepositories
 from ai.backend.manager.repositories.events.repositories import EventsRepositories
@@ -84,7 +83,6 @@ class Repositories:
     container_registry: ContainerRegistryRepositories
     deployment: DeploymentRepositories
     domain: DomainRepositories
-    dotfile: DotfileRepositories
     error_log: ErrorLogRepositories
     etcd_config: EtcdConfigRepositories
     export: ExportRepositories
@@ -132,7 +130,6 @@ class Repositories:
         container_registry_repositories = ContainerRegistryRepositories.create(args)
         deployment_repositories = DeploymentRepositories.create(args)
         domain_repositories = DomainRepositories.create(args)
-        dotfile_repositories = DotfileRepositories.create(args)
         error_log_repositories = ErrorLogRepositories.create(args)
         etcd_config_repositories = EtcdConfigRepositories.create(args)
         export_repositories = ExportRepositories.create(args)
@@ -181,7 +178,6 @@ class Repositories:
             container_registry=container_registry_repositories,
             deployment=deployment_repositories,
             domain=domain_repositories,
-            dotfile=dotfile_repositories,
             error_log=error_log_repositories,
             etcd_config=etcd_config_repositories,
             export=export_repositories,

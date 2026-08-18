@@ -1,42 +1,48 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
+from ai.backend.common.data.entity.types import EntityType, ScopeRef
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.repositories.user.types import DomainUserOperationScope
-from ai.backend.manager.services.user.actions.base import UserAction
+
+__all__ = ("SearchUsersByDomainAction",)
 
 
-@dataclass
-class SearchUsersByDomainAction(UserAction):
-    """Action for searching users within a domain."""
+@dataclass(frozen=True)
+class SearchUsersByDomainAction(OperationScopeOpsAction[UserRow, UserData]):
+    """Page through the users of a domain."""
 
-    scope: DomainUserOperationScope
-    querier: BatchQuerier
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    domain_id: DomainID
+    domain_name: str
+    searcher: UserSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchUsersByDomainActionResult(BaseActionResult):
-    """Result of searching users within a domain."""
-
-    users: list[UserData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return USER_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=self.domain_id),)
+
+    @override
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return (DomainUserOperationScope(domain_name=self.domain_name),)
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_users_by_domain"
+
+    @override
+    def to_searcher(self) -> UserSearcher:
+        return self.searcher

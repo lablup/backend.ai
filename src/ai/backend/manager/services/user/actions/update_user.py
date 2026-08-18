@@ -2,38 +2,36 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.user.types import BulkUserUpdateResultData, UserData
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.updaters import UserUpdateSpec
-from ai.backend.manager.services.user.actions.base import (
-    UserAction,
-    UserSingleEntityAction,
-    UserSingleEntityActionResult,
-)
 
 __all__ = (
     "UpdateUserAction",
     "UpdateUserActionResult",
-    "UpdateUserByIdAction",
-    "UpdateUserByIdActionResult",
     "UserUpdateSpec",
     "BulkUpdateUserAction",
     "BulkUpdateUserActionResult",
 )
 
 
-@dataclass
-class UpdateUserAction(UserSingleEntityAction):
-    email: str  # Still needed for the service layer implementation
+@dataclass(frozen=True)
+class UpdateUserAction(BaseSingleEntityAction):
+    """Edit one user."""
+
+    user_id: UserID
     updater: Updater[UserRow]
-    user_uuid: UUID | None = None  # Set by API layer for RBAC validation
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.user_id
 
     @override
     @classmethod
@@ -41,87 +39,38 @@ class UpdateUserAction(UserSingleEntityAction):
         return ActionOperationType.UPDATE
 
     @override
-    def target_entity_id(self) -> str:
-        if self.user_uuid is None:
-            raise ValueError("user_uuid must be set for RBAC validation")
-        return str(self.user_uuid)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        if self.user_uuid is None:
-            raise ValueError("user_uuid must be set for RBAC validation")
-        return RBACElementRef(RBACElementType.USER, str(self.user_uuid))
-
-
-@dataclass
-class UpdateUserActionResult(UserSingleEntityActionResult):
-    data: UserData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.data.id)
-
-
-@dataclass
-class UpdateUserByIdAction(UserSingleEntityAction):
-    """UUID-based user update action for Strawberry v2 mutations."""
-
-    user_id: UUID
-    updater: Updater[UserRow]
-
-    @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.user_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.USER, str(self.user_id))
+    def action_name(cls) -> str:
+        return "update_user"
 
 
-@dataclass
-class UpdateUserByIdActionResult(UserSingleEntityActionResult):
+@dataclass(frozen=True)
+class UpdateUserActionResult:
     data: UserData
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)
 
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.data.id)
-
-
-@dataclass
-class BulkUpdateUserAction(UserAction):
-    """Action for bulk updating multiple users."""
+@dataclass(frozen=True)
+class BulkUpdateUserAction(BaseGlobalAction):
+    """Edit several users at once, across domains."""
 
     items: list[UserUpdateSpec]
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return USER_ENTITY_TYPE
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
-
-@dataclass
-class BulkUpdateUserActionResult(BaseActionResult):
-    """Result of bulk user update."""
-
-    data: BulkUserUpdateResultData
-
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_update_users"
+
+
+@dataclass(frozen=True)
+class BulkUpdateUserActionResult:
+    data: BulkUserUpdateResultData

@@ -221,7 +221,7 @@ def build_api_routes(
     )
     userconfig_handler = UserConfigHandler(
         auth=processors.auth,
-        dotfile=processors.dotfile,
+        user=processors.user,
     )
     vfolder_handler = VFolderHandler(
         auth=processors.auth,

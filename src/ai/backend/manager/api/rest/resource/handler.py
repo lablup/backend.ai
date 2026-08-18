@@ -13,6 +13,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.resource.request import (
     CheckPresetsRequest,
     ListPresetsQuery,
@@ -210,8 +211,8 @@ class ResourceHandler:
 
     async def user_month_stats(self, ctx: UserContext) -> APIResponse:
         log.info("USER_LAST_MONTH_STATS (ak:{}, u:{})", ctx.access_key, ctx.user_uuid)
-        result = await self._user.user_month_stats.wait_for_complete(
-            UserMonthStatsAction(user_id=ctx.user_uuid)
+        result = await self._user.user_month_stats.run(
+            UserMonthStatsAction(user_id=UserID(ctx.user_uuid))
         )
         return APIResponse.build(HTTPStatus.OK, RawListResponse(root=result.stats))
 
@@ -221,7 +222,7 @@ class ResourceHandler:
 
     async def admin_month_stats(self, ctx: UserContext) -> APIResponse:
         log.info("ADMIN_LAST_MONTH_STATS ()")
-        result = await self._user.admin_month_stats.wait_for_complete(AdminMonthStatsAction())
+        result = await self._user.admin_month_stats.run(AdminMonthStatsAction())
         return APIResponse.build(HTTPStatus.OK, RawListResponse(root=result.stats))
 
     # ------------------------------------------------------------------

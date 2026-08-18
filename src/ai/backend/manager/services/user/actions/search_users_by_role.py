@@ -2,41 +2,39 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.user.types import RoleUserOperationScope
-from ai.backend.manager.services.user.actions.base import UserAction
+from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.user.searchers import UserSearcher
+
+__all__ = ("SearchUsersByRoleAction",)
 
 
-@dataclass
-class SearchUsersByRoleAction(UserAction):
-    """Action for searching users assigned to a role."""
+@dataclass(frozen=True)
+class SearchUsersByRoleAction(SearchGlobalOpsAction[UserRow, UserData]):
+    """Page through the users a role is assigned to.
 
-    scope: RoleUserOperationScope
-    querier: BatchQuerier
+    A role is not a scope users sit under, so the assignment is a condition on the
+    searcher rather than a scope the read is restricted to.
+    """
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    role_id: UUID
+    searcher: UserSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchUsersByRoleActionResult(BaseActionResult):
-    """Result of searching users assigned to a role."""
-
-    users: list[UserData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return USER_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_users_by_role"
+
+    @override
+    def to_searcher(self) -> UserSearcher:
+        return self.searcher

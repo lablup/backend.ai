@@ -26,7 +26,6 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.user.types import (
     UserData,
-    UserInfoContext,
 )
 from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -930,6 +929,7 @@ class UserInput(graphene.InputObjectType):  # type: ignore[misc]
         )
 
         return CreateUserAction(
+            domain_id=domain_id,
             creator=Creator(
                 spec=UserCreatorSpec(
                     username=str(self.username),
@@ -951,7 +951,6 @@ class UserInput(graphene.InputObjectType):  # type: ignore[misc]
                     container_gids=value_or_none(self.container_gids),
                 ),
             ),
-            _domain_id=domain_id,
             group_ids=value_or_none(self.group_ids),
         )
 
@@ -986,7 +985,7 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
         description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
     )
 
-    def to_action(self, email: str, graph_ctx: GraphQueryContext) -> UpdateUserAction:
+    def to_action(self, user_id: UserID, graph_ctx: GraphQueryContext) -> UpdateUserAction:
         # Create PasswordInfo if password is being changed
         password_state = OptionalState[PasswordInfo].nop()
         if self.password is not Undefined and self.password is not None:
@@ -1052,10 +1051,9 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
                 self.group_ids,
             ),
         )
-        # Note: User update uses email for lookup, pk_value is not used
         return UpdateUserAction(
-            email=email,
-            updater=Updater(spec=spec, pk_value=email),
+            user_id=user_id,
+            updater=Updater(spec=spec, pk_value=user_id),
         )
 
 
@@ -1070,10 +1068,10 @@ class PurgeUserInput(graphene.InputObjectType):  # type: ignore[misc]
         ),
     )
 
-    def to_action(self, email: str, user_info_ctx: UserInfoContext) -> PurgeUserAction:
+    def to_action(self, user_id: UserID, admin_user_id: UUID) -> PurgeUserAction:
         return PurgeUserAction(
-            user_info_ctx=user_info_ctx,
-            email=email,
+            user_id=user_id,
+            admin_user_id=admin_user_id,
             purge_shared_vfolders=OptionalState[bool].from_graphql(
                 self.purge_shared_vfolders,
             ),
@@ -1117,7 +1115,7 @@ class CreateUser(graphene.Mutation):  # type: ignore[misc]
         ).data
         action: CreateUserAction = props.to_action(email, graph_ctx, domain_data.id)
 
-        action_result = await graph_ctx.processors.user.create_user.wait_for_complete(action)
+        action_result = await graph_ctx.processors.user.create_user.run(action)
         keypair = KeyPair.from_data(action_result.data.keypair)
 
         return cls(
@@ -1151,14 +1149,11 @@ class ModifyUser(graphene.Mutation):  # type: ignore[misc]
 
         validate_user_mutation_props(props)
 
-        action: UpdateUserAction = props.to_action(email, graph_ctx)
         user_data = await graph_ctx.user_repository.get_by_email_validated(email)
-        action.user_uuid = user_data.id
-        res: UpdateUserActionResult = await graph_ctx.processors.user.update_user.wait_for_complete(
-            action
-        )
+        action: UpdateUserAction = props.to_action(UserID(user_data.id), graph_ctx)
+        res: UpdateUserActionResult = await graph_ctx.processors.user.update_user.run(action)
         if props.main_access_key is not Undefined and props.main_access_key is not None:
-            await graph_ctx.processors.user.switch_default_access_key.wait_for_complete(
+            await graph_ctx.processors.user.switch_default_access_key.run(
                 SwitchDefaultAccessKeyAction(
                     user_id=UserID(user_data.id),
                     access_key=AccessKey(props.main_access_key),
@@ -1195,8 +1190,10 @@ class DeleteUser(graphene.Mutation):  # type: ignore[misc]
         email: str,
     ) -> DeleteUser:
         graph_ctx: GraphQueryContext = info.context
-        action = DeleteUserAction(email)
-        await graph_ctx.processors.user.delete_user.wait_for_complete(action)
+        user_data = await graph_ctx.user_repository.get_by_email_validated(email)
+        await graph_ctx.processors.user.delete_user.run(
+            DeleteUserAction(user_id=UserID(user_data.id))
+        )
         return cls(
             ok=True,
             msg="success",
@@ -1237,15 +1234,9 @@ class PurgeUser(graphene.Mutation):  # type: ignore[misc]
         props: PurgeUserInput,
     ) -> PurgeUser:
         graph_ctx: GraphQueryContext = info.context
-        user_info_ctx = UserInfoContext(
-            uuid=graph_ctx.user["uuid"],
-            email=graph_ctx.user["email"],
-        )
-        action = props.to_action(email, user_info_ctx)
         user_data = await graph_ctx.user_repository.get_by_email_validated(email)
-        action.user_uuid = user_data.id
-
-        await graph_ctx.processors.user.purge_user.wait_for_complete(action)
+        action = props.to_action(UserID(user_data.id), graph_ctx.user["uuid"])
+        await graph_ctx.processors.user.purge_user.run(action)
 
         return cls(
             ok=True,

@@ -30,8 +30,10 @@ from ai.backend.manager.data.user.types import (
     UserData,
     UserSearchResult,
 )
+from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
@@ -40,6 +42,7 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import (
     UserKeypairOperationScope,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.manager.repositories.user.types import (
@@ -70,8 +73,9 @@ user_repository_resilience = Resilience(
 class UserRepository:
     _db_source: UserDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
         self._db_source = UserDBSource(db)
+        self._v2_ops = v2_ops_provider
 
     @user_repository_resilience.apply()
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
@@ -350,6 +354,15 @@ class UserRepository:
     ) -> SearchResult[KeyPairData]:
         """Admin search all keypairs without scope restriction."""
         return await self._db_source.admin_search_keypairs(querier)
+
+    @user_repository_resilience.apply()
+    async def update_keypair_column(self, updater: DataUpdater[Any, KeyPairData]) -> KeyPairData:
+        """Write one column of a keypair row."""
+        async with self._v2_ops.write_ops() as w:
+            data = await w.update_data(updater)
+            if data is None:
+                raise KeyPairNotFound(f"Keypair not found: {updater.pk_value()}")
+            return data
 
     @user_repository_resilience.apply()
     async def admin_get_keypair(self, access_key: str) -> KeyPairData:

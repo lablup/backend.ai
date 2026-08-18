@@ -27,7 +27,7 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.user.conditions import UserConditions
 from ai.backend.manager.models.user.orders import UserOrders
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
@@ -143,12 +143,12 @@ class UserAdapter(BaseFilterAdapter):
             spec=updater_spec, pk_value=UUID(int=0)
         )  # pk_value unused; email-based lookup
 
-    def build_querier(self, request: SearchUsersRequest) -> BatchQuerier:
-        """Build a BatchQuerier from search request."""
+    def build_searcher(self, request: SearchUsersRequest) -> UserSearcher:
+        """Build a user searcher from the search request."""
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(o) for o in request.order] if request.order else []
         pagination = OffsetPagination(limit=request.limit, offset=request.offset)
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return UserSearcher(conditions=conditions, orders=orders, pagination=pagination)
 
     def _convert_filter(self, filter_req: UserFilter) -> list[QueryCondition]:
         """Convert user filter to query conditions."""

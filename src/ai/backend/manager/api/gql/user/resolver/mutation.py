@@ -557,10 +557,6 @@ async def update_my_allowed_client_ip(
         raise UnreachableError("User context is not available")
     ctx = info.context
 
-    # Get user email (needed for UpdateUserAction)
-    user_payload = await ctx.adapters.user.get(me.user_id)
-    email = user_payload.user.basic_info.email
-
     new_allowlist = input.allowed_client_ip
 
     if new_allowlist is not None:
@@ -609,9 +605,8 @@ async def update_my_allowed_client_ip(
 
     updater_spec = UserUpdaterSpec(allowed_client_ip=allowed_client_ip)
     action = UpdateUserAction(
-        email=email,
-        updater=Updater(spec=updater_spec, pk_value=email),
-        user_uuid=me.user_id,
+        user_id=UserID(me.user_id),
+        updater=Updater(spec=updater_spec, pk_value=me.user_id),
     )
     await ctx.adapters.user.update_user(action)
 

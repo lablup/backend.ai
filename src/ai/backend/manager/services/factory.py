@@ -38,8 +38,6 @@ from ai.backend.manager.services.deployment_revision_preset.service import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
-from ai.backend.manager.services.dotfile.processors import DotfileProcessors
-from ai.backend.manager.services.dotfile.service import DotfileService
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
 from ai.backend.manager.services.etcd_config.service import EtcdConfigService
@@ -171,9 +169,6 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         app_config=AppConfigService(OpsRepository(repositories.v2_ops_provider)),
         domain=DomainService(repositories.domain.repository),
-        dotfile=DotfileService(
-            repository=repositories.dotfile.repository,
-        ),
         etcd_config=EtcdConfigService(
             repository=repositories.etcd_config.repository,
             config_provider=args.config_provider,
@@ -429,13 +424,12 @@ def create_processors(
             services.app_config,
         ),
         domain=DomainProcessors(registry.group(), services.domain, action_monitors),
-        dotfile=DotfileProcessors(services.dotfile, action_monitors, validators),
         error_log=ErrorLogProcessors(registry.group()),
         etcd_config=EtcdConfigProcessors(registry.group(), services.etcd_config),
         export=ExportProcessors(services.export, action_monitors, validators),
         fair_share=FairShareProcessors(services.fair_share, action_monitors, validators),
         group=GroupProcessors(registry.group(), services.group),
-        user=UserProcessors(registry.group(), services.user, action_monitors, validators),
+        user=UserProcessors(registry.group(), services.user),
         idle_checker=IdleCheckerProcessors(
             services.idle_checker, action_monitors, registry.group()
         ),

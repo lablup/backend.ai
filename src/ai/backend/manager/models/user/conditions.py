@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from datetime import datetime
+from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -19,6 +20,7 @@ from ai.backend.manager.models.condition_utils import (
 )
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
 
 __all__ = ("UserConditions",)
@@ -26,6 +28,17 @@ __all__ = ("UserConditions",)
 
 class UserConditions:
     """Query conditions for filtering users."""
+
+    @staticmethod
+    def by_role_id(role_id: UUID) -> QueryCondition:
+        """Match the users a role is assigned to."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.uuid.in_(
+                sa.select(UserRoleRow.user_id).where(UserRoleRow.role_id == role_id)
+            )
+
+        return inner
 
     # ==================== Email Filters ====================
 

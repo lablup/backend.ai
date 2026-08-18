@@ -4,20 +4,40 @@ from typing import Any
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.data.dotfile.types import DotfileEntries
 from ai.backend.manager.data.user.types import (
     BulkPurgeError,
     BulkUserPurgeResultData,
     UserInfoContext,
 )
+from ai.backend.manager.errors.storage import DotfileCreationFailed
 from ai.backend.manager.errors.user import UserPurgeFailure
+from ai.backend.manager.models.domain.row import verify_dotfile_name
+from ai.backend.manager.models.keypair.updaters import (
+    KeypairBootstrapScriptUpdater,
+    KeypairDotfilesUpdater,
+)
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
+)
+from ai.backend.manager.services.user.actions.bootstrap_script import (
+    GetBootstrapScriptAction,
+    GetBootstrapScriptActionResult,
+    UpdateBootstrapScriptAction,
+    UpdateBootstrapScriptActionResult,
+)
+from ai.backend.manager.services.user.actions.create_keypair_dotfile import (
+    CreateKeypairDotfileAction,
+    CreateKeypairDotfileActionResult,
 )
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
@@ -25,11 +45,13 @@ from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
     CreateUserActionResult,
 )
+from ai.backend.manager.services.user.actions.delete_keypair_dotfile import (
+    DeleteKeypairDotfileAction,
+    DeleteKeypairDotfileActionResult,
+)
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
-    DeleteUserByIdAction,
-    DeleteUserByIdActionResult,
 )
 from ai.backend.manager.services.user.actions.get_user import (
     GetUserAction,
@@ -68,32 +90,16 @@ from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserActionResult,
     PurgeUserAction,
     PurgeUserActionResult,
-    PurgeUserByIdAction,
-    PurgeUserByIdActionResult,
 )
-from ai.backend.manager.services.user.actions.search_users import (
-    SearchUsersAction,
-    SearchUsersActionResult,
-)
-from ai.backend.manager.services.user.actions.search_users_by_domain import (
-    SearchUsersByDomainAction,
-    SearchUsersByDomainActionResult,
-)
-from ai.backend.manager.services.user.actions.search_users_by_project import (
-    SearchUsersByProjectAction,
-    SearchUsersByProjectActionResult,
-)
-from ai.backend.manager.services.user.actions.search_users_by_role import (
-    SearchUsersByRoleAction,
-    SearchUsersByRoleActionResult,
+from ai.backend.manager.services.user.actions.update_keypair_dotfile import (
+    UpdateKeypairDotfileAction,
+    UpdateKeypairDotfileActionResult,
 )
 from ai.backend.manager.services.user.actions.update_user import (
     BulkUpdateUserAction,
     BulkUpdateUserActionResult,
     UpdateUserAction,
     UpdateUserActionResult,
-    UpdateUserByIdAction,
-    UpdateUserByIdActionResult,
 )
 from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
@@ -145,50 +151,19 @@ class UserService:
         return BulkCreateUserActionResult(data=result)
 
     async def update_user(self, action: UpdateUserAction) -> UpdateUserActionResult:
-        user_data_result = await self._user_repository.update_user_validated(
-            email=action.email,
+        user_data = await self._user_repository.update_user_by_uuid_validated(
+            user_uuid=action.user_id,
             updater=action.updater,
         )
-        return UpdateUserActionResult(
-            data=user_data_result,
-        )
+        return UpdateUserActionResult(data=user_data)
 
     async def bulk_modify_users(self, action: BulkUpdateUserAction) -> BulkUpdateUserActionResult:
         result = await self._user_repository.bulk_update_users_validated(action.items)
         return BulkUpdateUserActionResult(data=result)
 
     async def delete_user(self, action: DeleteUserAction) -> DeleteUserActionResult:
-        await self._user_repository.soft_delete_user_validated(
-            email=action.email,
-        )
-        return DeleteUserActionResult()
-
-    async def update_user_by_id(self, action: UpdateUserByIdAction) -> UpdateUserByIdActionResult:
-        user_data = await self._user_repository.update_user_by_uuid_validated(
-            user_uuid=action.user_id,
-            updater=action.updater,
-        )
-        return UpdateUserByIdActionResult(data=user_data)
-
-    async def delete_user_by_id(self, action: DeleteUserByIdAction) -> DeleteUserByIdActionResult:
         await self._user_repository.delete_user_by_uuid_validated(user_uuid=action.user_id)
-        return DeleteUserByIdActionResult()
-
-    async def purge_user_by_id(self, action: PurgeUserByIdAction) -> PurgeUserByIdActionResult:
-        admin_user = await self._user_repository.get_user_by_uuid(action.admin_user_id)
-        user_info_ctx = UserInfoContext(
-            uuid=admin_user.uuid,
-            email=admin_user.email,
-        )
-        # Reuse the internal UUID-based purge logic shared with bulk_purge_users
-        bulk_action = BulkPurgeUserAction(
-            user_ids=[action.user_id],
-            admin_user_id=action.admin_user_id,
-            purge_shared_vfolders=action.purge_shared_vfolders,
-            delegate_endpoint_ownership=action.delegate_endpoint_ownership,
-        )
-        await self._purge_single_user(action.user_id, bulk_action, user_info_ctx)
-        return PurgeUserByIdActionResult(user_uuid=action.user_id)
+        return DeleteUserActionResult()
 
     async def get_user(self, action: GetUserAction) -> GetUserActionResult:
         """Retrieve a single user by UUID.
@@ -202,68 +177,20 @@ class UserService:
         Raises:
             UserNotFound: If the user with the given UUID does not exist.
         """
-        user_data = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        user_data = await self._user_repository.get_user_by_uuid(action.user_id)
         return GetUserActionResult(user=user_data)
 
     async def purge_user(self, action: PurgeUserAction) -> PurgeUserActionResult:
-        email = action.email
-        log.info("Purging all records of the user {0}...", email)
-
-        # Check if user exists
-        user_data = await self._user_repository.get_by_email_validated(
-            email=email,
+        admin_user = await self._user_repository.get_user_by_uuid(action.admin_user_id)
+        user_info_ctx = UserInfoContext(uuid=admin_user.uuid, email=admin_user.email)
+        bulk_action = BulkPurgeUserAction(
+            user_ids=[action.user_id],
+            admin_user_id=action.admin_user_id,
+            purge_shared_vfolders=action.purge_shared_vfolders,
+            delegate_endpoint_ownership=action.delegate_endpoint_ownership,
         )
-        user_uuid = user_data.uuid
-
-        # Check for active vfolder mounts
-        if await self._user_repository.check_user_vfolder_mounted_to_active_kernels(user_uuid):
-            raise UserPurgeFailure(
-                "Some of user's virtual folders are mounted to active kernels. "
-                "Terminate those kernels first.",
-            )
-
-        # Handle shared vfolders migration
-        if action.purge_shared_vfolders.optional_value():
-            await self._user_repository.migrate_shared_vfolders(
-                deleted_user_uuid=user_uuid,
-                target_user_uuid=action.user_info_ctx.uuid,
-                target_user_email=action.user_info_ctx.email,
-            )
-
-        # Handle endpoint ownership delegation
-        if action.delegate_endpoint_ownership.optional_value():
-            await self._user_repository.delegate_endpoint_ownership(
-                user_uuid=user_uuid,
-                target_user_uuid=action.user_info_ctx.uuid,
-            )
-            await self._user_repository.delete_endpoints(
-                user_uuid=user_uuid,
-                delete_destroyed_only=True,
-            )
-        else:
-            await self._user_repository.delete_endpoints(
-                user_uuid=user_uuid,
-                delete_destroyed_only=False,
-            )
-
-        # Handle active sessions
-        if active_sessions := await self._user_repository.retrieve_active_sessions(user_uuid):
-            await self._scheduling_controller.mark_sessions_for_termination(
-                [session.id for session in active_sessions],
-                reason=KernelLifecycleEventReason.USER_PURGED.value,
-                forced=True,
-            )
-
-        # Delete vfolders
-        await self._user_repository.delete_user_vfolders(
-            user_uuid=user_uuid,
-            storage_manager=self._storage_manager,
-        )
-
-        # Finally purge the user completely
-        await self._user_repository.purge_user(email)
-
-        return PurgeUserActionResult(user_uuid=user_uuid)
+        await self._purge_single_user(action.user_id, bulk_action, user_info_ctx)
+        return PurgeUserActionResult(user_uuid=action.user_id)
 
     async def _purge_single_user(
         self,
@@ -367,71 +294,19 @@ class UserService:
         )
         return AdminMonthStatsActionResult(stats=stats)
 
-    async def search_users(self, action: SearchUsersAction) -> SearchUsersActionResult:
-        """Search all users (admin only)."""
-        result = await self._user_repository.search_users(querier=action.querier)
-        return SearchUsersActionResult(
-            users=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def search_users_by_domain(
-        self, action: SearchUsersByDomainAction
-    ) -> SearchUsersByDomainActionResult:
-        """Search users within a domain."""
-        result = await self._user_repository.search_users_by_domain(
-            scope=action.scope, querier=action.querier
-        )
-        return SearchUsersByDomainActionResult(
-            users=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def search_users_by_project(
-        self, action: SearchUsersByProjectAction
-    ) -> SearchUsersByProjectActionResult:
-        """Search users within a project."""
-        result = await self._user_repository.search_users_by_project(
-            scope=action.scope, querier=action.querier
-        )
-        return SearchUsersByProjectActionResult(
-            users=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def search_users_by_role(
-        self, action: SearchUsersByRoleAction
-    ) -> SearchUsersByRoleActionResult:
-        """Search users assigned to a role."""
-        result = await self._user_repository.search_users_by_role(
-            scope=action.scope, querier=action.querier
-        )
-        return SearchUsersByRoleActionResult(
-            users=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
     async def issue_my_keypair(self, action: IssueMyKeypairAction) -> IssueMyKeypairActionResult:
-        generated = await self._user_repository.issue_my_keypair(user_uuid=action.user_uuid)
+        generated = await self._user_repository.issue_my_keypair(user_uuid=action.user_id)
         return IssueMyKeypairActionResult(generated_data=generated)
 
     async def revoke_my_keypair(self, action: RevokeMyKeypairAction) -> RevokeMyKeypairActionResult:
         await self._user_repository.revoke_my_keypair(
-            user_uuid=action.user_uuid, access_key=action.access_key
+            user_uuid=action.user_id, access_key=action.access_key
         )
         return RevokeMyKeypairActionResult(success=True)
 
     async def update_my_keypair(self, action: UpdateMyKeypairAction) -> UpdateMyKeypairActionResult:
         keypair_data = await self._user_repository.update_my_keypair(
-            user_uuid=action.user_uuid,
+            user_uuid=action.user_id,
             updater=action.updater,
         )
         return UpdateMyKeypairActionResult(keypair=keypair_data)
@@ -449,7 +324,7 @@ class UserService:
     ) -> SearchMyKeypairsActionResult:
         """Search keypairs owned by the current user."""
         result = await self._user_repository.search_my_keypairs(
-            scope=action.scope, querier=action.querier
+            scope=action.scope(), querier=action.querier
         )
         return SearchMyKeypairsActionResult(result=result)
 
@@ -520,4 +395,53 @@ class UserService:
         return AdminGetSSHKeypairActionResult(
             access_key=action.access_key,
             ssh_public_key=ssh_public_key,
+        )
+
+    async def create_dotfile(
+        self, action: CreateKeypairDotfileAction
+    ) -> CreateKeypairDotfileActionResult:
+        if not verify_dotfile_name(action.entry.path):
+            raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
+        entries = (await self._read_dotfiles(action.access_key)).added(action.entry)
+        await self._write_dotfiles(action.access_key, entries)
+        return CreateKeypairDotfileActionResult(entries=entries.entries)
+
+    async def update_dotfile(
+        self, action: UpdateKeypairDotfileAction
+    ) -> UpdateKeypairDotfileActionResult:
+        entries = (await self._read_dotfiles(action.access_key)).replaced(action.entry)
+        await self._write_dotfiles(action.access_key, entries)
+        return UpdateKeypairDotfileActionResult(entries=entries.entries)
+
+    async def delete_dotfile(
+        self, action: DeleteKeypairDotfileAction
+    ) -> DeleteKeypairDotfileActionResult:
+        entries = (await self._read_dotfiles(action.access_key)).removed(action.path)
+        await self._write_dotfiles(action.access_key, entries)
+        return DeleteKeypairDotfileActionResult(entries=entries.entries)
+
+    async def get_bootstrap_script(
+        self, action: GetBootstrapScriptAction
+    ) -> GetBootstrapScriptActionResult:
+        keypair = await self._user_repository.admin_get_keypair(action.access_key)
+        return GetBootstrapScriptActionResult(script=keypair.bootstrap_script)
+
+    async def update_bootstrap_script(
+        self, action: UpdateBootstrapScriptAction
+    ) -> UpdateBootstrapScriptActionResult:
+        script = action.script.strip()
+        if len(script) > MAXIMUM_DOTFILE_SIZE:
+            raise DotfileCreationFailed("Maximum bootstrap script length reached")
+        await self._user_repository.update_keypair_column(
+            KeypairBootstrapScriptUpdater(access_key=action.access_key, script=script)
+        )
+        return UpdateBootstrapScriptActionResult()
+
+    async def _read_dotfiles(self, access_key: AccessKey) -> DotfileEntries:
+        keypair = await self._user_repository.admin_get_keypair(access_key)
+        return DotfileEntries.unpack(keypair.dotfiles)
+
+    async def _write_dotfiles(self, access_key: AccessKey, entries: DotfileEntries) -> None:
+        await self._user_repository.update_keypair_column(
+            KeypairDotfilesUpdater(access_key=access_key, dotfiles=entries.pack())
         )
