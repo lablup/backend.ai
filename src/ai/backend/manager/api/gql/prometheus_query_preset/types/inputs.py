@@ -61,9 +61,7 @@ class CreateQueryDefinitionInput(PydanticInputMixin[CreateQueryDefinitionInputDT
     category_id: UUID | None = gql_field(description="Category UUID.", default=None)
     metric_name: str = gql_field(description="Prometheus metric name.")
     query_template: str = gql_field(
-        description=(
-            "PromQL template with Jinja placeholders ({{ labels }}, {{ window }}, {{ group_by }})."
-        )
+        description=("PromQL template with placeholders (${labels}, ${window}, ${group_by}).")
     )
     time_window: str | None = gql_field(description="Default time window.", default=None)
     options: QueryDefinitionOptionsInput = gql_field(

@@ -1,13 +1,15 @@
-"""convert_prometheus_query_preset_templates_to_jinja
+"""convert_prometheus_query_preset_templates_to_dollar_placeholders
 
-The app renders ``query_template`` with Jinja only; the legacy ``str.format``
-syntax (``{labels}``, ``{{{labels}}}``, escaped braces) is no longer supported.
-This migration rewrites all stored templates, including the seeded defaults, to
-the Jinja form. The conversion helpers are a frozen copy of the removed legacy
-parsing logic. Idempotent: already-Jinja templates are left untouched.
+The app renders ``query_template`` by substituting ``${labels}``, ``${window}``
+and ``${group_by}``; every other character is literal PromQL. The legacy
+``str.format`` syntax (``{labels}``, ``{{{labels}}}``, escaped braces) is no
+longer supported. This migration rewrites all stored templates, including the
+seeded defaults, to the new form. The conversion helpers are a frozen copy of
+the removed legacy parsing logic. Idempotent: already-converted templates are
+left untouched.
 
 Revision ID: 4b8e2f7a91d3
-Revises: e7b2c9f04d31
+Revises: f1a7c3e9b482
 Create Date: 2026-08-10 00:00:00.000000
 
 """
@@ -15,18 +17,18 @@ Create Date: 2026-08-10 00:00:00.000000
 import re
 import string
 
-import jinja2
 import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "4b8e2f7a91d3"
-down_revision = "e7b2c9f04d31"
+down_revision = "f1a7c3e9b482"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
 
 _BRACE_BLOCK_RE = re.compile(r"\{([^{}]*)\}")
+_PLACEHOLDER_RE = re.compile(r"\$\{(?:labels|window|group_by)\}")
 
 
 def _escape_non_placeholders(template: str) -> str:
@@ -55,32 +57,19 @@ def _escape_non_placeholders(template: str) -> str:
     return _BRACE_BLOCK_RE.sub(repl, template)
 
 
-def _to_jinja(template: str) -> str:
-    """Rewrite a legacy ``str.format`` template as Jinja; other templates unchanged."""
+def _to_dollar_placeholders(template: str) -> str:
+    """Rewrite a legacy ``str.format`` template with ``${...}`` placeholders."""
+    if _PLACEHOLDER_RE.search(template):
+        return template  # already converted
     try:
         parsed = list(string.Formatter().parse(_escape_non_placeholders(template)))
     except ValueError:
         return template
-    has_placeholder = False
-    for _literal, field, _spec, _conv in parsed:
-        if field in ("labels", "window", "group_by"):
-            has_placeholder = True
-            break
-    if not has_placeholder:
-        try:
-            jinja2.Environment().parse(template)
-            return template
-        except jinja2.TemplateSyntaxError:
-            pass  # legacy escaped braces, e.g. `metric{{job="x"}}` — rebuild as literals
     out = ""
     for literal, field, _spec, _conv in parsed:
         out += literal
         if field is not None:
-            if out.endswith("{"):
-                # `{` directly before `{{` breaks the Jinja lexer (`{{{` lexes as `{{` + `{`).
-                # So we add a space: `metric{` + `{{ labels }}` → `metric{ {{ labels }}`
-                out += " "
-            out += "{{ " + field + " }}"
+            out += "${" + field + "}"
     return out
 
 
@@ -88,8 +77,7 @@ def upgrade() -> None:
     conn = op.get_bind()
     rows = conn.execute(sa.text("SELECT id, query_template FROM prometheus_query_presets")).all()
     for row_id, template in rows:
-        converted = _to_jinja(template)
-        # Skip if the template is already Jinja or otherwise unchanged by the conversion.
+        converted = _to_dollar_placeholders(template)
         if converted == template:
             continue
         conn.execute(

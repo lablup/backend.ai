@@ -23,11 +23,11 @@ class TestPrometheusQueryPresetPreview:
         ("query_template", "result_type"),
         [
             # Instant vector wrapping a range vector (typical preset shape).
-            ("sum(rate(metric{ {{ labels }} }[{{ window }}]))", "vector"),
+            ("sum(rate(metric{${labels}}[${window}]))", "vector"),
             # Plain instant vector.
-            ("metric{ {{ labels }} }", "vector"),
+            ("metric{${labels}}", "vector"),
             # Raw range vector — accepted by query_instant, returns matrix.
-            ("metric{ {{ labels }} }[{{ window }}]", "matrix"),
+            ("metric{${labels}}[${window}]", "matrix"),
         ],
     )
     async def test_returns_prometheus_response(

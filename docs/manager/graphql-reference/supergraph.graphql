@@ -4556,9 +4556,7 @@ input CreateQueryDefinitionInput
   """Prometheus metric name."""
   metricName: String!
 
-  """
-  PromQL template with Jinja placeholders ({{ labels }}, {{ window }}, {{ group_by }}).
-  """
+  """PromQL template with placeholders (${labels}, ${window}, ${group_by})."""
   queryTemplate: String!
 
   """Default time window."""

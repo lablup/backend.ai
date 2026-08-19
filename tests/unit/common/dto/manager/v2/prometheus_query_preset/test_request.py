@@ -415,5 +415,5 @@ class TestPreviewQueryDefinitionInput:
     """Tests for PreviewQueryDefinitionInput model."""
 
     def test_valid_creation(self) -> None:
-        inp = PreviewQueryDefinitionInput(query_template="sum(metric{ {{ labels }} })")
-        assert inp.query_template == "sum(metric{ {{ labels }} })"
+        inp = PreviewQueryDefinitionInput(query_template="sum(metric{${labels}})")
+        assert inp.query_template == "sum(metric{${labels}})"

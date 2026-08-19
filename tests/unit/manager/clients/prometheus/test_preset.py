@@ -33,71 +33,71 @@ class TestPromQLTemplateRendererRender:
         [
             RenderTestCase(
                 id="empty_labels",
-                template="sum(my_metric{ {{ labels }} }) by ({{ group_by }})",
+                template="sum(my_metric{${labels}}) by (${group_by})",
                 labels={},
                 group_by=frozenset({"value_type"}),
                 window="",
-                expected="sum(my_metric{  }) by (value_type)",
+                expected="sum(my_metric{}) by (value_type)",
             ),
             RenderTestCase(
                 id="multiple_group_by_sorted",
-                template="sum(my_metric{ {{ labels }} }) by ({{ group_by }})",
+                template="sum(my_metric{${labels}}) by (${group_by})",
                 labels={"job": LabelMatcher.exact("test")},
                 group_by=frozenset({"value_type", "kernel_id", "session_id"}),
                 window="",
-                expected='sum(my_metric{ job="test" }) by (kernel_id,session_id,value_type)',
+                expected='sum(my_metric{job="test"}) by (kernel_id,session_id,value_type)',
             ),
             RenderTestCase(
                 id="with_window",
-                template="sum(rate(my_metric{ {{ labels }} }[{{ window }}])) by ({{ group_by }})",
+                template="sum(rate(my_metric{${labels}}[${window}])) by (${group_by})",
                 labels={"job": LabelMatcher.exact("test")},
                 group_by=frozenset({"instance"}),
                 window="5m",
-                expected='sum(rate(my_metric{ job="test" }[5m])) by (instance)',
+                expected='sum(rate(my_metric{job="test"}[5m])) by (instance)',
             ),
             RenderTestCase(
                 id="escapes_double_quotes_in_label_value",
-                template="my_metric{ {{ labels }} }",
+                template="my_metric{${labels}}",
                 labels={"key": LabelMatcher.exact('value with "quotes"')},
                 group_by=frozenset(),
                 window="",
-                expected='my_metric{ key="value with \\"quotes\\"" }',
+                expected='my_metric{key="value with \\"quotes\\""}',
             ),
             RenderTestCase(
                 id="escapes_backslash_in_label_value",
-                template="my_metric{ {{ labels }} }",
+                template="my_metric{${labels}}",
                 labels={"path": LabelMatcher.exact("C:\\Users\\test")},
                 group_by=frozenset(),
                 window="",
-                expected='my_metric{ path="C:\\\\Users\\\\test" }',
+                expected='my_metric{path="C:\\\\Users\\\\test"}',
             ),
             RenderTestCase(
                 id="escapes_newline_in_label_value",
-                template="my_metric{ {{ labels }} }",
+                template="my_metric{${labels}}",
                 labels={"msg": LabelMatcher.exact("line1\nline2")},
                 group_by=frozenset(),
                 window="",
-                expected='my_metric{ msg="line1\\nline2" }',
+                expected='my_metric{msg="line1\\nline2"}',
             ),
             RenderTestCase(
                 id="regex_matcher",
-                template="my_metric{ {{ labels }} }",
+                template="my_metric{${labels}}",
                 labels={"kernel_id": LabelMatcher.regex("kernel-1|kernel-2")},
                 group_by=frozenset(),
                 window="",
-                expected='my_metric{ kernel_id=~"kernel-1|kernel-2" }',
+                expected='my_metric{kernel_id=~"kernel-1|kernel-2"}',
             ),
             # Static and injected matchers coexist in one selector.
             RenderTestCase(
                 id="static_matcher_with_all_placeholders",
-                template='sum by ({{ group_by }})(rate(metric{mode!="idle",{{ labels }}}[{{ window }}]))',
+                template='sum by (${group_by})(rate(metric{mode!="idle",${labels}}[${window}]))',
                 labels={"job": LabelMatcher.exact("api")},
                 group_by=frozenset({"instance"}),
                 window="5m",
                 expected='sum by (instance)(rate(metric{mode!="idle",job="api"}[5m]))',
             ),
             # Raw PromQL without placeholders — provided values are ignored,
-            # single braces are literal text.
+            # braces are literal text.
             RenderTestCase(
                 id="raw_template_ignores_provided_labels",
                 template='rate(node_cpu_seconds_total{mode!="idle"}[5m])',
@@ -106,13 +106,15 @@ class TestPromQLTemplateRendererRender:
                 window="5m",
                 expected='rate(node_cpu_seconds_total{mode!="idle"}[5m])',
             ),
+            # A `$` that is not one of the three placeholders stays literal,
+            # so anchored regex matchers survive rendering.
             RenderTestCase(
-                id="orphan_open_brace_is_literal",
-                template="metric{",
-                labels={},
+                id="regex_anchor_dollar_is_literal",
+                template='metric{instance=~"prod-.*$",${labels}}',
+                labels={"job": LabelMatcher.exact("api")},
                 group_by=frozenset(),
                 window="",
-                expected="metric{",
+                expected='metric{instance=~"prod-.*$",job="api"}',
             ),
         ],
         ids=lambda c: c.id,
@@ -128,19 +130,6 @@ class TestPromQLTemplateRendererRender:
         result = renderer.render(preset)
 
         assert result == case.expected
-
-    @pytest.mark.parametrize(
-        "template",
-        [
-            pytest.param("sum(metric{{{labels}}}) by ({group_by})", id="legacy_triple_brace"),
-            pytest.param("metric{ {{ unknown_var }} }", id="unknown_variable"),
-        ],
-    )
-    async def test_render_raises(self, renderer: PromQLTemplateRenderer, template: str) -> None:
-        preset = MetricPreset(template=template)
-
-        with pytest.raises(InvalidMetricPresetTemplate):
-            renderer.render(preset)
 
 
 class TestPromQLTemplateRendererValidate:
@@ -158,12 +147,16 @@ class TestPromQLTemplateRendererValidate:
                 id="multiple_matchers",
             ),
             pytest.param(
-                "sum by ({{ group_by }})(metric{ {{ labels }} }[{{ window }}])",
-                id="jinja_placeholders",
+                "sum by (${group_by})(metric{${labels}}[${window}])",
+                id="all_placeholders",
             ),
             pytest.param(
-                'sum by ({{ group_by }})(metric{mode!="idle",{{ labels }}})',
+                'sum by (${group_by})(metric{mode!="idle",${labels}})',
                 id="static_and_dynamic_labels",
+            ),
+            pytest.param(
+                'metric{instance=~"prod-.*$"}',
+                id="regex_anchor_dollar",
             ),
         ],
     )
@@ -188,6 +181,8 @@ class TestPromQLTemplateRendererValidate:
             pytest.param('rate(metric{mode!="idle"}[$__rate_interval])', id="grafana_builtin"),
             pytest.param('metric{job="$service"}', id="dollar_identifier"),
             pytest.param('metric{region="${region}"}', id="braced_dollar_var"),
+            pytest.param("metric{$labels}", id="placeholder_without_braces"),
+            pytest.param("sum by (${GROUP_BY})(metric)", id="placeholder_wrong_case"),
         ],
     )
     def test_rejects_unsupported_template_variables(
@@ -196,18 +191,6 @@ class TestPromQLTemplateRendererValidate:
         with pytest.raises(InvalidMetricPresetTemplate, match="Unsupported"):
             renderer.validate(template)
 
-    @pytest.mark.parametrize(
-        "template",
-        [
-            pytest.param("{% if labels %}metric{% endif %}", id="statement_block"),
-            pytest.param("metric{ {{ unknown_var }} }", id="unknown_variable"),
-            pytest.param("metric{ {{ labels | upper }} }", id="filter"),
-            pytest.param("metric{ {{ labels.attr }} }", id="attribute_access"),
-            pytest.param("   ", id="blank"),
-        ],
-    )
-    def test_rejects_disallowed_constructs(
-        self, renderer: PromQLTemplateRenderer, template: str
-    ) -> None:
-        with pytest.raises(InvalidMetricPresetTemplate):
-            renderer.validate(template)
+    def test_rejects_blank_template(self, renderer: PromQLTemplateRenderer) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate, match="must not be empty"):
+            renderer.validate("   ")
