@@ -16,6 +16,27 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.10 (2026-08-19)
+
+### Fixes
+* Report attached GPU information for containers using the open-source CUDA plugin, which was always empty because the plugin looked up the wrong resource slot name (`cuda.devices` instead of `cuda.device`) ([#13372](https://github.com/lablup/backend.ai/issues/13372))
+* Fix the legacy GraphQL `group_node.user_nodes` field always failing with an internal error by constructing the connection items as `UserNode` instead of `GroupNode` ([#13570](https://github.com/lablup/backend.ai/issues/13570))
+* Add structured per-field error details (`extensions.errors`) and a 400-class error code to GraphQL v2 input validation failures, replacing the generic internal error ([#13576](https://github.com/lablup/backend.ai/issues/13576))
+* Attach CORS headers to AppProxy coordinator error responses so browsers can read the status and error code instead of an opaque `Failed to fetch` ([#13635](https://github.com/lablup/backend.ai/issues/13635))
+* Honor the `X-Forwarded-URL` header when deriving the HMAC signature host and path only for requests coming from `manager.trusted-proxies`, and resolve the client IP across any number of proxy hops instead of rejecting requests whose `X-Forwarded-For` hop count does not match. ([#13663](https://github.com/lablup/backend.ai/issues/13663))
+* Fix interactive app launches (jupyter, vscode, ...) intermittently failing with HTTP 500 when the app took more than 10 seconds to open its port, by making the agent wait for the kernel runner's verdict rather than giving up before the runner does. ([#13684](https://github.com/lablup/backend.ai/issues/13684))
+* Fix `alembic upgrade` aborting at the RBAC global-role migration with `CompileError: Unconsumed column names: status`, which blocked upgrades of any database created before that revision ([#13695](https://github.com/lablup/backend.ai/issues/13695))
+* Fix session creation failing with `Could not determine the C library variant.` when an image's `ldd --version` output does not start with the libc banner ([#13719](https://github.com/lablup/backend.ai/issues/13719))
+* Fix app proxy circuit creation to pick the least-loaded worker instead of the most occupied one, so circuits are distributed evenly across multiple workers ([#13723](https://github.com/lablup/backend.ai/issues/13723))
+* Stop migrations from depending on live ORM model definitions by declaring the session_dependencies table locally in the add_session_table revision. ([#13785](https://github.com/lablup/backend.ai/issues/13785))
+* Fix the agent failing to identify and restore running kernel containers on Podman, which aborted agent startup with a `KeyError` and silently dropped kernels from the registry. ([#13793](https://github.com/lablup/backend.ai/issues/13793))
+* Fix container-level metrics and container-PID mapping failing on Podman by resolving cgroup paths from the container process rather than assuming Docker's cgroup layout. ([#13796](https://github.com/lablup/backend.ai/issues/13796))
+* Respond to a streaming request with an empty body instead of a 500 error when the source produces no data, such as downloading a zero-byte file ([#13801](https://github.com/lablup/backend.ai/issues/13801))
+* Fix compute session creation failing on container runtimes that read the seccomp profile option as a file path instead of an inline document. ([#13805](https://github.com/lablup/backend.ai/issues/13805))
+* Allow configuring the kernel container log driver instead of hardcoding the Docker-only `local` driver. ([#13817](https://github.com/lablup/backend.ai/issues/13817))
+* Pass an explicit `--pids-limit` when extracting the krunner environment so the extractor can fork under Podman's Docker-compatible API. ([#13821](https://github.com/lablup/backend.ai/issues/13821))
+
+
 ## 26.4.9 (2026-07-31)
 
 ### Features
