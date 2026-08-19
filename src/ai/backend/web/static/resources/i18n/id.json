@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "VFolder wajib diisi."
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "Buat Preset",
+    "Name": "Nama",
+    "PresetDeleted": "Preset varian runtime telah dihapus.",
+    "RuntimeVariantId": "ID Varian Runtime",
+    "RuntimeVariantPreset": "Preset Varian Runtime",
+    "TabTitle": "Preset Varian Runtime"
+  },
   "adminSession": {
     "PendingSessions": "Sesi Tertunda",
     "PendingSessionsScopedToResourceGroup": "Menampilkan sesi tertunda hanya untuk grup sumber daya yang dipilih. Alihkan grup sumber daya untuk melihat sesi di grup lain."
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "Riwayat Penjadwalan",
     "SessionId": "ID Sesi",
     "StartChatTest": "Uji di Obrolan",
+    "SwitchProjectConfirmContent": "Penerapan ini termasuk dalam proyek \"{{projectName}}\". Anda akan dialihkan ke proyek tersebut untuk melihatnya. Lanjutkan?",
+    "SwitchProjectConfirmTitle": "Beralih ke proyek lain?",
     "Tags": "Tag",
     "TagsPlaceholder": "Masukkan tag, dipisahkan dengan koma",
     "TagsTooltip": "Label opsional untuk mengorganisir dan memfilter deployment. Tekan Enter atau koma untuk menambahkan.",
@@ -1691,6 +1701,7 @@
     "CouldNotCopyText": "Tidak dapat menyalin teks: ",
     "CreateButtonCode": "Buat",
     "CreateNotebookButton": "Tombol Buat Buku Catatan",
+    "CreatedFolderIsReadOnly": "Folder dibuat dengan izin pemasangan hanya-baca sehingga tidak dapat menerima unduhan. Buat folder dengan izin pemasangan baca dan tulis.",
     "DownloadModelToFolder": "Unduh Model ke Folder",
     "Downloading": "Mengunduh...",
     "FailedToFetchRepositoryInformation": "Gagal mengambil informasi repositori.",
@@ -1707,6 +1718,12 @@
     "GitlabDefaultBranch": "Nama Cabang GitLab",
     "GitlabRepoWillBeFolder": "Repositori GitLab yang diimpor akan dikonversi menjadi folder dan dapat dipasang saat sesi dimulai.",
     "GitlabURL": "URL GitLab",
+    "HuggingFaceModelInfoUnavailable": "Tidak dapat memuat informasi model. Impor tetap dapat dimulai.",
+    "HuggingFaceModelIsDisabled": "Model ini dinonaktifkan di Hugging Face dan tidak dapat diunduh.",
+    "HuggingFaceModelIsGated": "Model ini memiliki akses terbatas. Setujui lisensinya di Hugging Face dan masukkan token akses, jika tidak unduhan akan gagal.",
+    "HuggingFaceModelNotFoundOrPrivate": "Model tidak ditemukan, atau bersifat privat. Periksa ID model atau masukkan token akses.",
+    "HuggingFaceModelSize": "Ukuran",
+    "HuggingFaceModelSizeIncludesAllRevisions": "Ukuran total repositori termasuk seluruh revisi. Unduhan sebenarnya bisa lebih kecil.",
     "HuggingFaceModelUrlOrId": "URL atau ID Model Hugging Face",
     "HuggingFaceModelWillBeDownloaded": "Model Hugging Face diunduh ke subfolder folder model yang dipilih melalui sesi batch.",
     "HuggingFaceRevision": "Revision",
@@ -1728,6 +1745,7 @@
     "NotebookBadgeCodeMarkdown": "Kode Lencana Notebook (Markdown)",
     "NotebookBadgeURL": "URL Buku Catatan",
     "NotebookURL": "URL Buku Catatan",
+    "OnlyWritableModelFoldersAreListed": "Hanya folder model dalam proyek saat ini yang dapat Anda pasang dengan izin tulis yang ditampilkan.",
     "Preparing": "Mempersiapkan...",
     "ReadyToImport": "Siap Impor",
     "RepoWillBeFolder": "Repositori GitHub yang diimpor dikonversi ke folder dan dapat dipasang saat sesi dimulai.",

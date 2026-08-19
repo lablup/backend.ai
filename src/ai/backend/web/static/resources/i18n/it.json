@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "Il VFolder è obbligatorio."
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "Crea Preimpostazione",
+    "Name": "Nome",
+    "PresetDeleted": "La preimpostazione della variante di runtime è stata eliminata.",
+    "RuntimeVariantId": "ID Variante di Runtime",
+    "RuntimeVariantPreset": "Preimpostazione Variante di Runtime",
+    "TabTitle": "Preimpostazioni Varianti di Runtime"
+  },
   "adminSession": {
     "PendingSessions": "Sessioni in sospeso",
     "PendingSessionsScopedToResourceGroup": "Vengono mostrate solo le sessioni in sospeso per il gruppo di risorse selezionato. Cambia gruppo di risorse per visualizzare le sessioni in altri gruppi."
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "Cronologia di pianificazione",
     "SessionId": "ID sessione",
     "StartChatTest": "Prova in chat",
+    "SwitchProjectConfirmContent": "Questa distribuzione appartiene al progetto \"{{projectName}}\". Verrai spostato su quel progetto per visualizzarla. Continuare?",
+    "SwitchProjectConfirmTitle": "Passare a un altro progetto?",
     "Tags": "Tag",
     "TagsPlaceholder": "Inserisci i tag, separati da virgole",
     "TagsTooltip": "Etichette opzionali per organizzare e filtrare le distribuzioni. Premi Invio o virgola per aggiungere.",
@@ -1688,6 +1698,7 @@
     "CouldNotCopyText": "Impossibile copiare il testo:",
     "CreateButtonCode": "Creare",
     "CreateNotebookButton": "Pulsante Crea blocco appunti",
+    "CreatedFolderIsReadOnly": "La cartella è stata creata con permesso di montaggio di sola lettura, quindi non può ricevere il download. Crea una cartella con permesso di lettura e scrittura.",
     "DownloadModelToFolder": "Scarica modello nella cartella",
     "Downloading": "Download in corso...",
     "FailedToFetchRepositoryInformation": "Impossibile recuperare le informazioni del repository.",
@@ -1704,6 +1715,12 @@
     "GitlabDefaultBranch": "Nome della filiale GitLab",
     "GitlabRepoWillBeFolder": "I repository GitLab importati vengono convertiti in cartelle e possono essere montati all'avvio della sessione.",
     "GitlabURL": "URL di GitLab",
+    "HuggingFaceModelInfoUnavailable": "Impossibile caricare le informazioni del modello. È comunque possibile avviare l'importazione.",
+    "HuggingFaceModelIsDisabled": "Questo modello è disabilitato su Hugging Face e non può essere scaricato.",
+    "HuggingFaceModelIsGated": "Questo modello è ad accesso limitato. Accetta la sua licenza su Hugging Face e inserisci un token di accesso, altrimenti il download fallirà.",
+    "HuggingFaceModelNotFoundOrPrivate": "Modello non trovato o privato. Controlla l'ID del modello oppure inserisci un token di accesso.",
+    "HuggingFaceModelSize": "Dimensione",
+    "HuggingFaceModelSizeIncludesAllRevisions": "Dimensione totale del repository, incluse tutte le revisioni. Il download effettivo potrebbe essere inferiore.",
     "HuggingFaceModelUrlOrId": "URL o ID del modello Hugging Face",
     "HuggingFaceModelWillBeDownloaded": "Il modello Hugging Face viene scaricato in una sottocartella della cartella del modello selezionata tramite una sessione batch.",
     "HuggingFaceRevision": "Revision",
@@ -1725,6 +1742,7 @@
     "NotebookBadgeCodeMarkdown": "Codice badge per notebook (markdown)",
     "NotebookBadgeURL": "URL del blocco note",
     "NotebookURL": "URL del blocco note",
+    "OnlyWritableModelFoldersAreListed": "Vengono elencate solo le cartelle di modelli del progetto corrente che puoi montare con permesso di scrittura.",
     "Preparing": "Preparazione...",
     "ReadyToImport": "Pronto per l'importazione",
     "RepoWillBeFolder": "I repository GitHub importati vengono convertiti in cartelle e possono essere montati all'avvio della sessione.",

@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "Το VFolder είναι υποχρεωτικό."
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "Δημιουργία Προεπιλογής",
+    "Name": "Όνομα",
+    "PresetDeleted": "Η προεπιλογή χρόνου εκτέλεσης διαγράφηκε.",
+    "RuntimeVariantId": "ID Χρόνου Εκτέλεσης",
+    "RuntimeVariantPreset": "Προεπιλογή Χρόνου Εκτέλεσης",
+    "TabTitle": "Προεπιλογές Χρόνου Εκτέλεσης"
+  },
   "adminSession": {
     "PendingSessions": "Εκκρεμείς συνεδρίες",
     "PendingSessionsScopedToResourceGroup": "Εμφανίζονται μόνο εκκρεμείς συνεδρίες για την επιλεγμένη ομάδα πόρων. Αλλάξτε ομάδες πόρων για να δείτε συνεδρίες σε άλλες ομάδες."
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "Ιστορικό προγραμματισμού",
     "SessionId": "ID συνεδρίας",
     "StartChatTest": "Δοκιμή στη συνομιλία",
+    "SwitchProjectConfirmContent": "Αυτή η ανάπτυξη ανήκει στο έργο «{{projectName}}». Θα μεταβείτε σε αυτό το έργο για να το προβάλετε. Συνέχεια;",
+    "SwitchProjectConfirmTitle": "Μετάβαση σε άλλο έργο;",
     "Tags": "Ετικέτες",
     "TagsPlaceholder": "Εισαγάγετε ετικέτες, χωρισμένες με κόμματα",
     "TagsTooltip": "Προαιρετικές ετικέτες για οργάνωση και φιλτράρισμα αναπτύξεων. Πατήστε Enter ή κόμμα για προσθήκη.",
@@ -1688,6 +1698,7 @@
     "CouldNotCopyText": "Δεν ήταν δυνατή η αντιγραφή κειμένου:",
     "CreateButtonCode": "Δημιουργώ",
     "CreateNotebookButton": "Δημιουργία κουμπιού σημειωματάριου",
+    "CreatedFolderIsReadOnly": "Ο φάκελος δημιουργήθηκε με δικαίωμα προσάρτησης μόνο για ανάγνωση, επομένως δεν μπορεί να δεχτεί τη λήψη. Δημιουργήστε φάκελο με δικαίωμα ανάγνωσης και εγγραφής.",
     "DownloadModelToFolder": "Λήψη μοντέλου σε φάκελο",
     "Downloading": "Λήψη ...",
     "FailedToFetchRepositoryInformation": "Αποτυχία ανάκτησης πληροφοριών αποθετηρίου.",
@@ -1704,6 +1715,12 @@
     "GitlabDefaultBranch": "Όνομα υποκαταστήματος GitLab",
     "GitlabRepoWillBeFolder": "Τα εισαγόμενα αποθετήρια GitLab μετατρέπονται σε φακέλους και μπορούν να προσαρτηθούν κατά την έναρξη της συνεδρίας.",
     "GitlabURL": "URL του GitLab",
+    "HuggingFaceModelInfoUnavailable": "Δεν ήταν δυνατή η φόρτωση των πληροφοριών του μοντέλου. Μπορείτε να ξεκινήσετε την εισαγωγή ούτως ή άλλως.",
+    "HuggingFaceModelIsDisabled": "Αυτό το μοντέλο είναι απενεργοποιημένο στο Hugging Face και δεν μπορεί να ληφθεί.",
+    "HuggingFaceModelIsGated": "Αυτό το μοντέλο έχει περιορισμένη πρόσβαση. Αποδεχτείτε την άδειά του στο Hugging Face και εισαγάγετε ένα διακριτικό πρόσβασης, διαφορετικά η λήψη θα αποτύχει.",
+    "HuggingFaceModelNotFoundOrPrivate": "Το μοντέλο δεν βρέθηκε ή είναι ιδιωτικό. Ελέγξτε το αναγνωριστικό του μοντέλου ή εισαγάγετε ένα διακριτικό πρόσβασης.",
+    "HuggingFaceModelSize": "Μέγεθος",
+    "HuggingFaceModelSizeIncludesAllRevisions": "Συνολικό μέγεθος του αποθετηρίου με όλες τις αναθεωρήσεις. Η πραγματική λήψη ενδέχεται να είναι μικρότερη.",
     "HuggingFaceModelUrlOrId": "URL ή ID μοντέλου Hugging Face",
     "HuggingFaceModelWillBeDownloaded": "Το μοντέλο Hugging Face λαμβάνεται σε υποφάκελο του επιλεγμένου φακέλου μοντέλου μέσω συνεδρίας batch.",
     "HuggingFaceRevision": "Revision",
@@ -1725,6 +1742,7 @@
     "NotebookBadgeCodeMarkdown": "Κωδικός σήματος σημειωματάριου (Markdown)",
     "NotebookBadgeURL": "URL σημειωματάριου",
     "NotebookURL": "URL σημειωματάριου",
+    "OnlyWritableModelFoldersAreListed": "Εμφανίζονται μόνο οι φάκελοι μοντέλων του τρέχοντος έργου που μπορείτε να προσαρτήσετε με δικαίωμα εγγραφής.",
     "Preparing": "Προετοιμασία ...",
     "ReadyToImport": "Έτοιμο για εισαγωγή",
     "RepoWillBeFolder": "Τα εισαγόμενα αποθετήρια GitHub μετατρέπονται σε φακέλους και μπορούν να προσαρτηθούν κατά την έναρξη της περιόδου λειτουργίας.",

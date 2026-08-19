@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "VFolder on pakollinen."
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "Luo esiasetus",
+    "Name": "Nimi",
+    "PresetDeleted": "Suoritusaikamuunnoksen esiasetus on poistettu.",
+    "RuntimeVariantId": "Suoritusaikamuunnoksen tunnus",
+    "RuntimeVariantPreset": "Suoritusaikamuunnoksen esiasetus",
+    "TabTitle": "Suoritusaikamuunnosten esiasetukset"
+  },
   "adminSession": {
     "PendingSessions": "Odotuksessa olevat istunnot",
     "PendingSessionsScopedToResourceGroup": "Näytetään vain valitun resurssiryhmän odottavat istunnot. Vaihda resurssiryhmää nähdäksesi istunnot muissa ryhmissä."
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "Ajoitushistoria",
     "SessionId": "Istunnon ID",
     "StartChatTest": "Testaa chatissa",
+    "SwitchProjectConfirmContent": "Tämä käyttöönotto kuuluu projektiin \"{{projectName}}\". Sinut siirretään kyseiseen projektiin sen tarkastelua varten. Jatketaanko?",
+    "SwitchProjectConfirmTitle": "Vaihdetaanko toiseen projektiin?",
     "Tags": "Tunnisteet",
     "TagsPlaceholder": "Syötä tunnisteet, pilkuilla erotettuna",
     "TagsTooltip": "Valinnaisia merkintöjä käyttöönottojen järjestämiseen ja suodattamiseen. Paina Enter tai pilkku lisätäksesi.",
@@ -1688,6 +1698,7 @@
     "CouldNotCopyText": "Tekstiä ei voitu kopioida:",
     "CreateButtonCode": "Luo",
     "CreateNotebookButton": "Luo muistikirja -painike",
+    "CreatedFolderIsReadOnly": "Kansio luotiin vain luku -liitosoikeudella, joten siihen ei voi ladata. Luo kansio luku- ja kirjoitusoikeudella.",
     "DownloadModelToFolder": "Lataa malli kansioon",
     "Downloading": "Lataaminen...",
     "FailedToFetchRepositoryInformation": "Tietojen hakeminen repositoriosta epäonnistui.",
@@ -1704,6 +1715,12 @@
     "GitlabDefaultBranch": "GitLab Branchin nimi",
     "GitlabRepoWillBeFolder": "Tuodut GitLab-arkistot muunnetaan kansioiksi ja ne voidaan asentaa istunnon alkaessa.",
     "GitlabURL": "GitLabin URL-osoite",
+    "HuggingFaceModelInfoUnavailable": "Mallin tietoja ei voitu ladata. Tuonnin voi silti aloittaa.",
+    "HuggingFaceModelIsDisabled": "Tämä malli on poistettu käytöstä Hugging Facessa, eikä sitä voi ladata.",
+    "HuggingFaceModelIsGated": "Tämän mallin käyttöä on rajoitettu. Hyväksy sen lisenssi Hugging Facessa ja anna käyttöoikeustunnus, muuten lataus epäonnistuu.",
+    "HuggingFaceModelNotFoundOrPrivate": "Mallia ei löytynyt tai se on yksityinen. Tarkista mallin tunnus tai anna käyttöoikeustunnus.",
+    "HuggingFaceModelSize": "Koko",
+    "HuggingFaceModelSizeIncludesAllRevisions": "Arkiston kokonaiskoko kaikkine revisioineen. Todellinen lataus voi olla pienempi.",
     "HuggingFaceModelUrlOrId": "Hugging Face -mallin URL tai ID",
     "HuggingFaceModelWillBeDownloaded": "Hugging Face -malli ladataan valitun mallikansion alikansioon eräistunnon avulla.",
     "HuggingFaceRevision": "Revision",
@@ -1725,6 +1742,7 @@
     "NotebookBadgeCodeMarkdown": "Muistikirjan merkkikoodi (Markdown)",
     "NotebookBadgeURL": "Muistikirjan URL-osoite",
     "NotebookURL": "Muistikirjan URL-osoite",
+    "OnlyWritableModelFoldersAreListed": "Luettelossa näkyvät vain nykyisen projektin mallikansiot, jotka voit liittää kirjoitusoikeudella.",
     "Preparing": "Valmistautuminen...",
     "ReadyToImport": "Valmis tuomaan",
     "RepoWillBeFolder": "Tuodut GitHub-arkistot muunnetaan kansioiksi ja ne voidaan asentaa istunnon alkaessa.",
