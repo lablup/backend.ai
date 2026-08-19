@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from collections.abc import Sequence
 from datetime import datetime
+from decimal import Decimal
 from typing import override
 
 from aiohttp import web
@@ -48,13 +49,21 @@ class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):
         raise NotImplementedError
 
 
+def _format_amount(amount: Decimal) -> str:
+    """Drop the trailing zeros the DB numeric type carries, without going scientific."""
+    return f"{amount.normalize():f}"
+
+
 def _format_excesses(excesses: Sequence[SlotExcess]) -> str:
     """One indented line per over-quota slot, with the numbers that made it fail."""
     lines: list[str] = []
     for exceeded in excesses:
         lines.append(
-            f"  - {exceeded.slot_name}: used {exceeded.used} + requested {exceeded.requested}"
-            f" > limit {exceeded.limit} (over by {exceeded.excess})"
+            f"  - {exceeded.slot_name}:"
+            f" used {_format_amount(exceeded.used)}"
+            f" + requested {_format_amount(exceeded.requested)}"
+            f" > limit {_format_amount(exceeded.limit)}"
+            f" (over by {_format_amount(exceeded.excess)})"
         )
     return "\n".join(lines)
 
