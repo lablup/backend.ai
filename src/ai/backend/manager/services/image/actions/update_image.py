@@ -8,7 +8,6 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
@@ -22,8 +21,9 @@ class UpdateImageAction(ImageAction):
     updater_spec: ImageUpdaterSpec
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_image"
 
     @override
     @classmethod
@@ -32,12 +32,8 @@ class UpdateImageAction(ImageAction):
 
 
 @dataclass
-class UpdateImageActionResult(BaseActionResult):
+class UpdateImageActionResult:
     image: ImageData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.image.id)
 
 
 class UpdateImageActionUnknownImageReferenceError(BackendAIError):

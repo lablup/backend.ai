@@ -400,11 +400,7 @@ class CreateContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
             )
         )
 
-        result = (
-            await ctx.processors.container_registry.create_container_registry.wait_for_complete(
-                action
-            )
-        )
+        result = await ctx.processors.container_registry.create_container_registry.run(action)
 
         return cls(
             container_registry=ContainerRegistryNode.from_dataclass(result.data),
@@ -479,11 +475,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
         )
 
         # Execute action through processor
-        result = (
-            await ctx.processors.container_registry.update_container_registry.wait_for_complete(
-                action
-            )
-        )
+        result = await ctx.processors.container_registry.update_container_registry.run(action)
 
         return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
 
@@ -517,12 +509,10 @@ class DeleteContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
 
-        result = (
-            await ctx.processors.container_registry.delete_container_registry.wait_for_complete(
-                DeleteContainerRegistryAction(
-                    purger=Purger(
-                        spec=ContainerRegistryPurgerSpec(registry_id=ContainerRegistryID(reg_id))
-                    )
+        result = await ctx.processors.container_registry.delete_container_registry.run(
+            DeleteContainerRegistryAction(
+                purger=Purger(
+                    spec=ContainerRegistryPurgerSpec(registry_id=ContainerRegistryID(reg_id))
                 )
             )
         )

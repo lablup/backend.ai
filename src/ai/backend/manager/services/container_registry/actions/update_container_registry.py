@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -14,8 +13,9 @@ class UpdateContainerRegistryAction(ContainerRegistryAction):
     updater: Updater[ContainerRegistryRow]
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.updater.pk_value)
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_container_registry"
 
     @override
     @classmethod
@@ -24,9 +24,5 @@ class UpdateContainerRegistryAction(ContainerRegistryAction):
 
 
 @dataclass
-class UpdateContainerRegistryActionResult(BaseActionResult):
+class UpdateContainerRegistryActionResult:
     data: ContainerRegistryData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)

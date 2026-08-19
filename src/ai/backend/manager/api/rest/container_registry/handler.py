@@ -116,7 +116,7 @@ class ContainerRegistryHandler:
             extra=params.extra,
             allowed_groups=params.allowed_groups,
         )
-        result = await self._container_registry.create_container_registry.wait_for_complete(
+        result = await self._container_registry.create_container_registry.run(
             CreateContainerRegistryAction(creator=Creator(spec=creator_spec))
         )
 
@@ -145,7 +145,7 @@ class ContainerRegistryHandler:
         registry_id = path.parsed.registry_id
         log.info("DELETE_CONTAINER_REGISTRY (registry:{})", registry_id)
 
-        await self._container_registry.delete_container_registry.wait_for_complete(
+        await self._container_registry.delete_container_registry.run(
             DeleteContainerRegistryAction(
                 purger=Purger(
                     spec=ContainerRegistryPurgerSpec(registry_id=ContainerRegistryID(registry_id))
@@ -161,7 +161,7 @@ class ContainerRegistryHandler:
     async def list_all(self) -> APIResponse:
         log.info("LIST_ALL_CONTAINER_REGISTRIES")
 
-        result = await self._container_registry.load_all_container_registries.wait_for_complete(
+        result = await self._container_registry.load_all_container_registries.run(
             LoadAllContainerRegistriesAction()
         )
 
@@ -199,7 +199,7 @@ class ContainerRegistryHandler:
             params.project,
         )
 
-        result = await self._container_registry.load_container_registries.wait_for_complete(
+        result = await self._container_registry.load_container_registries.run(
             LoadContainerRegistriesAction(registry=params.registry, project=params.project)
         )
 
@@ -273,7 +273,7 @@ class ContainerRegistryHandler:
                 else TriState.nop()
             ),
         )
-        result = await self._container_registry.update_container_registry.wait_for_complete(
+        result = await self._container_registry.update_container_registry.run(
             UpdateContainerRegistryAction(updater=Updater(spec=updater_spec, pk_value=registry_id))
         )
 
@@ -302,7 +302,7 @@ class ContainerRegistryHandler:
         params = body.parsed
         log.info("RESCAN_IMAGES (registry:{}, project:{})", params.registry, params.project)
 
-        await self._container_registry.rescan_images.wait_for_complete(
+        await self._container_registry.rescan_images.run(
             RescanImagesAction(
                 registry=params.registry,
                 project=params.project,
@@ -322,7 +322,7 @@ class ContainerRegistryHandler:
         params = body.parsed
         log.info("CLEAR_IMAGES (registry:{}, project:{})", params.registry, params.project)
 
-        await self._container_registry.clear_images.wait_for_complete(
+        await self._container_registry.clear_images.run(
             ClearImagesAction(registry=params.registry, project=params.project)
         )
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
@@ -358,5 +358,5 @@ class ContainerRegistryHandler:
             img_name=img_name,
             auth_header=auth_header,
         )
-        await self._container_registry.handle_harbor_webhook.wait_for_complete(action)
+        await self._container_registry.handle_harbor_webhook.run(action)
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)

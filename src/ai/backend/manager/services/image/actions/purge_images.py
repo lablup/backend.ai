@@ -1,16 +1,12 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.types import AgentId, ImageID
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.services.image.actions.base import (
     ImageAction,
     ImageSingleEntityAction,
-    ImageSingleEntityActionResult,
 )
 from ai.backend.manager.services.image.types import ImageRefData
 
@@ -23,8 +19,9 @@ class PurgeImageAction(ImageAction):
     noprune: bool
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "purge_image"
 
     @override
     @classmethod
@@ -33,14 +30,10 @@ class PurgeImageAction(ImageAction):
 
 
 @dataclass
-class PurgeImageActionResult(BaseActionResult):
+class PurgeImageActionResult:
     reserved_bytes: int
     purged_image: ImageData
     error: str | None
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.purged_image.id)
 
 
 @dataclass
@@ -63,8 +56,9 @@ class PurgeImagesAction(ImageAction):
     noprune: bool
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "purge_images"
 
     @override
     @classmethod
@@ -73,38 +67,25 @@ class PurgeImagesAction(ImageAction):
 
 
 @dataclass
-class PurgeImagesActionResult(BaseActionResult):
+class PurgeImagesActionResult:
     total_reserved_bytes: int
     purged_images: list[PurgedImagesData]
     errors: list[str]
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
 
 @dataclass
 class PurgeImageByIdAction(ImageSingleEntityAction):
-    image_id: ImageID
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "purge_image_by_id"
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.PURGE
 
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.image_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.IMAGE, str(self.image_id))
-
 
 @dataclass
-class PurgeImageByIdActionResult(ImageSingleEntityActionResult):
+class PurgeImageByIdActionResult:
     image: ImageData
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.image.id)

@@ -36,6 +36,7 @@ from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
+from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
 )
@@ -44,6 +45,7 @@ from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
+from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
@@ -165,6 +167,8 @@ def test_every_defined_v2_action_is_wired() -> None:
     ArtifactRegistryProcessors(registry.group(), MagicMock())
     ArtifactRevisionProcessors(registry.group(), MagicMock())
     ModelCardProcessors(registry.group(), MagicMock())
+    ContainerRegistryProcessors(registry.group(), MagicMock())
+    ImageProcessors(registry.group(), MagicMock())
 
     wired = sorted(cls.action_name() for cls in registry.wired_actions())
     defined = sorted(cls.action_name() for cls in _concrete_v2_action_classes())

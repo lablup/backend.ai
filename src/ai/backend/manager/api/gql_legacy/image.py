@@ -237,7 +237,7 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
     ) -> list[Self]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
-        result = await graph_ctx.processors.image.get_images_by_canonicals.wait_for_complete(
+        result = await graph_ctx.processors.image.get_images_by_canonicals.run(
             GetImagesByCanonicalsAction(
                 image_canonicals=list(image_names),
                 image_status=filter_by_statuses,
@@ -269,7 +269,7 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
     ) -> Image:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
-        result = await ctx.processors.image.get_image_by_id.wait_for_complete(
+        result = await ctx.processors.image.get_image_by_id.run(
             GetImageByIdAction(
                 image_id=ImageID(id),
                 image_status=filter_by_statuses,
@@ -287,7 +287,7 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
     ) -> Image:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
-        result = await ctx.processors.image.get_image_by_identifier.wait_for_complete(
+        result = await ctx.processors.image.get_image_by_identifier.run(
             GetImageByIdentifierAction(
                 image_identifier=ImageIdentifier(reference, architecture),
                 image_status=filter_by_statuses,
@@ -307,7 +307,7 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
             filter_by_statuses = [ImageStatus.ALIVE]
         if types is None:
             types = set()
-        result = await ctx.processors.image.get_all_images.wait_for_complete(
+        result = await ctx.processors.image.get_all_images.run(
             GetAllImagesAction(status_filter=filter_by_statuses)
         )
         all_items = [cls.from_image_with_agent_install_status(img) for img in result.data.values()]
@@ -458,7 +458,7 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
     async def _batch_load_installed_agents(
         cls, ctx: GraphQueryContext, image_ids: Sequence[ImageID]
     ) -> list[set[AgentId]]:
-        result = await ctx.processors.image.get_image_installed_agents.wait_for_complete(
+        result = await ctx.processors.image.get_image_installed_agents.run(
             GetImageInstalledAgentsAction(image_ids=list(image_ids))
         )
         installed_agent_ids_per_image: Mapping[ImageID, set[AgentId]] = result.data
@@ -731,7 +731,7 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
     async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> Image:
         ctx: GraphQueryContext = info.context
         _, image_id = AsyncNode.resolve_global_id(info, self.id)
-        action_result = await ctx.processors.image.get_image_by_id.wait_for_complete(
+        action_result = await ctx.processors.image.get_image_by_id.run(
             GetImageByIdAction(
                 image_id=ImageID(UUID(image_id)),
                 image_status=None,
@@ -774,7 +774,7 @@ class ForgetImageById(graphene.Mutation):  # type: ignore[misc]
 
         ctx: GraphQueryContext = info.context
 
-        result = await ctx.processors.image.forget_image_by_id.wait_for_complete(
+        result = await ctx.processors.image.forget_image_by_id.run(
             ForgetImageByIdAction(image_id=ImageID(image_uuid))
         )
 
@@ -816,7 +816,7 @@ class ForgetImage(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
         arch = architecture if architecture is not None else DEFAULT_IMAGE_ARCH
 
-        result = await ctx.processors.image.forget_image.wait_for_complete(
+        result = await ctx.processors.image.forget_image.run(
             ForgetImageAction(
                 reference=reference,
                 architecture=arch,
@@ -869,14 +869,14 @@ class PurgeImageById(graphene.Mutation):  # type: ignore[misc]
         image_uuid = extract_object_uuid(info, image_id, "image")
 
         ctx: GraphQueryContext = info.context
-        result = await ctx.processors.image.purge_image_by_id.wait_for_complete(
+        result = await ctx.processors.image.purge_image_by_id.run(
             PurgeImageByIdAction(
                 image_id=ImageID(image_uuid),
             )
         )
 
         if options.remove_from_registry:
-            await ctx.processors.image.untag_image_from_registry.wait_for_complete(
+            await ctx.processors.image.untag_image_from_registry.run(
                 UntagImageFromRegistryAction(
                     image_id=ImageID(image_uuid),
                 )
@@ -911,7 +911,7 @@ class UntagImageFromRegistry(graphene.Mutation):  # type: ignore[misc]
 
         log.info("remove image from registry {0} by API request", str(image_uuid))
         ctx: GraphQueryContext = info.context
-        result = await ctx.processors.image.untag_image_from_registry.wait_for_complete(
+        result = await ctx.processors.image.untag_image_from_registry.run(
             UntagImageFromRegistryAction(
                 image_id=ImageID(image_uuid),
             )
@@ -990,12 +990,14 @@ class RescanImages(graphene.Mutation):  # type: ignore[misc]
 
         async def _rescan_task(reporter: ProgressReporter) -> DispatchResult[Any]:
             if registry is None:
-                all_registries = await ctx.processors.container_registry.load_all_container_registries.wait_for_complete(
-                    LoadAllContainerRegistriesAction()
+                all_registries = (
+                    await ctx.processors.container_registry.load_all_container_registries.run(
+                        LoadAllContainerRegistriesAction()
+                    )
                 )
                 loaded_registries = all_registries.registries
             else:
-                registries = await ctx.processors.container_registry.load_container_registries.wait_for_complete(
+                registries = await ctx.processors.container_registry.load_container_registries.run(
                     LoadContainerRegistriesAction(
                         registry=registry,
                         project=project,
@@ -1006,13 +1008,11 @@ class RescanImages(graphene.Mutation):  # type: ignore[misc]
             rescanned_images: list[ImageData] = []
             errors: list[str] = []
             for registry_data in loaded_registries:
-                action_result = (
-                    await ctx.processors.container_registry.rescan_images.wait_for_complete(
-                        RescanImagesAction(
-                            registry=registry_data.registry_name,
-                            project=registry_data.project,
-                            progress_reporter=reporter,
-                        )
+                action_result = await ctx.processors.container_registry.rescan_images.run(
+                    RescanImagesAction(
+                        registry=registry_data.registry_name,
+                        project=registry_data.project,
+                        progress_reporter=reporter,
                     )
                 )
                 for error in action_result.errors:
@@ -1055,7 +1055,7 @@ class AliasImage(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
         arch = architecture if architecture is not None else DEFAULT_IMAGE_ARCH
 
-        await ctx.processors.image.alias_image.wait_for_complete(
+        await ctx.processors.image.alias_image.run(
             AliasImageAction(
                 image_canonical=target,
                 architecture=arch,
@@ -1084,7 +1084,7 @@ class DealiasImage(graphene.Mutation):  # type: ignore[misc]
         log.info("dealias image {0} by API request", alias)
         ctx: GraphQueryContext = info.context
 
-        await ctx.processors.image.dealias_image.wait_for_complete(
+        await ctx.processors.image.dealias_image.run(
             DealiasImageAction(
                 alias=alias,
             )
@@ -1111,17 +1111,15 @@ class ClearImages(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
         log.info("clear images from registry {0} by API request", registry)
 
-        result = (
-            await ctx.processors.container_registry.load_container_registries.wait_for_complete(
-                LoadContainerRegistriesAction(
-                    registry=registry,
-                    project=None,
-                )
+        result = await ctx.processors.container_registry.load_container_registries.run(
+            LoadContainerRegistriesAction(
+                registry=registry,
+                project=None,
             )
         )
 
         for registry_data in result.registries:
-            await ctx.processors.container_registry.clear_images.wait_for_complete(
+            await ctx.processors.container_registry.clear_images.run(
                 ClearImagesAction(
                     registry=registry_data.registry_name,
                     project=registry_data.project,
@@ -1217,7 +1215,7 @@ class ModifyImage(graphene.Mutation):  # type: ignore[misc]
         log.info("modify image {0} by API request", target)
         arch = architecture if architecture is not None else DEFAULT_IMAGE_ARCH
 
-        await ctx.processors.image.update_image.wait_for_complete(
+        await ctx.processors.image.update_image.run(
             UpdateImageAction(
                 target=target,
                 architecture=arch,
@@ -1358,7 +1356,7 @@ class ClearImageCustomResourceLimit(graphene.Mutation):  # type: ignore[misc]
             arch,
         )
         ctx: GraphQueryContext = info.context
-        result = await ctx.processors.image.clear_image_custom_resource_limit.wait_for_complete(
+        result = await ctx.processors.image.clear_image_custom_resource_limit.run(
             ClearImageCustomResourceLimitAction(
                 image_canonical=key.image_canonical,
                 architecture=arch,

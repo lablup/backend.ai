@@ -433,9 +433,9 @@ def create_processors(
         idle_checker=IdleCheckerProcessors(
             services.idle_checker, action_monitors, registry.group()
         ),
-        image=ImageProcessors(services.image, action_monitors, validators),
+        image=ImageProcessors(registry.group(), services.image),
         container_registry=ContainerRegistryProcessors(
-            services.container_registry, action_monitors, validators
+            registry.group(), services.container_registry
         ),
         vfolder=VFolderProcessors(services.vfolder, action_monitors, validators),
         vfolder_admin=VFolderAdminProcessors(services.vfolder_admin, action_monitors),

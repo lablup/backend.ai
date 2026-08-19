@@ -77,12 +77,14 @@ class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest, Rescan
         loaded_registries = []
 
         if manifest.registry is None:
-            all_registries = await self._processors.container_registry.load_all_container_registries.wait_for_complete(
-                LoadAllContainerRegistriesAction()
+            all_registries = (
+                await self._processors.container_registry.load_all_container_registries.run(
+                    LoadAllContainerRegistriesAction()
+                )
             )
             loaded_registries = all_registries.registries
         else:
-            registries = await self._processors.container_registry.load_container_registries.wait_for_complete(
+            registries = await self._processors.container_registry.load_container_registries.run(
                 LoadContainerRegistriesAction(
                     registry=manifest.registry,
                     project=manifest.project,
@@ -93,13 +95,11 @@ class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest, Rescan
         rescanned_images = []
         errors = []
         for registry_data in loaded_registries:
-            action_result = (
-                await self._processors.container_registry.rescan_images.wait_for_complete(
-                    RescanImagesAction(
-                        registry=registry_data.registry_name,
-                        project=registry_data.project,
-                        progress_reporter=None,  # TODO: Handle progress reporting in new pattern
-                    )
+            action_result = await self._processors.container_registry.rescan_images.run(
+                RescanImagesAction(
+                    registry=registry_data.registry_name,
+                    project=registry_data.project,
+                    progress_reporter=None,  # TODO: Handle progress reporting in new pattern
                 )
             )
 

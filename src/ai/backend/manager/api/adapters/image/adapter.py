@@ -115,7 +115,7 @@ class ImageAdapter(BaseAdapter):
             pagination=NoPagination(),
             conditions=[ImageConditions.by_ids(image_ids)],
         )
-        action_result = await self._processors.image.search_images.wait_for_complete(
+        action_result = await self._processors.image.search_images.run(
             SearchImagesAction(querier=querier)
         )
         image_map: dict[ImageID, ImageNode] = {
@@ -136,7 +136,7 @@ class ImageAdapter(BaseAdapter):
             pagination=NoPagination(),
             conditions=[ImageAliasConditions.by_ids(alias_ids)],
         )
-        action_result = await self._processors.image.search_aliases.wait_for_complete(
+        action_result = await self._processors.image.search_aliases.run(
             SearchAliasesAction(querier=querier)
         )
         alias_map: dict[uuid.UUID, ImageAliasNode] = {
@@ -150,7 +150,7 @@ class ImageAdapter(BaseAdapter):
         """Search images with admin scope using offset pagination."""
         querier = self._build_offset_querier(input)
 
-        action_result = await self._processors.image.search_images.wait_for_complete(
+        action_result = await self._processors.image.search_images.run(
             SearchImagesAction(querier=querier)
         )
 
@@ -182,7 +182,7 @@ class ImageAdapter(BaseAdapter):
             base_conditions=list(base_conditions) if base_conditions else None,
         )
 
-        action_result = await self._processors.image.search_images.wait_for_complete(
+        action_result = await self._processors.image.search_images.run(
             SearchImagesAction(querier=querier)
         )
 
@@ -214,7 +214,7 @@ class ImageAdapter(BaseAdapter):
             base_conditions=list(base_conditions) if base_conditions else None,
         )
 
-        action_result = await self._processors.image.search_aliases.wait_for_complete(
+        action_result = await self._processors.image.search_aliases.run(
             SearchAliasesAction(querier=querier)
         )
 
@@ -229,21 +229,21 @@ class ImageAdapter(BaseAdapter):
 
     async def admin_forget(self, input: ForgetImageInput) -> ForgetImagePayload:
         """Forget (soft-delete) an image by ID."""
-        result = await self._processors.image.forget_image_by_id.wait_for_complete(
+        result = await self._processors.image.forget_image_by_id.run(
             ForgetImageByIdAction(image_id=ImageID(input.image_id))
         )
         return ForgetImagePayload(item=self._data_to_dto(result.image))
 
     async def admin_purge(self, input: PurgeImageInput) -> PurgeImagePayload:
         """Purge (hard-delete) an image by ID."""
-        result = await self._processors.image.purge_image_by_id.wait_for_complete(
+        result = await self._processors.image.purge_image_by_id.run(
             PurgeImageByIdAction(image_id=ImageID(input.image_id))
         )
         return PurgeImagePayload(item=self._data_to_dto(result.image))
 
     async def admin_alias(self, input: AliasImageInput) -> AliasImagePayload:
         """Create an alias for an image."""
-        result = await self._processors.image.alias_image_by_id.wait_for_complete(
+        result = await self._processors.image.alias_image_by_id.run(
             AliasImageByIdAction(image_id=ImageID(input.image_id), alias=input.alias)
         )
         return AliasImagePayload(
@@ -254,7 +254,7 @@ class ImageAdapter(BaseAdapter):
 
     async def admin_dealias(self, input: DealiasImageInput) -> AliasImagePayload:
         """Remove an image alias."""
-        result = await self._processors.image.dealias_image.wait_for_complete(
+        result = await self._processors.image.dealias_image.run(
             DealiasImageAction(alias=input.alias)
         )
         return AliasImagePayload(
@@ -323,7 +323,7 @@ class ImageAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        result = await self._processors.image.update_image_by_id.wait_for_complete(
+        result = await self._processors.image.update_image_by_id.run(
             UpdateImageByIdAction(image_id=ImageID(input.image_id), updater_spec=spec)
         )
         return UpdateImagePayload(item=self._data_to_dto(result.image))

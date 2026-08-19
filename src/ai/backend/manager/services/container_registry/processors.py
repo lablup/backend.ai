@@ -1,6 +1,7 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
+from typing import Any
+
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.services.container_registry.actions.clear_images import (
     ClearImagesAction,
     ClearImagesActionResult,
@@ -61,74 +62,81 @@ from ai.backend.manager.services.container_registry.service import ContainerRegi
 
 
 class ContainerRegistryProcessors:
-    rescan_images: ActionProcessor[RescanImagesAction, RescanImagesActionResult]
-    clear_images: ActionProcessor[ClearImagesAction, ClearImagesActionResult]
-    load_container_registries: ActionProcessor[
+    rescan_images: GlobalActionProcessor[RescanImagesAction, RescanImagesActionResult]
+    clear_images: GlobalActionProcessor[ClearImagesAction, ClearImagesActionResult]
+    load_container_registries: GlobalActionProcessor[
         LoadContainerRegistriesAction, LoadContainerRegistriesActionResult
     ]
-    load_all_container_registries: ActionProcessor[
+    load_all_container_registries: GlobalActionProcessor[
         LoadAllContainerRegistriesAction, LoadAllContainerRegistriesActionResult
     ]
-    get_container_registries: ActionProcessor[
+    get_container_registries: GlobalActionProcessor[
         GetContainerRegistriesAction, GetContainerRegistriesActionResult
     ]
-    create_container_registry: ActionProcessor[
+    create_container_registry: GlobalActionProcessor[
         CreateContainerRegistryAction, CreateContainerRegistryActionResult
     ]
-    update_container_registry: ActionProcessor[
+    update_container_registry: GlobalActionProcessor[
         UpdateContainerRegistryAction, UpdateContainerRegistryActionResult
     ]
-    delete_container_registry: ActionProcessor[
+    delete_container_registry: GlobalActionProcessor[
         DeleteContainerRegistryAction, DeleteContainerRegistryActionResult
     ]
-    search_container_registries: ActionProcessor[
+    search_container_registries: GlobalActionProcessor[
         SearchContainerRegistriesAction, SearchContainerRegistriesActionResult
     ]
-    handle_harbor_webhook: ActionProcessor[
+    handle_harbor_webhook: GlobalActionProcessor[
         HandleHarborWebhookAction, HandleHarborWebhookActionResult
     ]
-    create_registry_quota: ActionProcessor[
+    create_registry_quota: GlobalActionProcessor[
         CreateRegistryQuotaAction, CreateRegistryQuotaActionResult
     ]
-    read_registry_quota: ActionProcessor[ReadRegistryQuotaAction, ReadRegistryQuotaActionResult]
-    update_registry_quota: ActionProcessor[
+    read_registry_quota: GlobalActionProcessor[
+        ReadRegistryQuotaAction, ReadRegistryQuotaActionResult
+    ]
+    update_registry_quota: GlobalActionProcessor[
         UpdateRegistryQuotaAction, UpdateRegistryQuotaActionResult
     ]
-    delete_registry_quota: ActionProcessor[
+    delete_registry_quota: GlobalActionProcessor[
         DeleteRegistryQuotaAction, DeleteRegistryQuotaActionResult
     ]
 
-    def __init__(
-        self,
-        service: ContainerRegistryService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.rescan_images = ActionProcessor(service.rescan_images, action_monitors)
-        self.clear_images = ActionProcessor(service.clear_images, action_monitors)
-        self.load_container_registries = ActionProcessor(
-            service.load_container_registries, action_monitors
+    def __init__(self, group: ProcessorGroup[Any], service: ContainerRegistryService) -> None:
+        self.rescan_images = group.global_scope(RescanImagesAction, service.rescan_images)
+        self.clear_images = group.global_scope(ClearImagesAction, service.clear_images)
+        self.load_container_registries = group.global_scope(
+            LoadContainerRegistriesAction, service.load_container_registries
         )
-        self.load_all_container_registries = ActionProcessor(
-            service.load_all_container_registries, action_monitors
+        self.load_all_container_registries = group.global_scope(
+            LoadAllContainerRegistriesAction, service.load_all_container_registries
         )
-        self.get_container_registries = ActionProcessor(
-            service.get_container_registries, action_monitors
+        self.get_container_registries = group.global_scope(
+            GetContainerRegistriesAction, service.get_container_registries
         )
-        self.create_container_registry = ActionProcessor(
-            service.create_container_registry, action_monitors
+        self.create_container_registry = group.global_scope(
+            CreateContainerRegistryAction, service.create_container_registry
         )
-        self.update_container_registry = ActionProcessor(
-            service.update_container_registry, action_monitors
+        self.update_container_registry = group.global_scope(
+            UpdateContainerRegistryAction, service.update_container_registry
         )
-        self.delete_container_registry = ActionProcessor(
-            service.delete_container_registry, action_monitors
+        self.delete_container_registry = group.global_scope(
+            DeleteContainerRegistryAction, service.delete_container_registry
         )
-        self.search_container_registries = ActionProcessor(
-            service.search_container_registries, action_monitors
+        self.search_container_registries = group.global_scope(
+            SearchContainerRegistriesAction, service.search_container_registries
         )
-        self.handle_harbor_webhook = ActionProcessor(service.handle_harbor_webhook, action_monitors)
-        self.create_registry_quota = ActionProcessor(service.create_registry_quota, action_monitors)
-        self.read_registry_quota = ActionProcessor(service.read_registry_quota, action_monitors)
-        self.update_registry_quota = ActionProcessor(service.update_registry_quota, action_monitors)
-        self.delete_registry_quota = ActionProcessor(service.delete_registry_quota, action_monitors)
+        self.handle_harbor_webhook = group.global_scope(
+            HandleHarborWebhookAction, service.handle_harbor_webhook
+        )
+        self.create_registry_quota = group.global_scope(
+            CreateRegistryQuotaAction, service.create_registry_quota
+        )
+        self.read_registry_quota = group.global_scope(
+            ReadRegistryQuotaAction, service.read_registry_quota
+        )
+        self.update_registry_quota = group.global_scope(
+            UpdateRegistryQuotaAction, service.update_registry_quota
+        )
+        self.delete_registry_quota = group.global_scope(
+            DeleteRegistryQuotaAction, service.delete_registry_quota
+        )

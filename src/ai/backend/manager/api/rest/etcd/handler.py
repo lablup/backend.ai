@@ -104,7 +104,7 @@ class EtcdHandler:
             "ETCD.GET_DOCKER_REGISTRIES has been deprecated because it no longer uses etcd."
             " Use /resource/container-registries API instead."
         )
-        result = await self._container_registry.get_container_registries.wait_for_complete(
+        result = await self._container_registry.get_container_registries.run(
             GetContainerRegistriesAction()
         )
         return APIResponse.build(HTTPStatus.OK, ContainerRegistriesResponse(root=result.registries))

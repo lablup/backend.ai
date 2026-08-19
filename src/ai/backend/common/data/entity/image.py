@@ -1,7 +1,18 @@
-from typing import NewType
-from uuid import UUID
+"""Entity type and id of the images table."""
 
-__all__ = ("ImageID",)
+from typing import override
+
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+
+__all__ = ("IMAGE_ENTITY_TYPE", "ImageID")
+
+IMAGE_ENTITY_TYPE = EntityType("image")
 
 
-ImageID = NewType("ImageID", UUID)
+class ImageID(EntityIdentifier):
+    """An image's entity id."""
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return IMAGE_ENTITY_TYPE
