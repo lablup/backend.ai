@@ -1,6 +1,6 @@
 from ai.backend.manager.actions.registry import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
-from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import PublicActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
@@ -152,7 +152,9 @@ from ai.backend.manager.services.session.service import SessionService
 
 class SessionProcessors:
     commit_session: SingleEntityActionProcessor[CommitSessionAction, CommitSessionActionResult]
-    compute_schedule: GlobalActionProcessor[ComputeScheduleAction, ComputeScheduleActionResult]
+    compute_schedule: PublicActionProcessor[
+        ComputeScheduleAction, ComputeScheduleActionResult
+    ]
     complete: SingleEntityActionProcessor[CompleteAction, CompleteActionResult]
     convert_session_to_image: SingleEntityActionProcessor[
         ConvertSessionToImageAction, ConvertSessionToImageActionResult
@@ -222,7 +224,7 @@ class SessionProcessors:
         # Actions without RBAC validation (internal/legacy)
         self.lookup = group.public_lookup_ops(LookupSessionAction)
         self.commit_session = group.single_entity(CommitSessionAction, service.commit_session)
-        self.compute_schedule = group.global_scope(ComputeScheduleAction, service.compute_schedule)
+        self.compute_schedule = group.public(ComputeScheduleAction, service.compute_schedule)
         self.complete = group.single_entity(CompleteAction, service.complete)
         self.convert_session_to_image = group.single_entity(
             ConvertSessionToImageAction, service.convert_session_to_image

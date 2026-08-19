@@ -35,7 +35,7 @@ class ComputeScheduleAction(SessionGlobalAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "global_compute_schedule"
+        return "compute_schedule"
 
     @override
     @classmethod
