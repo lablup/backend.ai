@@ -4,23 +4,28 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationData
 
-from .base import ResourceSlotAction
 
+@dataclass(frozen=True)
+class GetKernelAllocationBySlotAction(BaseGlobalAction):
+    """Read one slot's amount on one kernel.
 
-@dataclass
-class GetKernelAllocationBySlotAction(ResourceSlotAction):
+    Global until a kernel resolves to its session: the row belongs to the session the
+    kernel runs under, and there is no lookup from a kernel id to it yet.
+    """
+
     kernel_id: uuid.UUID
     slot_name: str
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.RESOURCE_ALLOCATION
+        return SESSION_ENTITY_TYPE
 
     @override
     @classmethod
@@ -28,14 +33,11 @@ class GetKernelAllocationBySlotAction(ResourceSlotAction):
         return ActionOperationType.GET
 
     @override
-    def entity_id(self) -> str | None:
-        return f"{self.kernel_id}:{self.slot_name}"
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_get_kernel_allocation_by_slot"
 
 
-@dataclass
-class GetKernelAllocationBySlotResult(BaseActionResult):
+@dataclass(frozen=True)
+class GetKernelAllocationBySlotResult:
     item: ResourceAllocationData
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

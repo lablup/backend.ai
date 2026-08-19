@@ -126,7 +126,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     AppConfigProcessors(
         registry.group(), registry.group(), registry.group(), registry.group(), MagicMock()
     )
-    ResourceSlotProcessors(MagicMock(), [], MagicMock(), registry.group())
+    ResourceSlotProcessors(registry.group(), MagicMock())
     IdleCheckerProcessors(MagicMock(), [], registry.group())
     RetentionPolicyProcessors(registry.group())
     LoginClientTypeProcessors(registry.group())

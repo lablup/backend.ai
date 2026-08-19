@@ -23,10 +23,13 @@ from .actions.get_project_resource_overview import (
     GetProjectResourceOverviewAction,
     GetProjectResourceOverviewResult,
 )
-from .actions.search_agent_resources import SearchAgentResourcesAction, SearchAgentResourcesResult
+from .actions.search_agent_resources import (
+    GlobalSearchAgentResourcesAction,
+    GlobalSearchAgentResourcesResult,
+)
 from .actions.search_resource_allocations import (
-    SearchResourceAllocationsAction,
-    SearchResourceAllocationsResult,
+    GlobalSearchResourceAllocationsAction,
+    GlobalSearchResourceAllocationsResult,
 )
 
 
@@ -51,10 +54,10 @@ class ResourceSlotService:
         )
 
     async def search_agent_resources(
-        self, action: SearchAgentResourcesAction
-    ) -> SearchAgentResourcesResult:
+        self, action: GlobalSearchAgentResourcesAction
+    ) -> GlobalSearchAgentResourcesResult:
         result = await self._repository.search_agent_resources(action.querier)
-        return SearchAgentResourcesResult(
+        return GlobalSearchAgentResourcesResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
@@ -77,10 +80,10 @@ class ResourceSlotService:
         )
 
     async def search_resource_allocations(
-        self, action: SearchResourceAllocationsAction
-    ) -> SearchResourceAllocationsResult:
+        self, action: GlobalSearchResourceAllocationsAction
+    ) -> GlobalSearchResourceAllocationsResult:
         result = await self._repository.search_resource_allocations(action.querier)
-        return SearchResourceAllocationsResult(
+        return GlobalSearchResourceAllocationsResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
