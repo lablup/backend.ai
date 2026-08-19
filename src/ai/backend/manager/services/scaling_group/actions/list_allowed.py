@@ -3,14 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 
-from .base import ScalingGroupAction
+from .base import ScalingGroupGlobalAction
 
 
 @dataclass(frozen=True)
-class ListAllowedScalingGroupsAction(ScalingGroupAction):
+class ListAllowedScalingGroupsAction(ScalingGroupGlobalAction):
     """Action to list scaling groups allowed for a user."""
 
     domain_name: str
@@ -20,20 +19,17 @@ class ListAllowedScalingGroupsAction(ScalingGroupAction):
 
     @override
     @classmethod
+    def action_name(cls) -> str:
+        return "global_list_allowed_resource_groups"
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
 
 @dataclass(frozen=True)
-class ListAllowedScalingGroupsActionResult(BaseActionResult):
+class ListAllowedScalingGroupsActionResult:
     """Result of listing allowed scaling groups."""
 
     scaling_group_names: list[str]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

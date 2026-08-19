@@ -114,9 +114,7 @@ from ai.backend.manager.services.resource_usage.actions.global_search_user_usage
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
 )
-from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id_by_name import (
-    ResolveResourceGroupIDByNameAction,
-)
+from ai.backend.manager.services.scaling_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.services.scaling_group.actions.update_fair_share_spec import (
     ResourceWeightInput,
     UpdateFairShareSpecAction,
@@ -146,10 +144,10 @@ class FairShareAPIHandler:
         self._adapter = FairShareAdapter()
 
     async def _resolve_resource_group_id(self, resource_group: str) -> ResourceGroupID:
-        result = await self._scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(resource_group))
+        result = await self._scaling_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(resource_group))
         )
-        return result.resource_group_id
+        return result.data.id
 
     # Domain Fair Share
 
@@ -726,13 +724,13 @@ class FairShareAPIHandler:
         body: BodyParam[UpsertDomainFairShareWeightRequest],
     ) -> APIResponse:
         """Upsert domain fair share weight."""
-        result = await self._scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(path.parsed.resource_group))
+        result = await self._scaling_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(path.parsed.resource_group))
         )
         action_result = await self._fair_share.upsert_domain_fair_share_weight.run(
             UpsertDomainFairShareWeightAction(
                 resource_group=path.parsed.resource_group,
-                resource_group_id=result.resource_group_id,
+                resource_group_id=result.data.id,
                 domain_name=path.parsed.domain_name,
                 weight=body.parsed.weight,
             )
@@ -750,13 +748,13 @@ class FairShareAPIHandler:
         body: BodyParam[UpsertProjectFairShareWeightRequest],
     ) -> APIResponse:
         """Upsert project fair share weight."""
-        result = await self._scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(path.parsed.resource_group))
+        result = await self._scaling_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(path.parsed.resource_group))
         )
         action_result = await self._fair_share.upsert_project_fair_share_weight.run(
             UpsertProjectFairShareWeightAction(
                 resource_group=path.parsed.resource_group,
-                resource_group_id=result.resource_group_id,
+                resource_group_id=result.data.id,
                 project_id=path.parsed.project_id,
                 domain_name=body.parsed.domain_name,
                 weight=body.parsed.weight,
@@ -775,13 +773,13 @@ class FairShareAPIHandler:
         body: BodyParam[UpsertUserFairShareWeightRequest],
     ) -> APIResponse:
         """Upsert user fair share weight."""
-        result = await self._scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(path.parsed.resource_group))
+        result = await self._scaling_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(path.parsed.resource_group))
         )
         action_result = await self._fair_share.upsert_user_fair_share_weight.run(
             UpsertUserFairShareWeightAction(
                 resource_group=path.parsed.resource_group,
-                resource_group_id=result.resource_group_id,
+                resource_group_id=result.data.id,
                 project_id=path.parsed.project_id,
                 user_uuid=path.parsed.user_uuid,
                 domain_name=body.parsed.domain_name,
@@ -809,13 +807,13 @@ class FairShareAPIHandler:
             for entry in body.parsed.inputs
         ]
 
-        result = await self._scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(body.parsed.resource_group))
+        result = await self._scaling_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(body.parsed.resource_group))
         )
         action_result = await self._fair_share.bulk_upsert_domain_fair_share_weight.run(
             BulkUpsertDomainFairShareWeightAction(
                 resource_group=body.parsed.resource_group,
-                resource_group_id=result.resource_group_id,
+                resource_group_id=result.data.id,
                 inputs=inputs,
             )
         )
@@ -840,13 +838,13 @@ class FairShareAPIHandler:
             for entry in body.parsed.inputs
         ]
 
-        result = await self._scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(body.parsed.resource_group))
+        result = await self._scaling_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(body.parsed.resource_group))
         )
         action_result = await self._fair_share.bulk_upsert_project_fair_share_weight.run(
             BulkUpsertProjectFairShareWeightAction(
                 resource_group=body.parsed.resource_group,
-                resource_group_id=result.resource_group_id,
+                resource_group_id=result.data.id,
                 inputs=inputs,
             )
         )
@@ -872,13 +870,13 @@ class FairShareAPIHandler:
             for entry in body.parsed.inputs
         ]
 
-        result = await self._scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(body.parsed.resource_group))
+        result = await self._scaling_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(body.parsed.resource_group))
         )
         action_result = await self._fair_share.bulk_upsert_user_fair_share_weight.run(
             BulkUpsertUserFairShareWeightAction(
                 resource_group=body.parsed.resource_group,
-                resource_group_id=result.resource_group_id,
+                resource_group_id=result.data.id,
                 inputs=inputs,
             )
         )
@@ -903,7 +901,7 @@ class FairShareAPIHandler:
             pagination=NoPagination(),
             conditions=[ScalingGroupConditions.by_name_equals(name_spec)],
         )
-        search_result = await self._scaling_group.search_scaling_groups.wait_for_complete(
+        search_result = await self._scaling_group.search_scaling_groups.run(
             SearchScalingGroupsAction(querier=querier)
         )
 
@@ -931,7 +929,7 @@ class FairShareAPIHandler:
             pagination=NoPagination(),
             conditions=[],
         )
-        search_result = await self._scaling_group.search_scaling_groups.wait_for_complete(
+        search_result = await self._scaling_group.search_scaling_groups.run(
             SearchScalingGroupsAction(querier=querier)
         )
 
@@ -967,6 +965,7 @@ class FairShareAPIHandler:
             ]
 
         action = UpdateFairShareSpecAction(
+            resource_group_id=await self._resolve_resource_group_id(path.parsed.resource_group),
             resource_group=path.parsed.resource_group,
             half_life_days=body.parsed.half_life_days,
             lookback_days=body.parsed.lookback_days,
@@ -975,7 +974,7 @@ class FairShareAPIHandler:
             resource_weights=resource_weights,
         )
 
-        result = await self._scaling_group.update_fair_share_spec.wait_for_complete(action)
+        result = await self._scaling_group.update_fair_share_spec.run(action)
 
         resp = UpdateResourceGroupFairShareSpecResponse(
             resource_group=result.scaling_group.name,

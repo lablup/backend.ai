@@ -468,7 +468,7 @@ def create_processors(
         ),
         model_card=ModelCardProcessors(services.model_card, action_monitors, validators),
         resource_usage=ResourceUsageProcessors(registry.group()),
-        scaling_group=ScalingGroupProcessors(services.scaling_group, action_monitors, validators),
+        scaling_group=ScalingGroupProcessors(registry.group(), services.scaling_group),
         metric=MetricProcessors(services.metric, action_monitors, validators),
         model_serving=ModelServingProcessors(services.model_serving, action_monitors, validators),
         model_serving_auto_scaling=ModelServingAutoScalingProcessors(

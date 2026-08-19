@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from typing import override
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 
 from .domain_base import ScalingGroupDomainAction
@@ -20,20 +19,17 @@ class UpdateAllowedResourceGroupsForDomainAction(ScalingGroupDomainAction):
 
     @override
     @classmethod
+    def action_name(cls) -> str:
+        return "update_allowed_resource_groups_for_domain"
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
-    @override
-    def entity_id(self) -> str | None:
-        return self.domain_name
-
 
 @dataclass(frozen=True)
-class UpdateAllowedResourceGroupsForDomainActionResult(BaseActionResult):
+class UpdateAllowedResourceGroupsForDomainActionResult:
     """Result containing the current allowed resource groups for the domain."""
 
     allowed_resource_groups: list[str]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

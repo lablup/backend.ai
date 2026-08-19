@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 
@@ -26,16 +25,17 @@ class ReplaceDefaultSessionOptionsAction(ScalingGroupAction):
 
     @override
     @classmethod
+    def action_name(cls) -> str:
+        return "replace_resource_group_default_session_options"
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
-    @override
-    def entity_id(self) -> str:
-        return str(self.resource_group)
-
 
 @dataclass(frozen=True)
-class ReplaceDefaultSessionOptionsActionResult(BaseActionResult):
+class ReplaceDefaultSessionOptionsActionResult:
     """Result of replacing a resource group's ``default_session_options``.
 
     Carries only the refreshed :class:`DefaultSessionOptions` — callers
@@ -45,7 +45,3 @@ class ReplaceDefaultSessionOptionsActionResult(BaseActionResult):
 
     resource_group: ResourceGroupName
     options: DefaultSessionOptions
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.resource_group)

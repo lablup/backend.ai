@@ -69,6 +69,7 @@ from ai.backend.manager.services.runtime_variant.processors import RuntimeVarian
 from ai.backend.manager.services.runtime_variant_preset.processors import (
     RuntimeVariantPresetProcessors,
 )
+from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
 from ai.backend.manager.services.storage_namespace.processors import (
     StorageNamespaceProcessors,
@@ -155,6 +156,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     FairShareProcessors(registry.group(), MagicMock())
     ResourcePresetProcessors(registry.group(), MagicMock())
     ResourceAllocationProcessors(registry.group(), MagicMock())
+    ScalingGroupProcessors(registry.group(), MagicMock())
 
     wired = sorted(cls.action_name() for cls in registry.wired_actions())
     defined = sorted(cls.action_name() for cls in _concrete_v2_action_classes())

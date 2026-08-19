@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import DeploymentOptions
 
@@ -24,16 +23,17 @@ class ReplaceDefaultDeploymentOptionsAction(ScalingGroupAction):
 
     @override
     @classmethod
+    def action_name(cls) -> str:
+        return "replace_resource_group_default_deployment_options"
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
-    @override
-    def entity_id(self) -> str:
-        return str(self.resource_group)
-
 
 @dataclass(frozen=True)
-class ReplaceDefaultDeploymentOptionsActionResult(BaseActionResult):
+class ReplaceDefaultDeploymentOptionsActionResult:
     """Result of replacing a resource group's ``default_deployment_options``.
 
     Carries only the refreshed :class:`DeploymentOptions` — callers that
@@ -42,7 +42,3 @@ class ReplaceDefaultDeploymentOptionsActionResult(BaseActionResult):
 
     resource_group: ResourceGroupName
     options: DeploymentOptions
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.resource_group)

@@ -1,13 +1,20 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.services.scaling_group.actions.base import ScalingGroupAction
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 
 
 @dataclass(frozen=True)
-class ScalingGroupDomainAction(ScalingGroupAction):
+class ScalingGroupDomainAction(BaseSingleEntityAction):
+    """Base for an operation on the resource groups a domain may schedule on.
+
+    The domain answers for it: what changes is which groups that domain reaches.
+    """
+
+    domain_id: DomainID
+
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.RESOURCE_GROUP_DOMAIN
+    def entity_id(self) -> EntityIdentifier:
+        return self.domain_id

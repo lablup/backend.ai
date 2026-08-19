@@ -58,9 +58,7 @@ from ai.backend.manager.services.domain.actions.update_domain_node import (
     UpdateDomainNodeAction,
     UpdateDomainNodeActionResult,
 )
-from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id_by_name import (
-    ResolveResourceGroupIDByNameAction,
-)
+from ai.backend.manager.services.scaling_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import (
@@ -354,10 +352,10 @@ async def _resolve_sgroup_ids(
 ) -> list[ResourceGroupID]:
     resolved: list[ResourceGroupID] = []
     for name in sgroup_names:
-        result = await graph_ctx.processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(name))
+        result = await graph_ctx.processors.scaling_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(name))
         )
-        resolved.append(result.resource_group_id)
+        resolved.append(result.data.id)
     return resolved
 
 

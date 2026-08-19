@@ -15,6 +15,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.dto.manager.v2.fair_share.types import (
@@ -103,6 +105,7 @@ from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupStatusUpdaterSpec,
     ScalingGroupUpdaterSpec,
 )
+from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.scaling_group.actions.create import CreateScalingGroupAction
 from ai.backend.manager.services.scaling_group.actions.get_allowed_domains_for_rg import (
     GetAllowedDomainsForResourceGroupAction,
@@ -122,6 +125,7 @@ from ai.backend.manager.services.scaling_group.actions.get_resource_info import 
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
 )
+from ai.backend.manager.services.scaling_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
     PurgeScalingGroupAction,
 )
@@ -130,9 +134,6 @@ from ai.backend.manager.services.scaling_group.actions.replace_default_deploymen
 )
 from ai.backend.manager.services.scaling_group.actions.replace_default_session_options import (
     ReplaceDefaultSessionOptionsAction,
-)
-from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id_by_name import (
-    ResolveResourceGroupIDByNameAction,
 )
 from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_ids_by_names import (
     ResolveResourceGroupIDsByNamesAction,
@@ -257,10 +258,8 @@ class ResourceGroupAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=len(names)),
             conditions=[ScalingGroupConditions.by_names(names)],
         )
-        action_result = (
-            await self._processors.scaling_group.search_scaling_groups.wait_for_complete(
-                SearchScalingGroupsAction(querier=querier)
-            )
+        action_result = await self._processors.scaling_group.search_scaling_groups.run(
+            SearchScalingGroupsAction(querier=querier)
         )
         rg_map = {sg.name: sg for sg in action_result.scaling_groups}
         return [
@@ -280,10 +279,8 @@ class ResourceGroupAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[ScalingGroupConditions.by_ids(ids)],
         )
-        action_result = (
-            await self._processors.scaling_group.search_scaling_groups.wait_for_complete(
-                SearchScalingGroupsAction(querier=querier)
-            )
+        action_result = await self._processors.scaling_group.search_scaling_groups.run(
+            SearchScalingGroupsAction(querier=querier)
         )
         rg_map = {sg.id: sg for sg in action_result.scaling_groups}
         return [self._data_to_detail_node(rg_map[id_]) if id_ in rg_map else None for id_ in ids]
@@ -304,10 +301,8 @@ class ResourceGroupAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = (
-            await self._processors.scaling_group.search_scaling_groups.wait_for_complete(
-                SearchScalingGroupsAction(querier=querier)
-            )
+        action_result = await self._processors.scaling_group.search_scaling_groups.run(
+            SearchScalingGroupsAction(querier=querier)
         )
         return ResourceGroupSearchPayload(
             items=[self._data_to_detail_node(sg) for sg in action_result.scaling_groups],
@@ -409,7 +404,7 @@ class ResourceGroupAdapter(BaseAdapter):
             is_default=input.is_default,
         )
         creator = Creator(spec=creator_spec)
-        action_result = await self._processors.scaling_group.create_scaling_group.wait_for_complete(
+        action_result = await self._processors.scaling_group.create_scaling_group.run(
             CreateScalingGroupAction(creator=creator)
         )
 
@@ -455,8 +450,10 @@ class ResourceGroupAdapter(BaseAdapter):
             metadata=metadata_spec,
         )
         updater = Updater(spec=updater_spec, pk_value=name)
-        action_result = await self._processors.scaling_group.update_scaling_group.wait_for_complete(
-            UpdateScalingGroupAction(updater=updater)
+        action_result = await self._processors.scaling_group.update_scaling_group.run(
+            UpdateScalingGroupAction(
+                resource_group_id=await self._resolve_resource_group_id(name), updater=updater
+            )
         )
 
         return UpdateResourceGroupPayload(
@@ -473,8 +470,11 @@ class ResourceGroupAdapter(BaseAdapter):
             ResourceInfoNode DTO with capacity, used, and free resource metrics.
             Quantities are normalized (trailing zeros removed, no scientific notation).
         """
-        action_result = await self._processors.scaling_group.get_resource_info.wait_for_complete(
-            GetResourceInfoAction(scaling_group=scaling_group)
+        action_result = await self._processors.scaling_group.get_resource_info.run(
+            GetResourceInfoAction(
+                resource_group_id=await self._resolve_resource_group_id(scaling_group),
+                scaling_group=scaling_group,
+            )
         )
         raw = action_result.resource_info
         return ResourceInfoNode(
@@ -506,10 +506,8 @@ class ResourceGroupAdapter(BaseAdapter):
             pagination=NoPagination(),
             conditions=[ScalingGroupConditions.by_name_equals(name_spec)],
         )
-        search_result = (
-            await self._processors.scaling_group.search_scaling_groups.wait_for_complete(
-                SearchScalingGroupsAction(querier=querier)
-            )
+        search_result = await self._processors.scaling_group.search_scaling_groups.run(
+            SearchScalingGroupsAction(querier=querier)
         )
         if not search_result.scaling_groups:
             raise ScalingGroupNotFound(resource_group)
@@ -567,16 +565,15 @@ class ResourceGroupAdapter(BaseAdapter):
                 for entry in input.resource_weights
             ]
 
-        action_result = (
-            await self._processors.scaling_group.update_fair_share_spec.wait_for_complete(
-                UpdateFairShareSpecAction(
-                    resource_group=input.resource_group_name,
-                    half_life_days=input.half_life_days,
-                    lookback_days=input.lookback_days,
-                    decay_unit_days=input.decay_unit_days,
-                    default_weight=input.default_weight,
-                    resource_weights=resource_weights,
-                )
+        action_result = await self._processors.scaling_group.update_fair_share_spec.run(
+            UpdateFairShareSpecAction(
+                resource_group_id=await self._resolve_resource_group_id(input.resource_group_name),
+                resource_group=input.resource_group_name,
+                half_life_days=input.half_life_days,
+                lookback_days=input.lookback_days,
+                decay_unit_days=input.decay_unit_days,
+                default_weight=input.default_weight,
+                resource_weights=resource_weights,
             )
         )
         return UpdateResourceGroupFairShareSpecPayloadNode(
@@ -671,8 +668,11 @@ class ResourceGroupAdapter(BaseAdapter):
         )
         updater = Updater(spec=updater_spec, pk_value=input.resource_group_name)
 
-        action_result = await self._processors.scaling_group.update_scaling_group.wait_for_complete(
-            UpdateScalingGroupAction(updater=updater)
+        action_result = await self._processors.scaling_group.update_scaling_group.run(
+            UpdateScalingGroupAction(
+                resource_group_id=await self._resolve_resource_group_id(input.resource_group_name),
+                updater=updater,
+            )
         )
         return UpdateResourceGroupConfigPayloadNode(
             resource_group=self._data_to_detail_node(action_result.scaling_group),
@@ -691,20 +691,29 @@ class ResourceGroupAdapter(BaseAdapter):
             Pydantic node representing the purged resource group.
         """
         purger = Purger(spec=ScalingGroupPurgerSpec(name=name))
-        action_result = await self._processors.scaling_group.purge_scaling_group.wait_for_complete(
-            PurgeScalingGroupAction(purger=purger)
+        action_result = await self._processors.scaling_group.purge_scaling_group.run(
+            PurgeScalingGroupAction(
+                resource_group_id=await self._resolve_resource_group_id(name), purger=purger
+            )
         )
 
         return self._data_to_detail_node(action_result.data)
 
     # Allow / Disallow operations
 
+    async def _resolve_domain_id(self, domain_name: str) -> DomainID:
+        """Resolve a domain name to its row id at the API boundary."""
+        result = await self._processors.domain.lookup.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
+        return result.data.id
+
     async def _resolve_resource_group_id(self, name: str) -> ResourceGroupID:
         """Resolve a resource group name to its row ID at the API boundary."""
-        result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(name))
+        result = await self._processors.scaling_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(name))
         )
-        return result.resource_group_id
+        return result.data.id
 
     async def _resolve_allowed_resource_group_ids(
         self,
@@ -718,7 +727,7 @@ class ResourceGroupAdapter(BaseAdapter):
         names = [ResourceGroupName(name) for name in {*add, *remove}]
         if not names:
             return [], []
-        result = await self._processors.scaling_group.resolve_resource_group_ids_by_names.wait_for_complete(
+        result = await self._processors.scaling_group.resolve_resource_group_ids_by_names.run(
             ResolveResourceGroupIDsByNamesAction(names=names)
         )
         ids_by_name = result.ids_by_name
@@ -739,13 +748,12 @@ class ResourceGroupAdapter(BaseAdapter):
         add_ids, remove_ids = await self._resolve_allowed_resource_group_ids(
             input.add or [], input.remove or []
         )
-        result = (
-            await self._processors.scaling_group.update_allowed_rgs_for_domain.wait_for_complete(
-                UpdateAllowedResourceGroupsForDomainAction(
-                    domain_name=input.domain_name,
-                    add=add_ids,
-                    remove=remove_ids,
-                )
+        result = await self._processors.scaling_group.update_allowed_rgs_for_domain.run(
+            UpdateAllowedResourceGroupsForDomainAction(
+                domain_id=await self._resolve_domain_id(input.domain_name),
+                domain_name=input.domain_name,
+                add=add_ids,
+                remove=remove_ids,
             )
         )
         return AllowedResourceGroupsPayload(items=result.allowed_resource_groups)
@@ -758,13 +766,11 @@ class ResourceGroupAdapter(BaseAdapter):
         add_ids, remove_ids = await self._resolve_allowed_resource_group_ids(
             input.add or [], input.remove or []
         )
-        result = (
-            await self._processors.scaling_group.update_allowed_rgs_for_project.wait_for_complete(
-                UpdateAllowedResourceGroupsForProjectAction(
-                    project_id=input.project_id,
-                    add=add_ids,
-                    remove=remove_ids,
-                )
+        result = await self._processors.scaling_group.update_allowed_rgs_for_project.run(
+            UpdateAllowedResourceGroupsForProjectAction(
+                project_id=ProjectID(input.project_id),
+                add=add_ids,
+                remove=remove_ids,
             )
         )
         return AllowedResourceGroupsPayload(items=result.allowed_resource_groups)
@@ -775,13 +781,11 @@ class ResourceGroupAdapter(BaseAdapter):
     ) -> AllowedDomainsPayload:
         """Atomically add/remove allowed domains for a resource group."""
         resource_group_id = await self._resolve_resource_group_id(input.resource_group_name)
-        result = (
-            await self._processors.scaling_group.update_allowed_domains_for_rg.wait_for_complete(
-                UpdateAllowedDomainsForResourceGroupAction(
-                    resource_group_id=resource_group_id,
-                    add=input.add or [],
-                    remove=input.remove or [],
-                )
+        result = await self._processors.scaling_group.update_allowed_domains_for_rg.run(
+            UpdateAllowedDomainsForResourceGroupAction(
+                resource_group_id=resource_group_id,
+                add=input.add or [],
+                remove=input.remove or [],
             )
         )
         return AllowedDomainsPayload(items=result.allowed_domains)
@@ -792,13 +796,11 @@ class ResourceGroupAdapter(BaseAdapter):
     ) -> AllowedProjectsPayload:
         """Atomically add/remove allowed projects for a resource group."""
         resource_group_id = await self._resolve_resource_group_id(input.resource_group_name)
-        result = (
-            await self._processors.scaling_group.update_allowed_projects_for_rg.wait_for_complete(
-                UpdateAllowedProjectsForResourceGroupAction(
-                    resource_group_id=resource_group_id,
-                    add=input.add or [],
-                    remove=input.remove or [],
-                )
+        result = await self._processors.scaling_group.update_allowed_projects_for_rg.run(
+            UpdateAllowedProjectsForResourceGroupAction(
+                resource_group_id=resource_group_id,
+                add=input.add or [],
+                remove=input.remove or [],
             )
         )
         return AllowedProjectsPayload(items=result.allowed_projects)
@@ -808,8 +810,10 @@ class ResourceGroupAdapter(BaseAdapter):
         domain_name: str,
     ) -> AllowedResourceGroupsPayload:
         """Get allowed resource groups for a domain."""
-        result = await self._processors.scaling_group.get_allowed_rgs_for_domain.wait_for_complete(
-            GetAllowedResourceGroupsForDomainAction(domain_name=domain_name)
+        result = await self._processors.scaling_group.get_allowed_rgs_for_domain.run(
+            GetAllowedResourceGroupsForDomainAction(
+                domain_id=await self._resolve_domain_id(domain_name), domain_name=domain_name
+            )
         )
         return AllowedResourceGroupsPayload(items=result.items)
 
@@ -818,8 +822,8 @@ class ResourceGroupAdapter(BaseAdapter):
         project_id: UUID,
     ) -> AllowedResourceGroupsPayload:
         """Get allowed resource groups for a project."""
-        result = await self._processors.scaling_group.get_allowed_rgs_for_project.wait_for_complete(
-            GetAllowedResourceGroupsForProjectAction(project_id=project_id)
+        result = await self._processors.scaling_group.get_allowed_rgs_for_project.run(
+            GetAllowedResourceGroupsForProjectAction(project_id=ProjectID(project_id))
         )
         return AllowedResourceGroupsPayload(items=result.items)
 
@@ -829,7 +833,7 @@ class ResourceGroupAdapter(BaseAdapter):
     ) -> AllowedDomainsPayload:
         """Get allowed domains for a resource group."""
         resource_group_id = await self._resolve_resource_group_id(resource_group_name)
-        result = await self._processors.scaling_group.get_allowed_domains_for_rg.wait_for_complete(
+        result = await self._processors.scaling_group.get_allowed_domains_for_rg.run(
             GetAllowedDomainsForResourceGroupAction(resource_group_id=resource_group_id)
         )
         return AllowedDomainsPayload(items=result.items)
@@ -840,7 +844,7 @@ class ResourceGroupAdapter(BaseAdapter):
     ) -> AllowedProjectsPayload:
         """Get allowed projects for a resource group."""
         resource_group_id = await self._resolve_resource_group_id(resource_group_name)
-        result = await self._processors.scaling_group.get_allowed_projects_for_rg.wait_for_complete(
+        result = await self._processors.scaling_group.get_allowed_projects_for_rg.run(
             GetAllowedProjectsForResourceGroupAction(resource_group_id=resource_group_id)
         )
         return AllowedProjectsPayload(items=result.items)
@@ -900,8 +904,9 @@ class ResourceGroupAdapter(BaseAdapter):
                 h.name() for h in self._deployment_coordinator.registered_handlers()
             ),
         )
-        action_result = await self._processors.scaling_group.replace_default_deployment_options.wait_for_complete(
+        action_result = await self._processors.scaling_group.replace_default_deployment_options.run(
             ReplaceDefaultDeploymentOptionsAction(
+                resource_group_id=await self._resolve_resource_group_id(name),
                 resource_group=name,
                 options=options,
             )
@@ -932,12 +937,11 @@ class ResourceGroupAdapter(BaseAdapter):
                 h.name() for h in self._schedule_coordinator.registered_lifecycle_handlers()
             ),
         )
-        action_result = (
-            await self._processors.scaling_group.replace_default_session_options.wait_for_complete(
-                ReplaceDefaultSessionOptionsAction(
-                    resource_group=name,
-                    options=options,
-                )
+        action_result = await self._processors.scaling_group.replace_default_session_options.run(
+            ReplaceDefaultSessionOptionsAction(
+                resource_group_id=await self._resolve_resource_group_id(name),
+                resource_group=name,
+                options=options,
             )
         )
         return ReplaceResourceGroupDefaultSessionOptionsPayload(

@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
@@ -19,20 +18,17 @@ class PurgeScalingGroupAction(ScalingGroupAction):
 
     @override
     @classmethod
+    def action_name(cls) -> str:
+        return "purge_resource_group"
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.PURGE
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.purger.spec.pk_value())
-
 
 @dataclass(frozen=True)
-class PurgeScalingGroupActionResult(BaseActionResult):
+class PurgeScalingGroupActionResult:
     """Result of purging a scaling group."""
 
     data: ScalingGroupData
-
-    @override
-    def entity_id(self) -> str | None:
-        return self.data.name

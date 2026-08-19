@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 
 from .domain_base import ScalingGroupDomainAction
@@ -17,20 +16,17 @@ class GetAllowedResourceGroupsForDomainAction(ScalingGroupDomainAction):
 
     @override
     @classmethod
+    def action_name(cls) -> str:
+        return "get_allowed_resource_groups_for_domain"
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
-    @override
-    def entity_id(self) -> str | None:
-        return self.domain_name
-
 
 @dataclass(frozen=True)
-class GetAllowedResourceGroupsForDomainActionResult(BaseActionResult):
+class GetAllowedResourceGroupsForDomainActionResult:
     """Result containing the allowed resource groups for the domain."""
 
     items: list[str]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

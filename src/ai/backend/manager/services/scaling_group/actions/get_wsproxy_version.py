@@ -3,14 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 
-from .base import ScalingGroupAction
+from .base import ScalingGroupGlobalAction
 
 
 @dataclass(frozen=True)
-class GetWsproxyVersionAction(ScalingGroupAction):
+class GetWsproxyVersionAction(ScalingGroupGlobalAction):
     """Action to get wsproxy version for a scaling group."""
 
     scaling_group_name: str
@@ -20,20 +19,17 @@ class GetWsproxyVersionAction(ScalingGroupAction):
 
     @override
     @classmethod
+    def action_name(cls) -> str:
+        return "global_get_wsproxy_version"
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
-    @override
-    def entity_id(self) -> str | None:
-        return self.scaling_group_name
-
 
 @dataclass(frozen=True)
-class GetWsproxyVersionActionResult(BaseActionResult):
+class GetWsproxyVersionActionResult:
     """Result of getting wsproxy version."""
 
     wsproxy_version: str
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

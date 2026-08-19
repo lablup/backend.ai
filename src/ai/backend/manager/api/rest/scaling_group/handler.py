@@ -54,7 +54,7 @@ class ScalingGroupHandler:
             access_key=ctx.access_key,
             is_admin=ctx.is_admin,
         )
-        result = await self._scaling_group.list_allowed_sgroups.wait_for_complete(action)
+        result = await self._scaling_group.list_allowed_sgroups.run(action)
         resp = ListScalingGroupsResponse(
             scaling_groups=[ScalingGroupItem(name=name) for name in result.scaling_group_names],
         )
@@ -82,6 +82,6 @@ class ScalingGroupHandler:
             group=group_id_or_name or "",
             access_key=ctx.access_key,
         )
-        result = await self._scaling_group.get_wsproxy_version.wait_for_complete(action)
+        result = await self._scaling_group.get_wsproxy_version.run(action)
         resp = WsproxyVersionResponse(wsproxy_version=result.wsproxy_version)
         return APIResponse.build(HTTPStatus.OK, resp)

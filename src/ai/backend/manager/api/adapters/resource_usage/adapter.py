@@ -99,9 +99,7 @@ from ai.backend.manager.services.resource_usage.actions.search_project_usage_buc
 from ai.backend.manager.services.resource_usage.actions.search_user_usage_buckets import (
     SearchUserUsageBucketsAction,
 )
-from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id_by_name import (
-    ResolveResourceGroupIDByNameAction,
-)
+from ai.backend.manager.services.scaling_group.actions.lookup import LookupResourceGroupAction
 
 DEFAULT_PAGINATION_LIMIT = 20
 
@@ -1089,7 +1087,7 @@ class ResourceUsageAdapter(BaseAdapter):
 
         The request names the group; a scope has to name its id.
         """
-        result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(name))
+        result = await self._processors.scaling_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(name))
         )
-        return result.resource_group_id
+        return result.data.id

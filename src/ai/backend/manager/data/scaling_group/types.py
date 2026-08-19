@@ -6,11 +6,12 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from pydantic import ConfigDict, Field, field_serializer, field_validator
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     BackendAISchema,
@@ -173,7 +174,7 @@ class FairShareScalingGroupSpec(BackendAISchema):
 
 
 @dataclass
-class ScalingGroupData:
+class ScalingGroupData(EntityData):
     id: ResourceGroupID
     name: str
     status: ScalingGroupStatus
@@ -184,6 +185,10 @@ class ScalingGroupData:
     fair_share_spec: FairShareScalingGroupSpec
     default_deployment_options: DeploymentOptions
     default_session_options: DefaultSessionOptions
+
+    @override
+    def entity_id(self) -> ResourceGroupID:
+        return self.id
 
 
 @dataclass
