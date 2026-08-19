@@ -141,9 +141,9 @@ class UpdateUserInput(BaseRequestModel):
         default=None,
         description="New domain assignment.",
     )
-    group_ids: list[UUID] | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New project (group) assignments. Replaces existing assignments. Set to null to clear.",
+    group_ids: list[UUID] | None = Field(
+        default=None,
+        description="New project (group) assignments. Replaces existing assignments. Leave null to keep existing.",
     )
     allowed_client_ip: list[str] | Sentinel | None = Field(
         default=SENTINEL,

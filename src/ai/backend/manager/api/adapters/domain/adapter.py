@@ -212,9 +212,7 @@ class DomainAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
             allowed_docker_registries=(
-                OptionalState.nop()
-                if isinstance(input.allowed_docker_registries, Sentinel)
-                else OptionalState.update(input.allowed_docker_registries)
+                OptionalState.update(input.allowed_docker_registries)
                 if input.allowed_docker_registries is not None
                 else OptionalState.nop()
             ),
