@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the tag
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           lfs: false
           # The pull request's checks only run when its branch is pushed by
