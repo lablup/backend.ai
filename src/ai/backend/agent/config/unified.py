@@ -75,6 +75,11 @@ class ContainerSandboxType(enum.StrEnum):
     JAIL = "jail"
 
 
+class ContainerLogDriver(enum.StrEnum):
+    LOCAL = "local"
+    JSON_FILE = "json-file"
+
+
 class ScratchType(enum.StrEnum):
     HOSTDIR = "hostdir"
     HOSTFILE = "hostfile"
@@ -1935,6 +1940,23 @@ class ResourceConfig(BaseConfigSchema):
 
 
 class ContainerLogsConfig(BaseConfigSchema):
+    driver: Annotated[
+        ContainerLogDriver,
+        Field(
+            default=ContainerLogDriver.LOCAL,
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Log driver used for kernel containers. "
+                "'local' is Docker-only and stores logs in an efficient binary format. "
+                "'json-file' is accepted by both Docker and Podman, but Podman keeps a "
+                "single size-capped log per container, so only 'max-length' takes effect "
+                "there while file count and compression have no equivalent."
+            ),
+            added_version="26.4.10",
+            example=ConfigExample(local="local", prod="local"),
+        ),
+    ]
     max_length: Annotated[
         BinarySizeField,
         Field(
