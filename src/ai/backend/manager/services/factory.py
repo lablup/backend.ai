@@ -437,15 +437,11 @@ def create_processors(
         container_registry=ContainerRegistryProcessors(
             registry.group(), services.container_registry
         ),
-        vfolder=VFolderProcessors(services.vfolder, action_monitors, validators),
-        vfolder_admin=VFolderAdminProcessors(services.vfolder_admin, action_monitors),
-        vfolder_file=VFolderFileProcessors(services.vfolder_file, action_monitors, validators),
-        vfolder_invite=VFolderInviteProcessors(
-            services.vfolder_invite, action_monitors, validators
-        ),
-        vfolder_sharing=VFolderSharingProcessors(
-            services.vfolder_sharing, action_monitors, validators
-        ),
+        vfolder=VFolderProcessors(registry.group(), services.vfolder),
+        vfolder_admin=VFolderAdminProcessors(registry.group(), services.vfolder_admin),
+        vfolder_file=VFolderFileProcessors(registry.group(), services.vfolder_file),
+        vfolder_invite=VFolderInviteProcessors(registry.group(), services.vfolder_invite),
+        vfolder_sharing=VFolderSharingProcessors(registry.group(), services.vfolder_sharing),
         session=SessionProcessors(registry.group(), services.session),
         keypair_resource_policy=KeypairResourcePolicyProcessors(registry.group()),
         manager_admin=ManagerAdminProcessors(registry.group(), services.manager_admin),

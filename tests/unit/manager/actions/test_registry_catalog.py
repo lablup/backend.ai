@@ -91,6 +91,11 @@ from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
 )
+from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
+from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
+from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
+from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
+from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 
 _V2_ACTION_BASES: tuple[type[Any], ...] = (
@@ -181,6 +186,11 @@ def test_every_defined_v2_action_is_wired() -> None:
     SchedulingHistoryProcessors(registry.group(), MagicMock())
     SessionProcessors(registry.group(), MagicMock())
     DeploymentProcessors(registry.group(), MagicMock())
+    VFolderProcessors(registry.group(), MagicMock())
+    VFolderAdminProcessors(registry.group(), MagicMock())
+    VFolderFileProcessors(registry.group(), MagicMock())
+    VFolderInviteProcessors(registry.group(), MagicMock())
+    VFolderSharingProcessors(registry.group(), MagicMock())
 
     wired = sorted(cls.action_name() for cls in registry.wired_actions())
     defined = sorted(cls.action_name() for cls in _concrete_v2_action_classes())

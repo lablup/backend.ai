@@ -123,8 +123,13 @@ class TestVFolderServicePurge:
         )
 
     @pytest.fixture
-    def sample_action(self, sample_purger: RBACEntityPurger[VFolderRow]) -> PurgeVFolderAction:
-        return PurgeVFolderAction(purger=sample_purger)
+    def sample_action(
+        self, sample_vfolder_uuid: uuid.UUID, sample_purger: RBACEntityPurger[VFolderRow]
+    ) -> PurgeVFolderAction:
+        return PurgeVFolderAction(
+            vfolder_uuid=VFolderUUID(sample_vfolder_uuid),
+            purger=sample_purger,
+        )
 
     async def test_purge_vfolder_success(
         self,

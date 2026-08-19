@@ -7,6 +7,7 @@ from datetime import datetime
 from functools import lru_cache
 from typing import Any, override
 
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.field import (
@@ -174,7 +175,7 @@ class UserWithVFolderHostPermissions:
 
 
 @dataclass
-class VFolderData:
+class VFolderData(EntityData):
     """
     Complete VFolder data representing all VFolder properties.
     Used by repository layer for returning full VFolder information.
@@ -202,6 +203,10 @@ class VFolderData:
     group: uuid.UUID | None
     cloneable: bool
     status: VFolderOperationStatus
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.id
 
 
 @dataclass

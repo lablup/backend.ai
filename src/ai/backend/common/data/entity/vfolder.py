@@ -1,11 +1,22 @@
-from typing import NewType
-from uuid import UUID
+"""Entity type and id of the vfolders table."""
 
-__all__ = ("VFolderUUID",)
+from typing import override
+
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+
+__all__ = ("VFOLDER_ENTITY_TYPE", "VFolderUUID")
+
+VFOLDER_ENTITY_TYPE = EntityType("vfolder")
 
 
-# Named ``VFolderUUID`` (not ``VFolderID``) to avoid clashing with the
-# existing composite ``VFolderID`` dataclass in ``common/types.py`` that
-# pairs a ``quota_scope_id`` with a ``folder_id``. This alias represents
-# the standalone UUID form used as the primary key of the vfolder row.
-VFolderUUID = NewType("VFolderUUID", UUID)
+class VFolderUUID(EntityIdentifier):
+    """A vfolder's entity id.
+
+    Named ``VFolderUUID`` because ``common/types.py`` already has a composite
+    ``VFolderID`` pairing a quota scope with a folder id.
+    """
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return VFOLDER_ENTITY_TYPE

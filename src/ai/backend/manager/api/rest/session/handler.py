@@ -184,8 +184,8 @@ from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
 )
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.actions.base import GetTaskLogsAction
-from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
-    ResolveIdsByNamesAction,
+from ai.backend.manager.services.vfolder.actions.lookup import (
+    LookupVFolderAction,
 )
 
 if TYPE_CHECKING:
@@ -540,12 +540,15 @@ class SessionHandler:
         if not names_to_resolve:
             return {}
 
-        result = await self._vfolder.resolve_vfolder_ids_by_names.wait_for_complete(
-            ResolveIdsByNamesAction(vfolder_names=names_to_resolve)
-        )
+        resolved = {
+            name: (
+                await self._vfolder.lookup.run(LookupVFolderAction(vfolder_name=name))
+            ).entity_id()
+            for name in names_to_resolve
+        }
         return {
             name: LegacyMountResolution(vfid=vfid, subpath=subpath_by_name.get(name))
-            for name, vfid in result.name_to_id.items()
+            for name, vfid in resolved.items()
         }
 
     # ------------------------------------------------------------------
@@ -1692,7 +1695,7 @@ class SessionHandler:
         user_role = request["user"]["role"]
         user_uuid = request["user"]["uuid"]
 
-        result = await self._vfolder.get_task_logs.wait_for_complete(
+        result = await self._vfolder.get_task_logs.run(
             GetTaskLogsAction(
                 user_id=user_uuid,
                 domain_name=domain_name,

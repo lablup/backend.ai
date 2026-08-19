@@ -409,7 +409,7 @@ class VFolderFileService:
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_id, user.id, user.domain_name
+            action.vfolder_uuid, user.id, user.domain_name
         )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
@@ -448,7 +448,7 @@ class VFolderFileService:
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_id, user.id, user.domain_name
+            action.vfolder_uuid, user.id, user.domain_name
         )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
@@ -474,7 +474,7 @@ class VFolderFileService:
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_id, user.id, user.domain_name
+            action.vfolder_uuid, user.id, user.domain_name
         )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
@@ -499,7 +499,7 @@ class VFolderFileService:
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_id, user.id, user.domain_name
+            action.vfolder_uuid, user.id, user.domain_name
         )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
@@ -527,7 +527,7 @@ class VFolderFileService:
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_id, user.id, user.domain_name
+            action.vfolder_uuid, user.id, user.domain_name
         )
 
         # Host permission check — resolved from user_id

@@ -1,7 +1,10 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.services.vfolder.actions.sharing import (
+    GlobalListSharedVFoldersAction,
+    GlobalListSharedVFoldersActionResult,
     ListSharedVFoldersAction,
     ListSharedVFoldersActionResult,
     ShareVFolderAction,
@@ -15,20 +18,27 @@ from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingS
 
 
 class VFolderSharingProcessors:
-    share: ActionProcessor[ShareVFolderAction, ShareVFolderActionResult]
-    unshare: ActionProcessor[UnshareVFolderAction, UnshareVFolderActionResult]
-    list_shared: ActionProcessor[ListSharedVFoldersAction, ListSharedVFoldersActionResult]
-    update_sharing_status: ActionProcessor[
+    share: SingleEntityActionProcessor[ShareVFolderAction, ShareVFolderActionResult]
+    unshare: SingleEntityActionProcessor[UnshareVFolderAction, UnshareVFolderActionResult]
+    list_shared: SingleEntityActionProcessor[
+        ListSharedVFoldersAction, ListSharedVFoldersActionResult
+    ]
+    global_list_shared: GlobalActionProcessor[
+        GlobalListSharedVFoldersAction, GlobalListSharedVFoldersActionResult
+    ]
+    update_sharing_status: SingleEntityActionProcessor[
         UpdateVFolderSharingStatusAction, UpdateVFolderSharingStatusActionResult
     ]
 
-    def __init__(
-        self,
-        service: VFolderSharingService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.share = ActionProcessor(service.share, action_monitors)
-        self.unshare = ActionProcessor(service.unshare, action_monitors)
-        self.list_shared = ActionProcessor(service.list_shared_vfolders, action_monitors)
-        self.update_sharing_status = ActionProcessor(service.update_sharing_status, action_monitors)
+    def __init__(self, group: ProcessorGroup[VFolderData], service: VFolderSharingService) -> None:
+        self.share = group.single_entity(ShareVFolderAction, service.share)
+        self.unshare = group.single_entity(UnshareVFolderAction, service.unshare)
+        self.list_shared = group.single_entity(
+            ListSharedVFoldersAction, service.list_shared_vfolders
+        )
+        self.global_list_shared = group.global_scope(
+            GlobalListSharedVFoldersAction, service.global_list_shared_vfolders
+        )
+        self.update_sharing_status = group.single_entity(
+            UpdateVFolderSharingStatusAction, service.update_sharing_status
+        )

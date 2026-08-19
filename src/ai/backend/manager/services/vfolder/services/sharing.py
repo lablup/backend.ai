@@ -4,6 +4,8 @@ from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.sharing import (
+    GlobalListSharedVFoldersAction,
+    GlobalListSharedVFoldersActionResult,
     ListSharedVFoldersAction,
     ListSharedVFoldersActionResult,
     ShareVFolderAction,
@@ -87,7 +89,9 @@ class VFolderSharingService:
     async def list_shared_vfolders(
         self, action: ListSharedVFoldersAction
     ) -> ListSharedVFoldersActionResult:
-        raw_list = await self._vfolder_repository.list_shared_vfolder_permissions(action.vfolder_id)
+        raw_list = await self._vfolder_repository.list_shared_vfolder_permissions(
+            action.vfolder_uuid
+        )
         shared_info = []
         for row in raw_list:
             owner = row["group"] if row["group"] else row["vfolder_user"]
@@ -106,11 +110,33 @@ class VFolderSharingService:
             )
         return ListSharedVFoldersActionResult(shared=shared_info)
 
+    async def global_list_shared_vfolders(
+        self, action: GlobalListSharedVFoldersAction
+    ) -> GlobalListSharedVFoldersActionResult:
+        raw_list = await self._vfolder_repository.list_shared_vfolder_permissions(None)
+        shared_info = []
+        for row in raw_list:
+            owner = row["group"] if row["group"] else row["vfolder_user"]
+            folder_type = "project" if row["group"] else "user"
+            shared_info.append(
+                VFolderSharedInfo(
+                    vfolder_id=row["vfolder_id"],
+                    vfolder_name=row["name"],
+                    status=row["status"],
+                    owner=str(owner),
+                    folder_type=folder_type,
+                    shared_user_uuid=row["user"],
+                    shared_user_email=row["email"],
+                    permission=row["permission"],
+                )
+            )
+        return GlobalListSharedVFoldersActionResult(shared=shared_info)
+
     async def update_sharing_status(
         self, action: UpdateVFolderSharingStatusAction
     ) -> UpdateVFolderSharingStatusActionResult:
         await self._vfolder_repository.update_vfolder_sharing_status(
-            action.vfolder_id,
+            action.vfolder_uuid,
             action.to_delete,
             action.to_update,
         )
