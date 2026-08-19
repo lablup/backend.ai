@@ -44,11 +44,13 @@ from ai.backend.agent.types import Container, MountInfo
 from ai.backend.agent.utils import read_sysfs
 from ai.backend.agent.vendor.linux import libnuma
 from ai.backend.common.asyncio import current_loop
+from ai.backend.common.cgroup import CgroupController, CgroupResolutionFailed
 from ai.backend.common.json import dump_json
 from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
     AcceleratorMetadata,
     ClusterInfo,
+    ContainerId,
     DeviceId,
     DeviceModelInfo,
     DeviceName,
@@ -278,9 +280,11 @@ class CPUPlugin(AbstractComputePlugin):
             return []
 
         async def sysfs_impl(container_id: str) -> float | None:
-            cpu_path = ctx.agent.get_cgroup_path("cpuacct", container_id)
             version = ctx.agent.docker_info["CgroupVersion"]  # type: ignore[attr-defined]
             try:
+                cpu_path = await ctx.agent.get_cgroup_path(
+                    CgroupController.CPUACCT, ContainerId(container_id)
+                )
                 match version:
                     case "1":
                         cpu_used = read_sysfs(cpu_path / "cpuacct.usage", int) / 1e6
@@ -295,7 +299,7 @@ class CPUPlugin(AbstractComputePlugin):
                         cpu_used = int(cpu_stats["usage_usec"]) / 1e3
                     case _:
                         return None
-            except OSError as e:
+            except (OSError, CgroupResolutionFailed) as e:
                 log.warning(
                     "CPUPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
                     container_id[:7],
@@ -660,11 +664,15 @@ class MemoryPlugin(AbstractComputePlugin):
         async def sysfs_impl(
             container_id: str,
         ) -> ContainerStatResult | None:
-            mem_path = ctx.agent.get_cgroup_path("memory", container_id)
-            io_path = ctx.agent.get_cgroup_path("blkio", container_id)
             version = ctx.agent.get_cgroup_version()
 
             try:
+                mem_path = await ctx.agent.get_cgroup_path(
+                    CgroupController.MEMORY, ContainerId(container_id)
+                )
+                io_path = await ctx.agent.get_cgroup_path(
+                    CgroupController.BLKIO, ContainerId(container_id)
+                )
                 io_read_bytes = 0
                 io_write_bytes = 0
                 match version:
@@ -730,7 +738,7 @@ class MemoryPlugin(AbstractComputePlugin):
                                     io_write_bytes += int(value)
                     case _:
                         return None
-            except OSError as e:
+            except (OSError, CgroupResolutionFailed) as e:
                 log.warning(
                     "MemoryPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
                     container_id[:7],
