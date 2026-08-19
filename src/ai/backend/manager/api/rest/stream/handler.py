@@ -691,7 +691,7 @@ async def stream_conn_tracker_gc(
             active_session_ids = list(app_ctx.active_connection_counts.keys())
             if active_session_ids:
                 try:
-                    await stream_processors.gc_stale_connections.wait_for_complete(
+                    await stream_processors.gc_stale_connections.run(
                         GCStaleConnectionsAction(active_session_ids=active_session_ids),
                     )
                 except Exception:

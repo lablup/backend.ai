@@ -4,7 +4,6 @@ from typing import override
 
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 
@@ -37,11 +36,7 @@ class GetUploadPresignedURLAction(BaseSingleEntityAction):
 
 
 @dataclass
-class GetUploadPresignedURLActionResult(BaseActionResult):
+class GetUploadPresignedURLActionResult:
     storage_id: uuid.UUID
     presigned_url: str
     fields: dict[str, str]
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.storage_id)

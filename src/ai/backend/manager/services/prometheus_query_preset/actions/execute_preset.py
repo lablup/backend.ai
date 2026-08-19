@@ -5,7 +5,6 @@ from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQuer
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
@@ -36,9 +35,5 @@ class ExecutePresetAction(BaseSingleEntityAction):
 
 
 @dataclass
-class ExecutePresetActionResult(BaseActionResult):
+class ExecutePresetActionResult:
     response: PrometheusResponse
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

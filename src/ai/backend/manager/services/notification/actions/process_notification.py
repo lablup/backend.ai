@@ -6,7 +6,6 @@ from uuid import UUID
 from ai.backend.common.data.entity.notification import NOTIFICATION_RULE_ENTITY_TYPE
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
@@ -45,14 +44,10 @@ class ProcessNotificationAction(BaseGlobalAction):
 
 
 @dataclass
-class ProcessNotificationActionResult(BaseActionResult):
+class ProcessNotificationActionResult:
     """Result of processing a notification."""
 
     rule_type: NotificationRuleType
     rules_matched: int
     successes: list[ProcessedRuleSuccess]
     errors: list[BaseException]
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.rule_type)

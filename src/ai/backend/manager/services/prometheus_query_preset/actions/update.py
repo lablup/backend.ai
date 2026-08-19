@@ -3,7 +3,6 @@ from typing import override
 
 from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
@@ -34,9 +33,5 @@ class UpdatePresetAction(BaseSingleEntityAction):
 
 
 @dataclass
-class UpdatePresetActionResult(BaseActionResult):
+class UpdatePresetActionResult:
     preset: PrometheusQueryPresetData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.preset.id)

@@ -1,9 +1,8 @@
 from collections.abc import Awaitable, Callable
 
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,
 )
@@ -55,7 +54,9 @@ class StreamProcessors:
     untrack_connection: SingleEntityActionProcessor[
         UntrackConnectionAction, UntrackConnectionActionResult
     ]
-    gc_stale_connections: ActionProcessor[GCStaleConnectionsAction, GCStaleConnectionsActionResult]
+    gc_stale_connections: GlobalActionProcessor[
+        GCStaleConnectionsAction, GCStaleConnectionsActionResult
+    ]
     execute_in_stream: SingleEntityActionProcessor[
         ExecuteInStreamAction, ExecuteInStreamActionResult
     ]
@@ -73,7 +74,6 @@ class StreamProcessors:
         self,
         group: ProcessorGroup[SessionData],
         service: StreamService,
-        action_monitors: list[ActionMonitor],
     ) -> None:
         self._service = service
         self.get_streaming_session = group.single_entity(
@@ -83,7 +83,9 @@ class StreamProcessors:
         self.untrack_connection = group.single_entity(
             UntrackConnectionAction, service.untrack_connection
         )
-        self.gc_stale_connections = ActionProcessor(service.gc_stale_connections, action_monitors)
+        self.gc_stale_connections = group.global_scope(
+            GCStaleConnectionsAction, service.gc_stale_connections
+        )
         self.execute_in_stream = group.single_entity(
             ExecuteInStreamAction, service.execute_in_stream
         )

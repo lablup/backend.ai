@@ -3,7 +3,6 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
@@ -36,9 +35,5 @@ class SearchQuotaScopesAction(BaseGlobalAction):
 
 
 @dataclass
-class SearchQuotaScopesActionResult(BaseActionResult):
+class SearchQuotaScopesActionResult:
     quota_scopes: list[QuotaScopeInfo]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
@@ -35,9 +34,5 @@ class CreateRuntimeVariantPresetAction(RuntimeVariantPresetGlobalAction):
 
 
 @dataclass
-class CreateRuntimeVariantPresetActionResult(BaseActionResult):
+class CreateRuntimeVariantPresetActionResult:
     preset: RuntimeVariantPresetData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.preset.id)

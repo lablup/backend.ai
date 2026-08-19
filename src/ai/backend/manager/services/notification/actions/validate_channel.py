@@ -5,7 +5,6 @@ from typing import override
 
 from ai.backend.common.data.entity.notification import NotificationChannelID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 
@@ -33,9 +32,5 @@ class ValidateChannelAction(BaseSingleEntityAction):
 
 
 @dataclass
-class ValidateChannelActionResult(BaseActionResult):
+class ValidateChannelActionResult:
     """Result of validating a notification channel."""
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

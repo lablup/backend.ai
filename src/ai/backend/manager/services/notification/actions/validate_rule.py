@@ -6,7 +6,6 @@ from typing import Any, override
 
 from ai.backend.common.data.entity.notification import NotificationRuleID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 
@@ -34,11 +33,7 @@ class ValidateRuleAction(BaseSingleEntityAction):
 
 
 @dataclass
-class ValidateRuleActionResult(BaseActionResult):
+class ValidateRuleActionResult:
     """Result of validating a notification rule."""
 
     message: str
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

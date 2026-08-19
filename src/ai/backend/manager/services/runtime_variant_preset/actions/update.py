@@ -5,7 +5,6 @@ from typing import override
 
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
@@ -40,9 +39,5 @@ class UpdateRuntimeVariantPresetAction(BaseSingleEntityAction):
 
 
 @dataclass
-class UpdateRuntimeVariantPresetActionResult(BaseActionResult):
+class UpdateRuntimeVariantPresetActionResult:
     preset: RuntimeVariantPresetData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.preset.id)
