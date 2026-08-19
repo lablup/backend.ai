@@ -26,15 +26,6 @@ class DummyEvent(AbstractAnycastEvent):
     value: int = 0
     blob: Any = None
 
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return (self.value,)
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> DummyEvent:
-        return cls(value=value[0])
-
     @classmethod
     @override
     def event_domain(cls) -> EventDomain:

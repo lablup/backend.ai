@@ -11,11 +11,11 @@ from ai.backend.common.message_queue.types import MessageName
 
 
 def _anycast_payload() -> AnycastMessagePayload:
-    return AnycastMessagePayload(name=MessageName("test-event"), source="i-test", body=b"body")
+    return AnycastMessagePayload(name=MessageName("test-event"), source="i-test", payload="{}")
 
 
 def _broadcast_payload() -> BroadcastMessagePayload:
-    return BroadcastMessagePayload(name=MessageName("test-event"), source="i-test", body=b"body")
+    return BroadcastMessagePayload(name=MessageName("test-event"), source="i-test", payload="{}")
 
 
 async def test_valkey_stream_anycast(test_valkey_stream: ValkeyStreamClient) -> None:

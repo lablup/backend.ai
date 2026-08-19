@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Self, override
+from typing import override
 
 from pydantic import Field
 
@@ -39,25 +39,6 @@ class BgtaskUpdatedEvent(BaseBgtaskEvent):
     total_progress: float
     message: str | None = None
 
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return (
-            str(self.task_id),
-            self.current_progress,
-            self.total_progress,
-            self.message,
-        )
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(
-            task_id=uuid.UUID(value[0]),
-            current_progress=value[1],
-            total_progress=value[2],
-            message=value[3],
-        )
-
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -83,21 +64,6 @@ class BaseBgtaskDoneEvent(BaseBgtaskEvent):
     """
 
     message: str | None = None
-
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return (
-            str(self.task_id),
-            self.message,
-        )
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(
-            task_id=uuid.UUID(value[0]),
-            message=value[1],
-        )
 
 
 class BgtaskDoneEvent(BaseBgtaskDoneEvent):
@@ -160,23 +126,6 @@ class BgtaskFailedEvent(BaseBgtaskDoneEvent):
 
 class BgtaskPartialSuccessEvent(BaseBgtaskDoneEvent):
     errors: list[str] = Field(default_factory=list)
-
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return (
-            str(self.task_id),
-            self.message,
-            self.errors,
-        )
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(
-            task_id=uuid.UUID(value[0]),
-            message=value[1],
-            errors=value[2],
-        )
 
     @classmethod
     @override

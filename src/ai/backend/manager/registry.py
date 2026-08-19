@@ -12,7 +12,6 @@ from collections.abc import (
     Sequence,
 )
 from datetime import datetime, timedelta
-from decimal import Decimal
 from typing import (
     Any,
     cast,
@@ -80,11 +79,9 @@ from ai.backend.common.types import (
     AbuseReport,
     AccessKey,
     AgentId,
-    BinarySize,
     ClusterMode,
     ClusterSSHKeyPair,
     CommitStatus,
-    DeviceId,
     HardwareMetadata,
     ImageAlias,
     ImageRegistry,
@@ -97,7 +94,6 @@ from ai.backend.common.types import (
     SessionEnqueueingConfig,
     SessionId,
     SessionTypes,
-    SlotName,
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
@@ -1250,29 +1246,6 @@ class AgentRegistry:
             network=network,
             startup_command=startup_command,
         )
-
-    def convert_resource_spec_to_resource_slot(
-        self,
-        allocations: Mapping[str, Mapping[SlotName, Mapping[DeviceId, str]]],
-    ) -> ResourceSlot:
-        """
-        Convert per-device resource spec allocations (agent-side format)
-        back into a resource slot (manager-side format).
-        """
-        slots = ResourceSlot()
-        for alloc_map in allocations.values():
-            for slot_name, allocation_by_device in alloc_map.items():
-                total_allocs: list[Decimal] = []
-                for allocation in allocation_by_device.values():
-                    if (
-                        isinstance(allocation, (BinarySize, str))
-                        and BinarySize.suffix_map.get(allocation[-1].lower()) is not None
-                    ):
-                        total_allocs.append(Decimal(BinarySize.from_str(allocation)))
-                    else:  # maybe Decimal("Infinity"), etc.
-                        total_allocs.append(Decimal(allocation))
-                slots[slot_name] = str(sum(total_allocs))
-        return slots
 
     async def create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
         key = rsa.generate_private_key(

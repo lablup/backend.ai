@@ -1,5 +1,6 @@
 import enum
-from collections.abc import Mapping
+from collections import defaultdict
+from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from typing import Self
 
@@ -8,9 +9,11 @@ from ai.backend.common.types import (
     BackendAISchema,
     ContainerId,
     DeviceId,
+    DeviceModelInfo,
     DeviceName,
     ResourceSlotEntry,
     ServicePortProtocols,
+    SlotName,
 )
 
 
@@ -73,6 +76,24 @@ class UsedDevice(BackendAISchema):
     processing_units: int | None
     memory_size: int | None
 
+    @classmethod
+    def from_model_info(
+        cls,
+        used: Mapping[ResourceSlotName, Decimal],
+        model: DeviceModelInfo | None,
+    ) -> Self:
+        """Describe one unit from its amounts and what the device plugin reports of it."""
+        if model is None:
+            return cls(model_name=None, used=used, processing_units=None, memory_size=None)
+        capacity = model["data"]
+        memory_size = capacity.get("mem")
+        return cls(
+            model_name=model["model_name"],
+            used=used,
+            processing_units=capacity.get("proc"),
+            memory_size=int(memory_size) if memory_size is not None else None,
+        )
+
 
 class UsedDevices(BackendAISchema):
     """
@@ -83,6 +104,38 @@ class UsedDevices(BackendAISchema):
     """
 
     units: Mapping[DeviceName, Mapping[DeviceId, UsedDevice]]
+
+    @classmethod
+    def from_allocations(
+        cls,
+        allocations: Mapping[DeviceName, Mapping[SlotName, Mapping[DeviceId, Decimal]]],
+        attached_devices: Mapping[DeviceName, Sequence[DeviceModelInfo]],
+    ) -> Self:
+        """
+        Build the payload from the two forms the agent holds it in.
+
+        The amounts and the device facts arrive apart — the agent's resource spec keys
+        the amounts by slot and then by unit, while `get_attached_devices()` describes
+        the units themselves — so they are transposed and joined here by device id. An
+        intrinsic slot has no plugin describing it, and its units carry the amounts alone.
+        """
+        units: dict[DeviceName, dict[DeviceId, UsedDevice]] = {}
+        for device_name, per_slot_alloc in allocations.items():
+            models = {
+                DeviceId(str(info["device_id"])): info
+                for info in attached_devices.get(device_name, [])
+            }
+            used_by_unit: MutableMapping[DeviceId, dict[ResourceSlotName, Decimal]] = defaultdict(
+                dict
+            )
+            for slot_name, per_unit_alloc in per_slot_alloc.items():
+                for device_id, amount in per_unit_alloc.items():
+                    used_by_unit[device_id][ResourceSlotName(str(slot_name))] = amount
+            units[device_name] = {
+                device_id: UsedDevice.from_model_info(used, models.get(device_id))
+                for device_id, used in used_by_unit.items()
+            }
+        return cls(units=units)
 
     @property
     def slot_totals(self) -> list[ResourceSlotEntry]:

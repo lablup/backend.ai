@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -12,7 +11,6 @@ from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
-    BinarySize,
     ClusterMode,
     KernelId,
     ResourceSlot,
@@ -177,111 +175,6 @@ class PreparedSessionsWithImages:
 
     sessions: list[PreparedSessionData]
     image_configs: dict[UUID, ImageConfigData]
-
-
-@dataclass
-class KernelCreationInfo:
-    """Information about kernel creation from agent."""
-
-    container_id: str | None = None
-    resource_spec: dict[str, Any] | None = None
-    attached_devices: dict[str, Any] = field(default_factory=dict)
-    repl_in_port: int | None = None
-    repl_out_port: int | None = None
-    stdin_port: int | None = None
-    stdout_port: int | None = None
-    service_ports: list[int] = field(default_factory=list)
-    kernel_host: str | None = None
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> KernelCreationInfo:
-        """Create from dictionary, handling missing or invalid fields."""
-        return cls(
-            container_id=data.get("container_id"),
-            resource_spec=data.get("resource_spec"),
-            attached_devices=data.get("attached_devices", {}),
-            repl_in_port=data.get("repl_in_port"),
-            repl_out_port=data.get("repl_out_port"),
-            stdin_port=data.get("stdin_port"),
-            stdout_port=data.get("stdout_port"),
-            service_ports=data.get("service_ports", []),
-            kernel_host=data.get("kernel_host"),
-        )
-
-    def get_resource_allocations(self) -> ResourceSlot:
-        """
-        Extract resource allocations from resource_spec.
-        Compatible with AgentRegistry.convert_resource_spec_to_resource_slot() format.
-
-        Handles the agent-side nested format:
-        allocations: {
-            "device_type": {
-                "slot_name": {
-                    "device_id": "value"
-                }
-            }
-        }
-        """
-        if not self.resource_spec or "allocations" not in self.resource_spec:
-            return ResourceSlot()
-
-        allocations = self.resource_spec["allocations"]
-        return self.convert_allocations_to_resource_slot(allocations)
-
-    @staticmethod
-    def convert_allocations_to_resource_slot(allocations: dict[str, Any]) -> ResourceSlot:
-        """
-        Convert per-device resource spec allocations (agent-side format)
-        back into a resource slot (manager-side format).
-
-        This is a static method that mirrors AgentRegistry.convert_resource_spec_to_resource_slot()
-        for compatibility.
-
-        Args:
-            allocations: The allocations dict from resource_spec
-
-        Returns:
-            ResourceSlot with aggregated resource values
-        """
-        if not allocations or not isinstance(allocations, dict):
-            return ResourceSlot()
-
-        slots = ResourceSlot()
-
-        # Handle the nested structure from agent
-        for alloc_map in allocations.values():
-            if not isinstance(alloc_map, dict):
-                continue
-
-            for slot_name, allocation_by_device in alloc_map.items():
-                if not isinstance(allocation_by_device, dict):
-                    # If it's not the expected nested structure,
-                    # try to use it directly as a value
-                    if allocation_by_device is not None:
-                        slots[slot_name] = str(allocation_by_device)
-                    continue
-
-                # Sum allocations across devices
-                total_allocs: list[Decimal] = []
-                for allocation in allocation_by_device.values():
-                    if allocation is None:
-                        continue
-
-                    # Handle BinarySize values (e.g., "1073741824b", "1g")
-                    if (
-                        isinstance(allocation, str)
-                        and len(allocation) > 0
-                        and BinarySize.suffix_map.get(allocation[-1].lower()) is not None
-                    ):
-                        total_allocs.append(Decimal(BinarySize.from_str(allocation)))
-                    else:
-                        # Regular decimal value or special values like "Infinity"
-                        total_allocs.append(Decimal(allocation))
-
-                if total_allocs:
-                    slots[slot_name] = str(sum(total_allocs))
-
-        return slots
 
 
 @dataclass(frozen=True)

@@ -25,6 +25,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.data.permission.types import (
     RBACElementType,
 )
+from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
@@ -45,6 +46,7 @@ from ai.backend.common.types import (
     PreemptionMode,
     PreemptionVictimScope,
     ResourceSlot,
+    ResourceSlotEntry,
     SessionId,
     SessionTypes,
     SlotTypes,
@@ -145,7 +147,6 @@ from ai.backend.manager.views.sokovan.allocation import (
 from ai.backend.manager.views.sokovan.image import ImageConfigData
 from ai.backend.manager.views.sokovan.lifecycle import (
     KernelBindingData,
-    KernelCreationInfo,
     SessionDataForPull,
     SessionDataForStart,
     SessionsForPullWithImages,
@@ -2635,7 +2636,7 @@ class ScheduleDBSource:
 
         :param kernel_id: Kernel ID to update
         :param reason: The reason for status change
-        :param creation_info: Container creation information as dataclass
+        :param creation_info: What the agent reported about the started container
         :return: True if update was successful, False otherwise
         """
         log.debug(
@@ -2661,7 +2662,25 @@ class ScheduleDBSource:
                 log.debug("[DBSource] Kernel {} not found!", kernel_id)
 
             now = await self._get_db_now_in_session(db_sess)
-            occupied_slots = creation_info.get_resource_allocations()
+            used_devices = creation_info.used_devices
+            occupied_slots = ResourceSlotEntry.inputs_to_resource_slot(used_devices.slot_totals)
+            # The JSONB columns take plain JSON: the engine's serializer does not know
+            # how to render the typed sub-models. `attached_devices` keeps the shape its
+            # readers already expect, and stays limited to the units a plugin describes —
+            # an intrinsic slot reports no model, as it did when the agent sent this column.
+            attached_devices = {
+                str(device_name): [
+                    {
+                        "device_id": str(device_id),
+                        "model_name": device.model_name,
+                        "data": {"mem": device.memory_size, "proc": device.processing_units},
+                    }
+                    for device_id, device in units.items()
+                    if device.model_name is not None
+                ]
+                for device_name, units in used_devices.units.items()
+            }
+            service_ports = [port.model_dump(mode="json") for port in creation_info.service_ports]
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -2677,12 +2696,10 @@ class ScheduleDBSource:
                     starts_at=now,
                     occupied_slots=occupied_slots,
                     container_id=creation_info.container_id,
-                    attached_devices=creation_info.attached_devices,
+                    attached_devices=attached_devices,
                     repl_in_port=creation_info.repl_in_port,
                     repl_out_port=creation_info.repl_out_port,
-                    stdin_port=creation_info.stdin_port,
-                    stdout_port=creation_info.stdout_port,
-                    service_ports=creation_info.service_ports,
+                    service_ports=service_ports,
                     kernel_host=creation_info.kernel_host,
                     status_history=sql_json_merge(
                         KernelRow.__table__.c.status_history,

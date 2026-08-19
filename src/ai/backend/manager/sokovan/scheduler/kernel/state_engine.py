@@ -8,10 +8,10 @@ All database operations go through the repository pattern.
 import logging
 from uuid import UUID
 
+from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
-from ai.backend.manager.views.sokovan.lifecycle import KernelCreationInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -82,7 +82,7 @@ class KernelStateEngine:
 
         :param kernel_id: The kernel ID
         :param reason: The reason for the state change
-        :param creation_info: Creation information as dataclass
+        :param creation_info: What the agent reported about the started container
         :return: True if the update was successful
         """
         log.debug("Marking kernel {} as RUNNING", kernel_id)
