@@ -174,7 +174,7 @@ _SECCOMP_PROFILE_FILENAME: Final[str] = "seccomp.json"
 # Container runtimes disagree on the seccomp option value: some decode it as the profile
 # document, others open it as a path, and neither accepts the other form. These engine
 # components, as reported by the version API, are the ones that require a path.
-_SECCOMP_FILE_ENGINES: Final[frozenset[str]] = frozenset({"Podman Engine"})
+_SECCOMP_PATH_ENGINES: Final[frozenset[str]] = frozenset({"Podman Engine"})
 
 known_glibc_distros: Final[dict[float, str]] = {
     2.17: "centos7.6",
@@ -326,7 +326,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     resource_lock: asyncio.Lock
     cluster_ssh_port_mapping: ClusterSSHPortMapping | None
     gwbridge_subnet: str | None
-    _require_seccomp_file: bool
+    _seccomp_profile_as_path: bool
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -346,7 +346,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         restarting: bool = False,
         cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
         gwbridge_subnet: str | None = None,
-        require_seccomp_file: bool = False,
+        seccomp_profile_as_path: bool = False,
     ) -> None:
         super().__init__(
             ownership_data,
@@ -376,7 +376,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.computer_docker_args = {}
 
         self.cluster_ssh_port_mapping = cluster_ssh_port_mapping
-        self._require_seccomp_file = require_seccomp_file
+        self._seccomp_profile_as_path = seccomp_profile_as_path
         self.gwbridge_subnet = gwbridge_subnet
 
         self.network_plugin_ctx = network_plugin_ctx
@@ -1079,7 +1079,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         # Some runtimes decode the option value as the profile document itself, others
         # open it as a path; neither accepts the other's form.
-        if self._require_seccomp_file:
+        if self._seccomp_profile_as_path:
             profile_path = self.scratch_dir / _SECCOMP_PROFILE_FILENAME
             async with aiofiles.open(profile_path, "w") as fp:
                 await fp.write(dump_json_str(seccomp_profile))
@@ -1494,7 +1494,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: str | None
     checked_invalid_images: set[str]
-    _require_seccomp_file: bool
+    _seccomp_profile_as_path: bool
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -1525,7 +1525,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             agent_class=agent_class,
         )
         self.checked_invalid_images = set()
-        self._require_seccomp_file = False
+        self._seccomp_profile_as_path = False
         pickle_loader_writer_creator = PickleBasedLoaderWriterCreator.create(
             PickleBasedKernelRegistryCreatorArgs(
                 scratch_root=local_config.container.scratch_root,
@@ -1581,7 +1581,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 docker_version["ApiVersion"],
                 ", ".join(engine_components),
             )
-            self._require_seccomp_file = not _SECCOMP_FILE_ENGINES.isdisjoint(engine_components)
+            self._seccomp_profile_as_path = any(
+                component in _SECCOMP_PATH_ENGINES for component in engine_components
+            )
             kernel_version = docker_version["KernelVersion"]
             if "linuxkit" in kernel_version:
                 self.local_config.agent.docker_mode = "linuxkit"
@@ -2080,7 +2082,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             restarting=restarting,
             cluster_ssh_port_mapping=cluster_ssh_port_mapping,
             gwbridge_subnet=self.gwbridge_subnet,
-            require_seccomp_file=self._require_seccomp_file,
+            seccomp_profile_as_path=self._seccomp_profile_as_path,
         )
 
     @override
