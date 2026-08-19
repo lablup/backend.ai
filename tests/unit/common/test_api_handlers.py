@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from http import HTTPStatus
-from typing import Any, Self
+from typing import Any, Self, override
 
 import pytest
 from aiohttp import web
