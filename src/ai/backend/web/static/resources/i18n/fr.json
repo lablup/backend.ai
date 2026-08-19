@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "Le VFolder est obligatoire."
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "Créer un préréglage",
+    "Name": "Nom",
+    "PresetDeleted": "Le préréglage de variante d'exécution a été supprimé.",
+    "RuntimeVariantId": "ID de la variante d'exécution",
+    "RuntimeVariantPreset": "Préréglage de variante d'exécution",
+    "TabTitle": "Préréglages de variante d'exécution"
+  },
   "adminSession": {
     "PendingSessions": "Sessions en attente",
     "PendingSessionsScopedToResourceGroup": "Affichage des sessions en attente pour le groupe de ressources sélectionné uniquement. Changez de groupe de ressources pour afficher les sessions dans d'autres groupes."
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "Historique de planification",
     "SessionId": "ID de session",
     "StartChatTest": "Tester dans le chat",
+    "SwitchProjectConfirmContent": "Ce déploiement appartient au projet \"{{projectName}}\". Vous serez basculé vers ce projet pour le consulter. Continuer ?",
+    "SwitchProjectConfirmTitle": "Passer à un autre projet ?",
     "Tags": "Étiquettes",
     "TagsPlaceholder": "Saisir des étiquettes, séparées par des virgules",
     "TagsTooltip": "Étiquettes optionnelles pour organiser et filtrer les déploiements. Appuyez sur Entrée ou virgule pour ajouter.",
@@ -1689,6 +1699,7 @@
     "CouldNotCopyText": "Impossible de copier le texte :",
     "CreateButtonCode": "Créer",
     "CreateNotebookButton": "Créer un bouton de bloc-notes",
+    "CreatedFolderIsReadOnly": "Le dossier a été créé avec une autorisation de montage en lecture seule et ne peut pas recevoir le téléchargement. Créez un dossier avec une autorisation de lecture et d'écriture.",
     "DownloadModelToFolder": "Télécharger le modèle dans le dossier",
     "Downloading": "Téléchargement...",
     "FailedToFetchRepositoryInformation": "Impossible de récupérer les informations du dépôt.",
@@ -1705,6 +1716,12 @@
     "GitlabDefaultBranch": "Nom de la branche GitLab",
     "GitlabRepoWillBeFolder": "Les dépôts GitLab importés sont convertis en dossiers et peuvent être montés au démarrage de la session.",
     "GitlabURL": "URL GitLab",
+    "HuggingFaceModelInfoUnavailable": "Impossible de charger les informations du modèle. L'import peut tout de même être lancé.",
+    "HuggingFaceModelIsDisabled": "Ce modèle est désactivé sur Hugging Face et ne peut pas être téléchargé.",
+    "HuggingFaceModelIsGated": "Ce modèle est à accès restreint. Acceptez sa licence sur Hugging Face et saisissez un jeton d'accès, sinon le téléchargement échouera.",
+    "HuggingFaceModelNotFoundOrPrivate": "Modèle introuvable ou privé. Vérifiez l'identifiant du modèle ou saisissez un jeton d'accès.",
+    "HuggingFaceModelSize": "Taille",
+    "HuggingFaceModelSizeIncludesAllRevisions": "Taille totale du dépôt, toutes révisions comprises. Le téléchargement réel peut être plus petit.",
     "HuggingFaceModelUrlOrId": "URL ou ID du modèle Hugging Face",
     "HuggingFaceModelWillBeDownloaded": "Le modèle Hugging Face est téléchargé dans un sous-dossier du dossier de modèle sélectionné via une session par lot.",
     "HuggingFaceRevision": "Revision",
@@ -1726,6 +1743,7 @@
     "NotebookBadgeCodeMarkdown": "Code de badge de bloc-notes (Markdown)",
     "NotebookBadgeURL": "URL du bloc-notes",
     "NotebookURL": "URL du bloc-notes",
+    "OnlyWritableModelFoldersAreListed": "Seuls les dossiers de modèles du projet actuel que vous pouvez monter avec des droits d'écriture sont affichés.",
     "Preparing": "En cours de préparation...",
     "ReadyToImport": "Prêt à importer",
     "RepoWillBeFolder": "Les dépôts GitHub importés sont convertis en dossiers et peuvent être montés au démarrage de la session.",

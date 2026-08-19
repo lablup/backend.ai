@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "VFolder is required."
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "Create Preset",
+    "Name": "Name",
+    "PresetDeleted": "Runtime variant preset has been deleted.",
+    "RuntimeVariantId": "Runtime Variant ID",
+    "RuntimeVariantPreset": "Runtime Variant Preset",
+    "TabTitle": "Runtime Variant Presets"
+  },
   "adminSession": {
     "PendingSessions": "Pending Sessions",
     "PendingSessionsScopedToResourceGroup": "Showing pending sessions for the selected resource group only. Switch resource groups to view sessions in other groups."
@@ -1136,6 +1144,8 @@
     "SchedulingHistory": "Scheduling History",
     "SessionId": "Session ID",
     "StartChatTest": "Test in Chat",
+    "SwitchProjectConfirmContent": "This deployment belongs to the \"{{projectName}}\" project. You'll be switched to that project to view it. Continue?",
+    "SwitchProjectConfirmTitle": "Switch to another project?",
     "Tags": "Tags",
     "TagsPlaceholder": "Enter tags, separated by commas",
     "TagsTooltip": "Optional labels for organizing and filtering deployments. Press Enter or comma to add.",
@@ -1675,6 +1685,7 @@
     "CouldNotCopyText": "Could not copy text: ",
     "CreateButtonCode": "Create",
     "CreateNotebookButton": "Create Notebook Button",
+    "CreatedFolderIsReadOnly": "The folder was created with read-only mount permission, so it cannot receive the download. Create a folder with read & write mount permission.",
     "DownloadModelToFolder": "Download Model To Folder",
     "Downloading": "Downloading...",
     "FailedToFetchRepositoryInformation": "Failed to fetch repository information.",
@@ -1691,6 +1702,12 @@
     "GitlabDefaultBranch": "GitLab Branch Name",
     "GitlabRepoWillBeFolder": "Imported GitLab repositories are converted to folders and can be mounted when session starts.",
     "GitlabURL": "GitLab URL",
+    "HuggingFaceModelInfoUnavailable": "Could not load the model information. You can still start the import.",
+    "HuggingFaceModelIsDisabled": "This model is disabled on Hugging Face and cannot be downloaded.",
+    "HuggingFaceModelIsGated": "This model is gated. Accept its license on Hugging Face and enter an access token, or the download will fail.",
+    "HuggingFaceModelNotFoundOrPrivate": "Model not found, or it is private. Check the model ID, or enter an access token.",
+    "HuggingFaceModelSize": "Size",
+    "HuggingFaceModelSizeIncludesAllRevisions": "Total size of the repository including every revision. The actual download may be smaller.",
     "HuggingFaceModelUrlOrId": "Hugging Face Model URL or ID",
     "HuggingFaceModelWillBeDownloaded": "The Hugging Face model is downloaded into a subfolder of the selected model folder by a batch session.",
     "HuggingFaceRevision": "Revision",
@@ -1712,6 +1729,7 @@
     "NotebookBadgeCodeMarkdown": "Notebook Badge Code (Markdown)",
     "NotebookBadgeURL": "Notebook URL",
     "NotebookURL": "Notebook URL",
+    "OnlyWritableModelFoldersAreListed": "Only model folders in the current project that you can mount with write permission are listed.",
     "Preparing": "Preparing...",
     "ReadyToImport": "Ready To Import",
     "RepoWillBeFolder": "Imported GitHub repositories are converted to folders and can be mounted when session starts.",
