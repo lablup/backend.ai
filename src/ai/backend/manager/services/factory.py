@@ -494,7 +494,7 @@ def create_processors(
             services.idle_checker_assignment, action_monitors, validators
         ),
         scheduling_history=SchedulingHistoryProcessors(
-            services.scheduling_history, action_monitors, validators
+            registry.group(), services.scheduling_history
         ),
         service_catalog=ServiceCatalogProcessors(registry.group()),
         template=TemplateProcessors(registry.group(), services.template),
