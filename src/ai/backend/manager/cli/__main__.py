@@ -417,5 +417,10 @@ def ops() -> None:
     """Command set for inspecting the wired domain operation catalog."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.idle_checker:cli")
+def idle_checker() -> None:
+    """Command set for idle checker related operations."""
+
+
 if __name__ == "__main__":
     main()
