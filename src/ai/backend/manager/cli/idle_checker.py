@@ -94,6 +94,15 @@ class PlannedChecker:
 
 
 @dataclass(frozen=True)
+class UtilizationPlan:
+    """Legacy utilization settings that have a representable equivalent."""
+
+    window_seconds: int
+    initial_grace_period_seconds: int
+    thresholds: list[tuple[str, Decimal]]
+
+
+@dataclass(frozen=True)
 class LegacyKeypairPolicy:
     """One keypair resource policy's idle-related settings."""
 
@@ -133,9 +142,9 @@ def plan_network_timeout_checkers(
 ) -> list[PlannedChecker]:
     """Plan one checker per distinct network idle threshold."""
     raw_threshold = (raw_checkers.get(CheckerType.NETWORK_TIMEOUT.value) or {}).get("threshold")
-    global_threshold = (
-        tx.TimeDuration().check(raw_threshold) if raw_threshold else _DEFAULT_NETWORK_THRESHOLD
-    )
+    parsed_threshold = tx.TimeDuration().check(raw_threshold) if raw_threshold else None
+    # The legacy checker falls back on a falsy parse result, so a zero threshold runs the default.
+    global_threshold = parsed_threshold or _DEFAULT_NETWORK_THRESHOLD
     candidates = {int(global_threshold.total_seconds())}
     # Exclude non-positive values, which mean "never expire" and have no representable spec.
     candidates |= {policy.idle_timeout for policy in policies if policy.idle_timeout > 0}
@@ -156,16 +165,15 @@ def plan_network_timeout_checkers(
     return planned
 
 
-def plan_utilization_checkers(
+def parse_utilization_config(
     raw_checkers: Mapping[str, Any],
     policies: Sequence[LegacyKeypairPolicy],
-    ratio_preset_id: PrometheusQueryPresetID,
-    rate_preset_id: PrometheusQueryPresetID,
-) -> list[PlannedChecker]:
-    """Plan one checker per configured resource threshold, warning about what cannot move.
+) -> UtilizationPlan | None:
+    """Read the legacy utilization settings, warning about what cannot move.
 
-    The legacy `and` operator has no single-spec equivalent, so multiple resources become
-    multiple checkers that behave as OR.
+    Returns ``None`` when the legacy checker could not have been running or has no
+    representable threshold, so that no preset is created for a migration that yields
+    no checker.
     """
     try:
         config = UtilizationConfig.model_validate(
@@ -177,7 +185,7 @@ def plan_utilization_checkers(
             "running; nothing is migrated: {}",
             e,
         )
-        return []
+        return None
     if not isinstance(config.time_window, timedelta) or not isinstance(
         config.initial_grace_period, timedelta
     ):
@@ -185,14 +193,14 @@ def plan_utilization_checkers(
             "utilization: 'time-window' and 'initial-grace-period' must not use a 'yr' or 'mo' "
             "unit; nothing is migrated."
         )
-        return []
+        return None
     window_seconds = int(config.time_window.total_seconds())
     if window_seconds < 1:
         log.warning(
             "utilization: 'time-window' is non-positive, so the legacy checker could not have "
             "been running; nothing is migrated."
         )
-        return []
+        return None
 
     migratable: list[tuple[str, Decimal]] = []
     for resource, value in sorted(config.resource_thresholds.items()):
@@ -215,9 +223,23 @@ def plan_utilization_checkers(
             overridden,
         )
 
+    if not migratable:
+        return None
+    return UtilizationPlan(
+        window_seconds=window_seconds,
+        initial_grace_period_seconds=int(config.initial_grace_period.total_seconds()),
+        thresholds=migratable,
+    )
+
+
+def plan_utilization_checkers(
+    plan: UtilizationPlan,
+    preset_ids: Mapping[str, PrometheusQueryPresetID],
+) -> list[PlannedChecker]:
+    """Plan one checker per parsed resource threshold."""
+    window_seconds = plan.window_seconds
     planned = []
-    for resource, threshold in migratable:
-        preset_id = rate_preset_id if resource in DIFF_METRICS else ratio_preset_id
+    for resource, threshold in plan.thresholds:
         planned.append(
             PlannedChecker(
                 name=f"Legacy utilization ({resource} < {threshold}%)",
@@ -226,13 +248,13 @@ def plan_utilization_checkers(
                     f"{window_seconds}s)."
                 ),
                 target_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
-                initial_grace_period_seconds=int(config.initial_grace_period.total_seconds()),
+                initial_grace_period_seconds=plan.initial_grace_period_seconds,
                 spec=IdleCheckerSpec(
                     type=CheckerType.UTILIZATION,
                     utilization=UtilizationSpec(
                         max_underutilized_duration_seconds=window_seconds,
                         threshold=UtilizationThresholdEntry(
-                            preset_id=preset_id,
+                            preset_id=preset_ids[resource],
                             threshold=threshold,
                             filter_labels=[
                                 MetricLabel(
@@ -248,40 +270,59 @@ def plan_utilization_checkers(
     return planned
 
 
-async def _ensure_utilization_preset(
+async def _ensure_utilization_presets(
     db_source: PrometheusQueryPresetDBSource,
-    name: str,
-    query_template: str,
-    time_window: str | None,
-    description: str,
-) -> PrometheusQueryPresetID:
-    """Return one of the migration's own presets, creating it on the first run.
+    resources: Sequence[str],
+) -> Mapping[str, PrometheusQueryPresetID]:
+    """Map each resource to its preset, creating only the presets the resources need.
 
     Dedicated presets are used instead of seeded ones, because the seeded presets get
     renamed by later migrations and may have been edited by operators.
     """
     presets = await db_source.search(BatchQuerier(pagination=NoPagination()))
-    for preset in presets.items:
-        if preset.name == name:
-            return PrometheusQueryPresetID(preset.id)
-    created = await db_source.create(
-        Creator(
-            spec=PrometheusQueryPresetCreatorSpec(
-                name=name,
-                metric_name=CONTAINER_UTILIZATION_METRIC_NAME,
-                query_template=query_template,
-                time_window=time_window,
-                filter_labels=[
-                    CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
-                    SESSION_ID_LABEL,
-                ],
-                group_labels=[SESSION_ID_LABEL],
-                description=description,
+    known_ids = {preset.name: PrometheusQueryPresetID(preset.id) for preset in presets.items}
+    preset_ids: dict[str, PrometheusQueryPresetID] = {}
+    for resource in resources:
+        if resource in DIFF_METRICS:
+            name = "legacy:idle:container-utilization-rate"
+            query_template = _RATE_PRESET_TEMPLATE
+            time_window = _RATE_PRESET_TIME_WINDOW
+            description = (
+                "Per-session utilization percentage of a cumulative counter metric such as "
+                "cpu_util, used by the idle checkers migrated from the legacy etcd configuration."
             )
-        )
-    )
-    log.info("created prometheus query preset {}", name)
-    return PrometheusQueryPresetID(created.id)
+        else:
+            name = "legacy:idle:container-utilization-ratio"
+            query_template = _RATIO_PRESET_TEMPLATE
+            time_window = None
+            description = (
+                "Per-session utilization percentage rebuilt from the exported current and "
+                "capacity values, used by the idle checkers migrated from the legacy etcd "
+                "configuration."
+            )
+        preset_id = known_ids.get(name)
+        if preset_id is None:
+            created = await db_source.create(
+                Creator(
+                    spec=PrometheusQueryPresetCreatorSpec(
+                        name=name,
+                        metric_name=CONTAINER_UTILIZATION_METRIC_NAME,
+                        query_template=query_template,
+                        time_window=time_window,
+                        filter_labels=[
+                            CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
+                            SESSION_ID_LABEL,
+                        ],
+                        group_labels=[SESSION_ID_LABEL],
+                        description=description,
+                    )
+                )
+            )
+            preset_id = PrometheusQueryPresetID(created.id)
+            known_ids[name] = preset_id
+            log.info("created prometheus query preset {}", name)
+        preset_ids[resource] = preset_id
+    return preset_ids
 
 
 def _register_cli_orm_cluster() -> None:
@@ -328,7 +369,7 @@ async def _migrate_legacy(cli_ctx: CLIContext) -> None:
                 for row in (await db_sess.execute(policy_query)).all()
             ]
             project_query = sa.select(GroupRow.id).where(
-                (GroupRow.type == ProjectType.GENERAL) & GroupRow.is_active.is_not(False)
+                (GroupRow.type == ProjectType.GENERAL) & GroupRow.is_active.is_(True)
             )
             project_ids = [row.id for row in (await db_sess.execute(project_query)).all()]
 
@@ -337,27 +378,12 @@ async def _migrate_legacy(cli_ctx: CLIContext) -> None:
         if CheckerType.NETWORK_TIMEOUT.value in enabled:
             planned_checkers += plan_network_timeout_checkers(idle_config.checkers, policies)
         if CheckerType.UTILIZATION.value in enabled:
-            ratio_preset_id = await _ensure_utilization_preset(
-                preset_db_source,
-                "legacy:idle:container-utilization-ratio",
-                _RATIO_PRESET_TEMPLATE,
-                None,
-                "Per-session utilization percentage rebuilt from the exported current and "
-                "capacity values, used by the idle checkers migrated from the legacy etcd "
-                "configuration.",
-            )
-            rate_preset_id = await _ensure_utilization_preset(
-                preset_db_source,
-                "legacy:idle:container-utilization-rate",
-                _RATE_PRESET_TEMPLATE,
-                _RATE_PRESET_TIME_WINDOW,
-                "Per-session utilization percentage of a cumulative counter metric such as "
-                "cpu_util, used by the idle checkers migrated from the legacy etcd "
-                "configuration.",
-            )
-            planned_checkers += plan_utilization_checkers(
-                idle_config.checkers, policies, ratio_preset_id, rate_preset_id
-            )
+            utilization_plan = parse_utilization_config(idle_config.checkers, policies)
+            if utilization_plan is not None:
+                preset_ids = await _ensure_utilization_presets(
+                    preset_db_source, [resource for resource, _ in utilization_plan.thresholds]
+                )
+                planned_checkers += plan_utilization_checkers(utilization_plan, preset_ids)
         if not planned_checkers:
             log.info("No legacy idle checker setting to migrate.")
             return
