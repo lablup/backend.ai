@@ -97,7 +97,7 @@ class ResourceHandler:
     ) -> APIResponse:
         log.info("LIST_PRESETS (ak:{})", ctx.access_key)
         params = query.parsed
-        result = await self._resource_preset.list_presets.wait_for_complete(
+        result = await self._resource_preset.list_presets.run(
             ListResourcePresetsAction(
                 access_key=ctx.access_key,
                 scaling_group=params.scaling_group,
@@ -123,7 +123,7 @@ class ResourceHandler:
             params.group,
             params.scaling_group,
         )
-        result = await self._resource_preset.check_presets.wait_for_complete(
+        result = await self._resource_preset.check_presets.run(
             CheckResourcePresetsAction(
                 access_key=AccessKey(ctx.access_key),
                 resource_policy=resource_policy,

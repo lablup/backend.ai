@@ -108,7 +108,7 @@ class ResourcePresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.resource_preset.search_presets_v2.wait_for_complete(
+        result = await self._processors.resource_preset.search_presets_v2.run(
             SearchResourcePresetsV2Action(querier=querier)
         )
         return AdminSearchResourcePresetsPayload(
@@ -124,7 +124,7 @@ class ResourcePresetAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=1),
             conditions=[lambda: ResourcePresetRow.id == preset_id],
         )
-        result = await self._processors.resource_preset.search_presets_v2.wait_for_complete(
+        result = await self._processors.resource_preset.search_presets_v2.run(
             SearchResourcePresetsV2Action(querier=querier)
         )
         if not result.presets:
@@ -148,7 +148,7 @@ class ResourcePresetAdapter(BaseAdapter):
                 scaling_group_name=resource_group_name,
             )
         )
-        result = await self._processors.resource_preset.create_preset.wait_for_complete(
+        result = await self._processors.resource_preset.create_preset.run(
             CreateResourcePresetAction(creator=creator)
         )
         return CreateResourcePresetPayload(
@@ -186,7 +186,7 @@ class ResourcePresetAdapter(BaseAdapter):
             scaling_group_name=resource_group_state,
         )
         updater = Updater(spec=updater_spec, pk_value=input.id)
-        result = await self._processors.resource_preset.update_preset.wait_for_complete(
+        result = await self._processors.resource_preset.update_preset.run(
             UpdateResourcePresetAction(updater=updater, id=input.id, name=None)
         )
         return UpdateResourcePresetPayload(
@@ -195,7 +195,7 @@ class ResourcePresetAdapter(BaseAdapter):
 
     async def delete(self, preset_id: UUID) -> DeleteResourcePresetPayload:
         """Delete a resource preset by ID."""
-        result = await self._processors.resource_preset.delete_preset.wait_for_complete(
+        result = await self._processors.resource_preset.delete_preset.run(
             DeleteResourcePresetAction(id=preset_id, name=None)
         )
         return DeleteResourcePresetPayload(id=result.resource_preset.id)

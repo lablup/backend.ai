@@ -251,7 +251,7 @@ class CreateResourcePreset(graphene.Mutation):  # type: ignore[misc]
 
         graph_ctx: GraphQueryContext = info.context
 
-        result = await graph_ctx.processors.resource_preset.create_preset.wait_for_complete(
+        result = await graph_ctx.processors.resource_preset.create_preset.run(
             CreateResourcePresetAction(creator=props.to_creator(name))
         )
 
@@ -290,7 +290,7 @@ class ModifyResourcePreset(graphene.Mutation):  # type: ignore[misc]
 
         graph_ctx: GraphQueryContext = info.context
 
-        await graph_ctx.processors.resource_preset.update_preset.wait_for_complete(
+        await graph_ctx.processors.resource_preset.update_preset.run(
             UpdateResourcePresetAction(id=id, name=name, updater=props.to_updater(id, name))
         )
 
@@ -327,7 +327,7 @@ class DeleteResourcePreset(graphene.Mutation):  # type: ignore[misc]
 
         graph_ctx: GraphQueryContext = info.context
 
-        await graph_ctx.processors.resource_preset.delete_preset.wait_for_complete(
+        await graph_ctx.processors.resource_preset.delete_preset.run(
             DeleteResourcePresetAction(id=id, name=name)
         )
 

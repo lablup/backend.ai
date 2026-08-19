@@ -10,7 +10,6 @@ from ai.backend.common.types import (
 from ai.backend.common.types import (
     LegacyResourceSlotState as ResourceSlotState,
 )
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.resource_preset.actions.base import ResourcePresetAction
 
@@ -25,8 +24,9 @@ class CheckResourcePresetsAction(ResourcePresetAction):
     scaling_group: str | None
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_check_resource_presets"
 
     @override
     @classmethod
@@ -35,7 +35,7 @@ class CheckResourcePresetsAction(ResourcePresetAction):
 
 
 @dataclass
-class CheckResourcePresetsActionResult(BaseActionResult):
+class CheckResourcePresetsActionResult:
     presets: list[Mapping[str, Any]]
     keypair_limits: list[SlotQuantity]
     keypair_using: list[SlotQuantity]
@@ -47,6 +47,3 @@ class CheckResourcePresetsActionResult(BaseActionResult):
     scaling_groups: Mapping[str, Mapping[ResourceSlotState, list[SlotQuantity]]]
 
     # TODO: Should return preset row ids after changing to batching.
-    @override
-    def entity_id(self) -> str | None:
-        return None

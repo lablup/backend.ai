@@ -2,7 +2,6 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
@@ -17,8 +16,9 @@ class UpdateResourcePresetAction(ResourcePresetAction):
     name: str | None
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.id) if self.id else None
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_update_resource_preset"
 
     @override
     @classmethod
@@ -27,9 +27,5 @@ class UpdateResourcePresetAction(ResourcePresetAction):
 
 
 @dataclass
-class UpdateResourcePresetActionResult(BaseActionResult):
+class UpdateResourcePresetActionResult:
     resource_preset: ResourcePresetData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.resource_preset.id)

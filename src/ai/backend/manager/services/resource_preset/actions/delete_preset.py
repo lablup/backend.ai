@@ -2,7 +2,6 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.services.resource_preset.actions.base import ResourcePresetAction
@@ -14,8 +13,9 @@ class DeleteResourcePresetAction(ResourcePresetAction):
     name: str | None
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.id) if self.id else None
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_delete_resource_preset"
 
     @override
     @classmethod
@@ -24,12 +24,8 @@ class DeleteResourcePresetAction(ResourcePresetAction):
 
 
 @dataclass
-class DeleteResourcePresetActionResult(BaseActionResult):
+class DeleteResourcePresetActionResult:
     resource_preset: ResourcePresetData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.resource_preset.id)
 
 
 # TODO: Create exceptions.

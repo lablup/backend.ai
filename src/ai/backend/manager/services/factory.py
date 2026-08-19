@@ -455,9 +455,7 @@ def create_processors(
             services.prometheus_query_preset, registry.group()
         ),
         prometheus_query_preset_category=PrometheusQueryPresetCategoryProcessors(registry.group()),
-        resource_preset=ResourcePresetProcessors(
-            services.resource_preset, action_monitors, validators
-        ),
+        resource_preset=ResourcePresetProcessors(registry.group(), services.resource_preset),
         resource_slot=ResourceSlotProcessors(
             services.resource_slot,
             action_monitors,

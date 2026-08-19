@@ -1,6 +1,10 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
+from typing import Any
+
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
     CheckResourcePresetsActionResult,
@@ -29,24 +33,29 @@ from ai.backend.manager.services.resource_preset.service import ResourcePresetSe
 
 
 class ResourcePresetProcessors:
-    create_preset: ActionProcessor[CreateResourcePresetAction, CreateResourcePresetActionResult]
-    update_preset: ActionProcessor[UpdateResourcePresetAction, UpdateResourcePresetActionResult]
-    delete_preset: ActionProcessor[DeleteResourcePresetAction, DeleteResourcePresetActionResult]
-    list_presets: ActionProcessor[ListResourcePresetsAction, ListResourcePresetsResult]
-    check_presets: ActionProcessor[CheckResourcePresetsAction, CheckResourcePresetsActionResult]
-    search_presets_v2: ActionProcessor[
+    create_preset: GlobalActionProcessor[
+        CreateResourcePresetAction, CreateResourcePresetActionResult
+    ]
+    update_preset: GlobalActionProcessor[
+        UpdateResourcePresetAction, UpdateResourcePresetActionResult
+    ]
+    delete_preset: GlobalActionProcessor[
+        DeleteResourcePresetAction, DeleteResourcePresetActionResult
+    ]
+    list_presets: PublicActionProcessor[ListResourcePresetsAction, ListResourcePresetsResult]
+    check_presets: PublicActionProcessor[
+        CheckResourcePresetsAction, CheckResourcePresetsActionResult
+    ]
+    search_presets_v2: GlobalActionProcessor[
         SearchResourcePresetsV2Action, SearchResourcePresetsV2ActionResult
     ]
 
-    def __init__(
-        self,
-        service: ResourcePresetService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.create_preset = ActionProcessor(service.create_preset, action_monitors)
-        self.update_preset = ActionProcessor(service.update_preset, action_monitors)
-        self.delete_preset = ActionProcessor(service.delete_preset, action_monitors)
-        self.list_presets = ActionProcessor(service.list_presets, action_monitors)
-        self.check_presets = ActionProcessor(service.check_presets, action_monitors)
-        self.search_presets_v2 = ActionProcessor(service.search_presets_v2, action_monitors)
+    def __init__(self, group: ProcessorGroup[Any], service: ResourcePresetService) -> None:
+        self.create_preset = group.global_scope(CreateResourcePresetAction, service.create_preset)
+        self.update_preset = group.global_scope(UpdateResourcePresetAction, service.update_preset)
+        self.delete_preset = group.global_scope(DeleteResourcePresetAction, service.delete_preset)
+        self.list_presets = group.public(ListResourcePresetsAction, service.list_presets)
+        self.check_presets = group.public(CheckResourcePresetsAction, service.check_presets)
+        self.search_presets_v2 = group.global_scope(
+            SearchResourcePresetsV2Action, service.search_presets_v2
+        )
