@@ -31,6 +31,7 @@ from aiodocker.docker import DockerContainer
 from ai.backend.common import identity
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.cgroup import (
+    CgroupController,
     get_cgroup_of_pid,
     get_container_id_of_cgroup,
     get_container_pids,
@@ -318,7 +319,7 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
                     await docker.close()
 
     try:
-        cgroup = get_cgroup_of_pid("pids", host_pid)
+        cgroup = get_cgroup_of_pid(CgroupController.PIDS, host_pid)
         cgroup_container_id = get_container_id_of_cgroup(cgroup)
         if cgroup_container_id is None:
             return NotContainerPID
