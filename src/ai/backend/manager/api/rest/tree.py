@@ -179,6 +179,7 @@ def build_api_routes(
     )
     export_handler = ExportHandler(
         export=processors.export,
+        domain=processors.domain,
         export_config=config_provider.config.export,
     )
     fair_share_handler = FairShareAPIHandler(

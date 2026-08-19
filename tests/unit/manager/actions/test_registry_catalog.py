@@ -42,6 +42,7 @@ from ai.backend.manager.services.deployment_revision_preset.processors import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
+from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
@@ -169,6 +170,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     ModelCardProcessors(registry.group(), MagicMock())
     ContainerRegistryProcessors(registry.group(), MagicMock())
     ImageProcessors(registry.group(), MagicMock())
+    ExportProcessors(registry.group(), MagicMock())
 
     wired = sorted(cls.action_name() for cls in registry.wired_actions())
     defined = sorted(cls.action_name() for cls in _concrete_v2_action_classes())

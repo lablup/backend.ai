@@ -1,32 +1,84 @@
-"""Base action class for export operations."""
+"""Base action classes for export operations."""
 
 from __future__ import annotations
 
-from abc import abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseAction
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
+from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 
 
 @dataclass
-class ExportAction(BaseAction):
-    """Base action class for export operations."""
+class ExportAction(BaseGlobalAction):
+    """Base for an export that spans the installation."""
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.EXPORT
+        return EXPORT_ENTITY_TYPE
 
-    @abstractmethod
+
+@dataclass
+class ExportUserScopeAction(BaseScopeAction):
+    """Base for an export of what belongs to one user."""
+
+    user_uuid: UserID
+
     @override
-    def entity_id(self) -> str | None:
-        raise NotImplementedError
-
     @classmethod
-    @abstractmethod
+    def entity_type(cls) -> EntityType:
+        return EXPORT_ENTITY_TYPE
+
     @override
-    def operation_type(cls) -> ActionOperationType:
-        raise NotImplementedError
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_uuid),)
+
+
+@dataclass
+class ExportProjectScopeAction(BaseScopeAction):
+    """Base for an export of what belongs to one project."""
+
+    project_id: ProjectID
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EXPORT_ENTITY_TYPE
+
+    @override
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id),)
+
+
+@dataclass
+class ExportDomainScopeAction(BaseScopeAction):
+    """Base for an export of what belongs to one domain."""
+
+    domain_id: DomainID
+    domain_name: str
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EXPORT_ENTITY_TYPE
+
+    @override
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=self.domain_id),)
+
+
+@dataclass
+class ExportScopeActionResult(BaseScopeActionResult):
+    """An export names no entity: what it wrote is a file, not a row."""
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return ()
