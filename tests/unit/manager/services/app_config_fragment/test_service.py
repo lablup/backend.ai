@@ -5,16 +5,21 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import (
+    MAX_APP_CONFIG_FRAGMENT_BYTES,
+    AppConfigScopeType,
+)
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
+from ai.backend.common.json import dump_json
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentBulkResult,
     AppConfigFragmentData,
@@ -22,7 +27,10 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentUpsertBulkResult,
     AppConfigFragmentUpsertItemError,
 )
-from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
+from ai.backend.manager.errors.app_config import (
+    AppConfigFragmentNotFound,
+    AppConfigFragmentTooLarge,
+)
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
@@ -77,6 +85,19 @@ class _ScopedSearchCase:
 def rejected_upsert_item() -> AppConfigFragmentUpsertItemError:
     """One rejected item for the repository mock to return alongside the written fragment."""
     return AppConfigFragmentUpsertItemError(config_name="menu", message="not allow-listed")
+
+
+@pytest.fixture
+def config_at_limit() -> dict[str, Any]:
+    """A config document whose compact JSON encoding is exactly the size limit."""
+    padding = MAX_APP_CONFIG_FRAGMENT_BYTES - len(dump_json({"k": ""}))
+    return {"k": "x" * padding}
+
+
+@pytest.fixture
+def config_over_limit(config_at_limit: dict[str, Any]) -> dict[str, Any]:
+    """The same document grown by one byte, so it sits just over the limit."""
+    return {"k": f"{config_at_limit['k']}x"}
 
 
 @pytest.fixture
@@ -177,6 +198,72 @@ class TestAppConfigFragmentService:
         assert result.scope_type() == case.expected_scope_type
         assert result.scope_id() == case.expected_scope_id
         mock_repository.bulk_upsert.assert_called_once_with(specs)
+
+    async def test_upsert_accepts_a_config_at_the_size_limit(
+        self,
+        service: AppConfigFragmentService,
+        mock_repository: MagicMock,
+        scoped_fragment: AppConfigFragmentData,
+        config_at_limit: dict[str, Any],
+    ) -> None:
+        mock_repository.bulk_upsert = AsyncMock(
+            return_value=AppConfigFragmentUpsertBulkResult(items=[scoped_fragment], failed=[])
+        )
+        specs = [
+            AppConfigFragmentUpserterSpec(
+                config_name="theme",
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_SCOPE_ID,
+                config=config_at_limit,
+            )
+        ]
+
+        result = await service.bulk_upsert(
+            BulkUpsertAppConfigFragmentsAction(
+                scope=AppConfigFragmentOperationScope(
+                    scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
+                ),
+                upserter_specs=specs,
+            )
+        )
+
+        assert result.items == [scoped_fragment]
+        mock_repository.bulk_upsert.assert_called_once_with(specs)
+
+    async def test_upsert_rejects_the_batch_when_an_item_is_over_the_size_limit(
+        self,
+        service: AppConfigFragmentService,
+        mock_repository: MagicMock,
+        config_at_limit: dict[str, Any],
+        config_over_limit: dict[str, Any],
+    ) -> None:
+        mock_repository.bulk_upsert = AsyncMock()
+        specs = [
+            AppConfigFragmentUpserterSpec(
+                config_name="theme",
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_SCOPE_ID,
+                config=config_at_limit,
+            ),
+            AppConfigFragmentUpserterSpec(
+                config_name="menu",
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_SCOPE_ID,
+                config=config_over_limit,
+            ),
+        ]
+
+        with pytest.raises(AppConfigFragmentTooLarge):
+            await service.bulk_upsert(
+                BulkUpsertAppConfigFragmentsAction(
+                    scope=AppConfigFragmentOperationScope(
+                        scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
+                    ),
+                    upserter_specs=specs,
+                )
+            )
+
+        mock_repository.bulk_upsert.assert_not_called()
 
     # --- get / search ---
 

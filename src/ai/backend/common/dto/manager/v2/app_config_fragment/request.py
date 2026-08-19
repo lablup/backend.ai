@@ -7,7 +7,10 @@ from typing import Any, Self
 from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import (
+    MAX_APP_CONFIG_FRAGMENT_BYTES,
+    AppConfigScopeType,
+)
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     AppConfigFragmentOrderField,
@@ -84,7 +87,12 @@ class AppConfigFragmentUpsertItem(BaseRequestModel):
     """One (config_name, config) pair to upsert at the request's scope."""
 
     config_name: str = Field(min_length=1, max_length=128, description="Registered config name.")
-    config: dict[str, Any] = Field(description="The fragment's JSON config document.")
+    config: dict[str, Any] = Field(
+        description=(
+            "The fragment's JSON config document, at most "
+            f"{MAX_APP_CONFIG_FRAGMENT_BYTES} bytes once serialized."
+        )
+    )
 
 
 class ScopedUpsertAppConfigFragmentsInput(BaseRequestModel):

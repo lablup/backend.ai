@@ -1254,7 +1254,9 @@ input AppConfigFragmentUpsertItem
   """Registered config name."""
   configName: String!
 
-  """The fragment's JSON config document."""
+  """
+  The fragment's JSON config document, at most 65536 bytes once serialized.
+  """
   config: JSON!
 }
 
