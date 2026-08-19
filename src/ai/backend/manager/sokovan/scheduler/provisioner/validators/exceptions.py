@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from datetime import datetime
-from decimal import Decimal
 from typing import override
 
 from aiohttp import web
@@ -16,8 +15,8 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
+from ai.backend.manager.views.sokovan.snapshot import SlotExcess
 
 
 class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):
@@ -49,8 +48,15 @@ class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):
         raise NotImplementedError
 
 
-def _format_slots(slots: Mapping[ResourceSlotName, Decimal]) -> str:
-    return " ".join(f"{k}={v}" for k, v in slots.items() if v)
+def _format_excesses(excesses: Sequence[SlotExcess]) -> str:
+    """One indented line per over-quota slot, with the numbers that made it fail."""
+    lines: list[str] = []
+    for excess in excesses:
+        lines.append(
+            f"  - {excess.slot_name}: used {excess.used} + requested {excess.requested}"
+            f" > limit {excess.limit} (over by {excess.excess})"
+        )
+    return "\n".join(lines)
 
 
 class ConcurrencyLimitExceeded(SchedulingValidationError):
@@ -112,16 +118,16 @@ class UserResourceQuotaExceeded(SchedulingValidationError):
     error_type = "https://api.backend.ai/probs/user-resource-quota-exceeded"
     error_title = "User resource quota exceeded."
 
-    _quota_slots: Mapping[ResourceSlotName, Decimal]
+    _excesses: Sequence[SlotExcess]
 
-    def __init__(self, *, quota_slots: Mapping[ResourceSlotName, Decimal]) -> None:
-        self._quota_slots = quota_slots
+    def __init__(self, *, excesses: Sequence[SlotExcess]) -> None:
+        self._excesses = list(excesses)
         super().__init__(self.summary())
 
     @override
     def summary(self) -> str:
         return (
-            f"Your default-keypair resource quota is exceeded. ({_format_slots(self._quota_slots)})"
+            f"Your default-keypair resource quota is exceeded.\n{_format_excesses(self._excesses)}"
         )
 
     @override
@@ -139,15 +145,15 @@ class ProjectResourceQuotaExceeded(SchedulingValidationError):
     error_type = "https://api.backend.ai/probs/group-resource-quota-exceeded"
     error_title = "Project resource quota exceeded."
 
-    _quota_slots: Mapping[ResourceSlotName, Decimal]
+    _excesses: Sequence[SlotExcess]
 
-    def __init__(self, *, quota_slots: Mapping[ResourceSlotName, Decimal]) -> None:
-        self._quota_slots = quota_slots
+    def __init__(self, *, excesses: Sequence[SlotExcess]) -> None:
+        self._excesses = list(excesses)
         super().__init__(self.summary())
 
     @override
     def summary(self) -> str:
-        return f"Your project resource quota is exceeded. ({_format_slots(self._quota_slots)})"
+        return f"Your project resource quota is exceeded.\n{_format_excesses(self._excesses)}"
 
     @override
     def error_code(self) -> ErrorCode:
@@ -164,15 +170,15 @@ class DomainResourceQuotaExceeded(SchedulingValidationError):
     error_type = "https://api.backend.ai/probs/domain-resource-quota-exceeded"
     error_title = "Domain resource quota exceeded."
 
-    _quota_slots: Mapping[ResourceSlotName, Decimal]
+    _excesses: Sequence[SlotExcess]
 
-    def __init__(self, *, quota_slots: Mapping[ResourceSlotName, Decimal]) -> None:
-        self._quota_slots = quota_slots
+    def __init__(self, *, excesses: Sequence[SlotExcess]) -> None:
+        self._excesses = list(excesses)
         super().__init__(self.summary())
 
     @override
     def summary(self) -> str:
-        return f"Your domain resource quota is exceeded. ({_format_slots(self._quota_slots)})"
+        return f"Your domain resource quota is exceeded.\n{_format_excesses(self._excesses)}"
 
     @override
     def error_code(self) -> ErrorCode:

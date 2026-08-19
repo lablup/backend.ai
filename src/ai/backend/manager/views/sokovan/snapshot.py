@@ -50,6 +50,20 @@ class SlotAllocation:
 
 
 @dataclass(frozen=True)
+class SlotExcess:
+    """One slot whose occupancy plus the new request passes a scope's quota."""
+
+    slot_name: ResourceSlotName
+    used: Decimal
+    requested: Decimal
+    limit: Decimal
+
+    @property
+    def excess(self) -> Decimal:
+        return self.used + self.requested - self.limit
+
+
+@dataclass(frozen=True)
 class ResourceLimit:
     """Slot quota owned by one scope (project/domain)."""
 
@@ -76,20 +90,29 @@ class ResourceAllocation:
     def empty(cls) -> ResourceAllocation:
         return ResourceAllocation(slots={})
 
-    def exceeds(self, request: ResourceRequest, limit: ResourceLimit) -> bool:
-        """True if allocated + requested exceeds the slot quota on any slot.
+    def exceeded_slots(self, request: ResourceRequest, limit: ResourceLimit) -> list[SlotExcess]:
+        """Every slot where allocated + requested exceeds the slot quota.
 
-        Missing keys count as zero on every side, matching the previous
-        ``ResourceSlot`` union-key comparison semantics.
+        Empty when the request fits. Missing keys count as zero on every side,
+        matching the previous ``ResourceSlot`` union-key comparison semantics.
         """
         slot_names = self.slots.keys() | request.slots.keys() | limit.slots.keys()
-        for slot_name in slot_names:
+        excesses: list[SlotExcess] = []
+        for slot_name in sorted(slot_names):
             allocation = self.slots.get(slot_name)
             allocated = allocation.allocated if allocation is not None else Decimal(0)
             requested = request.slots.get(slot_name, Decimal(0))
-            if allocated + requested > limit.slots.get(slot_name, Decimal(0)):
-                return True
-        return False
+            quota = limit.slots.get(slot_name, Decimal(0))
+            if allocated + requested > quota:
+                excesses.append(
+                    SlotExcess(
+                        slot_name=slot_name,
+                        used=allocated,
+                        requested=requested,
+                        limit=quota,
+                    )
+                )
+        return excesses
 
     def _merged_slots(self, request: ResourceRequest) -> dict[ResourceSlotName, SlotAllocation]:
         """Requested slots accumulate as reservations (the session is not running yet)."""
