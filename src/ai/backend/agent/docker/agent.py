@@ -41,7 +41,7 @@ from aiomonitor.task import preserve_termination_log
 from aiotools import TaskGroup
 from async_timeout import timeout
 from cachetools import LRUCache
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field
 
 from ai.backend.agent.agent import (
     ACTIVE_STATUS_SET,
@@ -211,8 +211,8 @@ known_glibc_distros: Final[dict[float, str]] = {
 
 class LogDriverOptions(BaseModel):
     """
-    Rotation options for the drivers that keep their own on-disk log files.
-    The Docker API takes every value as a string, under kebab-case keys.
+    Log rotation options. The Docker API takes every value as a string,
+    under kebab-case keys.
     """
 
     max_size: str = Field(serialization_alias="max-size")
@@ -224,34 +224,23 @@ class LogConfig(BaseModel):
     """
     The ``HostConfig.LogConfig`` payload of a container creation request,
     keyed in PascalCase as the Docker API expects.
-    Drivers that delegate log storage to the host carry no options at all.
     """
 
     type: ContainerLogDriver = Field(serialization_alias="Type")
-    config: LogDriverOptions | None = Field(default=None, serialization_alias="Config")
-
-    @field_serializer("config")
-    def _serialize_config(self, config: LogDriverOptions | None) -> dict[str, str]:
-        """Keep ``Config`` present as an empty object rather than dropping the key."""
-        if config is None:
-            return {}
-        return config.model_dump(by_alias=True)
+    config: LogDriverOptions = Field(serialization_alias="Config")
 
 
 def _build_log_config(local_config: AgentUnifiedConfig) -> LogConfig:
     """
     Build the ``HostConfig.LogConfig`` payload for a kernel container.
 
-    Only the drivers that keep their own on-disk files honor size-based rotation;
-    the others delegate log storage to the host and take no rotation options.
+    Every supported driver keeps its own on-disk log files, so the configured
+    total size is split across a fixed number of rotated files.
     """
     container_logs = local_config.container_logs
-    driver = container_logs.driver
-    if driver not in (ContainerLogDriver.LOCAL, ContainerLogDriver.JSON_FILE):
-        return LogConfig(type=driver)
     file_size = BinarySize(container_logs.max_length // _CONTAINER_LOG_FILE_COUNT)
     return LogConfig(
-        type=driver,
+        type=container_logs.driver,
         config=LogDriverOptions(
             max_size=f"{file_size:s}",
             max_file=str(_CONTAINER_LOG_FILE_COUNT),

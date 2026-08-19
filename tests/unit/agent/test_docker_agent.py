@@ -312,21 +312,22 @@ class TestBuildLogConfig:
         "driver",
         [ContainerLogDriver.LOCAL, ContainerLogDriver.JSON_FILE],
     )
-    def test_rotating_drivers_carry_size_options(self, driver: ContainerLogDriver) -> None:
+    def test_drivers_carry_size_options(self, driver: ContainerLogDriver) -> None:
         log_config = _build_log_config(_log_config(driver))
 
         assert log_config.type == driver
         assert log_config.config == LogDriverOptions(max_size="2m", max_file="5", compress="false")
 
-    def test_journald_takes_no_options(self) -> None:
-        log_config = _build_log_config(_log_config(ContainerLogDriver.JOURNALD))
-
-        assert log_config.type == ContainerLogDriver.JOURNALD
-        assert log_config.config is None
-
     @pytest.mark.parametrize(
         ("driver", "expected"),
         [
+            (
+                ContainerLogDriver.LOCAL,
+                {
+                    "Type": "local",
+                    "Config": {"max-size": "2m", "max-file": "5", "compress": "false"},
+                },
+            ),
             (
                 ContainerLogDriver.JSON_FILE,
                 {
@@ -334,7 +335,6 @@ class TestBuildLogConfig:
                     "Config": {"max-size": "2m", "max-file": "5", "compress": "false"},
                 },
             ),
-            (ContainerLogDriver.JOURNALD, {"Type": "journald", "Config": {}}),
         ],
     )
     def test_dumped_payload_uses_docker_api_keys(
