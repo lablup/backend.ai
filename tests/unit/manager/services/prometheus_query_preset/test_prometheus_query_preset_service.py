@@ -578,7 +578,7 @@ class TestPrometheusQueryPresetService:
     ) -> None:
         mock_repository.preview_template = AsyncMock()
 
-        action = PreviewPresetAction(query_template="rate(metric[$__rate_interval])")
+        action = PreviewPresetAction(query_template="metric{${unknown_var}}")
 
         with pytest.raises(InvalidMetricPresetTemplate):
             await service.preview_preset(action)

@@ -131,6 +131,14 @@ class TestPromQLTemplateRendererRender:
 
         assert result == case.expected
 
+    async def test_render_raises_on_unknown_placeholder(
+        self, renderer: PromQLTemplateRenderer
+    ) -> None:
+        preset = MetricPreset(template="metric{${unknown_var}}")
+
+        with pytest.raises(InvalidMetricPresetTemplate):
+            renderer.render(preset)
+
 
 class TestPromQLTemplateRendererValidate:
     """Tests for PromQLTemplateRenderer.validate() called from the service layer."""
@@ -158,6 +166,10 @@ class TestPromQLTemplateRendererValidate:
                 'metric{instance=~"prod-.*$"}',
                 id="regex_anchor_dollar",
             ),
+            pytest.param(
+                'rate(metric{mode!="idle"}[$__rate_interval])',
+                id="bare_dollar_is_literal",
+            ),
         ],
     )
     def test_accepts_valid_template(self, renderer: PromQLTemplateRenderer, template: str) -> None:
@@ -178,17 +190,29 @@ class TestPromQLTemplateRendererValidate:
     @pytest.mark.parametrize(
         "template",
         [
-            pytest.param('rate(metric{mode!="idle"}[$__rate_interval])', id="grafana_builtin"),
-            pytest.param('metric{job="$service"}', id="dollar_identifier"),
-            pytest.param('metric{region="${region}"}', id="braced_dollar_var"),
-            pytest.param("metric{$labels}", id="placeholder_without_braces"),
+            pytest.param('metric{region="${region}"}', id="unknown_name"),
             pytest.param("sum by (${GROUP_BY})(metric)", id="placeholder_wrong_case"),
+            pytest.param("metric{${lables}}", id="typo"),
         ],
     )
-    def test_rejects_unsupported_template_variables(
+    def test_rejects_unknown_placeholder_names(
         self, renderer: PromQLTemplateRenderer, template: str
     ) -> None:
         with pytest.raises(InvalidMetricPresetTemplate, match="Unsupported"):
+            renderer.validate(template)
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            pytest.param("metric{${labels | upper}}", id="filter"),
+            pytest.param("metric{${labels.attr}}", id="attribute_access"),
+            pytest.param("{% if labels %}metric{% endif %}", id="statement_block"),
+        ],
+    )
+    def test_rejects_non_substitution_constructs(
+        self, renderer: PromQLTemplateRenderer, template: str
+    ) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate, match="substitution is allowed"):
             renderer.validate(template)
 
     def test_rejects_blank_template(self, renderer: PromQLTemplateRenderer) -> None:

@@ -9,6 +9,7 @@ from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.exception import (
     BackendAIError,
     FailedToGetMetric,
+    InvalidMetricPresetTemplate,
     PrometheusConnectionError,
 )
 from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
@@ -189,7 +190,7 @@ class MetricRepository:
                 time_range=None,
                 time=evaluation_time.isoformat(),
             )
-        except (PrometheusConnectionError, FailedToGetMetric) as e:
+        except (PrometheusConnectionError, FailedToGetMetric, InvalidMetricPresetTemplate) as e:
             log.warning(
                 "Utilization query failed for preset {}: {}",
                 preset.id,

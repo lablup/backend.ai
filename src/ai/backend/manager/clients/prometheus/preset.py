@@ -1,17 +1,32 @@
 import re
-from collections.abc import Mapping, Sequence, Set
+from collections.abc import Callable, Iterator, Mapping, Sequence, Set
 from dataclasses import dataclass, field
 from enum import StrEnum
+from functools import lru_cache
 from typing import Final, Self
+
+from jinja2 import (
+    StrictUndefined,
+    Template,
+    TemplateError,
+    TemplateSyntaxError,
+    UndefinedError,
+    nodes,
+)
+from jinja2.sandbox import ImmutableSandboxedEnvironment
 
 from ai.backend.common.exception import InvalidMetricPresetTemplate
 
 PLACEHOLDER_NAMES = frozenset({"labels", "window", "group_by"})
 
-# `${labels}`, `${window}`, `${group_by}`; every other character is literal PromQL.
-_PLACEHOLDER_RE = re.compile(r"\$\{(" + "|".join(sorted(PLACEHOLDER_NAMES)) + r")\}")
-# Any `$`-sigil variable, so unknown ones can be reported instead of silently kept as literals.
-_ANY_VAR_RE = re.compile(r"\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*")
+# PromQL uses braces for label selectors, so the default `{{ }}` would collide
+# with the query language itself.
+_VARIABLE_START, _VARIABLE_END = "${", "}"
+
+# Literal text and `${ placeholder }` substitution only; statements and comments
+# reach the parser but are rejected here.
+_ALLOWED_NODE_TYPES = (nodes.Template, nodes.Output, nodes.TemplateData, nodes.Name)
+
 # Bare `{placeholder}` or any `{{{`: the pre-${} str.format syntax.
 _LEGACY_TEMPLATE_RE = re.compile(r"(?<![{$])\{(?:labels|window|group_by)\}(?!\})|\{\{\{")
 _PLACEHOLDER_HELP: Final[str] = ", ".join(f"${{{name}}}" for name in sorted(PLACEHOLDER_NAMES))
@@ -44,6 +59,12 @@ def regex_union(values: Sequence[str]) -> str:
     return "|".join(re.escape(value).replace(r"\-", "-") for value in values)
 
 
+def _walk(node: nodes.Node) -> Iterator[nodes.Node]:
+    yield node
+    for child in node.iter_child_nodes():
+        yield from _walk(child)
+
+
 def _escape_label_value(value: str) -> str:
     # PromQL string literals: escape backslash, double quote, newline, carriage return
     return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r")
@@ -67,27 +88,51 @@ class MetricPreset:
 
 
 class PromQLTemplateRenderer:
-    """Validates and renders PromQL templates built from a fixed placeholder set."""
+    """Validates and renders PromQL Jinja templates in a sandboxed environment."""
+
+    _env: ImmutableSandboxedEnvironment
+    _compile: Callable[[str], Template]
+
+    def __init__(self) -> None:
+        # Sandboxed: templates are user input from the admin API.
+        self._env = ImmutableSandboxedEnvironment(
+            variable_start_string=_VARIABLE_START,
+            variable_end_string=_VARIABLE_END,
+            undefined=StrictUndefined,
+        )
+        self._compile = lru_cache(maxsize=256)(self._env.from_string)
 
     def validate(self, template: str) -> None:
-        """Validate a PromQL template; raises ``InvalidMetricPresetTemplate``."""
+        """Validate a PromQL Jinja template; raises ``InvalidMetricPresetTemplate``."""
         if not template.strip():
             raise InvalidMetricPresetTemplate("Template must not be empty.")
-        unsupported_vars = [
-            match.group()
-            for match in _ANY_VAR_RE.finditer(template)
-            if not _PLACEHOLDER_RE.fullmatch(match.group())
-        ]
-        if unsupported_vars:
-            raise InvalidMetricPresetTemplate(
-                f"Unsupported template variables: {unsupported_vars}. "
-                f"Use placeholders {_PLACEHOLDER_HELP} or literal PromQL values."
-            )
         if _LEGACY_TEMPLATE_RE.search(template):
             raise InvalidMetricPresetTemplate(
                 "Legacy str.format template syntax is no longer supported; "
                 f"use {_PLACEHOLDER_HELP}: {template!r}"
             )
+        try:
+            ast = self._env.parse(template)
+        except TemplateSyntaxError as e:
+            raise InvalidMetricPresetTemplate(f"Invalid template syntax ({e}): {template!r}") from e
+        for node in _walk(ast):
+            if not isinstance(node, _ALLOWED_NODE_TYPES):
+                raise InvalidMetricPresetTemplate(
+                    f"Only {_VARIABLE_START} placeholder {_VARIABLE_END} substitution is allowed; "
+                    f"found {type(node).__name__}: {template!r}"
+                )
+        try:
+            # Smoke-render with empty values; StrictUndefined rejects unknown variables.
+            self._compile(template).render(labels="", window="", group_by="")
+        except UndefinedError as e:
+            raise InvalidMetricPresetTemplate(
+                f"Unsupported template variable ({e}). "
+                f"Use placeholders {_PLACEHOLDER_HELP} or literal PromQL values."
+            ) from e
+        except TemplateError as e:
+            raise InvalidMetricPresetTemplate(
+                f"Failed to render PromQL template ({type(e).__name__}: {e}): {template!r}"
+            ) from e
 
     def render(self, preset: MetricPreset) -> str:
         """Render the PromQL query with all preset values injected."""
@@ -95,9 +140,13 @@ class PromQLTemplateRenderer:
             f'{key}{value.operator}"{_escape_label_value(value.value)}"'
             for key, value in preset.labels.items()
         )
-        values = {
-            "labels": label_str,
-            "window": preset.window,
-            "group_by": ",".join(sorted(preset.group_by)),
-        }
-        return _PLACEHOLDER_RE.sub(lambda match: values[match.group(1)], preset.template)
+        try:
+            return self._compile(preset.template).render(
+                labels=label_str,
+                window=preset.window,
+                group_by=",".join(sorted(preset.group_by)),
+            )
+        except TemplateError as e:
+            raise InvalidMetricPresetTemplate(
+                f"Failed to render PromQL template ({type(e).__name__}: {e}): {preset.template!r}"
+            ) from e
