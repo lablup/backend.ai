@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "ต้องระบุ VFolder"
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "สร้างพรีเซต",
+    "Name": "ชื่อ",
+    "PresetDeleted": "ลบพรีเซตตัวแปรรันไทม์เรียบร้อยแล้ว",
+    "RuntimeVariantId": "รหัสตัวแปรรันไทม์",
+    "RuntimeVariantPreset": "พรีเซตตัวแปรรันไทม์",
+    "TabTitle": "พรีเซตตัวแปรรันไทม์"
+  },
   "adminSession": {
     "PendingSessions": "เซสชันที่รอดำเนินการ",
     "PendingSessionsScopedToResourceGroup": "แสดงเซสชันที่รอดำเนินการสำหรับกลุ่มทรัพยากรที่เลือกเท่านั้น สลับกลุ่มทรัพยากรเพื่อดูเซสชันในกลุ่มอื่น"
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "ประวัติการจัดตาราง",
     "SessionId": "ID เซสชัน",
     "StartChatTest": "ทดสอบในแชท",
+    "SwitchProjectConfirmContent": "การปรับใช้นี้เป็นของโปรเจกต์ \"{{projectName}}\" คุณจะถูกเปลี่ยนไปยังโปรเจกต์นั้นเพื่อดู ต้องการดำเนินการต่อหรือไม่",
+    "SwitchProjectConfirmTitle": "ต้องการสลับไปยังโปรเจกต์อื่นหรือไม่",
     "Tags": "แท็ก",
     "TagsPlaceholder": "ป้อนแท็ก คั่นด้วยเครื่องหมายจุลภาค",
     "TagsTooltip": "ป้ายกำกับที่ไม่บังคับสำหรับจัดระเบียบและกรองการปรับใช้ กด Enter หรือจุลภาคเพื่อเพิ่ม",
@@ -1690,6 +1700,7 @@
     "CouldNotCopyText": "ไม่สามารถคัดลอกข้อความ: ",
     "CreateButtonCode": "สร้าง",
     "CreateNotebookButton": "สร้างปุ่มโน้ตบุ๊ก",
+    "CreatedFolderIsReadOnly": "โฟลเดอร์ถูกสร้างด้วยสิทธิ์เมานต์แบบอ่านอย่างเดียว จึงไม่สามารถรับการดาวน์โหลดได้ กรุณาสร้างโฟลเดอร์ด้วยสิทธิ์เมานต์แบบอ่านและเขียน",
     "DownloadModelToFolder": "ดาวน์โหลดโมเดลไปยังโฟลเดอร์",
     "Downloading": "กำลังดาวน์โหลด...",
     "FailedToFetchRepositoryInformation": "ไม่สามารถดึงข้อมูลรีโพสิทอรีได้",
@@ -1706,6 +1717,12 @@
     "GitlabDefaultBranch": "ชื่อ Branch GitLab",
     "GitlabRepoWillBeFolder": "พื้นที่เก็บข้อมูล GitLab ที่นำเข้าจะถูกแปลงเป็นโฟลเดอร์และสามารถเมาท์ได้เมื่อเริ่มเซสชัน",
     "GitlabURL": "URL GitLab",
+    "HuggingFaceModelInfoUnavailable": "ไม่สามารถโหลดข้อมูลโมเดลได้ คุณยังสามารถเริ่มการนำเข้าได้",
+    "HuggingFaceModelIsDisabled": "โมเดลนี้ถูกปิดใช้งานบน Hugging Face จึงไม่สามารถดาวน์โหลดได้",
+    "HuggingFaceModelIsGated": "โมเดลนี้มีการจำกัดการเข้าถึง โปรดยอมรับสัญญาอนุญาตบน Hugging Face และกรอกโทเค็นการเข้าถึง มิฉะนั้นการดาวน์โหลดจะล้มเหลว",
+    "HuggingFaceModelNotFoundOrPrivate": "ไม่พบโมเดล หรือโมเดลเป็นแบบส่วนตัว โปรดตรวจสอบรหัสโมเดลหรือกรอกโทเค็นการเข้าถึง",
+    "HuggingFaceModelSize": "ขนาด",
+    "HuggingFaceModelSizeIncludesAllRevisions": "ขนาดรวมของที่เก็บข้อมูลรวมทุกรีวิชัน ขนาดที่ดาวน์โหลดจริงอาจเล็กกว่านี้",
     "HuggingFaceModelUrlOrId": "URL หรือ ID ของโมเดล Hugging Face",
     "HuggingFaceModelWillBeDownloaded": "โมเดล Hugging Face จะถูกดาวน์โหลดไปยังโฟลเดอร์ย่อยของโฟลเดอร์โมเดลที่เลือกโดยเซสชันแบบแบตช์",
     "HuggingFaceRevision": "Revision",
@@ -1727,6 +1744,7 @@
     "NotebookBadgeCodeMarkdown": "รหัสป้ายกำกับโน้ตบุ๊ก (Markdown)",
     "NotebookBadgeURL": "URL โน้ตบุ๊ก",
     "NotebookURL": "URL โน้ตบุ๊ก",
+    "OnlyWritableModelFoldersAreListed": "แสดงเฉพาะโฟลเดอร์โมเดลในโปรเจกต์ปัจจุบันที่คุณสามารถเมานต์ด้วยสิทธิ์เขียนได้",
     "Preparing": "กำลังเตรียมการ...",
     "ReadyToImport": "พร้อมนำเข้า",
     "RepoWillBeFolder": "พื้นที่เก็บข้อมูล GitHub ที่นำเข้าจะถูกแปลงเป็นโฟลเดอร์และสามารถเมาท์ได้เมื่อเริ่มเซสชัน",

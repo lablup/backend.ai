@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "El VFolder es obligatorio."
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "Crear Preset",
+    "Name": "Nombre",
+    "PresetDeleted": "El preset de runtime ha sido eliminado.",
+    "RuntimeVariantId": "ID de Runtime",
+    "RuntimeVariantPreset": "Preset de Runtime",
+    "TabTitle": "Presets de Runtime"
+  },
   "adminSession": {
     "PendingSessions": "Sesiones pendientes",
     "PendingSessionsScopedToResourceGroup": "Se muestran solo las sesiones pendientes del grupo de recursos seleccionado. Cambie de grupo de recursos para ver sesiones en otros grupos."
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "Historial de programación",
     "SessionId": "ID de sesión",
     "StartChatTest": "Probar en el chat",
+    "SwitchProjectConfirmContent": "Este despliegue pertenece al proyecto \"{{projectName}}\". Se le cambiará a ese proyecto para verlo. ¿Continuar?",
+    "SwitchProjectConfirmTitle": "¿Cambiar a otro proyecto?",
     "Tags": "Etiquetas",
     "TagsPlaceholder": "Ingrese etiquetas, separadas por comas",
     "TagsTooltip": "Etiquetas opcionales para organizar y filtrar implementaciones. Presione Enter o coma para añadir.",
@@ -1688,6 +1698,7 @@
     "CouldNotCopyText": "No se ha podido copiar el texto:",
     "CreateButtonCode": "Cree",
     "CreateNotebookButton": "Botón Crear bloc de notas",
+    "CreatedFolderIsReadOnly": "La carpeta se creó con permiso de montaje de solo lectura, por lo que no puede recibir la descarga. Cree una carpeta con permiso de lectura y escritura.",
     "DownloadModelToFolder": "Descargar modelo a la carpeta",
     "Downloading": "Descargando...",
     "FailedToFetchRepositoryInformation": "No se pudo obtener la información del repositorio.",
@@ -1704,6 +1715,12 @@
     "GitlabDefaultBranch": "Nombre de la rama de GitLab",
     "GitlabRepoWillBeFolder": "Los repositorios GitLab importados se convierten en carpetas y se pueden montar al iniciar la sesión.",
     "GitlabURL": "URL de GitLab",
+    "HuggingFaceModelInfoUnavailable": "No se pudo cargar la información del modelo. Aun así puede iniciar la importación.",
+    "HuggingFaceModelIsDisabled": "Este modelo está deshabilitado en Hugging Face y no se puede descargar.",
+    "HuggingFaceModelIsGated": "Este modelo tiene acceso restringido. Acepte su licencia en Hugging Face e introduzca un token de acceso, o la descarga fallará.",
+    "HuggingFaceModelNotFoundOrPrivate": "No se encontró el modelo, o es privado. Compruebe el ID del modelo o introduzca un token de acceso.",
+    "HuggingFaceModelSize": "Tamaño",
+    "HuggingFaceModelSizeIncludesAllRevisions": "Tamaño total del repositorio incluyendo todas las revisiones. La descarga real puede ser menor.",
     "HuggingFaceModelUrlOrId": "URL o ID del modelo de Hugging Face",
     "HuggingFaceModelWillBeDownloaded": "El modelo de Hugging Face se descarga en una subcarpeta de la carpeta de modelo seleccionada mediante una sesión por lotes.",
     "HuggingFaceRevision": "Revision",
@@ -1725,6 +1742,7 @@
     "NotebookBadgeCodeMarkdown": "Código de la insignia del cuaderno (Markdown)",
     "NotebookBadgeURL": "URL del cuaderno",
     "NotebookURL": "URL del cuaderno",
+    "OnlyWritableModelFoldersAreListed": "Solo se muestran las carpetas de modelos del proyecto actual que puede montar con permiso de escritura.",
     "Preparing": "Preparando...",
     "ReadyToImport": "Listo para importar",
     "RepoWillBeFolder": "Los repositorios de GitHub importados se convierten en carpetas y se pueden montar al iniciar la sesión.",

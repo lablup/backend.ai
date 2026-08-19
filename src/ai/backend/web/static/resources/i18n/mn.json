@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "VFolder шаардлагатай."
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "Урьдчилсан тохиргоо үүсгэх",
+    "Name": "Нэр",
+    "PresetDeleted": "Ажиллах орчны урьдчилсан тохиргоо устгагдлаа.",
+    "RuntimeVariantId": "Ажиллах орчны ID",
+    "RuntimeVariantPreset": "Ажиллах орчны урьдчилсан тохиргоо",
+    "TabTitle": "Ажиллах орчны урьдчилсан тохиргоонууд"
+  },
   "adminSession": {
     "PendingSessions": "Хүлээгдэж буй сессүүд",
     "PendingSessionsScopedToResourceGroup": "Зөвхөн сонгосон нөөцийн бүлгийн хүлээгдэж буй сессүүдийг харуулж байна. Бусад бүлгийн сессүүдийг харахын тулд нөөцийн бүлгийг сэлгэнэ үү."
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "Хуваарилалтын түүх",
     "SessionId": "Сессийн ID",
     "StartChatTest": "Чатад турших",
+    "SwitchProjectConfirmContent": "Энэ байршуулалт \"{{projectName}}\" төсөлд хамаарна. Үүнийг харахын тулд тухайн төсөл рүү шилжүүлэх болно. Үргэлжлүүлэх үү?",
+    "SwitchProjectConfirmTitle": "Өөр төсөл рүү шилжих үү?",
     "Tags": "Шошго",
     "TagsPlaceholder": "Таг оруулах, таслалаар тусгаарлана уу",
     "TagsTooltip": "Байршуулалтуудыг зохион байгуулах, шүүхэд зориулсан нэмэлт шошгонууд. Нэмэхийн тулд Enter эсвэл таслал дарна уу.",
@@ -1689,6 +1699,7 @@
     "CouldNotCopyText": "Текстийг хуулж чадсангүй:",
     "CreateButtonCode": "Үүсгэх",
     "CreateNotebookButton": "Jupyter Notebook товчлуур үүсгэх",
+    "CreatedFolderIsReadOnly": "Хавтас зөвхөн унших холболтын эрхтэй үүссэн тул татаж авах боломжгүй. Унших, бичих холболтын эрхтэй хавтас үүсгэнэ үү.",
     "DownloadModelToFolder": "Загварыг хавтас руу татах",
     "Downloading": "Татаж авч байна ...",
     "FailedToFetchRepositoryInformation": "Репозиторийн мэдээллийг авахад амжилтгүй боллоо.",
@@ -1705,6 +1716,12 @@
     "GitlabDefaultBranch": "GitLab салбарын нэр",
     "GitlabRepoWillBeFolder": "Импортын GitLab репозиторуудыг хавтас болгон хөрвүүлдэг бөгөөд сесс эхлэхэд холбож болно.",
     "GitlabURL": "GitLab URL",
+    "HuggingFaceModelInfoUnavailable": "Загварын мэдээллийг ачаалж чадсангүй. Импортыг үргэлжлүүлэн эхлүүлэх боломжтой.",
+    "HuggingFaceModelIsDisabled": "Энэ загвар Hugging Face дээр идэвхгүй болсон тул татаж авах боломжгүй.",
+    "HuggingFaceModelIsGated": "Энэ загвар хандалт хязгаарлагдсан. Hugging Face дээр лицензийг нь зөвшөөрч, хандалтын токен оруулаагүй бол татаж авалт амжилтгүй болно.",
+    "HuggingFaceModelNotFoundOrPrivate": "Загвар олдсонгүй, эсвэл хувийн байна. Загварын ID-г шалгах эсвэл хандалтын токен оруулна уу.",
+    "HuggingFaceModelSize": "Хэмжээ",
+    "HuggingFaceModelSizeIncludesAllRevisions": "Бүх хувилбарыг багтаасан репозиторийн нийт хэмжээ. Бодит татаж авалт үүнээс бага байж болно.",
     "HuggingFaceModelUrlOrId": "Hugging Face загварын URL эсвэл ID",
     "HuggingFaceModelWillBeDownloaded": "Hugging Face загварыг сонгосон загварын хавтасны дэд хавтас руу багц сессээр татаж авна.",
     "HuggingFaceRevision": "Revision",
@@ -1726,6 +1743,7 @@
     "NotebookBadgeCodeMarkdown": "Jupyter Notebook-ийн код (Markdown)",
     "NotebookBadgeURL": "Jupyter Notebook-ийн тэмдэгийн URL",
     "NotebookURL": "Jupyter Notebook-ийн URL",
+    "OnlyWritableModelFoldersAreListed": "Зөвхөн одоогийн төсөлд бичих эрхээр холбож болох загварын хавтаснууд харагдана.",
     "Preparing": "Бэлтгэж байна ...",
     "ReadyToImport": "Импортлоход бэлэн байна",
     "RepoWillBeFolder": "Импортоор оруулсан GitHub репозиторыг фолдер болгон хөрвүүлдэг бөгөөд Session эхлэхэд холбож болдог.",

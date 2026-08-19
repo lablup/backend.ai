@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "VFolder는 필수입니다."
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "프리셋 생성",
+    "Name": "이름",
+    "PresetDeleted": "런타임 프리셋이 삭제되었습니다.",
+    "RuntimeVariantId": "런타임 ID",
+    "RuntimeVariantPreset": "런타임 프리셋",
+    "TabTitle": "런타임 프리셋"
+  },
   "adminSession": {
     "PendingSessions": "대기 세션",
     "PendingSessionsScopedToResourceGroup": "선택한 자원 그룹의 대기 세션만 표시하고 있습니다. 다른 그룹의 세션을 보려면 자원 그룹을 전환하세요."
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "스케줄링 기록",
     "SessionId": "세션 ID",
     "StartChatTest": "채팅으로 테스트하기",
+    "SwitchProjectConfirmContent": "이 배포는 \"{{projectName}}\" 프로젝트에 속해 있습니다. 이 배포를 보려면 해당 프로젝트로 전환합니다. 진행할까요?",
+    "SwitchProjectConfirmTitle": "다른 프로젝트로 전환할까요?",
     "Tags": "태그",
     "TagsPlaceholder": "쉼표로 구분하여 태그를 입력하세요",
     "TagsTooltip": "배포를 정리하고 필터링하기 위한 선택적 라벨입니다. Enter 또는 쉼표로 추가하세요.",
@@ -1690,6 +1700,7 @@
     "CouldNotCopyText": "다음 텍스트 복사에 실패했습니다 : ",
     "CreateButtonCode": "배지 코드 생성",
     "CreateNotebookButton": "노트북 실행 버튼 만들기",
+    "CreatedFolderIsReadOnly": "읽기 전용 마운트 권한으로 폴더를 만들어 모델을 내려받을 수 없습니다. 읽기 및 쓰기 마운트 권한으로 폴더를 만드세요.",
     "DownloadModelToFolder": "모델을 폴더로 다운로드",
     "Downloading": "다운로드 중...",
     "FailedToFetchRepositoryInformation": "저장소 정보를 가져오지 못했습니다.",
@@ -1706,6 +1717,12 @@
     "GitlabDefaultBranch": "GitLab 브랜치 이름",
     "GitlabRepoWillBeFolder": "가져온 GitLab 저장소는 폴더로 변환되며, 세션을 시작할 때 마운트할 수 있습니다.",
     "GitlabURL": "GitLab 주소",
+    "HuggingFaceModelInfoUnavailable": "모델 정보를 불러오지 못했습니다. 가져오기는 그대로 진행할 수 있습니다.",
+    "HuggingFaceModelIsDisabled": "이 모델은 Hugging Face에서 비활성화되어 다운로드할 수 없습니다.",
+    "HuggingFaceModelIsGated": "이 모델은 접근 제한(gated) 모델입니다. Hugging Face에서 라이선스에 동의하고 액세스 토큰을 입력하지 않으면 다운로드에 실패합니다.",
+    "HuggingFaceModelNotFoundOrPrivate": "모델을 찾을 수 없거나 비공개 모델입니다. 모델 ID를 확인하거나 액세스 토큰을 입력하세요.",
+    "HuggingFaceModelSize": "크기",
+    "HuggingFaceModelSizeIncludesAllRevisions": "모든 리비전을 포함한 저장소 전체 크기입니다. 실제 다운로드 용량은 더 작을 수 있습니다.",
     "HuggingFaceModelUrlOrId": "Hugging Face 모델 URL 또는 ID",
     "HuggingFaceModelWillBeDownloaded": "배치 세션을 통해 Hugging Face 모델을 선택한 모델 폴더의 하위 폴더로 다운로드합니다.",
     "HuggingFaceRevision": "리비전",
@@ -1727,6 +1744,7 @@
     "NotebookBadgeCodeMarkdown": "노트북 배지 코드(Markdown)",
     "NotebookBadgeURL": "노트북 주소",
     "NotebookURL": "가져올 노트북 URL",
+    "OnlyWritableModelFoldersAreListed": "현재 프로젝트에서 쓰기 권한으로 마운트할 수 있는 모델 폴더만 표시됩니다.",
     "Preparing": "준비 중...",
     "ReadyToImport": "가져올 준비가 완료되었습니다.",
     "RepoWillBeFolder": "가져온 GitHub 저장소는 폴더로 변환되며, 세션을 시작할 때 마운트할 수 있습니다.",

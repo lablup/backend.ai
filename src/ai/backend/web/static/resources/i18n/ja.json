@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "VFolderは必須です。"
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "プリセットを作成",
+    "Name": "名前",
+    "PresetDeleted": "ランタイムバリアントプリセットが削除されました。",
+    "RuntimeVariantId": "ランタイムバリアント ID",
+    "RuntimeVariantPreset": "ランタイムバリアントプリセット",
+    "TabTitle": "ランタイムバリアントプリセット"
+  },
   "adminSession": {
     "PendingSessions": "保留中のセッション",
     "PendingSessionsScopedToResourceGroup": "選択したリソースグループの保留中のセッションのみを表示しています。他のグループのセッションを表示するにはリソースグループを切り替えてください。"
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "スケジュール履歴",
     "SessionId": "セッションID",
     "StartChatTest": "チャットでテスト",
+    "SwitchProjectConfirmContent": "このデプロイは「{{projectName}}」プロジェクトに属しています。表示するには、そのプロジェクトに切り替わります。続行しますか？",
+    "SwitchProjectConfirmTitle": "別のプロジェクトに切り替えますか？",
     "Tags": "タグ",
     "TagsPlaceholder": "タグをカンマ区切りで入力してください",
     "TagsTooltip": "デプロイメントを整理・フィルタリングするためのオプションのラベル。EnterまたはEnterキーを押して追加してください。",
@@ -1690,6 +1700,7 @@
     "CouldNotCopyText": "テキストをコピーできませんでした：",
     "CreateButtonCode": "作成する",
     "CreateNotebookButton": "ノートブック実行ボタン生成",
+    "CreatedFolderIsReadOnly": "読み取り専用のマウント権限でフォルダが作成されたため、ダウンロード先に使用できません。読み取り・書き込み権限でフォルダを作成してください。",
     "DownloadModelToFolder": "モデルをフォルダにダウンロード",
     "Downloading": "ダウンロード中...",
     "FailedToFetchRepositoryInformation": "リポジトリ情報の取得に失敗しました。",
@@ -1706,6 +1717,12 @@
     "GitlabDefaultBranch": "GitLab ブランチ名",
     "GitlabRepoWillBeFolder": "インポートしたGitLabリポジトリはフォルダに変換され、セッション開始時にマウントすることができます。",
     "GitlabURL": "GitLabアドレス",
+    "HuggingFaceModelInfoUnavailable": "モデル情報を取得できませんでした。インポートはそのまま実行できます。",
+    "HuggingFaceModelIsDisabled": "このモデルは Hugging Face で無効化されているため、ダウンロードできません。",
+    "HuggingFaceModelIsGated": "このモデルはゲート付きです。Hugging Face でライセンスに同意し、アクセストークンを入力しないとダウンロードに失敗します。",
+    "HuggingFaceModelNotFoundOrPrivate": "モデルが見つからないか、非公開です。モデル ID を確認するか、アクセストークンを入力してください。",
+    "HuggingFaceModelSize": "サイズ",
+    "HuggingFaceModelSizeIncludesAllRevisions": "すべてのリビジョンを含むリポジトリ全体のサイズです。実際のダウンロード容量はこれより小さい場合があります。",
     "HuggingFaceModelUrlOrId": "Hugging Face モデルの URL または ID",
     "HuggingFaceModelWillBeDownloaded": "Hugging Face モデルは、バッチセッションによって選択したモデルフォルダのサブフォルダにダウンロードされます。",
     "HuggingFaceRevision": "Revision",
@@ -1727,6 +1744,7 @@
     "NotebookBadgeCodeMarkdown": "ノートブックバッジコード（マークダウン）",
     "NotebookBadgeURL": "ノートブックのURL",
     "NotebookURL": "ノートブックのURL",
+    "OnlyWritableModelFoldersAreListed": "現在のプロジェクトで書き込み権限でマウントできるモデルフォルダのみ表示されます。",
     "Preparing": "準備...",
     "ReadyToImport": "インポートする準備ができました",
     "RepoWillBeFolder": "インポートされたGitHubリポジトリはフォルダーに変換され、セッションの開始時にマウントできます。",
