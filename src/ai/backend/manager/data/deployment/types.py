@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 from uuid import UUID
 
 import yarl
@@ -22,6 +22,7 @@ from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
@@ -1180,7 +1181,7 @@ class ReplicaStateData:
 
 
 @dataclass
-class ModelDeploymentData:
+class ModelDeploymentData(EntityData):
     """Modern (v2 / GraphQL) deployment projection.
 
     Carries revisions as ids only (``current_revision_id`` /
@@ -1207,6 +1208,10 @@ class ModelDeploymentData:
     policy: DeploymentPolicyData | None = None
     access_token_ids: list[UUID] | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.id
 
 
 @dataclass

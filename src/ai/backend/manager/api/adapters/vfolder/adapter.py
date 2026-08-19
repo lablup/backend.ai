@@ -6,6 +6,7 @@ import secrets
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -531,8 +532,12 @@ class VFolderAdapter(BaseAdapter):
             policy=policy,
         )
 
-        result = await self._processors.deployment.create_deployment.wait_for_complete(
-            CreateDeploymentAction(creator=creator, auto_activate=True)
+        result = await self._processors.deployment.create_deployment.run(
+            CreateDeploymentAction(
+                project_id=ProjectID(creator.metadata.project),
+                creator=creator,
+                auto_activate=True,
+            )
         )
         return DeployVFolderPayload(
             deployment_id=result.data.id,

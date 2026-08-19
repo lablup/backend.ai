@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.deployment import DeploymentID
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.creator import ModelRevisionCreator
 from ai.backend.manager.data.deployment.types import ModelRevisionData
@@ -13,13 +11,13 @@ from ai.backend.manager.services.deployment.actions.model_revision.base import (
 
 @dataclass
 class AddModelRevisionAction(ModelRevisionBaseAction):
-    model_deployment_id: DeploymentID
     adder: ModelRevisionCreator
     auto_activate: bool
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "add_model_revision"
 
     @override
     @classmethod
@@ -28,9 +26,5 @@ class AddModelRevisionAction(ModelRevisionBaseAction):
 
 
 @dataclass
-class AddModelRevisionActionResult(BaseActionResult):
+class AddModelRevisionActionResult:
     revision: ModelRevisionData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.revision.id)

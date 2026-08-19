@@ -7,6 +7,7 @@ from uuid import UUID
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.model_card import ModelCardID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
@@ -549,8 +550,12 @@ class ModelCardAdapter(BaseAdapter):
             policy=policy,
         )
 
-        result = await self._processors.deployment.create_deployment.wait_for_complete(
-            CreateDeploymentAction(creator=creator, auto_activate=True)
+        result = await self._processors.deployment.create_deployment.run(
+            CreateDeploymentAction(
+                project_id=ProjectID(creator.metadata.project),
+                creator=creator,
+                auto_activate=True,
+            )
         )
         return DeployModelCardPayload(
             deployment_id=result.data.id,

@@ -7,24 +7,22 @@ from decimal import Decimal
 from typing import override
 
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.deployment.actions.model_revision.base import (
-    ModelRevisionBaseAction,
-)
+from ai.backend.manager.services.deployment.actions.base import DeploymentGlobalAction
 
 
 @dataclass
-class SearchRevisionResourceSlotsAction(ModelRevisionBaseAction):
+class SearchRevisionResourceSlotsAction(DeploymentGlobalAction):
     """Action to search resource slots allocated to a deployment revision."""
 
     revision_id: DeploymentRevisionID
     querier: BatchQuerier
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.revision_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_revision_resource_slots"
 
     @override
     @classmethod
@@ -33,14 +31,10 @@ class SearchRevisionResourceSlotsAction(ModelRevisionBaseAction):
 
 
 @dataclass
-class SearchRevisionResourceSlotsActionResult(BaseActionResult):
+class SearchRevisionResourceSlotsActionResult:
     """Result of searching revision resource slots."""
 
     items: list[tuple[str, Decimal]]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

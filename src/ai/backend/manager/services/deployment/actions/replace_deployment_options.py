@@ -1,14 +1,10 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.deployment import DeploymentID
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import DeploymentOptions
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.services.deployment.actions.base import (
     DeploymentSingleEntityAction,
-    DeploymentSingleEntityActionResult,
 )
 
 
@@ -20,16 +16,12 @@ class ReplaceDeploymentOptionsAction(DeploymentSingleEntityAction):
     user can replace options on their own deployment.
     """
 
-    deployment_id: DeploymentID
     options: DeploymentOptions
 
     @override
-    def target_entity_id(self) -> str:
-        return str(self.deployment_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.MODEL_DEPLOYMENT, str(self.deployment_id))
+    @classmethod
+    def action_name(cls) -> str:
+        return "replace_deployment_options"
 
     @override
     @classmethod
@@ -38,16 +30,11 @@ class ReplaceDeploymentOptionsAction(DeploymentSingleEntityAction):
 
 
 @dataclass
-class ReplaceDeploymentOptionsActionResult(DeploymentSingleEntityActionResult):
+class ReplaceDeploymentOptionsActionResult:
     """Result of replacing a deployment's ``options`` surface.
 
     Carries only the refreshed :class:`DeploymentOptions` — callers that
     need the surrounding deployment node are expected to re-fetch it.
     """
 
-    deployment_id: DeploymentID
     options: DeploymentOptions
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.deployment_id)

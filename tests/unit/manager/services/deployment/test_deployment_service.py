@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
-from typing import Any, cast, override
+from typing import cast, override
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -31,13 +31,6 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
 )
 from ai.backend.common.schema.deployment import BlueGreenSpec, IntOrPercent, RollingUpdateSpec
 from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
 from ai.backend.manager.clients.appproxy.client import AppProxyClient, AppProxyClientPool
 from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.data.deployment.creator import (
@@ -66,11 +59,10 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
+from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.creators import EndpointTokenCreatorSpec
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
 )
@@ -81,14 +73,12 @@ from ai.backend.manager.services.deployment.actions.deployment_policy import (
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
 )
-from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import (
     DeploymentService,
     _convert_deployment_info_to_data,
     _convert_deployment_info_to_legacy_data,
 )
 from ai.backend.manager.sokovan.deployment import DeploymentController
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 
 class DeploymentServiceBaseFixtures:
@@ -121,22 +111,6 @@ class DeploymentServiceBaseFixtures:
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
             appproxy_client_pool=mock_appproxy_client_pool,
-        )
-
-    @pytest.fixture
-    def processors(self, deployment_service: DeploymentService) -> DeploymentProcessors:
-        """Create DeploymentProcessors with mock DeploymentService."""
-        return DeploymentProcessors(
-            deployment_service,
-            [],
-            ActionValidators(
-                virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-                rbac=RBACValidators(
-                    scope=MagicMock(spec=ScopeActionRBACValidator),
-                    single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
-                    bulk=MagicMock(spec=BulkActionRBACValidator),
-                ),
-            ),
         )
 
     @pytest.fixture
@@ -198,7 +172,7 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
 
     async def test_upsert_deployment_policy_insert(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         deployment_policy_data: DeploymentPolicyData,
         endpoint_id: uuid.UUID,
@@ -209,9 +183,11 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
             return_value=DeploymentPolicyUpsertResult(data=deployment_policy_data, created=True)
         )
 
-        action = UpsertDeploymentPolicyAction(upserter=rolling_upserter)
+        action = UpsertDeploymentPolicyAction(
+            deployment_id=DeploymentID(rolling_upserter.deployment_id), upserter=rolling_upserter
+        )
 
-        result = await processors.upsert_deployment_policy.wait_for_complete(action)
+        result = await deployment_service.upsert_deployment_policy(action)
 
         assert result.created is True
         assert result.data == deployment_policy_data
@@ -223,7 +199,7 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
 
     async def test_upsert_deployment_policy_update(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         blue_green_upserter: DeploymentPolicyUpserter,
         blue_green_policy_data: DeploymentPolicyData,
@@ -233,9 +209,12 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
             return_value=DeploymentPolicyUpsertResult(data=blue_green_policy_data, created=False)
         )
 
-        action = UpsertDeploymentPolicyAction(upserter=blue_green_upserter)
+        action = UpsertDeploymentPolicyAction(
+            deployment_id=DeploymentID(blue_green_upserter.deployment_id),
+            upserter=blue_green_upserter,
+        )
 
-        result = await processors.upsert_deployment_policy.wait_for_complete(action)
+        result = await deployment_service.upsert_deployment_policy(action)
 
         assert result.created is False
         assert result.data == blue_green_policy_data
@@ -263,7 +242,7 @@ class TestSearchDeploymentPolicies(DeploymentServiceBaseFixtures):
 
     async def test_search_deployment_policies_success(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         deployment_policy_data: DeploymentPolicyData,
         default_querier: BatchQuerier,
@@ -280,7 +259,7 @@ class TestSearchDeploymentPolicies(DeploymentServiceBaseFixtures):
 
         action = SearchDeploymentPoliciesAction(querier=default_querier)
 
-        result = await processors.search_deployment_policies.wait_for_complete(action)
+        result = await deployment_service.search_deployment_policies(action)
 
         assert result.data == [deployment_policy_data]
         assert result.total_count == 1
@@ -292,7 +271,7 @@ class TestSearchDeploymentPolicies(DeploymentServiceBaseFixtures):
 
     async def test_search_deployment_policies_empty_result(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         default_querier: BatchQuerier,
     ) -> None:
@@ -308,14 +287,14 @@ class TestSearchDeploymentPolicies(DeploymentServiceBaseFixtures):
 
         action = SearchDeploymentPoliciesAction(querier=default_querier)
 
-        result = await processors.search_deployment_policies.wait_for_complete(action)
+        result = await deployment_service.search_deployment_policies(action)
 
         assert result.data == []
         assert result.total_count == 0
 
     async def test_search_deployment_policies_with_pagination(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         deployment_policy_data: DeploymentPolicyData,
         paginated_querier: BatchQuerier,
@@ -332,7 +311,7 @@ class TestSearchDeploymentPolicies(DeploymentServiceBaseFixtures):
 
         action = SearchDeploymentPoliciesAction(querier=paginated_querier)
 
-        result = await processors.search_deployment_policies.wait_for_complete(action)
+        result = await deployment_service.search_deployment_policies(action)
 
         assert result.total_count == 25
         assert result.has_next_page is True
@@ -507,7 +486,7 @@ class TestAddModelRevision(ModelRevisionFixtures):
 
     async def test_add_model_revision_delegates_to_controller(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_controller: MagicMock,
         deployment_id: uuid.UUID,
         requester: UserData,
@@ -524,11 +503,11 @@ class TestAddModelRevision(ModelRevisionFixtures):
         mock_deployment_controller.add_deployment_revision = AsyncMock(return_value=revision_data)
 
         action = AddModelRevisionAction(
-            model_deployment_id=DeploymentID(deployment_id),
+            deployment_id=DeploymentID(deployment_id),
             adder=revision_creator,
             auto_activate=False,
         )
-        result = await processors.add_model_revision.wait_for_complete(action)
+        result = await deployment_service.add_model_revision(action)
 
         assert result.revision == revision_data
         mock_deployment_controller.add_deployment_revision.assert_awaited_once_with(
@@ -673,6 +652,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         create`` is producing tokens that app-proxy worker rejects with 401.
         """
         action = CreateAccessTokenAction(
+            deployment_id=DeploymentID(deployment_id),
             creator=ModelDeploymentAccessTokenCreator(
                 model_deployment_id=DeploymentID(deployment_id),
                 expires_at=datetime(2099, 1, 1, tzinfo=UTC),
@@ -684,9 +664,8 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
 
         repo_call = configure_repository.create_access_token.await_args
         assert repo_call is not None
-        creator = cast(RBACEntityCreator[Any], repo_call.args[0])
-        spec = cast(EndpointTokenCreatorSpec, creator.spec)
-        assert spec.token == sample_coordinator_jwt
+        creator = cast(EndpointTokenCreator, repo_call.args[1])
+        assert creator.token == sample_coordinator_jwt
 
 
 class TestConvertDeploymentInfoToData:

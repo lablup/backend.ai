@@ -6,19 +6,19 @@ from typing import override
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import ModelRevisionData
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.deployment.actions.model_revision.base import (
-    ModelRevisionBaseAction,
-)
+from ai.backend.manager.services.deployment.actions.base import DeploymentGlobalAction
 
 
 @dataclass
-class SearchRevisionsAction(ModelRevisionBaseAction):
+class GlobalSearchRevisionsAction(DeploymentGlobalAction):
+    """Page through model revisions across every deployment."""
+
     querier: BatchQuerier
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "search_revisions"
+        return "global_search_revisions"
 
     @override
     @classmethod
@@ -27,7 +27,7 @@ class SearchRevisionsAction(ModelRevisionBaseAction):
 
 
 @dataclass
-class SearchRevisionsActionResult:
+class GlobalSearchRevisionsActionResult:
     data: list[ModelRevisionData]
     total_count: int
     has_next_page: bool

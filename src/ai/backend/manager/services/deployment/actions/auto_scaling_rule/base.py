@@ -1,11 +1,11 @@
-from typing import override
+from dataclasses import dataclass
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseAction
+from ai.backend.manager.services.deployment.actions.base import DeploymentSingleEntityAction
 
 
-class AutoScalingRuleBaseAction(BaseAction):
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.DEPLOYMENT_AUTO_SCALING_RULE
+@dataclass
+class AutoScalingRuleBaseAction(DeploymentSingleEntityAction):
+    """Base for an operation on a deployment's auto-scaling rules.
+
+    Answered for by the deployment: what is touched lives under it.
+    """

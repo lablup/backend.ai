@@ -89,7 +89,8 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scheduling_history import (
     RouteHistoryRow,
@@ -105,6 +106,7 @@ from ai.backend.manager.repositories.base.updater import (
     Updater,
 )
 from ai.backend.manager.repositories.base.upserter import Upserter
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.scheduling_history.creators import DeploymentHistoryCreatorSpec
 
 from .db_source import DeploymentDBSource
@@ -165,12 +167,14 @@ class DeploymentRepository:
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
         storage_manager: StorageSessionManager,
         valkey_stat: ValkeyStatClient,
         valkey_live: ValkeyLiveClient,
         valkey_schedule: ValkeyScheduleClient,
     ) -> None:
         self._db_source = DeploymentDBSource(db, storage_manager)
+        self._v2_ops = v2_ops_provider
         self._storage_source = DeploymentStorageSource(storage_manager)
         self._valkey_stat = valkey_stat
         self._valkey_live = valkey_live
@@ -1542,18 +1546,11 @@ class DeploymentRepository:
 
     @deployment_repository_resilience.apply()
     async def create_access_token(
-        self,
-        creator: RBACEntityCreator[EndpointTokenRow],
-    ) -> EndpointTokenRow:
-        """Create a new access token for a model deployment.
-
-        Args:
-            creator: RBACEntityCreator containing the EndpointTokenCreatorSpec.
-
-        Returns:
-            Created EndpointTokenRow.
-        """
-        return await self._db_source.create_access_token(creator)
+        self, deployment_id: DeploymentID, creator: EndpointTokenCreator
+    ) -> ModelDeploymentAccessTokenData:
+        """Register an access token under the deployment it grants access to."""
+        async with self._v2_ops.write_ops() as w:
+            return await w.create_field_entity(deployment_id, creator)
 
     @deployment_repository_resilience.apply()
     async def get_access_token(

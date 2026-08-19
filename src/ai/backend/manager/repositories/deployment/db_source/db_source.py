@@ -3164,24 +3164,6 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             return await execute_purger(db_sess, purger)
 
-    # ========== Access Token Operations ==========
-
-    async def create_access_token(
-        self,
-        creator: RBACEntityCreator[EndpointTokenRow],
-    ) -> EndpointTokenRow:
-        """Create a new access token for a model deployment.
-
-        Args:
-            creator: RBACEntityCreator containing the EndpointTokenCreatorSpec.
-
-        Returns:
-            Created EndpointTokenRow.
-        """
-        async with self._begin_session_read_committed() as db_sess:
-            result = await execute_rbac_entity_creator(db_sess, creator)
-            return result.row
-
     # ========== Additional Search Operations ==========
 
     async def search_auto_scaling_rules(

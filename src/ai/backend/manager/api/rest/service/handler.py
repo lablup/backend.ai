@@ -23,6 +23,7 @@ from ai.backend.common.api_handlers import (
     QueryParam,
 )
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.model_serving.request import (
@@ -359,6 +360,7 @@ class ServiceHandler:
         validation_result = await self._run_validation(request, params)
 
         deployment_action = CreateLegacyDeploymentAction(
+            project_id=ProjectID(validation_result.group_id),
             draft=DeploymentCreationDraft(
                 metadata=DeploymentMetadata(
                     name=params.service_name,
@@ -378,10 +380,10 @@ class ServiceHandler:
                 network=DeploymentNetworkSpec(
                     open_to_public=params.open_to_public,
                 ),
-            )
+            ),
         )
         deployment_result: CreateLegacyDeploymentActionResult = (
-            await self._deployment.create_legacy_deployment.wait_for_complete(deployment_action)
+            await self._deployment.create_legacy_deployment.run(deployment_action)
         )
         deployment_info = deployment_result.data
         model_revision = _resolve_target_revision_data(deployment_info)
@@ -441,7 +443,7 @@ class ServiceHandler:
 
         deployment_action = DestroyDeploymentAction(deployment_id=DeploymentID(params.service_id))
         deployment_result: DestroyDeploymentActionResult = (
-            await self._deployment.destroy_deployment.wait_for_complete(deployment_action)
+            await self._deployment.destroy_deployment.run(deployment_action)
         )
         resp = SuccessResponseModel(success=deployment_result.success)
         return APIResponse.build(HTTPStatus.OK, resp)

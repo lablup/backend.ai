@@ -37,6 +37,7 @@ from ai.backend.manager.services.artifact_registry.processors import ArtifactReg
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
+from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
 )
@@ -179,6 +180,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     TemplateProcessors(registry.group(), MagicMock())
     SchedulingHistoryProcessors(registry.group(), MagicMock())
     SessionProcessors(registry.group(), MagicMock())
+    DeploymentProcessors(registry.group(), MagicMock())
 
     wired = sorted(cls.action_name() for cls in registry.wired_actions())
     defined = sorted(cls.action_name() for cls in _concrete_v2_action_classes())

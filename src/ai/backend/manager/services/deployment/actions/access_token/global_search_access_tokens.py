@@ -4,21 +4,21 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.deployment.types import ModelRevisionData
+from ai.backend.manager.data.deployment.types import ModelDeploymentAccessTokenData
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.deployment.actions.model_revision.base import (
-    ModelRevisionBaseAction,
-)
+from ai.backend.manager.services.deployment.actions.base import DeploymentGlobalAction
 
 
 @dataclass
-class SearchRevisionsAction(ModelRevisionBaseAction):
+class GlobalSearchAccessTokensAction(DeploymentGlobalAction):
+    """Page through access tokens across every deployment."""
+
     querier: BatchQuerier
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "search_revisions"
+        return "global_search_access_tokens"
 
     @override
     @classmethod
@@ -27,8 +27,8 @@ class SearchRevisionsAction(ModelRevisionBaseAction):
 
 
 @dataclass
-class SearchRevisionsActionResult:
-    data: list[ModelRevisionData]
+class GlobalSearchAccessTokensActionResult:
+    data: list[ModelDeploymentAccessTokenData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

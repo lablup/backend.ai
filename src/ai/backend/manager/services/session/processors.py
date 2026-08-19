@@ -152,9 +152,7 @@ from ai.backend.manager.services.session.service import SessionService
 
 class SessionProcessors:
     commit_session: SingleEntityActionProcessor[CommitSessionAction, CommitSessionActionResult]
-    compute_schedule: PublicActionProcessor[
-        ComputeScheduleAction, ComputeScheduleActionResult
-    ]
+    compute_schedule: PublicActionProcessor[ComputeScheduleAction, ComputeScheduleActionResult]
     complete: SingleEntityActionProcessor[CompleteAction, CompleteActionResult]
     convert_session_to_image: SingleEntityActionProcessor[
         ConvertSessionToImageAction, ConvertSessionToImageActionResult

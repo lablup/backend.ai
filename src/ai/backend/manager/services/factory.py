@@ -487,7 +487,7 @@ def create_processors(
         artifact=ArtifactProcessors(registry.group(), services.artifact),
         artifact_registry=ArtifactRegistryProcessors(registry.group(), services.artifact_registry),
         artifact_revision=ArtifactRevisionProcessors(registry.group(), services.artifact_revision),
-        deployment=DeploymentProcessors(services.deployment, action_monitors, validators),
+        deployment=DeploymentProcessors(registry.group(), services.deployment),
         storage_namespace=StorageNamespaceProcessors(registry.group()),
         audit_log=AuditLogProcessors(registry.group()),
         idle_checker_assignment=IdleCheckerAssignmentProcessors(

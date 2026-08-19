@@ -11,8 +11,10 @@ from __future__ import annotations
 import logging
 from http import HTTPStatus
 from typing import Final
+from uuid import UUID
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.dto.manager.auto_scaling_rule import (
     CreateAutoScalingRuleRequest,
     CreateAutoScalingRuleResponse,
@@ -47,6 +49,9 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_aut
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
 )
+from ai.backend.manager.services.deployment.actions.lookup_owner import (
+    LookupAutoScalingRuleDeploymentAction,
+)
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 
 from .adapter import AutoScalingRuleAdapter
@@ -60,6 +65,13 @@ class AutoScalingRuleHandler:
     def __init__(self, *, deployment: DeploymentProcessors) -> None:
         self._deployment = deployment
         self._adapter = AutoScalingRuleAdapter()
+
+    async def _resolve_deployment_id(self, rule_id: UUID) -> DeploymentID:
+        """Resolve the deployment an auto-scaling rule belongs to."""
+        result = await self._deployment.lookup_auto_scaling_rule_deployment.run(
+            LookupAutoScalingRuleDeploymentAction(rule_id=rule_id)
+        )
+        return DeploymentID(result.entity_id())
 
     async def create(
         self,
@@ -82,8 +94,10 @@ class AutoScalingRuleHandler:
             prometheus_query_preset_id=body.parsed.prometheus_query_preset_id,
         )
 
-        action_result = await self._deployment.create_auto_scaling_rule.wait_for_complete(
-            CreateAutoScalingRuleAction(creator=creator)
+        action_result = await self._deployment.create_auto_scaling_rule.run(
+            CreateAutoScalingRuleAction(
+                deployment_id=DeploymentID(body.parsed.model_deployment_id), creator=creator
+            )
         )
 
         resp = CreateAutoScalingRuleResponse(
@@ -99,8 +113,11 @@ class AutoScalingRuleHandler:
         """Get a specific auto-scaling rule."""
         log.info("AUTO_SCALING_RULE.GET (ak:{})", ctx.access_key)
 
-        action_result = await self._deployment.get_auto_scaling_rule.wait_for_complete(
-            GetAutoScalingRuleAction(auto_scaling_rule_id=path.parsed.rule_id)
+        action_result = await self._deployment.get_auto_scaling_rule.run(
+            GetAutoScalingRuleAction(
+                deployment_id=await self._resolve_deployment_id(path.parsed.rule_id),
+                auto_scaling_rule_id=path.parsed.rule_id,
+            )
         )
 
         resp = GetAutoScalingRuleResponse(
@@ -118,7 +135,7 @@ class AutoScalingRuleHandler:
 
         querier = self._adapter.build_querier(body.parsed)
 
-        action_result = await self._deployment.search_auto_scaling_rules.wait_for_complete(
+        action_result = await self._deployment.search_auto_scaling_rules.run(
             SearchAutoScalingRulesAction(querier=querier)
         )
 
@@ -144,8 +161,9 @@ class AutoScalingRuleHandler:
         rule_id = path.parsed.rule_id
         modifier = self._adapter.build_modifier(body.parsed)
 
-        action_result = await self._deployment.update_auto_scaling_rule.wait_for_complete(
+        action_result = await self._deployment.update_auto_scaling_rule.run(
             UpdateAutoScalingRuleAction(
+                deployment_id=await self._resolve_deployment_id(rule_id),
                 auto_scaling_rule_id=rule_id,
                 modifier=modifier,
             )
@@ -164,8 +182,11 @@ class AutoScalingRuleHandler:
         """Delete an auto-scaling rule."""
         log.info("AUTO_SCALING_RULE.DELETE (ak:{})", ctx.access_key)
 
-        action_result = await self._deployment.delete_auto_scaling_rule.wait_for_complete(
-            DeleteAutoScalingRuleAction(auto_scaling_rule_id=body.parsed.rule_id)
+        action_result = await self._deployment.delete_auto_scaling_rule.run(
+            DeleteAutoScalingRuleAction(
+                deployment_id=await self._resolve_deployment_id(body.parsed.rule_id),
+                auto_scaling_rule_id=body.parsed.rule_id,
+            )
         )
 
         resp = DeleteAutoScalingRuleResponse(deleted=action_result.success)
