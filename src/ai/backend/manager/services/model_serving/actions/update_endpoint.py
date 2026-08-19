@@ -2,21 +2,17 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.deployment import DeploymentID
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import EndpointData
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.model_serving.actions.base import (
-    ModelServiceSingleEntityAction,
-    ModelServiceSingleEntityActionResult,
+    ModelServiceAction,
 )
 
 
 @dataclass
-class UpdateEndpointAction(ModelServiceSingleEntityAction):
-    deployment_id: DeploymentID
+class UpdateEndpointAction(ModelServiceAction):
     updater: Updater[EndpointRow]
 
     @override
@@ -25,20 +21,13 @@ class UpdateEndpointAction(ModelServiceSingleEntityAction):
         return ActionOperationType.UPDATE
 
     @override
-    def target_entity_id(self) -> str:
-        return str(self.deployment_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.MODEL_DEPLOYMENT, str(self.deployment_id))
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_endpoint"
 
 
 @dataclass
-class UpdateEndpointActionResult(ModelServiceSingleEntityActionResult):
+class UpdateEndpointActionResult:
     deployment_id: DeploymentID
     success: bool
     data: EndpointData | None
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.deployment_id)

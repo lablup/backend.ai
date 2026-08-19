@@ -344,7 +344,7 @@ class ModelServingService:
             raise GenericForbidden("Only authorized requests may have access key scopes.")
 
     async def delete(self, action: DeleteModelServiceAction) -> DeleteModelServiceActionResult:
-        service_id = action.service_id
+        service_id = action.deployment_id
 
         # Validate access
         await self.check_user_access()
@@ -594,7 +594,7 @@ class ModelServingService:
         # Validate access
         await self.check_user_access()
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.service_id
+            action.deployment_id
         )
         if not validation_data:
             raise ModelServiceNotFound
@@ -602,7 +602,7 @@ class ModelServingService:
             raise EndpointAccessForbiddenError
 
         # Get endpoint data
-        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
+        endpoint_data = await self._repository.get_endpoint_by_id(action.deployment_id)
         if not endpoint_data:
             raise ModelServiceNotFound
         if endpoint_data.runtime_variant_id is None:
@@ -637,7 +637,7 @@ class ModelServingService:
         # Get endpoint
         await self.check_user_access()
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.service_id
+            action.deployment_id
         )
         if not validation_data:
             raise ModelServiceNotFound
@@ -645,7 +645,7 @@ class ModelServingService:
             raise EndpointAccessForbiddenError
 
         # Get endpoint data
-        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
+        endpoint_data = await self._repository.get_endpoint_by_id(action.deployment_id)
         if not endpoint_data:
             raise ModelServiceNotFound
 
@@ -669,7 +669,7 @@ class ModelServingService:
         # Validate access
         await self.check_user_access()
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.service_id
+            action.deployment_id
         )
         if not validation_data:
             raise ModelServiceNotFound
@@ -677,7 +677,7 @@ class ModelServingService:
             raise EndpointAccessForbiddenError
 
         # Clear errors
-        success = await self._repository.clear_endpoint_errors(action.service_id)
+        success = await self._repository.clear_endpoint_errors(action.deployment_id)
 
         if not success:
             raise ModelServiceNotFound
@@ -688,7 +688,7 @@ class ModelServingService:
         # Validate access
         await self.check_user_access()
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.service_id
+            action.deployment_id
         )
         if not validation_data:
             raise ModelServiceNotFound
@@ -697,7 +697,7 @@ class ModelServingService:
 
         # Update route traffic
         updated_endpoint_data = await self._repository.update_route_traffic(
-            self._valkey_live, action.route_id, action.service_id, action.traffic_ratio
+            self._valkey_live, action.route_id, action.deployment_id, action.traffic_ratio
         )
         if not updated_endpoint_data:
             raise ModelServiceNotFound
@@ -713,7 +713,7 @@ class ModelServingService:
         # Validate access
         await self.check_user_access()
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.service_id
+            action.deployment_id
         )
         if not validation_data:
             raise ModelServiceNotFound
@@ -721,7 +721,7 @@ class ModelServingService:
             raise EndpointAccessForbiddenError
 
         # Get route
-        route_data = await self._repository.get_route_by_id(action.route_id, action.service_id)
+        route_data = await self._repository.get_route_by_id(action.route_id, action.deployment_id)
 
         if not route_data:
             raise RouteNotFound
@@ -742,7 +742,7 @@ class ModelServingService:
             )
 
         # Decrease endpoint replicas
-        await self._repository.decrease_endpoint_replicas(action.service_id)
+        await self._repository.decrease_endpoint_replicas(action.deployment_id)
 
         return DeleteRouteActionResult(route_id=action.route_id)
 
@@ -750,7 +750,7 @@ class ModelServingService:
         # Validate access
         await self.check_user_access()
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.service_id
+            action.deployment_id
         )
         if not validation_data:
             raise ModelServiceNotFound
@@ -758,7 +758,7 @@ class ModelServingService:
             raise EndpointAccessForbiddenError
 
         # Get endpoint data
-        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
+        endpoint_data = await self._repository.get_endpoint_by_id(action.deployment_id)
         if not endpoint_data:
             raise ModelServiceNotFound
 
@@ -823,7 +823,7 @@ class ModelServingService:
         # Validate access
         await self.check_user_access()
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.service_id
+            action.deployment_id
         )
         if not validation_data:
             raise ModelServiceNotFound

@@ -55,6 +55,12 @@ from ai.backend.manager.services.login_client_type.processors import (
     LoginClientTypeProcessors,
 )
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
+from ai.backend.manager.services.model_serving.processors.auto_scaling import (
+    ModelServingAutoScalingProcessors,
+)
+from ai.backend.manager.services.model_serving.processors.model_serving import (
+    ModelServingProcessors,
+)
 from ai.backend.manager.services.notification.processors import NotificationProcessors
 from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
 from ai.backend.manager.services.project_resource_policy.processors import (
@@ -191,6 +197,8 @@ def test_every_defined_v2_action_is_wired() -> None:
     VFolderFileProcessors(registry.group(), MagicMock())
     VFolderInviteProcessors(registry.group(), MagicMock())
     VFolderSharingProcessors(registry.group(), MagicMock())
+    ModelServingProcessors(registry.group(), MagicMock())
+    ModelServingAutoScalingProcessors(registry.group(), MagicMock())
 
     wired = sorted(cls.action_name() for cls in registry.wired_actions())
     defined = sorted(cls.action_name() for cls in _concrete_v2_action_classes())

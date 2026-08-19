@@ -69,6 +69,9 @@ from ai.backend.manager.repositories.model_serving.updaters import (
     EndpointAutoScalingRuleUpdaterSpec,
     EndpointUpdaterSpec,
 )
+from ai.backend.manager.services.deployment.actions.lookup_owner import (
+    LookupAutoScalingRuleDeploymentAction,
+)
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
 )
@@ -373,7 +376,9 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):  # type: ign
     min_replicas = graphene.Int()
     max_replicas = graphene.Int()
 
-    def to_action(self, id: RuleId) -> UpdateEndpointAutoScalingRuleAction:
+    def to_action(
+        self, deployment_id: DeploymentID, id: RuleId
+    ) -> UpdateEndpointAutoScalingRuleAction:
         def convert_to_decimal(
             value: str | None | UndefinedType,
         ) -> decimal.Decimal | UndefinedType:
@@ -418,9 +423,18 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):  # type: ign
             ),
         )
         return UpdateEndpointAutoScalingRuleAction(
+            deployment_id=deployment_id,
             id=id,
             updater=Updater(spec=spec, pk_value=id),
         )
+
+
+async def _rule_deployment(graph_ctx: GraphQueryContext, rule_id: RuleId) -> DeploymentID:
+    """Resolve the deployment an auto-scaling rule belongs to."""
+    result = await graph_ctx.processors.deployment.lookup_auto_scaling_rule_deployment.run(
+        LookupAutoScalingRuleDeploymentAction(rule_id=rule_id)
+    )
+    return DeploymentID(result.entity_id())
 
 
 class CreateEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc]
@@ -458,7 +472,7 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc
             endpoint_id=_endpoint_id,
         )
 
-        result = await graph_ctx.processors.model_serving_auto_scaling.create_endpoint_auto_scaling_rule.wait_for_complete(
+        result = await graph_ctx.processors.model_serving_auto_scaling.create_endpoint_auto_scaling_rule.run(
             action
         )
 
@@ -503,10 +517,11 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc
         graph_ctx: GraphQueryContext = info.context
 
         action = props.to_action(
+            deployment_id=await _rule_deployment(graph_ctx, _rule_id),
             id=_rule_id,
         )
 
-        result = await graph_ctx.processors.model_serving_auto_scaling.update_endpoint_auto_scaling_rule.wait_for_complete(
+        result = await graph_ctx.processors.model_serving_auto_scaling.update_endpoint_auto_scaling_rule.run(
             action
         )
 
@@ -547,10 +562,11 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc
         graph_ctx: GraphQueryContext = info.context
 
         action = DeleteEndpointAutoScalingRuleAction(
+            deployment_id=await _rule_deployment(graph_ctx, _rule_id),
             id=_rule_id,
         )
 
-        result = await graph_ctx.processors.model_serving_auto_scaling.delete_endpoint_auto_scaling_rule.wait_for_complete(
+        result = await graph_ctx.processors.model_serving_auto_scaling.delete_endpoint_auto_scaling_rule.run(
             action
         )
 
@@ -1130,7 +1146,7 @@ class ModifyEndpoint(graphene.Mutation):  # type: ignore[misc]
             info=info,
         )
 
-        result = await graph_ctx.processors.model_serving.update_endpoint.wait_for_complete(action)
+        result = await graph_ctx.processors.model_serving.update_endpoint.run(action)
 
         return cls(
             ok=result.success,

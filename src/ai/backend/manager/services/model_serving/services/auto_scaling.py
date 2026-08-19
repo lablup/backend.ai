@@ -55,7 +55,7 @@ class AutoScalingService:
         # Validate access
         await self.check_user_access()
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.service_id
+            action.deployment_id
         )
         if not validation_data:
             raise ModelServiceNotFound
@@ -63,12 +63,12 @@ class AutoScalingService:
             raise EndpointAccessForbiddenError
 
         # Get endpoint data
-        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
+        endpoint_data = await self._repository.get_endpoint_by_id(action.deployment_id)
         if not endpoint_data:
             raise ModelServiceNotFound
 
         # Update replicas (access already validated)
-        success = await self._repository.update_endpoint_replicas(action.service_id, action.to)
+        success = await self._repository.update_endpoint_replicas(action.deployment_id, action.to)
         if not success:
             raise ModelServiceNotFound
 

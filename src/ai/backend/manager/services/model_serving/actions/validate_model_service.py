@@ -3,17 +3,21 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import AccessKey, RuntimeVariant, VFolderMount
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import ServiceConfig
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
+from ai.backend.manager.services.model_serving.actions.base import (
+    ModelServiceScopeAction,
+    ModelServiceScopeActionResult,
+)
 
 
 @dataclass
-class ValidateModelServiceAction(ModelServiceAction):
+class ValidateModelServiceAction(ModelServiceScopeAction):
     requester_access_key: AccessKey
     owner_access_key: AccessKey
     requester_uuid: uuid.UUID
@@ -29,17 +33,22 @@ class ValidateModelServiceAction(ModelServiceAction):
     owner_access_key_override: AccessKey | None
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.requester_uuid),)
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "validate_model_service"
+
 
 @dataclass
-class ValidateModelServiceActionResult(BaseActionResult):
+class ValidateModelServiceActionResult(ModelServiceScopeActionResult):
     model_vfolder_id: VFolderUUID
     model_definition_path: str | None
     requester_access_key: AccessKey
@@ -50,7 +59,3 @@ class ValidateModelServiceActionResult(BaseActionResult):
     resource_policy: dict[str, Any]
     scaling_group: str
     extra_mounts: Sequence[VFolderMount]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

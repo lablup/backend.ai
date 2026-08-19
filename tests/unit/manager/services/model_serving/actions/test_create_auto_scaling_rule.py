@@ -16,7 +16,6 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
 )
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.model_serving.creator import EndpointAutoScalingRuleCreator
 from ai.backend.manager.errors.service import (
     EndpointNotFound,
@@ -26,9 +25,6 @@ from ai.backend.manager.repositories.model_serving.repository import ModelServin
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
     CreateEndpointAutoScalingRuleActionResult,
-)
-from ai.backend.manager.services.model_serving.processors.auto_scaling import (
-    ModelServingAutoScalingProcessors,
 )
 from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 from ai.backend.testutils.scenario import ScenarioBase
@@ -69,19 +65,6 @@ class TestCreateEndpointAutoScalingRule:
     ) -> AutoScalingService:
         return AutoScalingService(
             repository=mock_repositories.repository,
-        )
-
-    @pytest.fixture
-    def auto_scaling_processors(
-        self,
-        mock_action_monitor: MagicMock,
-        auto_scaling_service: AutoScalingService,
-        mock_action_validators: ActionValidators,
-    ) -> ModelServingAutoScalingProcessors:
-        return ModelServingAutoScalingProcessors(
-            service=auto_scaling_service,
-            action_monitors=[mock_action_monitor],
-            validators=mock_action_validators,
         )
 
     @pytest.fixture
@@ -225,11 +208,11 @@ class TestCreateEndpointAutoScalingRule:
     )
     async def test_create_auto_scaling_rule(
         self,
+        auto_scaling_service: AutoScalingService,
         scenario: ScenarioBase[
             CreateEndpointAutoScalingRuleAction, CreateEndpointAutoScalingRuleActionResult
         ],
         user_data: UserData,
-        auto_scaling_processors: ModelServingAutoScalingProcessors,
         mock_check_user_access_create: AsyncMock,
         mock_get_endpoint_access_validation_data_create: AsyncMock,
         mock_create_auto_scaling_rule: AsyncMock,
@@ -274,11 +257,7 @@ class TestCreateEndpointAutoScalingRule:
         async def create_auto_scaling_rule(
             action: CreateEndpointAutoScalingRuleAction,
         ) -> CreateEndpointAutoScalingRuleActionResult:
-            return (
-                await auto_scaling_processors.create_endpoint_auto_scaling_rule.wait_for_complete(
-                    action
-                )
-            )
+            return await auto_scaling_service.create_endpoint_auto_scaling_rule(action)
 
         # For failure scenarios, expect exception
         if scenario.expected_exception is not None:

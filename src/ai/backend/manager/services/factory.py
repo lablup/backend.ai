@@ -466,9 +466,9 @@ def create_processors(
         resource_usage=ResourceUsageProcessors(registry.group()),
         scaling_group=ScalingGroupProcessors(registry.group(), services.scaling_group),
         metric=MetricProcessors(services.metric, action_monitors, validators),
-        model_serving=ModelServingProcessors(services.model_serving, action_monitors, validators),
+        model_serving=ModelServingProcessors(registry.group(), services.model_serving),
         model_serving_auto_scaling=ModelServingAutoScalingProcessors(
-            services.model_serving_auto_scaling, action_monitors, validators
+            registry.group(), services.model_serving_auto_scaling
         ),
         auth=AuthProcessors(services.auth, action_monitors, validators),
         login_client_type=LoginClientTypeProcessors(registry.group()),

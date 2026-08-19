@@ -2,24 +2,15 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType, RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.services.model_serving.actions.base import (
-    ModelServiceSingleEntityAction,
-    ModelServiceSingleEntityActionResult,
+    ModelServiceAction,
 )
 
 
 @dataclass
-class DeleteRouteAction(ModelServiceSingleEntityAction):
-    service_id: uuid.UUID
+class DeleteRouteAction(ModelServiceAction):
     route_id: uuid.UUID
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.MODEL_DEPLOYMENT
 
     @override
     @classmethod
@@ -27,18 +18,11 @@ class DeleteRouteAction(ModelServiceSingleEntityAction):
         return ActionOperationType.DELETE
 
     @override
-    def target_entity_id(self) -> str:
-        return str(self.route_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.MODEL_DEPLOYMENT, str(self.service_id))
+    @classmethod
+    def action_name(cls) -> str:
+        return "delete_route"
 
 
 @dataclass
-class DeleteRouteActionResult(ModelServiceSingleEntityActionResult):
+class DeleteRouteActionResult:
     route_id: uuid.UUID
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.route_id)
