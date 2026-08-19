@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, override
 
 import pyotp
 from aiohttp import web
@@ -39,17 +39,21 @@ class TOTPHook(HookPlugin):
             self._plugin_config.token_secret, self._plugin_config.token_lifetime
         )
 
+    @override
     def get_handlers(self) -> Sequence[tuple[str, HookHandler]]:
         return [
             ("POST_AUTHORIZE", self.validate_otp),
         ]
 
+    @override
     async def init(self, context: Any = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
+    @override
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         self.plugin_config = plugin_config
         self._plugin_config = TOTPConfig(**plugin_config)

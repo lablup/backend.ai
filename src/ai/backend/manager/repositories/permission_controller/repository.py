@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Collection, Mapping
 from typing import cast
 
-from ai.backend.common.data.permission.types import OperationType, RBACElementType
+from ai.backend.common.data.permission.types import OperationType, Permission, RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -50,6 +50,10 @@ from ai.backend.manager.data.permission.types import (
     ScopeListResult,
     ScopeType,
 )
+from ai.backend.manager.data.permission.virtual_scope import (
+    EntityPermissionCheckKey,
+    ScopePermissionCheckKey,
+)
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -67,14 +71,14 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     UserRoleCreatorSpec,
 )
 from ai.backend.manager.repositories.permission_controller.types import (
-    PermissionSearchScope,
-    ScopedRoleSearchScope,
+    PermissionOperationScope,
+    ScopedRoleOperationScope,
 )
 from ai.backend.manager.repositories.role_invitation.types import (
-    InviteeSearchScope,
-    InviterSearchScope,
+    InviteeOperationScope,
+    InviterOperationScope,
+    RoleInvitationOperationScope,
     RoleInvitationSearchResult,
-    RoleInvitationSearchScope,
 )
 
 from .db_source.db_source import CreateRoleInput, PermissionDBSource
@@ -202,7 +206,7 @@ class PermissionControllerRepository:
         result = await self._db_source.bulk_remove_role_permissions(purgers)
         failures = [
             BulkRolePermissionRemoveFailure(
-                permission_id=cast(uuid.UUID, error.purger.pk_value),
+                permission_id=cast(uuid.UUID, error.purger.spec.pk_value()),
                 message=str(error.exception),
             )
             for error in result.errors
@@ -326,7 +330,7 @@ class PermissionControllerRepository:
     async def search_roles_in_scope(
         self,
         querier: BatchQuerier,
-        scope: ScopedRoleSearchScope,
+        scope: ScopedRoleOperationScope,
     ) -> RoleListResult:
         """Search roles registered in a project scope."""
         return await self._db_source.search_roles_in_scope(querier=querier, scope=scope)
@@ -335,7 +339,7 @@ class PermissionControllerRepository:
     async def search_permissions(
         self,
         querier: BatchQuerier,
-        scope: PermissionSearchScope | None = None,
+        scope: PermissionOperationScope | None = None,
     ) -> PermissionListResult:
         """Searches permissions with pagination and filtering."""
         return await self._db_source.search_permissions(querier=querier, scope=scope)
@@ -439,6 +443,51 @@ class PermissionControllerRepository:
         return await self._db_source.check_bulk_permission_with_scope_chain(data)
 
     @permission_controller_repository_resilience.apply()
+    async def check_single_entity_permission_via_virtual_scope(
+        self,
+        key: EntityPermissionCheckKey,
+        permission: Permission,
+    ) -> bool:
+        """Permission check on a single entity through the virtual-scope chain.
+
+        Resolves the effective permission via
+        ``entity -> entity_memberships -> scope_bindings -> scope`` with per-hop
+        cap clipping and grants only when it covers every bit of ``permission``,
+        which may be a mask (``UPSERT`` requires ``CREATE | UPDATE``).
+        """
+        return await self._db_source.check_single_entity_permission_via_virtual_scope(
+            key, permission
+        )
+
+    @permission_controller_repository_resilience.apply()
+    async def check_bulk_permission_via_virtual_scope(
+        self,
+        keys: Collection[EntityPermissionCheckKey],
+        permission: Permission,
+    ) -> Mapping[EntityPermissionCheckKey, bool]:
+        """Batch permission check on multiple entities through the virtual-scope chain.
+
+        Same semantics as check_single_entity_permission_via_virtual_scope but
+        for an arbitrary collection of per-entity keys, batched per
+        ``(user_id, entity_type)`` group.
+        """
+        return await self._db_source.check_bulk_permission_via_virtual_scope(keys, permission)
+
+    @permission_controller_repository_resilience.apply()
+    async def check_scope_permission_via_virtual_scope(
+        self,
+        keys: Collection[ScopePermissionCheckKey],
+        permission: Permission,
+    ) -> Mapping[ScopePermissionCheckKey, bool]:
+        """Permission check on target scopes through the virtual-scope chain.
+
+        Each scope is walked as an entity while permission rows are matched on
+        the key's ``entity_type``, batched per
+        ``(user_id, scope_type, entity_type)`` group.
+        """
+        return await self._db_source.check_scope_permission_via_virtual_scope(keys, permission)
+
+    @permission_controller_repository_resilience.apply()
     async def resolve_effective_permissions(
         self,
         keys: Collection[PermissionResolutionKey],
@@ -472,7 +521,7 @@ class PermissionControllerRepository:
     async def search_invitations_by_invitee(
         self,
         querier: BatchQuerier,
-        scope: InviteeSearchScope,
+        scope: InviteeOperationScope,
     ) -> RoleInvitationSearchResult:
         return await self._db_source.search_invitations_by_invitee(querier, scope)
 
@@ -480,7 +529,7 @@ class PermissionControllerRepository:
     async def search_invitations_by_inviter(
         self,
         querier: BatchQuerier,
-        scope: InviterSearchScope,
+        scope: InviterOperationScope,
     ) -> RoleInvitationSearchResult:
         return await self._db_source.search_invitations_by_inviter(querier, scope)
 
@@ -488,7 +537,7 @@ class PermissionControllerRepository:
     async def search_invitations_by_role(
         self,
         querier: BatchQuerier,
-        scope: RoleInvitationSearchScope,
+        scope: RoleInvitationOperationScope,
     ) -> RoleInvitationSearchResult:
         return await self._db_source.search_invitations_by_role(querier, scope)
 

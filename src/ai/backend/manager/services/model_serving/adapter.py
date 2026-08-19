@@ -6,9 +6,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 if TYPE_CHECKING:
     from ai.backend.common.dto.manager.model_serving.request import ServiceFilterModel

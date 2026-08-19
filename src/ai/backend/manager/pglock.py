@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import AbstractAsyncContextManager
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.common.lock import AbstractDistributedLock
 
@@ -20,10 +20,12 @@ class PgAdvisoryLock(AbstractDistributedLock):
         self.lock_id = lock_id
         self._lock_ctx = None
 
+    @override
     async def __aenter__(self) -> Any:
         self._lock_ctx = self.db.advisory_lock(self.lock_id)
         await self._lock_ctx.__aenter__()
 
+    @override
     async def __aexit__(self, *exc_info: Any) -> bool | None:
         if self._lock_ctx is None:
             raise DBOperationFailed("Lock context is not initialized")

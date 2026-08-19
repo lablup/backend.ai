@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import override
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -11,16 +12,17 @@ import sqlalchemy as sa
 from ai.backend.common.exception import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
 
 
 @dataclass(frozen=True)
-class MyLoginSessionSearchScope(SearchScope):
+class MyLoginSessionOperationScope(OperationScope):
     """Scope for searching login sessions owned by the current user."""
 
     user_id: UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         user_id = self.user_id
 
@@ -30,6 +32,7 @@ class MyLoginSessionSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         return [
             ExistenceCheck(
@@ -41,11 +44,12 @@ class MyLoginSessionSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class MyLoginHistorySearchScope(SearchScope):
+class MyLoginHistoryOperationScope(OperationScope):
     """Scope for searching login history of the current user."""
 
     user_id: UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         user_id = self.user_id
 
@@ -55,6 +59,7 @@ class MyLoginHistorySearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         return [
             ExistenceCheck(

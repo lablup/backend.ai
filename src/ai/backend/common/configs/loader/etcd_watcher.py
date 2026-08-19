@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, override
 
 from aiotools import aclosing
 from etcd_client import WatchEventType
@@ -16,6 +16,7 @@ class EtcdConfigWatcher(AbstractConfigWatcher):
         self._etcd = etcd
         self._config_prefix = config_prefix
 
+    @override
     async def watch(self) -> Any:
         async with aclosing(self._etcd.watch_prefix(self._config_prefix)) as agen:
             async for ev in agen:

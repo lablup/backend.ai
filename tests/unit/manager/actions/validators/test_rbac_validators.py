@@ -30,6 +30,8 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.bulk import BaseBulkAction
 from ai.backend.manager.actions.action.scope import BaseScopeAction
@@ -49,7 +51,14 @@ from ai.backend.manager.actions.validators.rbac.single_entity import (
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.agent import AgentRow
+
+# ORM cluster registration: configure_mappers() (triggered when this isolated
+# test registers a domain-cluster row) resolves string relationships against the
+# registry. These rows are reachable via relationships but are not otherwise
+# imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -62,12 +71,19 @@ from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 from ai.backend.testutils.db import with_tables
+
+_ORM_CLUSTER = (
+    AgentRow,
+    ImageRow,
+    ScalingGroupForDomainRow,
+)
 
 
 @dataclass(frozen=True)
@@ -180,6 +196,7 @@ def _make_user_data(user_id: uuid.UUID, *, is_superadmin: bool) -> UserData:
         is_superadmin=is_superadmin,
         role=UserRole.SUPERADMIN if is_superadmin else UserRole.USER,
         domain_name=_TARGET_DOMAIN,
+        domain_id=DomainID(uuid.uuid4()),
     )
 
 
@@ -192,6 +209,9 @@ async def _seed_user_with_role(
     suffix = user_id.hex[:8]
     policy_name = f"policy-{suffix}"
     async with db.begin_session() as db_sess:
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
+        db_sess.add(DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot()))
         db_sess.add(
             UserResourcePolicyRow(
                 name=policy_name,
@@ -204,11 +224,14 @@ async def _seed_user_with_role(
         db_sess.add(
             UserRow(
                 uuid=user_id,
+                username=f"user-{suffix}",
                 email=f"user-{suffix}@test.com",
                 resource_policy=policy_name,
                 status=UserStatus.ACTIVE,
                 need_password_change=False,
                 sudo_session_enabled=False,
+                domain_name=domain_name,
+                domain_id=domain_id,
             )
         )
         await db_sess.flush()
@@ -234,6 +257,9 @@ async def _grant_permission(
     operation: OperationType,
 ) -> None:
     async with db.begin_session() as db_sess:
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
+        db_sess.add(DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot()))
         db_sess.add(
             PermissionRow(
                 role_id=role_id,

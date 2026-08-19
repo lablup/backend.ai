@@ -16,6 +16,8 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
@@ -46,22 +48,35 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow, batch_populate_session_occupied_slots
-from ai.backend.manager.models.session_template import TemplateType, session_templates
+from ai.backend.manager.models.session_template import SessionTemplateRow, TemplateType
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.testutils.db import with_tables
 
 
 @dataclass
 class SessionTestData:
+    domain_id: DomainID
     domain_name: str
+    scaling_group_id: ResourceGroupID
     user_id: uuid.UUID
     group_id: uuid.UUID
     session_id: SessionId
     kernel_id: KernelId
     access_key: AccessKey
+
+
+@pytest.fixture
+def test_domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
+
+
+@pytest.fixture
+def test_scaling_group_id() -> ResourceGroupID:
+    return ResourceGroupID(uuid.uuid4())
 
 
 class TestSessionRepository:
@@ -99,7 +114,12 @@ class TestSessionRepository:
         return SessionRepository(db_with_cleanup)
 
     @pytest.fixture
-    async def session_with_kernel(self, db_with_cleanup: ExtendedAsyncSAEngine) -> SessionTestData:
+    async def session_with_kernel(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_scaling_group_id: ResourceGroupID,
+    ) -> SessionTestData:
         """Create a session with kernel for testing search operations."""
         domain_name = "test-domain"
         user_id = uuid.uuid4()
@@ -111,6 +131,7 @@ class TestSessionRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             # Create domain
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -123,6 +144,7 @@ class TestSessionRepository:
 
             # Create scaling group
             scaling_group = ScalingGroupRow(
+                id=test_scaling_group_id,
                 name="default",
                 is_active=True,
                 is_public=True,
@@ -181,7 +203,7 @@ class TestSessionRepository:
                 resource_policy=user_resource_policy.name,
                 allowed_client_ip=None,
                 totp_key=None,
-                main_access_key=None,
+                domain_id=test_domain_id,
             )
             db_sess.add(user)
 
@@ -225,6 +247,7 @@ class TestSessionRepository:
                 session_type=SessionTypes.INTERACTIVE,
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
+                domain_id=test_domain_id,
                 domain_name=domain_name,
                 group_id=group_id,
                 user_uuid=user_id,
@@ -246,6 +269,7 @@ class TestSessionRepository:
                 environ=None,
                 bootstrap_script=None,
                 use_host_network=False,
+                resource_group_id=test_scaling_group_id,
                 scaling_group_name="default",
             )
             db_sess.add(session)
@@ -267,6 +291,8 @@ class TestSessionRepository:
                 cluster_idx=0,
                 local_rank=0,
                 cluster_hostname="main",
+                scaling_group="default",
+                resource_group_id=test_scaling_group_id,
                 image="cr.backend.ai/stable/python:latest",
                 architecture="x86_64",
                 registry="cr.backend.ai",
@@ -303,7 +329,9 @@ class TestSessionRepository:
             await db_sess.commit()
 
         return SessionTestData(
+            domain_id=test_domain_id,
             domain_name=domain_name,
+            scaling_group_id=test_scaling_group_id,
             user_id=user_id,
             group_id=group_id,
             session_id=session_id,
@@ -425,6 +453,7 @@ class TestSessionRepository:
                     session_type=SessionTypes.INTERACTIVE,
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=1,
+                    domain_id=base.domain_id,
                     domain_name=base.domain_name,
                     group_id=base.group_id,
                     user_uuid=base.user_id,
@@ -446,6 +475,7 @@ class TestSessionRepository:
                     environ=None,
                     bootstrap_script=None,
                     use_host_network=False,
+                    resource_group_id=base.scaling_group_id,
                     scaling_group_name="default",
                 )
             )
@@ -590,7 +620,10 @@ class TestBatchPopulateSessionOccupiedSlots:
 
     @pytest.fixture
     async def session_with_allocations(
-        self, db_with_resource_tables: ExtendedAsyncSAEngine
+        self,
+        db_with_resource_tables: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_scaling_group_id: ResourceGroupID,
     ) -> SessionTestData:
         """Create a session with resource_allocations (but empty JSONB occupying_slots)."""
         domain_name = "test-domain"
@@ -602,6 +635,7 @@ class TestBatchPopulateSessionOccupiedSlots:
 
         async with db_with_resource_tables.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -613,6 +647,7 @@ class TestBatchPopulateSessionOccupiedSlots:
             db_sess.add(domain)
 
             scaling_group = ScalingGroupRow(
+                id=test_scaling_group_id,
                 name="default",
                 is_active=True,
                 is_public=True,
@@ -668,7 +703,7 @@ class TestBatchPopulateSessionOccupiedSlots:
                 resource_policy=user_resource_policy.name,
                 allowed_client_ip=None,
                 totp_key=None,
-                main_access_key=None,
+                domain_id=test_domain_id,
             )
             db_sess.add(user)
 
@@ -708,6 +743,7 @@ class TestBatchPopulateSessionOccupiedSlots:
                 session_type=SessionTypes.INTERACTIVE,
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
+                domain_id=test_domain_id,
                 domain_name=domain_name,
                 group_id=group_id,
                 user_uuid=user_id,
@@ -729,6 +765,7 @@ class TestBatchPopulateSessionOccupiedSlots:
                 environ=None,
                 bootstrap_script=None,
                 use_host_network=False,
+                resource_group_id=test_scaling_group_id,
                 scaling_group_name="default",
             )
             db_sess.add(session)
@@ -748,6 +785,8 @@ class TestBatchPopulateSessionOccupiedSlots:
                 cluster_idx=0,
                 local_rank=0,
                 cluster_hostname="main",
+                scaling_group="default",
+                resource_group_id=test_scaling_group_id,
                 image="cr.backend.ai/stable/python:latest",
                 architecture="x86_64",
                 registry="cr.backend.ai",
@@ -807,7 +846,9 @@ class TestBatchPopulateSessionOccupiedSlots:
             await db_sess.commit()
 
         return SessionTestData(
+            domain_id=test_domain_id,
             domain_name=domain_name,
+            scaling_group_id=test_scaling_group_id,
             user_id=user_id,
             group_id=group_id,
             session_id=session_id,
@@ -899,7 +940,7 @@ class TestGetTemplateInfoById:
                 KeyPairResourcePolicyRow,
                 UserRow,
                 GroupRow,
-                session_templates,
+                SessionTemplateRow,
                 KeyPairRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -917,14 +958,16 @@ class TestGetTemplateInfoById:
 
     @pytest.fixture
     async def active_template(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[uuid.UUID, str]:
         """Insert an active session_template. Returns (template_id, name)."""
         return await self._create_template(db_with_cleanup, is_active=True, name="test-template")
 
     @pytest.fixture
     async def inactive_template(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[uuid.UUID, str]:
         """Insert an inactive session_template. Returns (template_id, name)."""
         return await self._create_template(
@@ -942,6 +985,7 @@ class TestGetTemplateInfoById:
 
         Returns (template_id, name).
         """
+        domain_id = DomainID(uuid.uuid4())
         template_id = uuid.uuid4()
         domain_name = f"test-domain-{template_id.hex[:8]}"
         user_uuid = uuid.uuid4()
@@ -950,6 +994,7 @@ class TestGetTemplateInfoById:
         async with db.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -983,6 +1028,7 @@ class TestGetTemplateInfoById:
                         rounds=100_000,
                         salt_size=32,
                     ),
+                    domain_id=domain_id,
                     need_password_change=False,
                     full_name="Test User",
                     description="",
@@ -996,7 +1042,7 @@ class TestGetTemplateInfoById:
             await db_sess.flush()
 
             await db_sess.execute(
-                sa.insert(session_templates).values(
+                sa.insert(SessionTemplateRow).values(
                     id=template_id,
                     is_active=is_active,
                     domain_name=domain_name,

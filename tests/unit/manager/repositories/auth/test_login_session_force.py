@@ -9,26 +9,39 @@ from dataclasses import dataclass
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.auth.login_session_types import (
+    LoginAttemptResult,
+    LoginSessionStatus,
+)
 from ai.backend.manager.errors.auth import AuthorizationFailed
+from ai.backend.manager.models.agent import AgentRow
+
+# ORM cluster registration: configure_mappers() (triggered when this isolated
+# test registers a domain-cluster row) resolves string relationships against the
+# registry. These rows are reachable via relationships but are not otherwise
+# imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
-from ai.backend.manager.models.login_session.enums import (
-    LoginAttemptResult,
-    LoginSessionStatus,
-)
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import AuthDBSource
 from ai.backend.testutils.db import with_tables
+
+_ORM_CLUSTER = (
+    AgentRow,
+    ScalingGroupForDomainRow,
+)
 
 
 @dataclass
@@ -71,6 +84,7 @@ class TestLoginSessionForce:
         self, db_with_cleanup: ExtendedAsyncSAEngine
     ) -> AsyncGenerator[SampleUserData, None]:
         """Create a user with domain, resource policies, and keypair."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4()}"
         user_uuid = uuid.uuid4()
         email = f"test-{uuid.uuid4()}@example.com"
@@ -80,6 +94,7 @@ class TestLoginSessionForce:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="test",
                     is_active=True,
@@ -125,6 +140,7 @@ class TestLoginSessionForce:
                 role=UserRole.USER,
                 resource_policy="test-user-policy",
                 need_password_change=False,
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -135,12 +151,12 @@ class TestLoginSessionForce:
                 user_id=email,
                 user=user_uuid,
                 is_active=True,
+                is_default=True,
                 resource_policy="test-keypair-policy",
             )
             db_sess.add(keypair)
             await db_sess.flush()
 
-            user.main_access_key = access_key
             await db_sess.commit()
 
         yield SampleUserData(

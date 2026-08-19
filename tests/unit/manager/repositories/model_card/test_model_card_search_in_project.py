@@ -1,8 +1,8 @@
 """Tests for ModelCardDBSource.search_in_project membership check.
 
-Verifies that the ASE-based membership_check_query on
-ProjectModelCardSearchScope correctly gates access:
-- A user who IS a project member (via association_scopes_entities) can search.
+Verifies that the virtual-scope-based membership_check_query on
+ProjectModelCardOperationScope correctly gates access:
+- A user who IS a project member (enrolled in the project's virtual scope) can search.
 - A user who is NOT a project member is rejected with GenericForbidden.
 """
 
@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.common import GenericForbidden
@@ -38,12 +39,14 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.model_card.db_source.db_source import ModelCardDBSource
-from ai.backend.manager.repositories.model_card.types import ProjectModelCardSearchScope
+from ai.backend.manager.repositories.model_card.types import ProjectModelCardOperationScope
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -51,7 +54,7 @@ if TYPE_CHECKING:
 
 
 class TestSearchInProjectMembership:
-    """Verify ASE-based membership gating in search_in_project."""
+    """Verify virtual-scope-based membership gating in search_in_project."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -79,6 +82,8 @@ class TestSearchInProjectMembership:
                 KernelRow,
                 ModelCardRow,
                 AssociationScopesEntitiesRow,
+                VirtualScopeRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -89,7 +94,9 @@ class TestSearchInProjectMembership:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> DomainRow:
         async with db_with_cleanup.begin_session() as db_sess:
+            domain_id = DomainID(uuid.uuid4())
             domain = DomainRow(
+                id=domain_id,
                 name=f"test-domain-{uuid.uuid4().hex[:8]}",
                 description="Test domain",
                 is_active=True,
@@ -157,12 +164,32 @@ class TestSearchInProjectMembership:
         return group
 
     @pytest.fixture
+    async def test_project_scope_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_project: GroupRow,
+    ) -> uuid.UUID:
+        """Materialize the project's virtual scope and return its id."""
+        vs_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                VirtualScopeRow(
+                    id=vs_id,
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=test_project.id,
+                )
+            )
+            await db_sess.flush()
+        return vs_id
+
+    @pytest.fixture
     async def member_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
         test_user_resource_policy: UserResourcePolicyRow,
         test_project: GroupRow,
+        test_project_scope_id: uuid.UUID,
     ) -> UserRow:
         async with db_with_cleanup.begin_session() as db_sess:
             user = UserRow(
@@ -175,6 +202,7 @@ class TestSearchInProjectMembership:
                     rounds=100_000,
                     salt_size=32,
                 ),
+                domain_id=DomainID(test_domain.id),
                 need_password_change=False,
                 full_name="Member User",
                 domain_name=test_domain.name,
@@ -185,7 +213,15 @@ class TestSearchInProjectMembership:
             )
             db_sess.add(user)
             await db_sess.flush()
-            # Register as project member via ASE
+            # Register as project member: virtual-scope chain (read model)
+            # plus the dual-written legacy ASE row.
+            db_sess.add(
+                EntityMembershipRow(
+                    virtual_scope_id=test_project_scope_id,
+                    entity_type=EntityType.USER.value,
+                    entity_id=user.uuid,
+                )
+            )
             db_sess.add(
                 AssociationScopesEntitiesRow(
                     scope_type=ScopeType.PROJECT,
@@ -215,6 +251,7 @@ class TestSearchInProjectMembership:
                     rounds=100_000,
                     salt_size=32,
                 ),
+                domain_id=DomainID(test_domain.id),
                 need_password_change=False,
                 full_name="Non-Member User",
                 domain_name=test_domain.name,
@@ -240,7 +277,7 @@ class TestSearchInProjectMembership:
         test_project: GroupRow,
         member_user: UserRow,
     ) -> None:
-        scope = ProjectModelCardSearchScope(
+        scope = ProjectModelCardOperationScope(
             project_id=test_project.id,
             user_id=member_user.uuid,
         )
@@ -255,7 +292,7 @@ class TestSearchInProjectMembership:
         test_project: GroupRow,
         non_member_user: UserRow,
     ) -> None:
-        scope = ProjectModelCardSearchScope(
+        scope = ProjectModelCardOperationScope(
             project_id=test_project.id,
             user_id=non_member_user.uuid,
         )

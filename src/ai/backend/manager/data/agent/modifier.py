@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, override
 
-from ai.backend.manager.models.agent import AgentStatus
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.types import OptionalState, PartialModifier
 
 

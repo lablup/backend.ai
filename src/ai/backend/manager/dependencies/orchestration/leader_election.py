@@ -5,6 +5,7 @@ import socket
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
 from ai.backend.common.defs import REDIS_STREAM_LOCK, RedisRole
@@ -19,6 +20,8 @@ from ai.backend.common.leader.tasks.event_task import EventTaskSpec
 from ai.backend.common.types import ValkeyProfileTarget
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.leader.tasks.retention_sweep import RetentionSweepTask
+from ai.backend.manager.repositories.retention.repository import RetentionRepository
 from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -33,6 +36,7 @@ class LeaderElectionInput:
     config_provider: ManagerConfigProvider
     event_producer: EventProducer
     sokovan_orchestrator: SokovanOrchestrator
+    retention_repository: RetentionRepository
 
 
 class LeaderElectionDependency(
@@ -47,10 +51,12 @@ class LeaderElectionDependency(
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "leader-election"
 
     @asynccontextmanager
+    @override
     async def provide(
         self, setup_input: LeaderElectionInput
     ) -> AsyncIterator[ValkeyLeaderElection]:
@@ -106,6 +112,16 @@ class LeaderElectionDependency(
         leader_tasks: list[PeriodicTask] = [
             EventProducerTask(spec, setup_input.event_producer) for spec in task_specs
         ]
+
+        # Register the DB record retention sweep as a leader-only periodic task.
+        # Only the cadence lives here; batch_size/per_tick_budget are injected
+        # into the repository (from config) so sweep() stays argument-free.
+        leader_tasks.append(
+            RetentionSweepTask(
+                repository=setup_input.retention_repository,
+                interval=setup_input.config_provider.config.retention.sweep_interval,
+            )
+        )
 
         # Register tasks with the election system
         leader_cron = LeaderCron(tasks=leader_tasks)

@@ -28,10 +28,14 @@ def build_v2_routes(
     # Lazy imports to avoid circular dependencies at module level
     from .agent.handler import V2AgentHandler
     from .agent.registry import register_v2_agent_routes
+    from .app_config.handler import V2AppConfigHandler
+    from .app_config.registry import register_v2_app_config_routes
     from .app_config_allow_list.handler import V2AppConfigAllowListHandler
     from .app_config_allow_list.registry import register_v2_app_config_allow_list_routes
     from .app_config_definition.handler import V2AppConfigDefinitionHandler
     from .app_config_definition.registry import register_v2_app_config_definition_routes
+    from .app_config_fragment.handler import V2AppConfigFragmentHandler
+    from .app_config_fragment.registry import register_v2_app_config_fragment_routes
     from .artifact.handler import V2ArtifactHandler
     from .artifact.registry import register_v2_artifact_routes
     from .artifact_registry.handler import V2ArtifactRegistryHandler
@@ -52,6 +56,10 @@ def build_v2_routes(
     from .fair_share.registry import register_v2_fair_share_routes
     from .huggingface_registry.handler import V2HuggingFaceRegistryHandler
     from .huggingface_registry.registry import register_v2_huggingface_registry_routes
+    from .idle_checker.handler import V2IdleCheckerHandler
+    from .idle_checker.registry import register_v2_idle_checker_routes
+    from .idle_checker_assignment.handler import V2IdleCheckerAssignmentHandler
+    from .idle_checker_assignment.registry import register_v2_idle_checker_assignment_routes
     from .image.handler import V2ImageHandler
     from .image.registry import register_v2_image_routes
     from .keypair.handler import V2KeypairHandler
@@ -92,6 +100,8 @@ def build_v2_routes(
     from .resource_slot.registry import register_v2_resource_slot_routes
     from .resource_usage.handler import V2ResourceUsageHandler
     from .resource_usage.registry import register_v2_resource_usage_routes
+    from .retention_policy.handler import V2RetentionPolicyHandler
+    from .retention_policy.registry import register_v2_retention_policy_routes
     from .role_invitation.handler import V2RoleInvitationHandler
     from .role_invitation.registry import register_v2_role_invitation_routes
     from .role_preset.handler import V2RolePresetHandler
@@ -121,6 +131,8 @@ def build_v2_routes(
 
     # Build all handlers (each takes its individual adapter)
     agent_handler = V2AgentHandler(adapter=adapters.agent)
+    app_config_handler = V2AppConfigHandler(adapter=adapters.app_config)
+    app_config_fragment_handler = V2AppConfigFragmentHandler(adapter=adapters.app_config_fragment)
     app_config_allow_list_handler = V2AppConfigAllowListHandler(
         adapter=adapters.app_config_allow_list
     )
@@ -136,6 +148,10 @@ def build_v2_routes(
     fair_share_handler = V2FairShareHandler(adapter=adapters.fair_share)
     huggingface_registry_handler = V2HuggingFaceRegistryHandler(
         adapter=adapters.huggingface_registry
+    )
+    idle_checker_handler = V2IdleCheckerHandler(adapter=adapters.idle_checker)
+    idle_checker_assignment_handler = V2IdleCheckerAssignmentHandler(
+        adapter=adapters.idle_checker_assignment
     )
     image_handler = V2ImageHandler(adapter=adapters.image)
     keypair_handler = V2KeypairHandler(adapter=adapters.user)
@@ -160,6 +176,7 @@ def build_v2_routes(
     resource_policy_handler = V2ResourcePolicyHandler(adapter=adapters.resource_policy)
     resource_preset_handler = V2ResourcePresetHandler(adapter=adapters.resource_preset)
     resource_slot_handler = V2ResourceSlotHandler(adapter=adapters.resource_slot)
+    retention_policy_handler = V2RetentionPolicyHandler(adapter=adapters.retention_policy)
     runtime_variant_handler = V2RuntimeVariantHandler(adapter=adapters.runtime_variant)
     runtime_variant_preset_handler = V2RuntimeVariantPresetHandler(
         adapter=adapters.runtime_variant_preset
@@ -184,6 +201,10 @@ def build_v2_routes(
 
     # Add all domain sub-registries
     v2_reg.add_subregistry(register_v2_agent_routes(agent_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_app_config_routes(app_config_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_app_config_fragment_routes(app_config_fragment_handler, route_deps)
+    )
     v2_reg.add_subregistry(
         register_v2_app_config_allow_list_routes(app_config_allow_list_handler, route_deps)
     )
@@ -208,6 +229,10 @@ def build_v2_routes(
     v2_reg.add_subregistry(register_v2_fair_share_routes(fair_share_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_huggingface_registry_routes(huggingface_registry_handler, route_deps)
+    )
+    v2_reg.add_subregistry(register_v2_idle_checker_routes(idle_checker_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_idle_checker_assignment_routes(idle_checker_assignment_handler, route_deps)
     )
     v2_reg.add_subregistry(register_v2_image_routes(image_handler, route_deps))
     v2_reg.add_subregistry(register_v2_keypair_routes(keypair_handler, route_deps))
@@ -240,6 +265,9 @@ def build_v2_routes(
     v2_reg.add_subregistry(register_v2_resource_policy_routes(resource_policy_handler, route_deps))
     v2_reg.add_subregistry(register_v2_resource_preset_routes(resource_preset_handler, route_deps))
     v2_reg.add_subregistry(register_v2_resource_slot_routes(resource_slot_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_retention_policy_routes(retention_policy_handler, route_deps)
+    )
     v2_reg.add_subregistry(register_v2_runtime_variant_routes(runtime_variant_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_runtime_variant_preset_routes(runtime_variant_preset_handler, route_deps)

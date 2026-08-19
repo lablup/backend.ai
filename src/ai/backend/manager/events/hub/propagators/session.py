@@ -4,7 +4,7 @@ import asyncio
 import logging
 import uuid
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import load_only
@@ -88,10 +88,12 @@ class SessionEventPropagator(EventPropagator):
         self._filters = filters
         self._closed_lock = asyncio.Lock()
 
+    @override
     def id(self) -> uuid.UUID:
         """Get the unique identifier for the propagator."""
         return self._id
 
+    @override
     async def propagate_event(self, event: AbstractEvent) -> None:
         """Propagate an event to the SSE stream if it passes filtering."""
         if self._closed:
@@ -283,6 +285,7 @@ class SessionEventPropagator(EventPropagator):
 
         return True
 
+    @override
     async def close(self) -> None:
         """Close the propagator and stop event streaming."""
         async with self._closed_lock:

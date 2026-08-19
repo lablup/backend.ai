@@ -7,7 +7,7 @@ import time
 import warnings
 from collections.abc import MutableMapping
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, override
 
 import aiohttp
 from aiotools import cancel_and_wait
@@ -95,6 +95,7 @@ class ClientPool:
             await client.session.close()
         self._clients.clear()
 
+    @override
     def __repr__(self) -> str:
         return (
             f"<http_client.ClientPool object at {hex(id(self))} created from {self._creator_info}>"

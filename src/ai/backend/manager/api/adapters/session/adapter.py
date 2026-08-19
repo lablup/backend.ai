@@ -40,9 +40,17 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceOptsEntryInfoDTO,
     ResourceOptsInfoDTO,
 )
+from ai.backend.common.dto.manager.v2.scheduler.request import ComputeScheduleInput
+from ai.backend.common.dto.manager.v2.scheduler.response import (
+    ComputeScheduleKernelResultInfo,
+    ComputeSchedulePayload,
+    UnschedulableReasonHintInfo,
+)
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     EnqueueSessionInput,
+    ExcludeSessionIdleChecksInput,
+    IncludeSessionIdleChecksInput,
     SessionFilter,
     SessionOrder,
     ShutdownSessionServiceInput,
@@ -53,6 +61,8 @@ from ai.backend.common.dto.manager.v2.session.request import (
 from ai.backend.common.dto.manager.v2.session.response import (
     AdminSearchSessionsPayload,
     EnqueueSessionPayload,
+    ExcludeSessionIdleChecksPayload,
+    IncludeSessionIdleChecksPayload,
     SessionLifecycleInfoGQLDTO,
     SessionLogsPayload,
     SessionMetadataInfoGQLDTO,
@@ -65,6 +75,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
     UpdateSessionPayload,
 )
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum, SessionStatusFilter
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
@@ -74,12 +85,18 @@ from ai.backend.common.types import (
     KernelId,
     MountInfoEntry,
     MountPermission,
+    ResourceSlot,
     SessionId,
     SessionTypes,
 )
+from ai.backend.common.types import ResourceSlotEntry as DataResourceSlotEntry
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
+from ai.backend.manager.data.session.compute_schedule import ComputeScheduleKernelResult
+from ai.backend.manager.data.session.draft import KernelResourceInput
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.kernel.conditions import KernelConditions
@@ -109,14 +126,23 @@ from ai.backend.manager.models.session.orders import (
     resolve_order as resolve_session_order,
 )
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
+from ai.backend.manager.repositories.session.types import ProjectSessionOperationScope
+from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
+    BatchGetKernelResourceAllocationAction,
+)
+from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
+    BatchGetSessionResourceAllocationAction,
+)
+from ai.backend.manager.services.session.actions.compute_schedule import (
+    ComputeScheduleAction,
+)
 from ai.backend.manager.services.session.actions.enqueue_session import (
     EnqueueSessionAction,
     ResourceSlotEntry,
@@ -218,7 +244,7 @@ class SessionAdapter(BaseAdapter):
         """Enqueue a new session for scheduling.
 
         When ``input.owner_id`` is set, the session is created on behalf of the
-        target user: their main access key, role, and domain are used in place
+        target user: their default access key, role, and domain are used in place
         of the caller's. Resolution and authorization of the delegated user
         are handled by the downstream session service, not by this adapter.
         """
@@ -273,6 +299,7 @@ class SessionAdapter(BaseAdapter):
                     for e in input.resource_entries
                 ],
                 resource_group=input.resource_group,
+                resource_group_id=input.resource_group_id,
                 shmem=input.resource_opts.shmem.expr
                 if input.resource_opts and input.resource_opts.shmem
                 else None,
@@ -287,9 +314,15 @@ class SessionAdapter(BaseAdapter):
             execution=execution_spec,
             scheduling=SessionSchedulingSpec(
                 priority=input.priority,
+                job_priority=input.job_priority,
                 is_preemptible=input.is_preemptible,
                 dependencies=input.dependencies,
                 agent_list=input.agent_list,
+                agent_selection_policy=(
+                    AgentSelectionPolicy(input.agent_selection_policy.value)
+                    if input.agent_selection_policy is not None
+                    else None
+                ),
                 attach_network=input.attach_network,
             ),
             batch=batch_spec,
@@ -306,6 +339,90 @@ class SessionAdapter(BaseAdapter):
         result = await self._processors.session.enqueue_session.wait_for_complete(action)
         return EnqueueSessionPayload(
             session=self._session_data_to_node(result.session_data),
+        )
+
+    # -------------------------------------------------------------------------
+    # Compute schedule
+    # -------------------------------------------------------------------------
+
+    async def compute_schedule(self, input: ComputeScheduleInput) -> ComputeSchedulePayload:
+        """Probe whether each kernel of a would-be session fits the target
+        resource group's nodes, without provisioning.
+
+        A self-service query: the requesting user is resolved from the request
+        context and passed as ``user_uuid``. The service resolves that user's
+        default access key from it, so the adapter supplies no access key.
+        """
+        cluster_mode = (
+            ClusterMode.MULTI_NODE
+            if input.cluster_mode == ClusterModeEnum.MULTI_NODE
+            else ClusterMode.SINGLE_NODE
+        )
+        kernels = [
+            KernelResourceInput(
+                image_id=kernel.image_id,
+                resources=tuple(
+                    DataResourceSlotEntry(
+                        resource_type=ResourceSlotName(entry.resource_type),
+                        quantity=entry.quantity,
+                    )
+                    for entry in kernel.resources
+                ),
+            )
+            for kernel in input.kernels
+        ]
+        action = ComputeScheduleAction(
+            kernels=kernels,
+            cluster_mode=cluster_mode,
+            resource_group_id=input.resource_group_id,
+            designated_agent_ids=input.designated_agent_ids,
+            agent_selection_policy=(
+                AgentSelectionPolicy(input.agent_selection_policy.value)
+                if input.agent_selection_policy is not None
+                else None
+            ),
+        )
+        result = await self._processors.session.compute_schedule.wait_for_complete(action)
+        return ComputeSchedulePayload(
+            results=[
+                self._compute_schedule_kernel_result_to_info(kernel_result)
+                for kernel_result in result.result.kernel_results
+            ],
+        )
+
+    @staticmethod
+    def _compute_schedule_kernel_result_to_info(
+        result: ComputeScheduleKernelResult,
+    ) -> ComputeScheduleKernelResultInfo:
+        """Map the internal per-kernel fitting outcome onto its response DTO."""
+        reason_hint: UnschedulableReasonHintInfo | None = None
+        hint = result.reason_hint
+        if hint is not None:
+            required_reduction = (
+                [
+                    ResourceSlotEntryInfo(
+                        resource_type=entry.resource_type,
+                        quantity=Decimal(entry.quantity),
+                    )
+                    for entry in hint.required_reduction
+                ]
+                if hint.required_reduction is not None
+                else None
+            )
+            reason_hint = UnschedulableReasonHintInfo(
+                required_reduction=required_reduction,
+            )
+        return ComputeScheduleKernelResultInfo(
+            requested_slots=[
+                ResourceSlotEntryInfo(
+                    resource_type=entry.resource_type,
+                    quantity=Decimal(entry.quantity),
+                )
+                for entry in result.requested_slots
+            ],
+            requested_architecture=result.requested_architecture,
+            success=result.success,
+            reason_hint=reason_hint,
         )
 
     # -------------------------------------------------------------------------
@@ -362,6 +479,66 @@ class SessionAdapter(BaseAdapter):
             info.id: self._kernel_info_to_node(info) for info in action_result.data
         }
         return [kernel_map.get(kernel_id) for kernel_id in kernel_ids]
+
+    @staticmethod
+    def _aggregate_to_allocation_dto(
+        aggregate: ResourceAllocationAggregate | None,
+    ) -> ResourceAllocationGQLDTO:
+        """Convert a per-owner resource-allocation aggregate to the shared GQL DTO.
+
+        A missing aggregate (owner with no resource_allocations rows) maps to empty
+        slot sets rather than null.
+        """
+
+        def _to_info(slots: ResourceSlot | None) -> ResourceSlotInfo:
+            return ResourceSlotInfo(
+                entries=[
+                    ResourceSlotEntryInfo(resource_type=k, quantity=Decimal(str(v)))
+                    for k, v in (slots or {}).items()
+                ]
+            )
+
+        return ResourceAllocationGQLDTO(
+            requested=_to_info(aggregate.requested if aggregate else None),
+            used=_to_info(aggregate.used if aggregate else None),
+            allocated=_to_info(aggregate.allocated if aggregate else None),
+        )
+
+    async def batch_resource_allocation_by_session(
+        self, session_ids: Sequence[SessionId]
+    ) -> list[ResourceAllocationGQLDTO]:
+        """Batch-aggregate resource_allocations per session for DataLoader use.
+
+        Returns one DTO per input session id, in the same order.
+        """
+        if not session_ids:
+            return []
+        action_result = (
+            await self._processors.session.batch_get_session_resource_allocation.wait_for_complete(
+                BatchGetSessionResourceAllocationAction(session_ids=list(session_ids))
+            )
+        )
+        return [
+            self._aggregate_to_allocation_dto(action_result.data.get(sid)) for sid in session_ids
+        ]
+
+    async def batch_resource_allocation_by_kernel(
+        self, kernel_ids: Sequence[KernelId]
+    ) -> list[ResourceAllocationGQLDTO]:
+        """Batch-aggregate resource_allocations per kernel for DataLoader use.
+
+        Returns one DTO per input kernel id, in the same order.
+        """
+        if not kernel_ids:
+            return []
+        action_result = (
+            await self._processors.session.batch_get_kernel_resource_allocation.wait_for_complete(
+                BatchGetKernelResourceAllocationAction(kernel_ids=list(kernel_ids))
+            )
+        )
+        return [
+            self._aggregate_to_allocation_dto(action_result.data.get(kid)) for kid in kernel_ids
+        ]
 
     # -------------------------------------------------------------------------
     # Session search
@@ -466,7 +643,7 @@ class SessionAdapter(BaseAdapter):
 
     async def gql_search_by_project(
         self,
-        scope: ProjectSessionSearchScope,
+        scope: ProjectSessionOperationScope,
         input: AdminSearchSessionsInput,
     ) -> AdminSearchSessionsPayload:
         """Search sessions within a project, cursor-based pagination."""
@@ -813,6 +990,20 @@ class SessionAdapter(BaseAdapter):
             skipped=result.skipped,
         )
 
+    async def exclude_idle_checks(
+        self, input: ExcludeSessionIdleChecksInput
+    ) -> ExcludeSessionIdleChecksPayload:
+        """Exclude sessions from a checker's idle checks."""
+        # Wired to the idle-checker service by BA-7120 (#13328).
+        raise NotImplementedError
+
+    async def include_idle_checks(
+        self, input: IncludeSessionIdleChecksInput
+    ) -> IncludeSessionIdleChecksPayload:
+        """Re-include previously excluded sessions into a checker's idle checks."""
+        # Wired to the idle-checker service by BA-7120 (#13328).
+        raise NotImplementedError
+
     # -------------------------------------------------------------------------
     # Service management
     # -------------------------------------------------------------------------
@@ -933,6 +1124,7 @@ class SessionAdapter(BaseAdapter):
                 cluster_mode=data.cluster_mode.name,
                 cluster_size=data.cluster_size,
                 priority=data.priority,
+                job_priority=data.job_priority,
                 is_preemptible=data.is_preemptible,
                 tag=data.tag,
             ),

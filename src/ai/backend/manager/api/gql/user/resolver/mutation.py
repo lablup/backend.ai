@@ -13,7 +13,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.user.request import DeleteUserInput, PurgeUserInput
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
 from ai.backend.common.identifier.user import UserID
-from ai.backend.common.types import ReadableCIDR
+from ai.backend.common.types import AccessKey, ReadableCIDR
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -249,6 +249,7 @@ async def admin_bulk_update_users_v2(
     auth_config = ctx.config_provider.config.auth
 
     items: list[UserUpdateSpec] = []
+    default_key_switches: dict[UserID, AccessKey] = {}
     for user_item in input.users:
         dto = user_item.input.to_pydantic()
 
@@ -319,11 +320,6 @@ async def admin_bulk_update_users_v2(
                 if dto.sudo_session_enabled is not None
                 else OptionalState.nop()
             ),
-            main_access_key=(
-                TriState.nop()
-                if isinstance(dto.main_access_key, Sentinel)
-                else TriState.from_graphql(dto.main_access_key)
-            ),
             container_uid=(
                 TriState.nop()
                 if isinstance(dto.container_uid, Sentinel)
@@ -346,11 +342,12 @@ async def admin_bulk_update_users_v2(
             ),
         )
 
+        if not isinstance(dto.main_access_key, Sentinel) and dto.main_access_key is not None:
+            default_key_switches[UserID(user_item.user_id)] = AccessKey(dto.main_access_key)
         items.append(UserUpdateSpec(user_id=UserID(user_item.user_id), updater_spec=updater_spec))
 
     action = BulkModifyUserAction(items=items)
-    payload = await ctx.adapters.user.bulk_modify_users(action)
-
+    payload = await ctx.adapters.user.bulk_modify_users(action, default_key_switches)
     return BulkUpdateUsersV2PayloadGQL.from_pydantic(payload)
 
 

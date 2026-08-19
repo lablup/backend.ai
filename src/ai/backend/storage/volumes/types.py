@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path, PurePath
-from typing import Self
+from typing import Self, override
 
 from ai.backend.common.dto.storage.field import VFolderMetaField, VolumeMetaField
 from ai.backend.common.dto.storage.path import QuotaScopeKeyPath, VFolderKeyPath
@@ -27,6 +27,7 @@ class QuotaScopeKey(LoggingInternalMeta):
             quota_scope_id=QuotaScopeID(path.quota_scope_type, path.quota_scope_uuid),
         )
 
+    @override
     def to_logging_str(self) -> str:
         return f"QuotaScopeKey(volume_id={self.volume_id}, quota_scope_id={self.quota_scope_id})"
 
@@ -44,6 +45,7 @@ class VFolderKey(LoggingInternalMeta):
             vfolder_id=VFolderID(quota_scope_id, path.folder_uuid),
         )
 
+    @override
     def to_logging_str(self) -> str:
         return f"VFolderKey(volume_id={self.volume_id}, vfolder_id={self.vfolder_id})"
 
@@ -65,6 +67,7 @@ class VolumeMeta(LoggingInternalMeta):
             capabilities=self.capabilities,
         )
 
+    @override
     def to_logging_str(self) -> str:
         return (
             f"VolumeMeta(volume_id={self.volume_id}, backend={self.backend}, path={self.path}, "
@@ -89,6 +92,7 @@ class VFolderMeta(LoggingInternalMeta):
             fs_used_bytes=self.fs_used_bytes,
         )
 
+    @override
     def to_logging_str(self) -> str:
         return (
             f"VFolderMeta(mount_path={self.mount_path}, file_count={self.file_count}, "
@@ -108,5 +112,6 @@ class QuotaScopeMeta(LoggingInternalMeta):
             limit_bytes=self.limit_bytes,
         )
 
+    @override
     def to_logging_str(self) -> str:
         return f"QuotaScopeMeta(used_bytes={self.used_bytes}, limit_bytes={self.limit_bytes})"

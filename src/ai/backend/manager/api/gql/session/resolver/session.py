@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     TerminateSessionsInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -20,7 +21,14 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.session.types import (
     EnqueueSessionInputGQL,
     EnqueueSessionPayloadGQL,
+    ExcludeSessionIdleChecksFailureInfoGQL,
+    ExcludeSessionIdleChecksInputGQL,
+    ExcludeSessionIdleChecksPayloadGQL,
+    IncludeSessionIdleChecksFailureInfoGQL,
+    IncludeSessionIdleChecksInputGQL,
+    IncludeSessionIdleChecksPayloadGQL,
     ProjectSessionScopeGQL,
+    SessionIdleCheckTargetInfoGQL,
     SessionV2ConnectionGQL,
     SessionV2EdgeGQL,
     SessionV2FilterGQL,
@@ -109,10 +117,10 @@ async def project_sessions_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> SessionV2ConnectionGQL | None:
-    from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
+    from ai.backend.manager.repositories.session.types import ProjectSessionOperationScope
 
     payload = await info.context.adapters.session.gql_search_by_project(
-        scope=ProjectSessionSearchScope(project_id=scope.project_id),
+        scope=ProjectSessionOperationScope(project_id=scope.project_id),
         input=AdminSearchSessionsInput(
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
@@ -192,4 +200,73 @@ async def terminate_sessions_v2(
         terminating=[ID(str(sid)) for sid in payload.terminating],
         force_terminated=[ID(str(sid)) for sid in payload.force_terminated],
         skipped=[ID(str(sid)) for sid in payload.skipped],
+    )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Exclude checker-session pairs from idle checks. Per-session RBAC permission "
+            "is enforced by the bulk validator; any denial fails the whole request."
+        ),
+    ),
+)
+async def exclude_session_idle_checks(
+    input: ExcludeSessionIdleChecksInputGQL,
+    info: Info[StrawberryGQLContext],
+) -> ExcludeSessionIdleChecksPayloadGQL | None:
+    """Exclude one or more checker-session pairs from idle checks."""
+    payload = await info.context.adapters.session.exclude_idle_checks(input.to_pydantic())
+    return ExcludeSessionIdleChecksPayloadGQL(
+        items=[
+            SessionIdleCheckTargetInfoGQL(
+                checker_id=ID(str(target.checker_id)),
+                session_id=ID(str(target.session_id)),
+            )
+            for target in payload.items
+        ],
+        failed=[
+            ExcludeSessionIdleChecksFailureInfoGQL(
+                checker_id=ID(str(failure.checker_id)),
+                session_id=ID(str(failure.session_id)),
+                message=failure.message,
+            )
+            for failure in payload.failed
+        ],
+    )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Include checker-session pairs into idle checks, resetting them so checks "
+            "start from the initial grace period. Per-session RBAC permission "
+            "is enforced by the bulk validator; any denial fails the whole request."
+        ),
+    ),
+)
+async def include_session_idle_checks(
+    input: IncludeSessionIdleChecksInputGQL,
+    info: Info[StrawberryGQLContext],
+) -> IncludeSessionIdleChecksPayloadGQL | None:
+    """Include one or more checker-session pairs into idle checks."""
+    payload = await info.context.adapters.session.include_idle_checks(input.to_pydantic())
+    return IncludeSessionIdleChecksPayloadGQL(
+        items=[
+            SessionIdleCheckTargetInfoGQL(
+                checker_id=ID(str(target.checker_id)),
+                session_id=ID(str(target.session_id)),
+            )
+            for target in payload.items
+        ],
+        failed=[
+            IncludeSessionIdleChecksFailureInfoGQL(
+                checker_id=ID(str(failure.checker_id)),
+                session_id=ID(str(failure.session_id)),
+                message=failure.message,
+            )
+            for failure in payload.failed
+        ],
     )

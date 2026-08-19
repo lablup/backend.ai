@@ -11,6 +11,7 @@ import asyncio
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import override
 
 import aiohttp
 
@@ -63,9 +64,11 @@ class RouteHealthObserver(RouteObserver):
         self._valkey_schedule = valkey_schedule
 
     @classmethod
+    @override
     def name(cls) -> str:
         return "route-health-observer"
 
+    @override
     async def observe(self, routes: Sequence[RouteData]) -> RouteObservationResult:
         """Check health for routes using ReplicaProbeTarget from Valkey."""
         if not routes:

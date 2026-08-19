@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import override
 
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.common.configs.redis import RedisConfig
@@ -50,10 +51,12 @@ class AgentBootstrapComposer(DependencyComposer[AgentBootstrapInput, AgentBootst
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "bootstrap"
 
     @asynccontextmanager
+    @override
     async def compose(
         self,
         stack: DependencyStack,

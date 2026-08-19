@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import enum
-import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -22,13 +21,13 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
-from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.identifier.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -36,8 +35,8 @@ from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
 from ai.backend.manager.data.session.options import HandlerOptions
 
 if TYPE_CHECKING:
+    from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
     from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
-    from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
 from ai.backend.common.types import (
     AutoScalingMetricSource,
@@ -103,6 +102,12 @@ class RouteStatus(enum.Enum):
     @lru_cache(maxsize=1)
     def inactive_route_statuses(cls) -> set[RouteStatus]:
         return {RouteStatus.TERMINATING, RouteStatus.TERMINATED, RouteStatus.FAILED_TO_START}
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def terminal_statuses(cls) -> set[RouteStatus]:
+        """Routes that will not transition further (TERMINATING is still in-flight)."""
+        return {RouteStatus.TERMINATED, RouteStatus.FAILED_TO_START}
 
     def is_active(self) -> bool:
         return self in self.active_route_statuses()
@@ -195,6 +200,12 @@ class ReplicaGroupLifecycle(enum.StrEnum):
     FAILED = "failed"
     DRAINING = "draining"
     DRAINED = "drained"
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def terminal_statuses(cls) -> set[ReplicaGroupLifecycle]:
+        """Replica-group lifecycles that will not transition further."""
+        return {cls.DRAINED, cls.FAILED}
 
 
 class ReplicaGroupScalingStatus(enum.StrEnum):
@@ -519,62 +530,6 @@ class DeploymentOptions(ConfiguredModel):
     """
 
     handler_options: DeploymentHandlerOptions = Field(default_factory=DeploymentHandlerOptions)
-
-
-class ReplicaGroupRolloutSpec(ConfiguredModel):
-    """Per-group rollout step config snapshot from the deployment strategy at
-    DEPLOYING_INITIALIZING; bounds how fast routes move toward the group's desired counts."""
-
-    max_surge: IntOrPercent
-    max_unavailable: IntOrPercent
-
-    def resolve_max_surge(self, total: int) -> int:
-        """Extra target replicas allowed above the goal (rounds up for percentages)."""
-        return self._resolve(self.max_surge, total, round_up=True)
-
-    def resolve_max_unavailable(self, total: int) -> int:
-        """Replicas allowed unavailable below the goal (rounds down for percentages)."""
-        return self._resolve(self.max_unavailable, total, round_up=False)
-
-    @staticmethod
-    def _resolve(value: IntOrPercent, total: int, *, round_up: bool) -> int:
-        if value.count is not None:
-            return value.count
-        result = total * (value.percent or 0.0)
-        return math.ceil(result) if round_up else math.floor(result)
-
-
-@dataclass(frozen=True)
-class TargetGroupSpec:
-    """How the deploying revision's target group is chosen. ``use_primary_group`` True rolls out
-    in place into the deployment's primary group (rolling) — the setup reads that group at creation
-    time and creates a fresh one if none exists yet. When False, a fresh group is always created
-    (blue-green/canary).
-
-    No traffic weight here: a freshly rolled-out group serves no traffic until PROMOTING shifts
-    it over, so PROVISIONING creates it at weight 0 and leaves a reused group's weight untouched."""
-
-    use_primary_group: bool
-    rollout: ReplicaGroupRolloutSpec
-
-
-@dataclass(frozen=True)
-class TrafficStepInput:
-    """Current traffic split + timing for one PROMOTING tick (step is relative to current)."""
-
-    target_traffic_weight: int
-    serving_traffic_weight: int
-    last_changed_at: datetime
-    now: datetime
-
-
-@dataclass(frozen=True)
-class TrafficStep:
-    """The next traffic split (target/serving) and whether promotion is complete."""
-
-    target_traffic_weight: int
-    serving_traffic_weight: int
-    completed: bool
 
 
 class ResourceSpec(ConfiguredModel):
@@ -1390,7 +1345,7 @@ class RouteHistoryData:
 class ReplicaGroupHistoryData:
     """Domain model for replica-group history."""
 
-    id: UUID
+    id: ReplicaGroupHistoryID
     replica_group_id: ReplicaGroupID
     deployment_id: DeploymentID
 
@@ -1408,6 +1363,16 @@ class ReplicaGroupHistoryData:
     attempts: int
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass
+class ReplicaGroupHistoryListResult:
+    """Search result with pagination for replica-group history."""
+
+    items: list[ReplicaGroupHistoryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
 
 @dataclass
@@ -1526,35 +1491,35 @@ class AccessTokenSearchResult:
 
 
 @dataclass(frozen=True)
-class RouteSearchScope:
+class RouteOperationScope:
     """Scope for searching routes within a specific deployment."""
 
     deployment_id: UUID
 
 
 @dataclass(frozen=True)
-class ReplicaSearchScope:
+class ReplicaOperationScope:
     """Scope for searching replicas within a specific deployment."""
 
     deployment_id: UUID
 
 
 @dataclass(frozen=True)
-class AccessTokenSearchScope:
+class AccessTokenOperationScope:
     """Scope for searching access tokens within a specific deployment."""
 
     deployment_id: UUID
 
 
 @dataclass(frozen=True)
-class AutoScalingRuleSearchScope:
+class AutoScalingRuleOperationScope:
     """Scope for searching auto-scaling rules within a specific deployment."""
 
     deployment_id: UUID
 
 
 @dataclass(frozen=True)
-class RevisionSearchScope:
+class RevisionOperationScope:
     """Scope for searching revisions within a specific deployment."""
 
     deployment_id: UUID

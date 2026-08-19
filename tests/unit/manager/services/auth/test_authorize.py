@@ -12,9 +12,9 @@ from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookRes
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired
-from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
@@ -162,9 +162,9 @@ def setup_successful_auth(
         active_sessions=[],
     )
 
-    # Step 2: get_user_row_by_uuid returns a user row with a main keypair
+    # Step 2: get_user_row_by_uuid returns a user row with a default keypair
     mock_user_row = MagicMock()
-    mock_user_row.get_main_keypair_row.return_value = _make_mock_keypair_row()
+    mock_user_row.get_default_keypair_row.return_value = _make_mock_keypair_row()
     mock_auth_repository.get_user_row_by_uuid.return_value = mock_user_row
 
     # Step 3: create_login_session returns the session token
@@ -286,7 +286,7 @@ async def test_authorize_with_hook_authorization(
 
     # Mock user row with keypair
     mock_user_row = MagicMock()
-    mock_user_row.get_main_keypair_row.return_value = _make_mock_keypair_row(
+    mock_user_row.get_default_keypair_row.return_value = _make_mock_keypair_row(
         access_key="hook_access_key",
         secret_key="hook_secret_key",
     )
@@ -375,7 +375,7 @@ async def test_authorize_with_post_hook_response(
 
     # Mock user row with keypair (needed for _post_check)
     mock_user_row = MagicMock()
-    mock_user_row.get_main_keypair_row.return_value = _make_mock_keypair_row()
+    mock_user_row.get_default_keypair_row.return_value = _make_mock_keypair_row()
     mock_auth_repository.get_user_row_by_uuid.return_value = mock_user_row
 
     # First hook (AUTHORIZE) passes normally
@@ -424,7 +424,7 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
 
     # Mock user row with keypair
     mock_user_row = MagicMock()
-    mock_user_row.get_main_keypair_row.return_value = _make_mock_keypair_row()
+    mock_user_row.get_default_keypair_row.return_value = _make_mock_keypair_row()
     mock_auth_repository.get_user_row_by_uuid.return_value = mock_user_row
 
     # Both hooks pass
@@ -494,7 +494,7 @@ async def test_authorize_force_invalidates_existing_sessions(
 
     # Mock user row with keypair
     mock_user_row = MagicMock()
-    mock_user_row.get_main_keypair_row.return_value = _make_mock_keypair_row()
+    mock_user_row.get_default_keypair_row.return_value = _make_mock_keypair_row()
     mock_auth_repository.get_user_row_by_uuid.return_value = mock_user_row
 
     # Both hooks pass

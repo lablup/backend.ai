@@ -14,6 +14,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.clients.agent.client import AgentClient
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -22,18 +23,18 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.clients.agent import AgentClient, AgentClientPool
+from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.repositories.scheduler import (
-    TerminatingKernelData,
-    TerminatingSessionData,
-)
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     SessionTerminator,
     SessionTerminatorArgs,
+)
+from ai.backend.manager.views.sokovan.session import (
+    TerminatingKernelData,
+    TerminatingSessionData,
 )
 
 

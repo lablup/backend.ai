@@ -26,7 +26,7 @@ from functools import partial
 from http import HTTPStatus
 from pathlib import Path
 from pprint import pprint
-from typing import Any, cast
+from typing import Any, Final, cast
 
 import aiohttp
 import aiohttp_cors
@@ -56,6 +56,7 @@ from ai.backend.common.dto.internal.health import (
 )
 from ai.backend.common.dto.manager.auth.request import UpdatePasswordNoAuthRequest
 from ai.backend.common.dto.manager.auth.types import (
+    AuthResponse,
     AuthSuccessResponse,
     RequireTwoFactorAuthResponse,
     RequireTwoFactorRegistrationResponse,
@@ -65,6 +66,7 @@ from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptio
 from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.web.session import (
     Session,
     extra_config_headers,
@@ -80,6 +82,7 @@ from ai.backend.web.clients.apollo_router_pool import (
     ApolloRouterPoolGateHealthChecker,
 )
 from ai.backend.web.clients.endpoint_pool import (
+    AcquiredEndpoint,
     EndpointPoolSpec,
     HealthyEndpointPool,
     build_endpoint_selection_strategy,
@@ -93,11 +96,11 @@ from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_poli
 
 from . import __version__, user_agent
 from .auth import build_forwarding_headers, fill_forwarding_hdrs_to_api_session, get_client_ip
-from .errors import InvalidAPIConfigurationError
+from .errors import InvalidAPIConfigurationError, UnexpectedAuthResponseError
 from .proxy import (
+    apollo_router_handler,
     decrypt_payload,
     web_handler,
-    web_handler_with_jwt,
     web_plugin_handler,
     websocket_handler,
 )
@@ -108,6 +111,8 @@ from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+PROXIED_HTTP_METHODS: Final = ("HEAD", "GET", "PUT", "POST", "PATCH", "DELETE")
 
 
 cache_patterns = {
@@ -263,17 +268,23 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         "password_changed_at": None,
     }
 
+    manager_pool = cast(HealthyEndpointPool, request.app["manager_pool"])
+    registries = cast(
+        Mapping[str, BackendAIClientRegistry], request.app["no_auth_client_registries"]
+    )
     try:
-        registry: BackendAIClientRegistry = request.app["no_auth_client_registry"]
-        resp = await registry.auth.update_password_no_auth(
-            UpdatePasswordNoAuthRequest(
-                domain=config.api.domain,
-                username=creds["username"],
-                current_password=creds["current_password"],
-                new_password=creds["new_password"],
-            ),
-            extra_headers=build_forwarding_headers(request),
-        )
+        # Pick a healthy endpoint from the pool and use its pre-built no-auth
+        # registry, instead of pinning to endpoint[0].
+        async with manager_pool.acquire() as acquired:
+            resp = await registries[acquired.endpoint].auth.update_password_no_auth(
+                UpdatePasswordNoAuthRequest(
+                    domain=config.api.domain,
+                    username=creds["username"],
+                    current_password=creds["current_password"],
+                    new_password=creds["new_password"],
+                ),
+                extra_headers=build_forwarding_headers(request),
+            )
         result["password_changed_at"] = resp.password_changed_at
         log.info(
             "UPDATE_PASSWORD_NO_AUTH: Authorization succeeded for (email:{}, ip:{})",
@@ -334,6 +345,40 @@ async def login_check_handler(request: web.Request) -> web.Response:
         "data": public_data,
         "session_id": session.identity,  # temporary wsproxy interop patch
     })
+
+
+async def _authorize_via_anonymous_session(
+    request: web.Request,
+    acquired_endpoint: AcquiredEndpoint,
+    config: WebServerUnifiedConfig,
+    *,
+    username: str,
+    password: str,
+    extra_args: Mapping[str, Any],
+    forward_cookies: bool = False,
+) -> AuthResponse:
+    """Authorize anonymously against the given (pool-acquired) Manager endpoint.
+
+    Endpoint selection stays with the caller, which acquires ``acquired_endpoint``
+    from ``manager_pool`` and keeps this call inside the acquire context.
+    """
+    anon_api_config = APIConfig(
+        domain=config.api.domain,
+        endpoint=acquired_endpoint.endpoint,
+        access_key="",
+        secret_key="",  # anonymous session
+        user_agent=user_agent,
+        skip_sslcert_validation=not config.api.ssl_verify,
+    )
+    if not anon_api_config.is_anonymous:
+        raise InvalidAPIConfigurationError(
+            "Anonymous API configuration is not properly initialized."
+        )
+    async with APISession(config=anon_api_config) as api_session:
+        fill_forwarding_hdrs_to_api_session(request, api_session)
+        if forward_cookies:
+            api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
+        return await api_session.User.authorize(username, password, extra_args=extra_args)
 
 
 async def login_handler(request: web.Request) -> web.Response:
@@ -437,72 +482,69 @@ async def login_handler(request: web.Request) -> web.Response:
             content_type="application/problem+json",
         )
 
+    manager_pool = cast(HealthyEndpointPool, request.app["manager_pool"])
     try:
-        anon_api_config = APIConfig(
-            domain=config.api.domain,
-            endpoint=str(config.api.endpoint[0]),
-            access_key="",
-            secret_key="",  # anonymous session
-            user_agent=user_agent,
-            skip_sslcert_validation=not config.api.ssl_verify,
-        )
-        if not anon_api_config.is_anonymous:
-            raise InvalidAPIConfigurationError(
-                "Anonymous API configuration is not properly initialized."
+        extra_args = {}
+        extra_keys = set(creds.keys()) ^ {"username", "password"}
+        for extra_key in extra_keys:
+            extra_args[extra_key] = creds[extra_key]
+        async with manager_pool.acquire() as acquired_endpoint:
+            auth_result = await _authorize_via_anonymous_session(
+                request,
+                acquired_endpoint,
+                config,
+                username=creds["username"],
+                password=creds["password"],
+                extra_args=extra_args,
             )
-        async with APISession(config=anon_api_config) as api_session:
-            fill_forwarding_hdrs_to_api_session(request, api_session)
-            extra_args = {}
-            extra_keys = set(creds.keys()) ^ {"username", "password"}
-            for extra_key in extra_keys:
-                extra_args[extra_key] = creds[extra_key]
-            auth_result = await api_session.User.authorize(
-                creds["username"], creds["password"], extra_args=extra_args
-            )
-            match auth_result:
-                case AuthSuccessResponse():
-                    token = auth_result
-                    stored_token = {
-                        "type": "keypair",
-                        "access_key": token.access_key,
-                        "secret_key": token.secret_key,
-                        "role": token.role,
-                        "status": token.status,
-                    }
-                    public_return = {
-                        "access_key": token.access_key,
-                        "role": token.role,
-                        "status": token.status,
-                    }
-                    _bind_session_to_manager_token(session, token.session_token)
-                    session["authenticated"] = True
-                    session["token"] = stored_token  # store full token
-                    result["authenticated"] = True
-                    result["data"] = public_return  # store public info from token
-                    login_fail_count = 0
-                    await _set_login_history(last_login_attempt, login_fail_count)
-                    log.info(
-                        "LOGIN_HANDLER: Authorization succeeded for (email:{}, ip:{})",
-                        creds["username"],
-                        client_ip,
-                    )
-                case RequireTwoFactorRegistrationResponse():
-                    result["authenticated"] = False
-                    result["data"] = {
-                        "type": "https://api.backend.ai/probs/require-totp-registration",
-                        "title": "Two-Factor Authentication registration required.",
-                        "details": "You must register Two-Factor Authentication.",
-                        "two_factor_registration_token": auth_result.token,
-                    }
-                    return web.json_response(result)
-                case RequireTwoFactorAuthResponse():
-                    result["authenticated"] = False
-                    result["data"] = {
-                        "type": "https://api.backend.ai/probs/require-totp-authentication",
-                        "title": "Two-Factor Authentication needed.",
-                        "details": "You must authenticate using Two-Factor Authentication.",
-                    }
-                    return web.json_response(result)
+        match auth_result:
+            case AuthSuccessResponse():
+                token = auth_result
+                stored_token = {
+                    "type": "keypair",
+                    "access_key": token.access_key,
+                    "secret_key": token.secret_key,
+                    "role": token.role,
+                    "status": token.status,
+                }
+                public_return = {
+                    "access_key": token.access_key,
+                    "role": token.role,
+                    "status": token.status,
+                }
+                _bind_session_to_manager_token(session, token.session_token)
+                session["authenticated"] = True
+                session["token"] = stored_token  # store full token
+                result["authenticated"] = True
+                result["data"] = public_return  # store public info from token
+                login_fail_count = 0
+                await _set_login_history(last_login_attempt, login_fail_count)
+                log.info(
+                    "LOGIN_HANDLER: Authorization succeeded for (email:{}, ip:{})",
+                    creds["username"],
+                    client_ip,
+                )
+            case RequireTwoFactorRegistrationResponse():
+                result["authenticated"] = False
+                result["data"] = {
+                    "type": "https://api.backend.ai/probs/require-totp-registration",
+                    "title": "Two-Factor Authentication registration required.",
+                    "details": "You must register Two-Factor Authentication.",
+                    "two_factor_registration_token": auth_result.token,
+                }
+                return web.json_response(result)
+            case RequireTwoFactorAuthResponse():
+                result["authenticated"] = False
+                result["data"] = {
+                    "type": "https://api.backend.ai/probs/require-totp-authentication",
+                    "title": "Two-Factor Authentication needed.",
+                    "details": "You must authenticate using Two-Factor Authentication.",
+                }
+                return web.json_response(result)
+            case _:
+                raise UnexpectedAuthResponseError(
+                    f"Unexpected auth result type: {type(auth_result)}"
+                )
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         return web.HTTPBadGateway(
@@ -544,14 +586,15 @@ async def logout_handler(request: web.Request) -> web.Response:
     # Invalidate login session in Manager DB
     if session_token:
         config = cast(WebServerUnifiedConfig, request.app["config"])
+        manager_pool = cast(HealthyEndpointPool, request.app["manager_pool"])
         try:
-            endpoint = str(config.api.endpoint[0])
-            async with aiohttp.ClientSession() as http_session:
-                await http_session.post(
-                    f"{endpoint}/auth/logout",
-                    json={"session_token": session_token},
-                    ssl=config.api.ssl_verify,
-                )
+            async with manager_pool.acquire() as acquired:
+                async with aiohttp.ClientSession() as http_session:
+                    await http_session.post(
+                        f"{acquired.endpoint}/auth/logout",
+                        json={"session_token": session_token},
+                        ssl=config.api.ssl_verify,
+                    )
         except Exception:
             log.exception(
                 "Failed to invalidate login session in Manager DB (token={})", session_token
@@ -673,73 +716,68 @@ async def token_login_handler(request: web.Request) -> web.Response:
         "authenticated": False,
         "data": None,
     }
+    manager_pool = cast(HealthyEndpointPool, request.app["manager_pool"])
+    # Instead of email and password, token will be used for user auth.
+    # The purpose of token login is to authenticate a client, typically a browser, using a
+    # separate token referred to as `sToken`, rather than using user's email and password.
+    # However, the `api_session.User.authorize` SDK requires email and password as
+    # parameters, so we just pass fake (arbitrary) email and password which are placeholders
+    # in token-based login. Each authorize hook plugin will deal with various type of
+    # `sToken` and related parameters to authorize a user. In this process, email and
+    # password do not play any role.
+    extra_args = {**rqst_data, auth_token_name: auth_token}
     try:
-        anon_api_config = APIConfig(
-            domain=config.api.domain,
-            endpoint=str(config.api.endpoint[0]),
-            access_key="",
-            secret_key="",  # anonymous session
-            user_agent=user_agent,
-            skip_sslcert_validation=not config.api.ssl_verify,
-        )
-        if not anon_api_config.is_anonymous:
-            raise InvalidAPIConfigurationError(
-                "Anonymous API configuration is not properly initialized."
+        async with manager_pool.acquire() as acquired_endpoint:
+            auth_result = await _authorize_via_anonymous_session(
+                request,
+                acquired_endpoint,
+                config,
+                username="fake-email",
+                password="fake-pwd",
+                extra_args=extra_args,
+                forward_cookies=True,
             )
-        async with APISession(config=anon_api_config) as api_session:
-            fill_forwarding_hdrs_to_api_session(request, api_session)
-            # Instead of email and password, token will be used for user auth.
-            api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
-            extra_args = {**rqst_data, auth_token_name: auth_token}
-            # The purpose of token login is to authenticate a client, typically a browser, using a
-            # separate token referred to as `sToken`, rather than using user's email and password.
-            # However, the `api_session.User.authorize` SDK requires email and password as
-            # parameters, so we just pass fake (arbitrary) email and password which are placeholders
-            # in token-based login. Each authorize hook plugin will deal with various type of
-            # `sToken` and related parameters to authorize a user. In this process, email and
-            # password do not play any role.
-            auth_result = await api_session.User.authorize(
-                "fake-email", "fake-pwd", extra_args=extra_args
-            )
-            match auth_result:
-                case AuthSuccessResponse():
-                    token = auth_result
-                case RequireTwoFactorRegistrationResponse():
-                    result["authenticated"] = False
-                    result["data"] = {
-                        "type": "https://api.backend.ai/probs/require-totp-registration",
-                        "title": "Two-Factor Authentication registration required.",
-                        "details": "You must register Two-Factor Authentication.",
-                        "two_factor_registration_token": auth_result.token,
-                    }
-                    return web.json_response(result)
-                case RequireTwoFactorAuthResponse():
-                    result["authenticated"] = False
-                    result["data"] = {
-                        "type": "https://api.backend.ai/probs/require-totp-authentication",
-                        "title": "Two-Factor Authentication needed.",
-                        "details": "You must authenticate using Two-Factor Authentication.",
-                    }
-                    return web.json_response(result)
-                case _:
-                    raise RuntimeError(f"Unexpected auth result type: {type(auth_result)}")
-            stored_token = {
-                "type": "keypair",
-                "access_key": token.access_key,
-                "secret_key": token.secret_key,
-                "role": token.role,
-                "status": token.status,
-            }
-            public_return = {
-                "access_key": token.access_key,
-                "role": token.role,
-                "status": token.status,
-            }
-            _bind_session_to_manager_token(session, token.session_token)
-            session["authenticated"] = True
-            session["token"] = stored_token  # store full token
-            result["authenticated"] = True
-            result["data"] = public_return  # store public info from token
+        match auth_result:
+            case AuthSuccessResponse():
+                token = auth_result
+            case RequireTwoFactorRegistrationResponse():
+                result["authenticated"] = False
+                result["data"] = {
+                    "type": "https://api.backend.ai/probs/require-totp-registration",
+                    "title": "Two-Factor Authentication registration required.",
+                    "details": "You must register Two-Factor Authentication.",
+                    "two_factor_registration_token": auth_result.token,
+                }
+                return web.json_response(result)
+            case RequireTwoFactorAuthResponse():
+                result["authenticated"] = False
+                result["data"] = {
+                    "type": "https://api.backend.ai/probs/require-totp-authentication",
+                    "title": "Two-Factor Authentication needed.",
+                    "details": "You must authenticate using Two-Factor Authentication.",
+                }
+                return web.json_response(result)
+            case _:
+                raise UnexpectedAuthResponseError(
+                    f"Unexpected auth result type: {type(auth_result)}"
+                )
+        stored_token = {
+            "type": "keypair",
+            "access_key": token.access_key,
+            "secret_key": token.secret_key,
+            "role": token.role,
+            "status": token.status,
+        }
+        public_return = {
+            "access_key": token.access_key,
+            "role": token.role,
+            "status": token.status,
+        }
+        _bind_session_to_manager_token(session, token.session_token)
+        session["authenticated"] = True
+        session["token"] = stored_token  # store full token
+        result["authenticated"] = True
+        result["data"] = public_return  # store public info from token
     except BackendClientError as e:
         return web.HTTPBadGateway(
             text=json.dumps({
@@ -939,18 +977,33 @@ async def apollo_router_pool_ctx(
 
 
 @asynccontextmanager
-async def no_auth_client_registry_ctx(
-    config: WebServerUnifiedConfig,
-) -> AsyncGenerator[BackendAIClientRegistry]:
-    client_config = V2ClientConfig(
-        endpoint=URL(str(config.api.endpoint[0])),
-        skip_ssl_verification=not config.api.ssl_verify,
-    )
-    registry = await BackendAIClientRegistry.create(client_config, NoAuth())
+async def no_auth_client_registries_ctx(
+    manager_pool: HealthyEndpointPool,
+    ssl_verify: bool,
+) -> AsyncGenerator[Mapping[str, BackendAIClientRegistry]]:
+    """Build one no-auth v2 client registry per Manager endpoint in the pool.
+
+    Keyed by the same endpoint strings ``manager_pool`` hands out, so the
+    no-auth password reset path can use the registry of a pool-selected
+    healthy endpoint instead of pinning to ``config.api.endpoint[0]``.
+    """
+    registries: dict[str, BackendAIClientRegistry] = {}
     try:
-        yield registry
+        for endpoint in manager_pool.all_endpoints():
+            registries[endpoint] = await BackendAIClientRegistry.create(
+                V2ClientConfig(
+                    endpoint=URL(endpoint),
+                    skip_ssl_verification=not ssl_verify,
+                ),
+                NoAuth(),
+            )
+        yield registries
     finally:
-        await registry.close()
+        # Best-effort close so one failing registry does not leak the others.
+        await asyncio.gather(
+            *(registry.close() for registry in registries.values()),
+            return_exceptions=True,
+        )
 
 
 @asynccontextmanager
@@ -1049,6 +1102,11 @@ async def webapp_ctx(
     )
     cors.add(app.router.add_route("POST", "/func/{path:auth/signup}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", manager_web_handler))
+    # `public` is a reserved anonymous segment in v2 paths (manager `api/rest/v2/AGENTS.md`).
+    for method in PROXIED_HTTP_METHODS:
+        cors.add(
+            app.router.add_route(method, "/func/{path:v2/[^/]+/public/[^/]+$}", anon_web_handler)
+        )
     cors.add(
         app.router.add_route("GET", "/func/{path:stream/kernel/_/events}", manager_web_handler)
     )
@@ -1060,20 +1118,15 @@ async def webapp_ctx(
 
     # Feature flag for using Apollo Router(Graphql Federation)
     if config.apollo_router.enabled:
-        # Use JWT authentication for Apollo Router if enabled, otherwise use HMAC
         supergraph_handler = partial(
-            web_handler_with_jwt,
+            apollo_router_handler,
             endpoint_pool=cast(HealthyEndpointPool, app["apollo_router_pool"]),
         )
         cors.add(app.router.add_route("GET", "/func/admin/gql", supergraph_handler))
         cors.add(app.router.add_route("POST", "/func/admin/gql", supergraph_handler))
 
-    cors.add(app.router.add_route("HEAD", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("GET", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("PUT", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("POST", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("PATCH", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("DELETE", "/func/{path:.*$}", manager_web_handler))
+    for method in PROXIED_HTTP_METHODS:
+        cors.add(app.router.add_route(method, "/func/{path:.*$}", manager_web_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:stream/.*$}", pipeline_websocket_handler))
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*login/$}", pipeline_login_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:.*$}", pipeline_handler))
@@ -1160,8 +1213,8 @@ async def server_main(
             app["apollo_router_pool"] = await web_init_stack.enter_async_context(
                 apollo_router_pool_ctx(config, app)
             )
-        app["no_auth_client_registry"] = await web_init_stack.enter_async_context(
-            no_auth_client_registry_ctx(config)
+        app["no_auth_client_registries"] = await web_init_stack.enter_async_context(
+            no_auth_client_registries_ctx(app["manager_pool"], config.api.ssl_verify)
         )
         await web_init_stack.enter_async_context(redis_ctx(config, app, pidx))
 
@@ -1239,6 +1292,7 @@ def main(
     debug: bool,
 ) -> None:
     """Start the webui host service as a foreground process."""
+    force_threaded_dns_resolver()
     # Delete this part when you remove --debug option
     raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
 

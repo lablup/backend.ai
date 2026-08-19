@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import override
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -11,7 +12,7 @@ import sqlalchemy as sa
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 
 @dataclass
@@ -25,11 +26,12 @@ class RoleInvitationSearchResult:
 
 
 @dataclass(frozen=True)
-class InviteeSearchScope(SearchScope):
+class InviteeOperationScope(OperationScope):
     """Scope for searching invitations addressed to a specific user."""
 
     invitee_user_id: UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         invitee_user_id = self.invitee_user_id
 
@@ -39,17 +41,19 @@ class InviteeSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         # Invitee existence is guaranteed by RBAC authentication before reaching here.
         return []
 
 
 @dataclass(frozen=True)
-class InviterSearchScope(SearchScope):
+class InviterOperationScope(OperationScope):
     """Scope for searching invitations sent by a specific user."""
 
     inviter_user_id: UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         inviter_user_id = self.inviter_user_id
 
@@ -59,17 +63,19 @@ class InviterSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         # Inviter existence is guaranteed by RBAC authentication before reaching here.
         return []
 
 
 @dataclass(frozen=True)
-class RoleInvitationSearchScope(SearchScope):
+class RoleInvitationOperationScope(OperationScope):
     """Scope for searching invitations for a specific role."""
 
     role_id: UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         role_id = self.role_id
 
@@ -79,6 +85,7 @@ class RoleInvitationSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         # Role existence is validated by the RBAC permission check before reaching here.
         return []

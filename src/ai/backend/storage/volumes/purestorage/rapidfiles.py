@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from stat import S_IFDIR, S_IFLNK
 from subprocess import CalledProcessError
+from typing import override
 
 from ai.backend.common.json import load_json
 from ai.backend.common.types import BinarySize
@@ -24,6 +25,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class RapidFileToolsFSOpModel(BaseFSOpModel):
+    @override
     async def copy_tree(
         self,
         src_path: Path,
@@ -44,6 +46,7 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
         except CalledProcessError as e:
             raise PureStorageCommandFailedError(f'"pcp" command failed: {e.stderr}') from e
 
+    @override
     async def delete_tree(
         self,
         path: Path,
@@ -57,6 +60,7 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
         except CalledProcessError as e:
             raise PureStorageCommandFailedError(f"'prm' command failed: {e.stderr}") from e
 
+    @override
     def scan_tree(
         self,
         path: Path,
@@ -109,6 +113,7 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
 
         return _aiter()
 
+    @override
     async def scan_tree_usage(
         self,
         path: Path,
@@ -146,6 +151,7 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
             await proc.wait()
         return TreeUsage(file_count=total_count, used_bytes=total_size)
 
+    @override
     async def scan_tree_size(
         self,
         path: Path,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import pytest
 import sqlalchemy as sa
@@ -21,6 +21,7 @@ from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
     RBACScopeEntityUnbinder,
@@ -38,7 +39,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class ScopeUnbinderMappingRow(Base):  # type: ignore[misc]
+class ScopeUnbinderMappingRow(Base):
     """N:N mapping row for scope unbinder testing."""
 
     __tablename__ = "test_scope_unbinder_mapping"
@@ -71,11 +72,13 @@ class TestScopeEntityUnbinder(RBACScopeEntityUnbinder[ScopeUnbinderMappingRow]):
         self._scope_id = scope_id
         self._scope_element_type = scope_element_type
 
+    @override
     def build_purger_spec(self) -> BatchPurgerSpec[ScopeUnbinderMappingRow]:
         entity_ids = self._entity_ids_value
         scope_id = self._scope_id
 
         class _Spec(BatchPurgerSpec[ScopeUnbinderMappingRow]):
+            @override
             def build_subquery(self) -> sa.sql.Select[tuple[ScopeUnbinderMappingRow]]:
                 stmt = sa.select(ScopeUnbinderMappingRow).where(
                     ScopeUnbinderMappingRow.scope_id == scope_id,
@@ -86,17 +89,24 @@ class TestScopeEntityUnbinder(RBACScopeEntityUnbinder[ScopeUnbinderMappingRow]):
                     )
                 return stmt
 
+            @override
+            def conflict_checks(self) -> Sequence[ConflictCheck]:
+                return ()
+
         return _Spec()
 
     @property
+    @override
     def entity_type(self) -> RBACElementType:
         return self._entity_element_type
 
     @property
+    @override
     def scope_ref(self) -> RBACElementRef:
         return RBACElementRef(self._scope_element_type, self._scope_id)
 
     @property
+    @override
     def entity_ids(self) -> Sequence[str] | None:
         return self._entity_ids_value
 
@@ -125,7 +135,7 @@ class UnbinderSeedContext:
 async def create_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
-    async with with_tables(database_connection, UNBINDER_TABLES):  # type: ignore[arg-type]
+    async with with_tables(database_connection, UNBINDER_TABLES):
         yield
 
 

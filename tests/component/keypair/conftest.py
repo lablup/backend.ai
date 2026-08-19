@@ -21,7 +21,7 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.keypair.handler import V2KeypairHandler
 from ai.backend.manager.api.rest.v2.keypair.registry import register_v2_keypair_routes
-from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.processors import Processors

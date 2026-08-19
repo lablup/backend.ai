@@ -17,13 +17,16 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship
+from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship
+from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.permission.permission_defs import DomainPermission
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.base import (
     GUID,
@@ -32,6 +35,7 @@ from ai.backend.manager.models.base import (
     SlugType,
     VFolderHostPermissionColumn,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -44,14 +48,9 @@ from ai.backend.manager.models.rbac import (
     required_permission,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import DomainPermission
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.group import GroupRow
-    from ai.backend.manager.models.network import NetworkRow
     from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
-    from ai.backend.manager.models.session import SessionRow
-    from ai.backend.manager.models.user import UserRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -74,8 +73,9 @@ def row_to_data(row: DomainRow | Row[Any]) -> DomainData:
         name=row.name,
         description=row.description,
         is_active=row.is_active,
+        is_default=row.is_default,
         created_at=row.created_at,
-        modified_at=row.modified_at,
+        updated_at=row.updated_at,
         total_resource_slots=row.total_resource_slots,
         allowed_vfolder_hosts=row.allowed_vfolder_hosts,
         allowed_docker_registries=row.allowed_docker_registries,
@@ -84,14 +84,17 @@ def row_to_data(row: DomainRow | Row[Any]) -> DomainData:
     )
 
 
-def _get_network_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.network import NetworkRow
-
-    return DomainRow.name == foreign(NetworkRow.domain_name)
-
-
-class DomainRow(Base):  # type: ignore[misc]
+class DomainRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "domains"
+    __table_args__ = (
+        # Partial unique index: at most one domain may have is_default = true.
+        sa.Index(
+            "uq_domains_is_default",
+            "is_default",
+            unique=True,
+            postgresql_where=sa.text("is_default"),
+        ),
+    )
 
     name: Mapped[str] = mapped_column(
         "name", SlugType(length=64, allow_unicode=True, allow_dot=True), primary_key=True
@@ -105,15 +108,8 @@ class DomainRow(Base):  # type: ignore[misc]
     )
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool] = mapped_column("is_active", sa.Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
-    )
-    modified_at: Mapped[datetime] = mapped_column(
-        "modified_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.current_timestamp(),
-        nullable=False,
+    is_default: Mapped[bool] = mapped_column(
+        "is_default", sa.Boolean, nullable=False, default=False, server_default=sa.false()
     )
     # TODO: separate resource-related fields with new domain resource policy table when needed.
     total_resource_slots: Mapped[ResourceSlot] = mapped_column(
@@ -135,18 +131,17 @@ class DomainRow(Base):  # type: ignore[misc]
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
     )
 
-    sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="domain")
-    users: Mapped[list[UserRow]] = relationship("UserRow", back_populates="domain")
-    groups: Mapped[list[GroupRow]] = relationship("GroupRow", back_populates="domain")
     sgroup_for_domains_rows: Mapped[list[ScalingGroupForDomainRow]] = relationship(
         "ScalingGroupForDomainRow",
-        back_populates="domain_row",
     )
-    networks: Mapped[list[NetworkRow]] = relationship(
-        "NetworkRow",
-        back_populates="domain_row",
-        primaryjoin=_get_network_join_condition,
-    )
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+        return cls.id
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.name
 
     def to_data(self) -> DomainData:
         return row_to_data(self)
@@ -164,7 +159,7 @@ class DomainModel(RBACModel[DomainPermission]):
     description: str | None
     is_active: bool
     created_at: datetime
-    modified_at: datetime
+    updated_at: datetime
 
     _total_resource_slots: ResourceSlot
     _allowed_vfolder_hosts: VFolderHostPermissionMap
@@ -176,6 +171,7 @@ class DomainModel(RBACModel[DomainPermission]):
     _permissions: frozenset[DomainPermission] = field(default_factory=frozenset)
 
     @property
+    @override
     def permissions(self) -> Container[DomainPermission]:
         return self._permissions
 
@@ -212,7 +208,7 @@ class DomainModel(RBACModel[DomainPermission]):
             description=row.description,
             is_active=row.is_active,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            updated_at=row.updated_at,
             _total_resource_slots=row.total_resource_slots,
             _allowed_vfolder_hosts=row.allowed_vfolder_hosts,
             _allowed_docker_registries=row.allowed_docker_registries,
@@ -282,12 +278,14 @@ class DomainPermissionContext(AbstractPermissionContext[DomainPermission, Domain
             )
         return cond
 
+    @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
         return sa.select(DomainRow).where(cond)
 
+    @override
     async def calculate_final_permission(self, rbac_obj: DomainRow) -> frozenset[DomainPermission]:
         domain_row = rbac_obj
         domain_name = domain_row.name

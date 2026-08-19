@@ -11,6 +11,7 @@ from ai.backend.test.templates.template import WrapperTestTemplate
 
 class ModelVFolderTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "model_vfolder"
 

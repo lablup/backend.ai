@@ -322,7 +322,7 @@ class FairShareFactorCalculator:
 
         Args:
             fair_share_data: Fair share data containing per-entity resource weights
-            default_weights: Default weights from scaling group config
+            default_weights: Default weights from resource group config
 
         Returns:
             ResourceSlot with weights for each resource type
@@ -347,7 +347,7 @@ class FairShareFactorCalculator:
             usage: Total decayed resource usage (resource-seconds)
             weight: Priority weight multiplier
             resource_weights: Weights for each resource type
-            cluster_capacity: Total available slots from all agents in the scaling group
+            cluster_capacity: Total available slots from all agents in the resource group
             lookback_days: Number of days in lookback window
 
         Returns:

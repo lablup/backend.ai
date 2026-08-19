@@ -1,8 +1,18 @@
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from ipaddress import IPv4Network, IPv6Network
 
-from ai.backend.manager.models.user import UserRole, UserStatus
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
+from ai.backend.common.types import AccessKey, ReadableCIDR, SecretKey
+from ai.backend.manager.data.keypair.types import KeyPairData
+from ai.backend.manager.data.resource.types import (
+    KeyPairResourcePolicyData,
+    UserResourcePolicyData,
+)
+from ai.backend.manager.data.user.types import UserStatus
 
 
 @dataclass
@@ -24,7 +34,7 @@ class AuthorizationResult:
 @dataclass
 class UserData:
     uuid: uuid.UUID
-    username: str | None
+    username: str
     email: str
     password: str | None
     need_password_change: bool
@@ -47,3 +57,36 @@ class UserData:
 class GroupMembershipData:
     group_id: uuid.UUID
     user_id: uuid.UUID
+
+
+@dataclass(frozen=True)
+class UserCreationData:
+    """A fully provisioned user and its default keypair."""
+
+    user: UserData
+    keypair: KeyPairData
+
+
+@dataclass(frozen=True)
+class AuthenticatedUser:
+    """The authenticated caller's user record, limited to what request handling reads."""
+
+    uuid: UserID
+    email: str
+    role: UserRole
+    domain_name: str
+    domain_id: DomainID
+    sudo_session_enabled: bool
+    allowed_client_ip: list[ReadableCIDR[IPv4Network | IPv6Network]] | None
+    resource_policy: UserResourcePolicyData
+
+
+@dataclass(frozen=True)
+class AuthenticatedKeypair:
+    """The keypair the request authenticated with, limited to what request handling reads."""
+
+    access_key: AccessKey
+    secret_key: SecretKey
+    is_admin: bool
+    rate_limit: int | None
+    resource_policy: KeyPairResourcePolicyData

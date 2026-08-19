@@ -5,6 +5,7 @@ from .resolver import (
     admin_app_config_allow_lists,
     admin_create_app_config_allow_list,
     admin_purge_app_config_allow_list,
+    admin_update_app_config_allow_list,
 )
 from .types import (
     AppConfigAllowListConnection,
@@ -37,4 +38,5 @@ __all__ = (
     # Mutation resolvers
     "admin_create_app_config_allow_list",
     "admin_purge_app_config_allow_list",
+    "admin_update_app_config_allow_list",
 )

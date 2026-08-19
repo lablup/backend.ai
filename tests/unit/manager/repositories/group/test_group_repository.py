@@ -5,15 +5,16 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import AsyncGenerator
-from typing import cast
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import EntityType, ScopeType
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.data.permission.types import EntityType, RoleSource, ScopeType
+from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -22,9 +23,10 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderUsageMode,
 )
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.group.types import GroupData, ProjectMemberRoleSpec, ProjectType
+from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
@@ -55,6 +57,10 @@ from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow, UserRo
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+    RolePermissionPresetRow,
+)
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -66,18 +72,20 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
-from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestGroupRepositoryCreateResourcePolicyValidation:
@@ -96,6 +104,14 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
                 ProjectResourcePolicyRow,
                 GroupRow,
                 AssociationScopesEntitiesRow,  # RBAC scopes-entities association
+                RoleRow,
+                PermissionRow,
+                # Creating a project provisions its virtual scope and preset-derived roles
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
+                RolePresetRow,
+                RolePermissionPresetRow,
             ],
         ):
             yield database_connection
@@ -104,12 +120,14 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create test domain."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -122,7 +140,7 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
             session.add(domain)
             await session.commit()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def project_resource_policy(
@@ -145,45 +163,29 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
         return policy_name
 
     @pytest.fixture
-    async def group_db_source_with_mock_role_manager(
+    async def group_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> GroupDBSource:
-        """GroupDBSource with mocked RoleManager for create tests."""
-        db_source = GroupDBSource(db=db_with_cleanup)
-        mock_role_manager = MagicMock()
-        mock_role_manager.create_system_role = AsyncMock(return_value=None)
-        mock_role_manager.create_preset_roles = AsyncMock(return_value=[])
-        db_source._role_manager = mock_role_manager
-        return db_source
-
-    @pytest.fixture
-    async def group_repository_with_mock_role_manager(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source_with_mock_role_manager: GroupDBSource,
     ) -> GroupRepository:
-        """GroupRepository with mocked RoleManager for create tests."""
-        repo = GroupRepository(
+        """GroupRepository for create tests."""
+        return GroupRepository(
             db=db_with_cleanup,
             config_provider=MagicMock(),
             valkey_stat_client=MagicMock(),
             storage_manager=MagicMock(spec=StorageSessionManager),
         )
-        repo._db_source = group_db_source_with_mock_role_manager
-        return repo
 
     async def test_create_succeeds_with_existing_project_resource_policy(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository_with_mock_role_manager: GroupRepository,
-        test_domain: str,
+        group_repository: GroupRepository,
+        test_domain: DomainFixtureData,
         project_resource_policy: str,
     ) -> None:
         """Test that group creation succeeds when project_resource_policy exists."""
         spec = GroupCreatorSpec(
             name=f"test-group-{uuid.uuid4().hex[:8]}",
-            domain_name=test_domain,
+            domain_name=test_domain.domain_name,
             description="Test group",
             is_active=True,
             total_resource_slots=ResourceSlot({}),
@@ -194,21 +196,21 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
         )
         creator = Creator(spec=spec)
 
-        result = await group_repository_with_mock_role_manager.create(creator)
+        result = await group_repository.create(creator)
 
         assert result.name == spec.name
         assert result.resource_policy == project_resource_policy
 
     async def test_create_fails_with_nonexistent_project_resource_policy(
         self,
-        group_repository_with_mock_role_manager: GroupRepository,
-        test_domain: str,
+        group_repository: GroupRepository,
+        test_domain: DomainFixtureData,
     ) -> None:
         """Test that group creation fails when project_resource_policy does not exist."""
         nonexistent_policy = "nonexistent-policy"
         spec = GroupCreatorSpec(
             name=f"test-group-{uuid.uuid4().hex[:8]}",
-            domain_name=test_domain,
+            domain_name=test_domain.domain_name,
             description="Test group",
             is_active=True,
             total_resource_slots=ResourceSlot({}),
@@ -220,7 +222,7 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
         creator = Creator(spec=spec)
 
         with pytest.raises(InvalidAPIParameters) as exc_info:
-            await group_repository_with_mock_role_manager.create(creator)
+            await group_repository.create(creator)
 
         assert "Resource policy" in str(exc_info.value)
         assert "does not exist" in str(exc_info.value)
@@ -276,20 +278,32 @@ class TestGroupRepository:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
+                # Creating a project provisions its virtual scope and preset-derived roles
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
+                RolePresetRow,
+                RolePermissionPresetRow,
             ],
         ):
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+        test_domain_id: DomainID,
+    ) -> DomainFixtureData:
         """Create test domain"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -302,7 +316,7 @@ class TestGroupRepository:
             session.add(domain)
             await session.commit()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
 
     @pytest.fixture
     async def default_project_resource_policy(
@@ -349,7 +363,7 @@ class TestGroupRepository:
     async def test_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         default_user_resource_policy: str,
         test_password_info: PasswordInfo,
     ) -> uuid.UUID:
@@ -367,9 +381,10 @@ class TestGroupRepository:
                 description="Test user",
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain,
+                domain_name=test_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=default_user_resource_policy,
+                domain_id=test_domain.domain_id,
             )
             session.add(user)
             await session.commit()
@@ -380,7 +395,7 @@ class TestGroupRepository:
     async def test_users_for_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         default_user_resource_policy: str,
         test_password_info: PasswordInfo,
     ) -> list[uuid.UUID]:
@@ -400,11 +415,13 @@ class TestGroupRepository:
                     description="Test user",
                     status=UserStatus.ACTIVE,
                     status_info="active",
-                    domain_name=test_domain,
+                    domain_name=test_domain.domain_name,
                     role=UserRole.USER,
                     resource_policy=default_user_resource_policy,
+                    domain_id=test_domain.domain_id,
                 )
                 session.add(user)
+                session.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
                 user_uuids.append(user_uuid)
             await session.commit()
 
@@ -414,7 +431,7 @@ class TestGroupRepository:
     async def test_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         default_project_resource_policy: str,
     ) -> uuid.UUID:
         """Create test group together with both an admin role and a member
@@ -435,7 +452,7 @@ class TestGroupRepository:
                 name=f"test-group-{group_id.hex[:8]}",
                 description="Test group",
                 is_active=True,
-                domain_name=test_domain,
+                domain_name=test_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id="test-integration-id",
@@ -470,6 +487,12 @@ class TestGroupRepository:
                     entity_id=str(member_role_id),
                 )
             )
+            session.add(
+                VirtualScopeRow(
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=group_id,
+                )
+            )
             await session.commit()
 
         return group_id
@@ -494,45 +517,21 @@ class TestGroupRepository:
         )
 
     @pytest.fixture
-    async def group_db_source_with_mock_role_manager(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> GroupDBSource:
-        """GroupDBSource with mocked RoleManager for create tests"""
-        db_source = GroupDBSource(db=db_with_cleanup)
-        mock_role_manager = MagicMock()
-        mock_role_manager.create_system_role = AsyncMock(return_value=None)
-        mock_role_manager.create_preset_roles = AsyncMock(return_value=[])
-        db_source._role_manager = mock_role_manager
-        return db_source
-
-    @pytest.fixture
-    async def group_repository_with_mock_role_manager(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        storage_manager_mock: StorageSessionManager,
-        group_db_source_with_mock_role_manager: GroupDBSource,
-    ) -> GroupRepository:
-        """GroupRepository with mocked RoleManager for create tests"""
-        repo = GroupRepository(
-            db=db_with_cleanup,
-            config_provider=MagicMock(),
-            valkey_stat_client=MagicMock(),
-            storage_manager=storage_manager_mock,
-        )
-        repo._db_source = group_db_source_with_mock_role_manager
-        return repo
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
 
     @pytest.fixture
     async def test_scaling_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_id: ResourceGroupID,
     ) -> str:
         """Create test scaling group"""
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
             sgroup = ScalingGroupRow(
+                id=test_scaling_group_id,
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
@@ -550,10 +549,12 @@ class TestGroupRepository:
     async def group_with_active_kernel(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
+        test_domain_id: DomainID,
         test_user: uuid.UUID,
         default_project_resource_policy: str,
         test_scaling_group: str,
+        test_scaling_group_id: ResourceGroupID,
     ) -> uuid.UUID:
         """Create a group with an active kernel"""
         group_id = uuid.uuid4()
@@ -568,7 +569,7 @@ class TestGroupRepository:
                 name=f"group-with-kernel-{group_id.hex[:8]}",
                 description="Group with active kernel",
                 is_active=True,
-                domain_name=test_domain,
+                domain_name=test_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,
@@ -583,6 +584,7 @@ class TestGroupRepository:
                 status=AgentStatus.ALIVE,
                 region="local",
                 scaling_group=test_scaling_group,
+                resource_group_id=test_scaling_group_id,
                 schedulable=True,
                 available_slots=ResourceSlot({}),
                 occupied_slots=ResourceSlot({}),
@@ -596,8 +598,11 @@ class TestGroupRepository:
             session_row = SessionRow(
                 id=session_id,
                 creation_id=f"test-session-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain,
+                domain_name=test_domain.domain_name,
+                domain_id=test_domain_id,
                 group_id=group_id,
+                scaling_group_name=test_scaling_group,
+                resource_group_id=test_scaling_group_id,
                 user_uuid=test_user,
                 access_key="test-access-key",
                 cluster_mode="single-node",
@@ -616,12 +621,14 @@ class TestGroupRepository:
             kernel = KernelRow(
                 id=kernel_id,
                 session_id=session_id,
-                domain_name=test_domain,
+                domain_name=test_domain.domain_name,
                 group_id=group_id,
                 user_uuid=test_user,
                 access_key="test-access-key",
                 agent=agent_id,
                 agent_addr="tcp://127.0.0.1:5001",
+                scaling_group=test_scaling_group,
+                resource_group_id=test_scaling_group_id,
                 cluster_role="main",
                 cluster_idx=0,
                 cluster_hostname=f"kernel-{kernel_id.hex[:8]}",
@@ -644,7 +651,7 @@ class TestGroupRepository:
     async def group_with_active_endpoint(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         test_user: uuid.UUID,
         default_project_resource_policy: str,
         test_scaling_group: str,
@@ -660,7 +667,7 @@ class TestGroupRepository:
                 name=f"group-with-endpoint-{group_id.hex[:8]}",
                 description="Group with active endpoint",
                 is_active=True,
-                domain_name=test_domain,
+                domain_name=test_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,
@@ -678,7 +685,7 @@ class TestGroupRepository:
                 session_owner=test_user,
                 replicas=1,
                 desired_replicas=1,
-                domain=test_domain,
+                domain=test_domain.domain_name,
                 project=group_id,
                 resource_group=test_scaling_group,
                 lifecycle_stage=EndpointLifecycle.CREATED,
@@ -692,10 +699,12 @@ class TestGroupRepository:
     async def group_with_mounted_vfolders(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
+        test_domain_id: DomainID,
         test_user: uuid.UUID,
         default_project_resource_policy: str,
         test_scaling_group: str,
+        test_scaling_group_id: ResourceGroupID,
     ) -> uuid.UUID:
         """Create a group with vfolders mounted to active kernels"""
         group_id = uuid.uuid4()
@@ -711,7 +720,7 @@ class TestGroupRepository:
                 name=f"group-with-vfolder-{group_id.hex[:8]}",
                 description="Group with mounted vfolders",
                 is_active=True,
-                domain_name=test_domain,
+                domain_name=test_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,
@@ -726,7 +735,7 @@ class TestGroupRepository:
                 id=vfolder_id,
                 name=f"test-vfolder-{vfolder_id.hex[:8]}",
                 host="local",
-                domain_name=test_domain,
+                domain_name=test_domain.domain_name,
                 group=group_id,
                 user=test_user,
                 quota_scope_id=QuotaScopeID(QuotaScopeType.PROJECT, group_id),
@@ -743,6 +752,7 @@ class TestGroupRepository:
                 status=AgentStatus.ALIVE,
                 region="local",
                 scaling_group=test_scaling_group,
+                resource_group_id=test_scaling_group_id,
                 schedulable=True,
                 available_slots=ResourceSlot({}),
                 occupied_slots=ResourceSlot({}),
@@ -756,8 +766,11 @@ class TestGroupRepository:
             session_row = SessionRow(
                 id=session_id,
                 creation_id=f"test-session-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain,
+                domain_name=test_domain.domain_name,
+                domain_id=test_domain_id,
                 group_id=group_id,
+                scaling_group_name=test_scaling_group,
+                resource_group_id=test_scaling_group_id,
                 user_uuid=test_user,
                 access_key="test-access-key",
                 cluster_mode="single-node",
@@ -777,12 +790,14 @@ class TestGroupRepository:
             kernel = KernelRow(
                 id=kernel_id,
                 session_id=session_id,
-                domain_name=test_domain,
+                domain_name=test_domain.domain_name,
                 group_id=group_id,
                 user_uuid=test_user,
                 access_key="test-access-key",
                 agent=agent_id,
                 agent_addr="tcp://127.0.0.1:5001",
+                scaling_group=test_scaling_group,
+                resource_group_id=test_scaling_group_id,
                 cluster_role="main",
                 cluster_idx=0,
                 cluster_hostname=f"kernel-{kernel_id.hex[:8]}",
@@ -805,7 +820,7 @@ class TestGroupRepository:
     async def inactive_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         default_project_resource_policy: str,
     ) -> tuple[uuid.UUID, str]:
         """Create a soft-deleted (is_active=False) group for negative-path tests."""
@@ -818,7 +833,7 @@ class TestGroupRepository:
                 name=group_name,
                 description="Inactive group",
                 is_active=False,
-                domain_name=test_domain,
+                domain_name=test_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,
@@ -837,29 +852,29 @@ class TestGroupRepository:
     async def test_create_success(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository_with_mock_role_manager: GroupRepository,
-        test_domain: str,
+        group_repository: GroupRepository,
+        test_domain: DomainFixtureData,
         default_project_resource_policy: str,
     ) -> None:
         """Test successful group creation with valid domain and resource_policy."""
         creator_spec = GroupCreatorSpec(
             name="test-new-group",
-            domain_name=test_domain,
+            domain_name=test_domain.domain_name,
             description="Test group description",
             resource_policy=default_project_resource_policy,
         )
         creator = Creator(spec=creator_spec)
 
-        result = await group_repository_with_mock_role_manager.create(creator)
+        result = await group_repository.create(creator)
 
         assert result.name == "test-new-group"
-        assert result.domain_name == test_domain
+        assert result.domain_name == test_domain.domain_name
         assert result.description == "Test group description"
         assert result.is_active is True
 
     async def test_create_domain_not_exists(
         self,
-        group_repository_with_mock_role_manager: GroupRepository,
+        group_repository: GroupRepository,
         default_project_resource_policy: str,
     ) -> None:
         """Test group creation fails when domain does not exist"""
@@ -870,49 +885,49 @@ class TestGroupRepository:
         )
         creator = Creator(spec=creator_spec)
 
-        with pytest.raises(InvalidAPIParameters):
-            await group_repository_with_mock_role_manager.create(creator)
+        with pytest.raises(DomainNotFound):
+            await group_repository.create(creator)
 
     async def test_create_duplicate_name_in_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository_with_mock_role_manager: GroupRepository,
-        test_domain: str,
+        group_repository: GroupRepository,
+        test_domain: DomainFixtureData,
         default_project_resource_policy: str,
     ) -> None:
         """Test group creation fails with duplicate name in same domain"""
         creator_spec = GroupCreatorSpec(
             name="duplicate-group",
-            domain_name=test_domain,
+            domain_name=test_domain.domain_name,
             resource_policy=default_project_resource_policy,
         )
 
         # First creation succeeds
-        await group_repository_with_mock_role_manager.create(Creator(spec=creator_spec))
+        await group_repository.create(Creator(spec=creator_spec))
 
         # Second creation with same name should fail
         with pytest.raises(InvalidAPIParameters):
-            await group_repository_with_mock_role_manager.create(Creator(spec=creator_spec))
+            await group_repository.create(Creator(spec=creator_spec))
 
     async def test_create_creates_domain_scope_association(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository_with_mock_role_manager: GroupRepository,
-        test_domain: str,
+        group_repository: GroupRepository,
+        test_domain: DomainFixtureData,
         default_project_resource_policy: str,
     ) -> None:
         """Test that creating a project creates AssociationScopesEntitiesRow for domain scope."""
         creator_spec = GroupCreatorSpec(
             name="test-rbac-group",
-            domain_name=test_domain,
+            domain_name=test_domain.domain_name,
             description="Test group for RBAC",
             resource_policy=default_project_resource_policy,
         )
         creator = Creator(spec=creator_spec)
 
-        result = await group_repository_with_mock_role_manager.create(creator)
+        result = await group_repository.create(creator)
 
-        # Verify AssociationScopesEntitiesRow was created
+        # Verify AssociationScopesEntitiesRow was created, keyed by the domain UUID
         async with db_with_cleanup.begin_readonly_session() as session:
             scope_assoc = await session.scalar(
                 sa.select(AssociationScopesEntitiesRow).where(
@@ -920,51 +935,53 @@ class TestGroupRepository:
                         AssociationScopesEntitiesRow.entity_type == EntityType.PROJECT,
                         AssociationScopesEntitiesRow.entity_id == str(result.id),
                         AssociationScopesEntitiesRow.scope_type == ScopeType.DOMAIN,
-                        AssociationScopesEntitiesRow.scope_id == test_domain,
+                        AssociationScopesEntitiesRow.scope_id == str(test_domain.domain_id),
                     )
                 )
             )
             assert scope_assoc is not None
             assert scope_assoc.entity_type == EntityType.PROJECT
             assert scope_assoc.scope_type == ScopeType.DOMAIN
-            assert scope_assoc.scope_id == test_domain
+            assert scope_assoc.scope_id == str(test_domain.domain_id)
             assert scope_assoc.entity_id == str(result.id)
 
     async def test_create_creates_admin_and_member_system_roles(
         self,
-        group_repository_with_mock_role_manager: GroupRepository,
-        group_db_source_with_mock_role_manager: GroupDBSource,
-        test_domain: str,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_repository: GroupRepository,
+        test_domain: DomainFixtureData,
         default_project_resource_policy: str,
     ) -> None:
-        """Project creation must request both an admin role (via GroupData) and a
-        member role (via ProjectMemberRoleSpec) from the RoleManager."""
+        """Project creation provisions an admin and a member SYSTEM role at its scope."""
         creator_spec = GroupCreatorSpec(
             name="test-roles-group",
-            domain_name=test_domain,
+            domain_name=test_domain.domain_name,
             description="Test group for role creation",
             resource_policy=default_project_resource_policy,
         )
-        creator = Creator(spec=creator_spec)
 
-        result = await group_repository_with_mock_role_manager.create(creator)
+        result = await group_repository.create(Creator(spec=creator_spec))
 
-        mock_create = cast(
-            AsyncMock, group_db_source_with_mock_role_manager._role_manager.create_system_role
-        )
-        assert mock_create.call_count == 2
+        expected_names = {
+            f"project-{str(result.id)[:8]}-admin",
+            f"project-{str(result.id)[:8]}-member",
+        }
+        async with db_with_cleanup.begin_readonly_session() as session:
+            roles = (
+                await session.scalars(sa.select(RoleRow).where(RoleRow.name.in_(expected_names)))
+            ).all()
+            scope_ids = (
+                await session.scalars(
+                    sa.select(PermissionRow.scope_id).where(
+                        PermissionRow.role_id.in_([role.id for role in roles])
+                    )
+                )
+            ).all()
 
-        passed_specs = [call.args[1] for call in mock_create.call_args_list]
-        assert any(isinstance(spec, GroupData) and spec.id == result.id for spec in passed_specs)
-        assert any(
-            isinstance(spec, ProjectMemberRoleSpec) and spec.project_id == result.id
-            for spec in passed_specs
-        )
-
-        member_spec = next(spec for spec in passed_specs if isinstance(spec, ProjectMemberRoleSpec))
-        assert member_spec.role_name() == f"project-{str(result.id)[:8]}-member"
-        assert member_spec.scope_id().scope_type == ScopeType.PROJECT
-        assert member_spec.scope_id().scope_id == str(result.id)
+        assert {role.name for role in roles} == expected_names
+        assert all(role.source == RoleSource.SYSTEM for role in roles)
+        # every granted permission is scoped to the new project
+        assert set(scope_ids) == {str(result.id)}
 
     # ===========================================
     # Tests for modify_validated method
@@ -1095,7 +1112,11 @@ class TestGroupRepository:
         test_group: uuid.UUID,
         test_users_for_group: list[uuid.UUID],
     ) -> None:
-        """Test removing users from group with user_update_mode='remove'"""
+        """Test removing users from group with user_update_mode='remove'.
+
+        Membership removal deletes the RBAC scope binding only; role mappings
+        are left untouched.
+        """
         updater_spec = GroupUpdaterSpec()
         updater = Updater(spec=updater_spec, pk_value=test_group)
 
@@ -1133,25 +1154,15 @@ class TestGroupRepository:
             )
             assert member_role_id is not None
 
-            removed_user_role_rows = (
+            user_role_rows = (
                 await session.scalars(
                     sa.select(UserRoleRow).where(
-                        UserRoleRow.user_id == test_users_for_group[0],
+                        UserRoleRow.user_id.in_(test_users_for_group),
                         UserRoleRow.role_id == member_role_id,
                     )
                 )
             ).all()
-            assert len(removed_user_role_rows) == 0
-
-            remaining_user_role_rows = (
-                await session.scalars(
-                    sa.select(UserRoleRow).where(
-                        UserRoleRow.user_id.in_(test_users_for_group[1:3]),
-                        UserRoleRow.role_id == member_role_id,
-                    )
-                )
-            ).all()
-            assert len(remaining_user_role_rows) == 2
+            assert len(user_role_rows) == 3
 
             # RBAC scope binding: the removed user's (PROJECT, user) row must
             # be gone, while the remaining users' rows must still exist.
@@ -1296,25 +1307,27 @@ class TestGroupRepository:
     async def test_project_id_by_name_in_domain_returns_id(
         self,
         group_repository: GroupRepository,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         test_group: uuid.UUID,
     ) -> None:
         """Resolves an active project's UUID from its (domain, name) pair."""
         group_name = f"test-group-{test_group.hex[:8]}"
 
-        project_id = await group_repository.project_id_by_name_in_domain(test_domain, group_name)
+        project_id = await group_repository.project_id_by_name_in_domain(
+            test_domain.domain_name, group_name
+        )
 
         assert project_id == ProjectID(test_group)
 
     async def test_project_id_by_name_in_domain_returns_none_for_unknown_name(
         self,
         group_repository: GroupRepository,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         test_group: uuid.UUID,
     ) -> None:
         """Returns None when no project with that name exists in the domain."""
         project_id = await group_repository.project_id_by_name_in_domain(
-            test_domain, "no-such-group"
+            test_domain.domain_name, "no-such-group"
         )
 
         assert project_id is None
@@ -1336,13 +1349,15 @@ class TestGroupRepository:
     async def test_project_id_by_name_in_domain_returns_none_for_inactive_project(
         self,
         group_repository: GroupRepository,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         inactive_group: tuple[uuid.UUID, str],
     ) -> None:
         """Returns None when the matching project is soft-deleted (is_active=False)."""
         _, group_name = inactive_group
 
-        project_id = await group_repository.project_id_by_name_in_domain(test_domain, group_name)
+        project_id = await group_repository.project_id_by_name_in_domain(
+            test_domain.domain_name, group_name
+        )
 
         assert project_id is None
 
@@ -1370,12 +1385,14 @@ class TestGroupRowVFolderHostPermissionMap:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create test domain."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -1388,7 +1405,7 @@ class TestGroupRowVFolderHostPermissionMap:
             session.add(domain)
             await session.commit()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def project_resource_policy(
@@ -1414,7 +1431,7 @@ class TestGroupRowVFolderHostPermissionMap:
     async def test_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         project_resource_policy: str,
     ) -> uuid.UUID:
         """Create a group with allowed_vfolder_hosts set."""
@@ -1426,7 +1443,7 @@ class TestGroupRowVFolderHostPermissionMap:
                 name=f"test-group-{group_id.hex[:8]}",
                 description="Test group with vfolder hosts",
                 is_active=True,
-                domain_name=test_domain,
+                domain_name=test_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={
                     "local": ["create-vfolder", "mount-in-session"],
@@ -1453,7 +1470,7 @@ class TestGroupRowVFolderHostPermissionMap:
 
     async def test_group_data_allowed_vfolder_hosts_is_vfolder_host_permission_map(
         self,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         project_resource_policy: str,
     ) -> None:
         """Test that GroupRow.to_data() properly converts allowed_vfolder_hosts to enums.
@@ -1472,7 +1489,7 @@ class TestGroupRowVFolderHostPermissionMap:
             name="test-group",
             description="Test group",
             is_active=True,
-            domain_name=test_domain,
+            domain_name=test_domain.domain_name,
             total_resource_slots=ResourceSlot(),
             # String lists as passed from GroupCreatorSpec
             allowed_vfolder_hosts=VFolderHostPermissionMap({

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
+from typing import override
 
 import attrs
 from yarl import URL
@@ -35,6 +36,7 @@ class SimpleRRLoadBalancer(LoadBalancer):
     Rotates the endpoints upon every request.
     """
 
+    @override
     def rotate(self, endpoints: list[URL]) -> None:
         if len(endpoints) == 1:
             return
@@ -47,6 +49,7 @@ class PeriodicRRLoadBalancer(LoadBalancer):
     Rotates the endpoints upon the specified interval.
     """
 
+    @override
     def rotate(self, endpoints: list[URL]) -> None:
         pass
 
@@ -56,6 +59,7 @@ class LowestLatencyLoadBalancer(LoadBalancer):
     Change the endpoints with the lowest average latency for last N requests.
     """
 
+    @override
     def rotate(self, endpoints: list[URL]) -> None:
         pass
 

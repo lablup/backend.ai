@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Collection, Mapping
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -12,7 +12,6 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -21,6 +20,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import (
@@ -32,22 +32,21 @@ from ai.backend.manager.data.user.types import (
 )
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicyKeypairSearchScope,
-    UserKeypairSearchScope,
+    KeypairResourcePolicyKeypairOperationScope,
+    UserKeypairOperationScope,
 )
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.manager.repositories.user.types import (
-    DomainUserSearchScope,
-    ProjectUserSearchScope,
-    RoleUserSearchScope,
+    DomainUserOperationScope,
+    ProjectUserOperationScope,
+    RoleUserOperationScope,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdateSpec
 
@@ -102,23 +101,6 @@ class UserRepository:
         Create a new user with default keypair and group associations.
         """
         return await self._db_source.create_user_validated(creator, group_ids)
-
-    @user_repository_resilience.apply()
-    async def assign_project_membership(self, user_uuid: UUID, project_id: ProjectID) -> None:
-        """Add a user to a project, mapping the user to the project's member role."""
-        await self._db_source.assign_project_membership(user_uuid, project_id)
-
-    @user_repository_resilience.apply()
-    async def assign_users_to_scope(
-        self, user_uuid: UserID, domain_name: str | None, project_ids: Collection[ProjectID]
-    ) -> None:
-        """Grant the auto_assign roles of a new user's initial domain/project scopes."""
-        await self._db_source.assign_users_to_scope(user_uuid, domain_name, project_ids)
-
-    @user_repository_resilience.apply()
-    async def assign_user_to_model_store(self, user_uuid: UserID, domain_name: str | None) -> None:
-        """Add a user to its domain's model-store project and grant its auto_assign roles."""
-        await self._db_source.assign_user_to_model_store(user_uuid, domain_name)
 
     @user_repository_resilience.apply()
     async def bulk_create_users_validated(
@@ -209,12 +191,9 @@ class UserRepository:
         self,
         user_uuid: UUID,
         target_user_uuid: UUID,
-        target_main_access_key: AccessKey,
     ) -> None:
         """Delegate endpoint ownership to another user."""
-        await self._db_source.delegate_endpoint_ownership(
-            user_uuid, target_user_uuid, target_main_access_key
-        )
+        await self._db_source.delegate_endpoint_ownership(user_uuid, target_user_uuid)
 
     @user_repository_resilience.apply()
     async def delete_endpoints(
@@ -276,12 +255,12 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def search_users_by_domain(
-        self, scope: DomainUserSearchScope, querier: BatchQuerier
+        self, scope: DomainUserOperationScope, querier: BatchQuerier
     ) -> UserSearchResult:
         """Search users within a domain.
 
         Args:
-            scope: DomainUserSearchScope defining the domain to search within.
+            scope: DomainUserOperationScope defining the domain to search within.
             querier: BatchQuerier containing conditions, orders, and pagination.
 
         Returns:
@@ -291,12 +270,12 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def search_users_by_project(
-        self, scope: ProjectUserSearchScope, querier: BatchQuerier
+        self, scope: ProjectUserOperationScope, querier: BatchQuerier
     ) -> UserSearchResult:
         """Search users within a project.
 
         Args:
-            scope: ProjectUserSearchScope defining the project to search within.
+            scope: ProjectUserOperationScope defining the project to search within.
             querier: BatchQuerier containing conditions, orders, and pagination.
 
         Returns:
@@ -306,7 +285,7 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def search_users_by_role(
-        self, scope: RoleUserSearchScope, querier: BatchQuerier
+        self, scope: RoleUserOperationScope, querier: BatchQuerier
     ) -> UserSearchResult:
         """Search users assigned to a role."""
         return await self._db_source.search_users_by_role(scope, querier)
@@ -327,14 +306,14 @@ class UserRepository:
         return await self._db_source.update_my_keypair(user_uuid, updater)
 
     @user_repository_resilience.apply()
-    async def switch_my_main_access_key(self, user_uuid: UUID, access_key: str) -> None:
-        """Switch the main access key for the current user."""
-        await self._db_source.switch_my_main_access_key(user_uuid, access_key)
+    async def switch_default_access_key(self, user_id: UserID, access_key: AccessKey) -> None:
+        """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
+        await self._db_source.switch_default_access_key(user_id, access_key)
 
     @user_repository_resilience.apply()
     async def search_my_keypairs(
         self,
-        scope: UserKeypairSearchScope,
+        scope: UserKeypairOperationScope,
         querier: BatchQuerier,
     ) -> SearchResult[KeyPairData]:
         """Search keypairs owned by the scoped user.
@@ -351,7 +330,7 @@ class UserRepository:
     @user_repository_resilience.apply()
     async def search_keypairs_by_resource_policy(
         self,
-        scope: KeypairResourcePolicyKeypairSearchScope,
+        scope: KeypairResourcePolicyKeypairOperationScope,
         querier: BatchQuerier,
     ) -> SearchResult[KeyPairData]:
         """Search keypairs assigned to a keypair resource policy.

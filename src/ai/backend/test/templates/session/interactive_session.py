@@ -120,12 +120,13 @@ class _BaseInteractiveSessionTemplate(WrapperTestTemplate):
             ):
                 yield
         finally:
-            if session_id:
+            if session_id is not None:
                 await self._verify_session_destruction(client_session, session_name)
 
 
 class InteractiveSessionTemplate(_BaseInteractiveSessionTemplate):
     @property
+    @override
     def name(self) -> str:
         return "interactive_session"
 
@@ -136,6 +137,7 @@ class InteractiveSessionTemplate(_BaseInteractiveSessionTemplate):
 
 class InteractiveSessionWithBootstrapScriptTemplate(_BaseInteractiveSessionTemplate):
     @property
+    @override
     def name(self) -> str:
         return "interactive_session_with_bootstrap_script"
 
@@ -147,6 +149,7 @@ class InteractiveSessionWithBootstrapScriptTemplate(_BaseInteractiveSessionTempl
 
 class InteractiveSessionWithCustomGroupTemplate(_BaseInteractiveSessionTemplate):
     @property
+    @override
     def name(self) -> str:
         return "interactive_session_with_custom_group"
 

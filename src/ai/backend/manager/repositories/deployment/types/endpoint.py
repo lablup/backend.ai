@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, override
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -28,7 +28,7 @@ from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 
 @dataclass
@@ -148,7 +148,7 @@ class RouteServiceDiscoveryInfo:
 
 
 @dataclass(frozen=True)
-class ProjectDeploymentSearchScope(SearchScope):
+class ProjectDeploymentOperationScope(OperationScope):
     """Required scope for searching endpoints within a project.
 
     Used for project-scoped deployment search (project admin).
@@ -156,6 +156,7 @@ class ProjectDeploymentSearchScope(SearchScope):
 
     project_id: UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         project_id = self.project_id
 
@@ -165,6 +166,7 @@ class ProjectDeploymentSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         return [
             ExistenceCheck(

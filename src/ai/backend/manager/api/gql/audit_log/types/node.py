@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 from uuid import UUID
 
 import strawberry
@@ -15,6 +15,7 @@ from strawberry.relay import Connection, Edge, NodeID
 from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogNode
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -36,6 +37,7 @@ class AuditLogStatusGQL(StrEnum):
     ERROR = "error"
     UNKNOWN = "unknown"
     RUNNING = "running"
+    DENIED = "denied"
 
 
 @gql_node_type(
@@ -56,6 +58,16 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     request_id: str | None = gql_field(description="Request ID that triggered this operation.")
     triggered_by: str | None = gql_field(
         description="UUID string of the user who triggered the action."
+    )
+    acted_as: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description=(
+                "UUID of the effective (acting) user the action ran as. "
+                "Differs from triggered_by only while a super admin is impersonating a target."
+            ),
+        ),
+        default=None,
     )
     description: str = gql_field(description="Human-readable description of the operation.")
     duration: str | None = gql_field(
@@ -87,7 +99,34 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
             return None
         return user_data
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description=(
+                "The effective (acting) user the action ran as, resolved from acted_as UUID. "
+                "Differs from user only while a super admin is impersonating a target."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def actor(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        if self.acted_as is None:
+            return None
+        user_data = await info.context.data_loaders.user_loader.load(self.acted_as)
+        if user_data is None:
+            return None
+        return user_data
+
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]
         cls,
         *,

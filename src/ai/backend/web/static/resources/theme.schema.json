@@ -15,6 +15,26 @@
     "dark": {
       "$ref": "./antdThemeConfig.schema.json"
     },
+    "families": {
+      "type": "object",
+      "description": "Selectable theme families, keyed by family id (e.g. 'stained', 'glass'). The 'default' family is always synthesized from the top-level light/dark; a 'default' key here is ignored. When this block is omitted entirely (pre-family theme.json files), the catalog has only that synthesized default and family selection is unavailable.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "light": {
+            "$ref": "./antdThemeConfig.schema.json"
+          },
+          "dark": {
+            "$ref": "./antdThemeConfig.schema.json"
+          },
+          "label": {
+            "type": "string",
+            "description": "Human-readable label shown in the family selector. Falls back to the family key."
+          }
+        },
+        "required": ["light", "dark"]
+      }
+    },
     "logo": {
       "type": "object",
       "description": "Properties to customize the site's logo, considering both light and dark modes.",

@@ -17,14 +17,15 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.common.data.permission.types import ScopeType as RBACScopeType
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.exception import (
     GroupNotFound,
     InvalidAPIParameters,
 )
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.models.group import (
     GroupRow,
     ProjectType,
@@ -36,15 +37,16 @@ from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import ProjectPermission
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.virtual_scope.queries import (
+    user_scope_membership_exists,
+    user_scope_membership_query,
+)
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
+from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
 from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
 from ai.backend.manager.services.group.actions.delete_group import (
     DeleteGroupAction,
@@ -126,7 +128,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         "name": ("name", None),
         "is_active": ("is_active", None),
         "created_at": ("created_at", dtparse),
-        "modified_at": ("modified_at", dtparse),
+        "modified_at": ("updated_at", dtparse),
         "domain_name": ("domain_name", None),
         "resource_policy": ("resource_policy", None),
     }
@@ -136,7 +138,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         "name": ("name", None),
         "is_active": ("is_active", None),
         "created_at": ("created_at", None),
-        "modified_at": ("modified_at", None),
+        "modified_at": ("updated_at", None),
         "domain_name": ("domain_name", None),
         "resource_policy": ("resource_policy", None),
     }
@@ -154,7 +156,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             description=row.description,
             is_active=row.is_active,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            modified_at=row.updated_at,
             domain_name=row.domain_name,
             total_resource_slots=row.total_resource_slots.to_json() or {},
             allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
@@ -183,7 +185,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult[Self]:
+    ) -> ConnectionResolverResult[UserNode]:
         from ai.backend.manager.models.user import UserRow
 
         graph_ctx: GraphQueryContext = info.context
@@ -216,26 +218,15 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             before=before,
             last=last,
         )
-        # Project membership comes from association_scopes_entities (PROJECT/USER).
-        # Cast UserRow.uuid (GUID) to String to match the non-UUID String(64)
-        # entity_id column safely.
-        j = sa.join(
-            UserRow,
-            AssociationScopesEntitiesRow,
-            sa.cast(UserRow.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-        )
-        membership_filter = sa.and_(
-            AssociationScopesEntitiesRow.scope_type == RBACScopeType.PROJECT,
-            AssociationScopesEntitiesRow.scope_id == str(self.id),
-            AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-        )
-        user_query = query.select_from(j).where(membership_filter)
-        cnt_query = sa.select(sa.func.count()).select_from(j).where(membership_filter)
+        # Project membership comes from the virtual-scope chain (PROJECT/USER).
+        membership_filter = user_scope_membership_exists(PROJECT_SCOPE_TYPE, self.id, UserRow.uuid)
+        user_query = query.where(membership_filter)
+        cnt_query = sa.select(sa.func.count()).select_from(UserRow).where(membership_filter)
         for cond in conditions:
             cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(user_query)).all()
-            result = [type(self).from_row(graph_ctx, row) for row in user_rows]
+            result = [UserNode.from_row(graph_ctx, row) for row in user_rows]
             total_cnt = await db_session.scalar(cnt_query) or 0
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
@@ -382,7 +373,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             description=row.description,
             is_active=row.is_active,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            modified_at=row.updated_at,
             domain_name=row.domain_name,
             total_resource_slots=(
                 row.total_resource_slots.to_json() if row.total_resource_slots is not None else {}
@@ -509,21 +500,12 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             _type = [ProjectType.GENERAL]
         else:
             _type = type
-        ase = AssociationScopesEntitiesRow.__table__
-        user_id_strs = [str(uid) for uid in user_ids]
-        j = sa.join(
-            groups,
-            ase,
-            sa.and_(
-                sa.cast(groups.c.id, sa.String) == ase.c.scope_id,
-                ase.c.scope_type == RBACScopeType.PROJECT,
-                ase.c.entity_type == EntityType.USER,
-            ),
-        )
+        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
+        j = sa.join(groups, ms, groups.c.id == ms.c.scope_id)
         query = (
-            sa.select(groups, ase.c.entity_id.label("user_id_str"))
+            sa.select(groups, ms.c.user_id)
             .select_from(j)
-            .where(ase.c.entity_id.in_(user_id_strs) & (groups.c.type.in_(_type)))
+            .where(ms.c.user_id.in_(user_ids) & (groups.c.type.in_(_type)))
         )
         if is_active is not None:
             query = query.where(groups.c.is_active == is_active)
@@ -534,7 +516,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
                 query,
                 cls,
                 user_ids,
-                lambda row: uuid.UUID(row.user_id_str),
+                lambda row: row.user_id,
             )
 
     @classmethod
@@ -543,17 +525,9 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         graph_ctx: GraphQueryContext,
         user_id: uuid.UUID,
     ) -> Sequence[Group]:
-        ase = AssociationScopesEntitiesRow.__table__
-        j = sa.join(
-            groups,
-            ase,
-            sa.and_(
-                sa.cast(groups.c.id, sa.String) == ase.c.scope_id,
-                ase.c.scope_type == RBACScopeType.PROJECT,
-                ase.c.entity_type == EntityType.USER,
-            ),
+        query = sa.select(groups).where(
+            user_scope_membership_exists(PROJECT_SCOPE_TYPE, groups.c.id, user_id)
         )
-        query = sa.select(groups).select_from(j).where(ase.c.entity_id == str(user_id))
         async with graph_ctx.db.begin_readonly() as conn:
             return [
                 obj
@@ -581,7 +555,7 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
         required=False, default_value={}, description="Added in 24.03.0"
     )
 
-    def to_action(self, name: str) -> CreateGroupAction:
+    def to_action(self, name: str, domain_id: DomainID) -> CreateGroupAction:
         def value_or_none(value: Any) -> Any:
             return value if value is not Undefined else None
 
@@ -618,6 +592,7 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
                 )
             ),
             _domain_name=self.domain_name,
+            _domain_id=domain_id,
         )
 
 
@@ -708,7 +683,12 @@ class CreateGroup(graphene.Mutation):  # type: ignore[misc]
                 "Group name cannot be empty or whitespace and must not exceed 64 characters."
             )
 
-        action = props.to_action(name)
+        domain_data = (
+            await graph_ctx.processors.domain.get_domain.wait_for_complete(
+                GetDomainAction(domain_name=props.domain_name)
+            )
+        ).data
+        action = props.to_action(name, domain_data.id)
         res = await graph_ctx.processors.group.create_group.wait_for_complete(action)
         return cls(
             ok=True,

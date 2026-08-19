@@ -1,9 +1,16 @@
 import enum
 from abc import ABC, abstractmethod
-from typing import Self, final, override
+from typing import Any, ClassVar, Self, final, override
 
-from ai.backend.common.message_queue.types import MessagePayload
+from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic_core import PydanticSerializationError
 
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.message_queue.payload import BroadcastMessagePayload
+from ai.backend.common.message_queue.types import MessageName
+
+from .exceptions import EventPayloadDecodingError, EventPayloadEncodingError
+from .message import EventMessage
 from .user_event.user_event import UserEvent
 
 __all__ = (
@@ -57,27 +64,58 @@ class DeliveryPattern(enum.StrEnum):
     ANYCAST = "anycast"
 
 
-class AbstractEvent(ABC):
+class AbstractEvent(BaseModel, ABC):
+    """
+    The base of every event.
+
+    An event is a Pydantic model, so its own fields are the message body: the
+    conversion to and from `EventMessage` below is the same for every event, is
+    written once here, and is final — no event may redefine how its body is
+    rendered.
+
+    Unknown fields are ignored rather than rejected, which is what lets a producer
+    add a field without breaking a consumer running an older version — the whole
+    reason the body is named fields instead of a positional tuple.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    @final
+    def to_message(self) -> EventMessage:
+        """
+        Render this event as the message it is handed to the queue as.
+
+        Raises:
+            EventPayloadEncodingError: If a field of this event is not JSON-representable
+        """
+        name = MessageName(self.event_name())
+        try:
+            payload = self.model_dump_json()
+        except PydanticSerializationError as e:
+            raise EventPayloadEncodingError(extra_msg=f"{name}: {e}") from e
+        return EventMessage(name=name, payload=payload)
+
+    @final
+    @classmethod
+    def from_message(cls, message: EventMessage) -> Self:
+        """
+        Reconstruct the event from the message it was rendered as.
+
+        Raises:
+            EventPayloadDecodingError: If the body does not validate against this event
+        """
+        try:
+            return cls.model_validate_json(message.payload)
+        except (ValidationError, BackendAIError) as e:
+            # An event deriving `BackendAISchema` maps `ValidationError` to a
+            # `BackendAIError` of its own choosing, so both forms arrive here.
+            raise EventPayloadDecodingError(extra_msg=f"{message.name}: {e}") from e
+
     @classmethod
     @abstractmethod
     def delivery_pattern(cls) -> DeliveryPattern:
         """
         Return the delivery pattern of the event.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def serialize(self) -> tuple[bytes, ...]:
-        """
-        Return a msgpack-serializable tuple.
-        """
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def deserialize(cls, value: tuple[bytes, ...]) -> Self:
-        """
-        Construct the event args from a tuple deserialized from msgpack.
         """
         raise NotImplementedError
 
@@ -130,9 +168,11 @@ class AbstractBroadcastEvent(AbstractEvent):
     An event that should be broadcasted to all subscribers.
     """
 
-    _register_dict: dict[str, type["AbstractBroadcastEvent"]] = {}
+    _register_dict: ClassVar[dict[str, type["AbstractBroadcastEvent"]]] = {}
 
-    def __init_subclass__(cls) -> None:
+    @override
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
         try:
             name = cls.event_name()
             if name in cls._register_dict:
@@ -143,14 +183,18 @@ class AbstractBroadcastEvent(AbstractEvent):
             return
 
     @classmethod
-    def deserialize_from_wrapper(cls, payload: MessagePayload) -> "AbstractBroadcastEvent":
+    def from_broadcast_payload(cls, payload: BroadcastMessagePayload) -> "AbstractBroadcastEvent":
         """
-        Deserialize the event from event wrapper mapping.
+        Reconstruct the event a broadcast payload carries.
+
+        A payload names its event but does not carry its class, so this is where the
+        name is resolved against the registry — the one place a subscriber that holds
+        only a payload can get back to a typed event.
         """
         event_class = cls._register_dict.get(payload.name)
         if not event_class:
             raise ValueError(f"Event class for name {payload.name} not found")
-        return event_class.deserialize(payload.args)
+        return event_class.from_message(EventMessage(name=payload.name, payload=payload.payload))
 
     @classmethod
     @override

@@ -16,10 +16,10 @@ from ai.backend.manager.api.rest.session_template.handler import SessionTemplate
 from ai.backend.manager.api.rest.session_template.registry import register_session_template_routes
 from ai.backend.manager.api.rest.template.registry import register_template_routes
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository

@@ -16,6 +16,7 @@ _TOKEN_DURATION = "3600"  # 1 hour
 
 class ModelServiceTokenTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "generate_model_service_token"
 

@@ -1,5 +1,6 @@
 from collections.abc import Mapping
 from datetime import datetime
+from typing import override
 from uuid import UUID, uuid4
 
 import pytest
@@ -12,6 +13,7 @@ from ai.backend.client.v2.config import ClientConfig
 class MockAuth(AuthStrategy):
     """A mock auth strategy for testing that returns predictable headers."""
 
+    @override
     def sign(
         self,
         method: str,

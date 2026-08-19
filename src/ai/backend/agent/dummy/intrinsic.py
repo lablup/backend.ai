@@ -1,7 +1,7 @@
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import aiodocker
 
@@ -59,15 +59,19 @@ class CPUPlugin(AbstractComputePlugin):
         super().__init__(plugin_config, local_config)
         self.resource_config = dummy_config["agent"]["resource"]
 
+    @override
     async def init(self, context: Any | None = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
+    @override
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
         pass
 
+    @override
     def get_metadata(self) -> AcceleratorMetadata:
         return {
             "slot_name": "cpu",
@@ -78,6 +82,7 @@ class CPUPlugin(AbstractComputePlugin):
             "display_icon": "cpu",
         }
 
+    @override
     async def list_devices(self) -> Collection[AbstractComputeDevice]:
         num_core: int = self.resource_config["cpu"]["num-core"]
         return [
@@ -91,21 +96,26 @@ class CPUPlugin(AbstractComputePlugin):
             for core_idx in range(num_core)
         ]
 
+    @override
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
         devices = await self.list_devices()
         return {
             SlotName("cpu"): Decimal(sum(dev.processing_units for dev in devices)),
         }
 
+    @override
     def get_version(self) -> str:
         return __version__
 
+    @override
     async def extra_info(self) -> Mapping[str, str]:
         return {}
 
+    @override
     async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
         return []
 
+    @override
     async def gather_container_measures(
         self,
         ctx: StatContext,
@@ -113,11 +123,13 @@ class CPUPlugin(AbstractComputePlugin):
     ) -> Sequence[ContainerMeasurement]:
         return []
 
+    @override
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
     ) -> Sequence[ProcessMeasurement]:
         return []
 
+    @override
     async def create_alloc_map(self) -> "AbstractAllocMap":
         devices = await self.list_devices()
         return DiscretePropertyAllocMap(
@@ -129,9 +141,11 @@ class CPUPlugin(AbstractComputePlugin):
             },
         )
 
+    @override
     async def get_hooks(self, distro: str, arch: str) -> Sequence[Path]:
         return []
 
+    @override
     async def generate_docker_args(
         self,
         docker: aiodocker.docker.Docker,
@@ -149,6 +163,7 @@ class CPUPlugin(AbstractComputePlugin):
             },
         }
 
+    @override
     async def restore_from_container(
         self,
         container: Container,
@@ -156,6 +171,7 @@ class CPUPlugin(AbstractComputePlugin):
     ) -> None:
         return None
 
+    @override
     async def get_attached_devices(
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
@@ -172,11 +188,13 @@ class CPUPlugin(AbstractComputePlugin):
                 })
         return attached_devices
 
+    @override
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> list[str]:
         return []
 
+    @override
     async def generate_mounts(
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> list[MountInfo]:
@@ -210,15 +228,19 @@ class MemoryPlugin(AbstractComputePlugin):
         super().__init__(plugin_config, local_config)
         self.resource_config = dummy_config["agent"]["resource"]
 
+    @override
     async def init(self, context: Any | None = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
+    @override
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
         pass
 
+    @override
     def get_metadata(self) -> AcceleratorMetadata:
         return {
             "slot_name": "ram",
@@ -229,6 +251,7 @@ class MemoryPlugin(AbstractComputePlugin):
             "display_icon": "cpu",
         }
 
+    @override
     async def list_devices(self) -> Collection[AbstractComputeDevice]:
         memory_size = self.resource_config["memory"]["size"]
         return [
@@ -242,21 +265,26 @@ class MemoryPlugin(AbstractComputePlugin):
             ),
         ]
 
+    @override
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
         devices = await self.list_devices()
         return {
             SlotName("mem"): Decimal(sum(dev.memory_size for dev in devices)),
         }
 
+    @override
     def get_version(self) -> str:
         return __version__
 
+    @override
     async def extra_info(self) -> Mapping[str, str]:
         return {}
 
+    @override
     async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
         return []
 
+    @override
     async def gather_container_measures(
         self,
         ctx: StatContext,
@@ -264,11 +292,13 @@ class MemoryPlugin(AbstractComputePlugin):
     ) -> Sequence[ContainerMeasurement]:
         return []
 
+    @override
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
     ) -> Sequence[ProcessMeasurement]:
         return []
 
+    @override
     async def create_alloc_map(self) -> "AbstractAllocMap":
         devices = await self.list_devices()
         return DiscretePropertyAllocMap(
@@ -281,9 +311,11 @@ class MemoryPlugin(AbstractComputePlugin):
             },
         )
 
+    @override
     async def get_hooks(self, distro: str, arch: str) -> Sequence[Path]:
         return []
 
+    @override
     async def generate_docker_args(
         self,
         docker: aiodocker.docker.Docker,
@@ -291,6 +323,7 @@ class MemoryPlugin(AbstractComputePlugin):
     ) -> Mapping[str, Any]:
         return {}
 
+    @override
     async def restore_from_container(
         self,
         container: Container,
@@ -298,6 +331,7 @@ class MemoryPlugin(AbstractComputePlugin):
     ) -> None:
         return None
 
+    @override
     async def get_attached_devices(
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
@@ -314,11 +348,13 @@ class MemoryPlugin(AbstractComputePlugin):
                 })
         return attached_devices
 
+    @override
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> list[str]:
         return []
 
+    @override
     async def generate_mounts(
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> list[MountInfo]:

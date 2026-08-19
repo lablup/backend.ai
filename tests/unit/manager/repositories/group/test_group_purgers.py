@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -26,6 +28,10 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -38,11 +44,15 @@ from ai.backend.manager.models.session import SessionRow, SessionStatus, Session
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
+from ai.backend.manager.repositories.base.rbac.entity_purger import (
+    RBACEntityPurger,
+    execute_rbac_entity_purger,
+)
 from ai.backend.manager.repositories.group.purgers import (
-    GroupBatchPurgerSpec,
     GroupEndpointBatchPurgerSpec,
     GroupKernelBatchPurgerSpec,
     GroupSessionBatchPurgerSpec,
+    ProjectPurgerSpec,
     SessionByIdsBatchPurgerSpec,
 )
 from ai.backend.testutils.db import with_tables
@@ -80,6 +90,9 @@ class TestGroupPurgersIntegration:
                 EndpointRow,
                 ReplicaGroupRow,
                 RoutingRow,
+                RoleRow,
+                PermissionRow,
+                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -151,6 +164,7 @@ class TestGroupPurgersIntegration:
                 domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
+                domain_id=sample_domain.domain_id,
             )
             session.add(user)
             await session.flush()
@@ -185,12 +199,21 @@ class TestGroupPurgersIntegration:
             return group
 
     @pytest.fixture
-    async def sample_scaling_group(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
+    def sample_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
+    async def sample_scaling_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_scaling_group_id: ResourceGroupID,
+    ) -> str:
         """Create a test scaling group."""
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             sgroup = ScalingGroupRow(
                 name=sgroup_name,
+                id=sample_scaling_group_id,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
@@ -206,6 +229,8 @@ class TestGroupPurgersIntegration:
         sample_group: GroupRow,
         sample_domain: DomainFixtureData,
         sample_user: UserRow,
+        sample_scaling_group: str,
+        sample_scaling_group_id: ResourceGroupID,
     ) -> list[SessionRow]:
         """Create test sessions belonging to the group."""
         sessions: list[SessionRow] = []
@@ -217,7 +242,10 @@ class TestGroupPurgersIntegration:
                     cluster_mode="single-node",
                     cluster_size=1,
                     domain_name=sample_domain.domain_name,
+                    domain_id=sample_domain.domain_id,
                     group_id=sample_group.id,
+                    scaling_group_name=sample_scaling_group,
+                    resource_group_id=sample_scaling_group_id,
                     user_uuid=sample_user.uuid,
                     occupying_slots=ResourceSlot({}),
                     requested_slots=ResourceSlot({}),
@@ -252,6 +280,8 @@ class TestGroupPurgersIntegration:
                     domain_name=sample_domain.domain_name,
                     group_id=sample_group.id,
                     user_uuid=sample_user.uuid,
+                    scaling_group=sess.scaling_group_name,
+                    resource_group_id=sess.resource_group_id,
                     occupied_slots=ResourceSlot({}),
                     requested_slots=ResourceSlot({}),
                     occupied_shares={},
@@ -307,6 +337,8 @@ class TestGroupPurgersIntegration:
         sample_domain: DomainFixtureData,
         sample_group: GroupRow,
         sample_user: UserRow,
+        sample_scaling_group: str,
+        sample_scaling_group_id: ResourceGroupID,
     ) -> tuple[list[SessionRow], list[RoutingRow]]:
         """Create test sessions connected to endpoints via routings."""
         sessions: list[SessionRow] = []
@@ -320,7 +352,10 @@ class TestGroupPurgersIntegration:
                     cluster_mode="single-node",
                     cluster_size=1,
                     domain_name=sample_domain.domain_name,
+                    domain_id=sample_domain.domain_id,
                     group_id=sample_group.id,
+                    scaling_group_name=sample_scaling_group,
+                    resource_group_id=sample_scaling_group_id,
                     user_uuid=sample_user.uuid,
                     occupying_slots=ResourceSlot({}),
                     requested_slots=ResourceSlot({}),
@@ -452,8 +487,8 @@ class TestGroupPurgersIntegration:
 
         # Purge endpoint sessions using collected session IDs
         async with db_with_cleanup.begin_session() as session:
-            purger = BatchPurger(spec=SessionByIdsBatchPurgerSpec(session_ids=session_ids))
-            result = await execute_batch_purger(session, purger)
+            session_purger = BatchPurger(spec=SessionByIdsBatchPurgerSpec(session_ids=session_ids))
+            result = await execute_batch_purger(session, session_purger)
             assert result.deleted_count == len(endpoint_sessions)
 
         # Verify endpoint sessions are deleted
@@ -475,9 +510,11 @@ class TestGroupPurgersIntegration:
 
         # Purge group
         async with db_with_cleanup.begin_session() as session:
-            purger = BatchPurger(spec=GroupBatchPurgerSpec(group_id=group_id), batch_size=1)
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == 1
+            purger = RBACEntityPurger(
+                spec=ProjectPurgerSpec(project_id=ProjectID(group_id)),
+            )
+            result = await execute_rbac_entity_purger(session, purger)
+            assert result is not None
 
         # Verify group is deleted
         async with db_with_cleanup.begin_session() as session:

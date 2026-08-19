@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import override
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -11,14 +12,14 @@ import sqlalchemy as sa
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.session.row import SessionRow
 
-__all__ = ("ProjectSessionSearchScope",)
+__all__ = ("ProjectSessionOperationScope",)
 
 
 @dataclass(frozen=True)
-class ProjectSessionSearchScope(SearchScope):
+class ProjectSessionOperationScope(OperationScope):
     """Required scope for searching sessions within a project.
 
     Used for project-scoped session search (project admin).
@@ -27,6 +28,7 @@ class ProjectSessionSearchScope(SearchScope):
     project_id: UUID
     """Required. The project (group) to search within."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for SessionRow."""
         project_id = self.project_id
@@ -37,6 +39,7 @@ class ProjectSessionSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         """Return existence checks for scope validation."""
         return [

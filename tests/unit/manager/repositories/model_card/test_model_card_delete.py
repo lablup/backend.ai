@@ -12,6 +12,8 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     MountPermission,
@@ -49,7 +51,7 @@ from ai.backend.manager.models.resource_slot.row import (
     ModelCardResourceRequirementRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderRow
@@ -57,6 +59,7 @@ from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
 from ai.backend.manager.repositories.model_card.db_source.db_source import ModelCardDBSource
+from ai.backend.manager.repositories.model_card.purgers import ModelCardPurgerSpec
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -138,12 +141,22 @@ class TestModelCardDelete:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> DomainRow:
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=f"test-domain-{uuid.uuid4().hex[:8]}",
                 description="Test domain",
                 is_active=True,
@@ -154,6 +167,25 @@ class TestModelCardDelete:
             db_sess.add(domain)
             await db_sess.flush()
         return domain
+
+    @pytest.fixture
+    async def test_scaling_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_id: ResourceGroupID,
+    ) -> ScalingGroupRow:
+        async with db_with_cleanup.begin_session() as db_sess:
+            sgroup = ScalingGroupRow(
+                id=test_scaling_group_id,
+                name=f"test-sgroup-{uuid.uuid4().hex[:8]}",
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            db_sess.add(sgroup)
+            await db_sess.flush()
+        return sgroup
 
     @pytest.fixture
     async def test_user_resource_policy(
@@ -206,6 +238,7 @@ class TestModelCardDelete:
                     rounds=100_000,
                     salt_size=32,
                 ),
+                domain_id=DomainID(test_domain.id),
                 need_password_change=False,
                 full_name="Test User",
                 domain_name=test_domain.name,
@@ -273,6 +306,9 @@ class TestModelCardDelete:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
+        test_domain_id: DomainID,
+        test_scaling_group: ScalingGroupRow,
+        test_scaling_group_id: ResourceGroupID,
         test_user: UserRow,
         test_group: GroupRow,
     ) -> VFolderRow:
@@ -291,9 +327,21 @@ class TestModelCardDelete:
             )
             db_sess.add(vfolder)
             await db_sess.flush()
+            scaling_group = ScalingGroupRow(
+                name="test-sg",
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            db_sess.add(scaling_group)
+            await db_sess.flush()
             mount_holder = SessionRow(
                 id=uuid.uuid4(),
+                domain_id=test_domain_id,
                 domain_name=test_domain.name,
+                resource_group_id=test_scaling_group_id,
+                scaling_group_name=test_scaling_group.name,
                 group_id=test_group.id,
                 user_uuid=test_user.uuid,
                 occupying_slots=ResourceSlot(),
@@ -372,7 +420,7 @@ class TestModelCardDelete:
         assert target.vfolder_id == sibling.vfolder_id
 
         await db_source.delete(
-            Purger(row_class=ModelCardRow, pk_value=target.id),
+            Purger(spec=ModelCardPurgerSpec(card_id=target.id)),
             case.options,
         )
 
@@ -411,9 +459,9 @@ class TestModelCardDelete:
 
         result = await db_source.bulk_delete(
             [
-                Purger(row_class=ModelCardRow, pk_value=valid_a.id),
-                Purger(row_class=ModelCardRow, pk_value=missing_id),
-                Purger(row_class=ModelCardRow, pk_value=valid_b.id),
+                Purger(spec=ModelCardPurgerSpec(card_id=valid_a.id)),
+                Purger(spec=ModelCardPurgerSpec(card_id=missing_id)),
+                Purger(spec=ModelCardPurgerSpec(card_id=valid_b.id)),
             ],
             DeleteModelCardOptions(delete_associated_vfolder=False),
         )
@@ -449,8 +497,8 @@ class TestModelCardDelete:
 
         result = await db_source.bulk_delete(
             [
-                Purger(row_class=ModelCardRow, pk_value=free_card.id),
-                Purger(row_class=ModelCardRow, pk_value=mounted_card.id),
+                Purger(spec=ModelCardPurgerSpec(card_id=free_card.id)),
+                Purger(spec=ModelCardPurgerSpec(card_id=mounted_card.id)),
             ],
             DeleteModelCardOptions(delete_associated_vfolder=True),
         )

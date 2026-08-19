@@ -72,11 +72,19 @@ def _get_permissions_table() -> sa.Table:
     )
 
 
+_MAX_BIND_PARAMS = 16000
+
+
 def _insert_skip_on_conflict(
     db_conn: Connection, table: sa.Table, rows: list[dict[str, Any]]
 ) -> None:
-    if rows:
-        stmt = pg_insert(table).values(rows).on_conflict_do_nothing()
+    if not rows:
+        return
+    params_per_row = max(1, len(rows[0]))
+    chunk_size = max(1, _MAX_BIND_PARAMS // params_per_row)
+    for start in range(0, len(rows), chunk_size):
+        chunk = rows[start : start + chunk_size]
+        stmt = pg_insert(table).values(chunk).on_conflict_do_nothing()
         db_conn.execute(stmt)
 
 

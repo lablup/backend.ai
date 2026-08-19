@@ -2,7 +2,7 @@ import asyncio
 import functools
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, override
 from unittest.mock import AsyncMock
 
 import pytest
@@ -27,12 +27,15 @@ class DummyPlugin(AbstractPlugin):
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
         super().__init__(plugin_config, local_config)
 
+    @override
     async def init(self, context: Any | None = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
+    @override
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         pass
 
@@ -187,12 +190,15 @@ class DummyExplicitAllowPlugin(AbstractPlugin):
     require_explicit_allow = True
     _entrypoint_name = "explicit-only"
 
+    @override
     async def init(self, context: Any | None = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
+    @override
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         pass
 
@@ -275,18 +281,22 @@ class DummyHookPassingPlugin(HookPlugin):
 
     _entrypoint_name = "hook-p"
 
+    @override
     def get_handlers(self) -> list[tuple[str, Callable[..., Any]]]:
         return [
             ("HOOK1", self.hook1_handler),
             ("HOOK2", self.hook2_handler),
         ]
 
+    @override
     async def init(self, context: Any | None = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
+    @override
     async def update_plugin_config(self, new_config: Mapping[str, Any]) -> None:
         pass
 
@@ -306,18 +316,22 @@ class DummyHookRejectingPlugin(HookPlugin):
 
     _entrypoint_name = "hook-r"
 
+    @override
     def get_handlers(self) -> list[tuple[str, Callable[..., Any]]]:
         return [
             ("HOOK1", self.hook1_handler),
             ("HOOK2", self.hook2_handler),
         ]
 
+    @override
     async def init(self, context: Any | None = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
+    @override
     async def update_plugin_config(self, new_config: Mapping[str, Any]) -> None:
         pass
 
@@ -337,17 +351,21 @@ class DummyHookErrorPlugin(HookPlugin):
 
     _entrypoint_name = "hook-e"
 
+    @override
     def get_handlers(self) -> list[tuple[str, Callable[..., Any]]]:
         return [
             ("HOOK3", self.hook3_handler),
         ]
 
+    @override
     async def init(self, context: Any | None = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
+    @override
     async def update_plugin_config(self, new_config: Mapping[str, Any]) -> None:
         pass
 

@@ -60,7 +60,7 @@ class TestModelDefinitionPayload:
                         model_path="/models",
                         service=ModelServiceConfig(
                             port=8000,
-                            start_command=["vllm", "serve", "/models"],
+                            start_command="vllm serve /models",
                         ),
                     )
                 ]
@@ -78,11 +78,11 @@ class TestModelDefinitionPayload:
     @pytest.mark.parametrize(
         ("args", "expected_start_command"),
         [
-            pytest.param(None, ["vllm", "serve", "/models"], id="presets-absent"),
-            pytest.param([], ["vllm", "serve", "/models"], id="presets-empty"),
+            pytest.param(None, "vllm serve /models", id="presets-absent"),
+            pytest.param([], "vllm serve /models", id="presets-empty"),
             pytest.param(
                 ["--max-model-len", "4096"],
-                ["vllm", "serve", "/models", "--max-model-len", "4096"],
+                "vllm serve /models --max-model-len 4096",
                 id="presets-with-args",
             ),
         ],
@@ -91,7 +91,7 @@ class TestModelDefinitionPayload:
         self,
         vllm_revision: ModelRevisionData,
         args: list[str] | None,
-        expected_start_command: list[str],
+        expected_start_command: str,
     ) -> None:
         # Builder wiring contract: pulls args from ``context.resolved_presets``
         # (handling both ``None`` and empty-list shapes) and returns a dict
@@ -108,11 +108,8 @@ class TestModelDefinitionPayload:
         self,
         vllm_revision: ModelRevisionData,
     ) -> None:
-        # Regression guard for BA-5891 at the highest layer where the bug
-        # surfaced: tokens must arrive split, so each value lands as its
-        # own argv entry rather than ``"--port 8000"``. The same invariant
-        # is implied by the parametrized expected lists above, but this
-        # test makes it an explicit assertion at the kernel-payload boundary.
+        # Regression guard for argument appending: preset tokens are shell-quoted
+        # before they are appended to the command string.
         tokens = ["--port", "8000", "--max-model-len", "4096"]
 
         payload = DeploymentSessionDraftBuilder._model_definition_payload(
@@ -121,8 +118,7 @@ class TestModelDefinitionPayload:
 
         assert payload is not None
         cmd = payload["models"][0]["service"]["start_command"]
-        assert cmd == ["vllm", "serve", "/models", *tokens]
-        assert all(" " not in token for token in cmd)
+        assert cmd == "vllm serve /models --port 8000 --max-model-len 4096"
 
 
 class TestKernelGroups:

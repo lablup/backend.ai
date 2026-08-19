@@ -3,13 +3,13 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentController,
@@ -46,10 +46,12 @@ class DeploymentControllerDependency(
     """Provides DeploymentController lifecycle management."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "deployment-controller"
 
     @asynccontextmanager
+    @override
     async def provide(
         self, setup_input: DeploymentControllerInput
     ) -> AsyncIterator[DeploymentController]:

@@ -17,6 +17,7 @@ from ai.backend.test.templates.template import (
 
 class LoginTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "login"
 

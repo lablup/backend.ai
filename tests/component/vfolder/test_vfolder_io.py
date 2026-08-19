@@ -40,9 +40,9 @@ from ai.backend.common.dto.manager.vfolder import (
     UmountHostReq,
 )
 from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 VFolderFixtureData = dict[str, Any]

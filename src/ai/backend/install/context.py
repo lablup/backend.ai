@@ -6,11 +6,9 @@ import hashlib
 import importlib.resources
 import json
 import os
-import random
 import re
 import secrets
 import shutil
-import sys
 import tempfile
 import uuid
 from abc import ABCMeta, abstractmethod
@@ -21,7 +19,7 @@ from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, override
 
 import aiofiles
 import aiotools
@@ -53,12 +51,12 @@ from .docker import (
     get_preferred_pants_local_exec_root,
 )
 from .http import wget
-from .python import check_python
 from .types import (
     Accelerator,
     DistInfo,
     FrontendMode,
     HalfstackConfig,
+    HarborOptions,
     ImageSource,
     InstallInfo,
     InstallType,
@@ -69,16 +67,11 @@ from .types import (
     PrerequisiteError,
     ServerAddr,
     ServiceConfig,
+    SftpAgentOptions,
 )
 from .widgets import ProgressItem, SetupLog
 
 current_log: ContextVar[SetupLog] = ContextVar("current_log")
-PASSPHRASE_CHARACTER_POOL: Final[list[str]] = (
-    [chr(x) for x in range(ord("a"), ord("z") + 1)]
-    + [chr(x) for x in range(ord("A"), ord("Z") + 1)]
-    + [chr(x) for x in range(ord("0"), ord("9") + 1)]
-    + ["*$./"]
-)
 
 
 class PostGuide(enum.Enum):
@@ -114,9 +107,107 @@ class Context(metaclass=ABCMeta):
     def hydrate_install_info(self) -> InstallInfo:
         raise NotImplementedError
 
-    @abstractmethod
+    def _build_install_info(
+        self,
+        *,
+        install_type: InstallType,
+        base_path: Path,
+        local_proxy_port: int,
+        loopback_aliases: tuple[str, ...],
+        harbor: HarborOptions | None = None,
+        sftp_agent: SftpAgentOptions | None = None,
+    ) -> InstallInfo:
+        # TODO: customize addr/user/password options
+        # TODO: multi-node setup
+        public_facing_address = self.install_variable.public_facing_address
+        if public_facing_address in loopback_aliases:
+            public_component_bind_address = "127.0.0.1"
+        else:
+            public_component_bind_address = "0.0.0.0"
+        halfstack_config = HalfstackConfig(
+            ha_setup=False,
+            postgres_addr=ServerAddr(HostPortPair("127.0.0.1", 8100)),
+            postgres_user="postgres",
+            postgres_password="develove",
+            redis_addr=ServerAddr(HostPortPair("127.0.0.1", 8110)),
+            redis_sentinel_addrs=[],
+            redis_password=None,
+            etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8120))],
+            etcd_user=None,
+            etcd_password=None,
+        )
+        service_config = ServiceConfig(
+            webserver_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 8090),
+                face=HostPortPair(public_facing_address, 8090),
+            ),
+            webserver_ipc_base_path="ipc/webserver",
+            webserver_var_base_path="var/webserver",
+            webui_menu_blocklist=["pipeline"],
+            webui_menu_inactivelist=["statistics"],
+            manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
+            storage_proxy_manager_auth_key=secrets.token_hex(32),
+            manager_ipc_base_path="ipc/manager",
+            manager_var_base_path="var/manager",
+            local_proxy_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, local_proxy_port),
+                face=HostPortPair(public_facing_address, local_proxy_port),
+            ),
+            scaling_group="default",
+            agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
+            agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
+            agent_sock_port=6007,
+            agent_ipc_base_path="ipc/agent",
+            agent_var_base_path="var/agent",
+            storage_proxy_client_facing_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 6021),
+                face=HostPortPair(public_facing_address, 6021),
+            ),
+            storage_proxy_manager_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
+            storage_proxy_ipc_base_path="ipc/storage-proxy",
+            storage_proxy_var_base_path="var/storage-proxy",
+            storage_proxy_random=secrets.token_hex(32),
+            storage_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6029)),
+            storage_agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6012)),
+            storage_agent_ipc_base_path="ipc/storage-agent",
+            storage_agent_var_base_path="var/storage-agent",
+            vfolder_relpath="vfolder/local/volume1",
+            appproxy_api_secret=secrets.token_hex(32),
+            appproxy_jwt_secret=secrets.token_hex(32),
+            appproxy_permit_hash_secret=secrets.token_hex(32),
+            appproxy_coordinator_addr=ServerAddr(HostPortPair(public_facing_address, 10200)),
+            appproxy_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10201)),
+            appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
+            harbor=harbor,
+            sftp_agent=sftp_agent,
+        )
+        return InstallInfo(
+            version=self.dist_info.version,
+            base_path=base_path,
+            type=install_type,
+            last_updated=datetime.now(tzutc()),
+            halfstack_config=halfstack_config,
+            service_config=service_config,
+            accelerator=self.install_variable.accelerator,
+        )
+
     async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
-        raise NotImplementedError
+        """
+        cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
+        """
+        mapping = {
+            Accelerator.CUDA_MOCK: "configs/accelerator/mock-accelerator.toml",
+            Accelerator.CUDA_MIG_MOCK: "configs/accelerator/cuda-mock-mig.toml",
+            Accelerator.ROCM_MOCK: "configs/accelerator/rocm-mock.toml",
+        }
+
+        src = mapping.get(accelerator)
+        if not src:
+            return
+
+        dst = Path("mock-accelerator.toml")
+        self.log_header(f"Copying accelerator config: {src} -> {dst}")
+        shutil.copy(src, dst)
 
     def add_post_guide(self, guide: PostGuide) -> None:
         self._post_guides.append(guide)
@@ -129,9 +220,6 @@ class Context(metaclass=ABCMeta):
 
     def mangle_pkgname(self, name: str, fat: bool = False) -> str:
         return f"backendai-{name}-{self.os_info.platform}"
-
-    def generate_passphrase(self, len: int = 16) -> str:
-        return "".join(random.sample(PASSPHRASE_CHARACTER_POOL, len))
 
     @staticmethod
     @contextmanager
@@ -192,12 +280,17 @@ class Context(metaclass=ABCMeta):
                 tg.create_task(read_stderr(p.stderr))
                 exit_code = await p.wait()
         except asyncio.CancelledError:
+            # Cancellation here is always a global abort (Ctrl-C / app shutdown /
+            # parent-task cancel) -- no caller wraps run_exec in a timeout. Reap
+            # the child, then re-raise so the abort propagates instead of silently
+            # continuing to the next install step.
             p.terminate()
             try:
-                exit_code = await asyncio.wait_for(p.wait(), timeout=5.0)
+                await asyncio.wait_for(p.wait(), timeout=5.0)
             except TimeoutError:
                 p.kill()
-                exit_code = await p.wait()
+                await p.wait()
+            raise
         return exit_code
 
     async def run_shell(self, script: str, **kwargs: Any) -> int:
@@ -264,14 +357,42 @@ class Context(metaclass=ABCMeta):
         if self.install_info.type == InstallType.SOURCE:
             # Develop mode: use ./backend.ai from current directory
             cmd_str = " ".join(cmdargs)
-            await self.run_shell(f"./backend.ai {cmd_str}")
+            exit_code = await self.run_shell(f"./backend.ai {cmd_str}")
 
         elif self.install_info.type == InstallType.PACKAGE:
             # Package mode: use backendai-manager from base_path
             executable = Path(self.install_info.base_path) / "backendai-manager"
-            await self.run_exec(
+            exit_code = await self.run_exec(
                 [str(executable), *cmdargs],
                 cwd=self.install_info.base_path,
+            )
+        else:
+            raise RuntimeError(f"Unsupported install type: {self.install_info.type}")
+
+        if exit_code != 0:
+            raise RuntimeError(
+                f"Manager CLI command failed (exit {exit_code}): {' '.join(cmdargs)}"
+            )
+
+    async def run_appproxy_coordinator_cli(self, cmdargs: Sequence[str]) -> None:
+        if self.install_info.type == InstallType.SOURCE:
+            # Develop mode: use ./backend.ai from current directory
+            cmd_str = " ".join(cmdargs)
+            exit_code = await self.run_shell(f"./backend.ai app-proxy-coordinator {cmd_str}")
+
+        elif self.install_info.type == InstallType.PACKAGE:
+            # Package mode: use backendai-appproxy-coordinator from base_path
+            executable = Path(self.install_info.base_path) / "backendai-appproxy-coordinator"
+            exit_code = await self.run_exec(
+                [str(executable), "app-proxy-coordinator", *cmdargs],
+                cwd=self.install_info.base_path,
+            )
+        else:
+            raise RuntimeError(f"Unsupported install type: {self.install_info.type}")
+
+        if exit_code != 0:
+            raise RuntimeError(
+                f"App-proxy coordinator CLI command failed (exit {exit_code}): {' '.join(cmdargs)}"
             )
 
     @actxmgr
@@ -503,10 +624,6 @@ class Context(metaclass=ABCMeta):
         with self.resource_path("ai.backend.install.fixtures", "example-keypairs.json") as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
         with self.resource_path(
-            "ai.backend.install.fixtures", "example-set-user-main-access-keys.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with self.resource_path(
             "ai.backend.install.fixtures", "example-resource-slot-types.json"
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
@@ -532,11 +649,15 @@ class Context(metaclass=ABCMeta):
             "ai.backend.install.fixtures", "example-prometheus-query-presets.json"
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+        with self.resource_path(
+            "ai.backend.install.fixtures", "example-retention-policies.json"
+        ) as path:
+            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
 
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os()
         text = Text()
-        text.append("Detetced OS info: ")
+        text.append("Detected OS info: ")
         text.append(self.os_info.__rich__())  # type: ignore
         self.log.write(text)
         if "LiveCD" in self.os_info.distro_variants:
@@ -630,9 +751,9 @@ class Context(metaclass=ABCMeta):
         # sftp_scaling_groups at that agent's scaling group so that SFTP
         # upload sessions get routed through it.
         # Must be under volumes/proxies/<proxy>/ per manager config schema.
-        if service.sftp_agent_enabled:
+        if service.sftp_agent is not None:
             data["volumes"]["proxies"]["local"]["sftp_scaling_groups"] = (
-                service.sftp_agent_scaling_group
+                service.sftp_agent.scaling_group
             )
         await self.etcd_put_json("", data)
         data = {}
@@ -764,11 +885,12 @@ class Context(metaclass=ABCMeta):
         ``configure_agent``) so that etcd, mount-path, plugin, and other
         environment-specific settings are automatically shared.  Then
         applies SFTP-specific overrides (distinct ports, pid-file,
-        scaling-group, ipc/var paths) so the two agents can coexist on
+        initial-resource-group-name, ipc/var paths) so the two agents can coexist on
         the same node without resource collisions.
         """
         service = self.install_info.service_config
-        if not service.sftp_agent_enabled:
+        sftp = service.sftp_agent
+        if sftp is None:
             return
 
         # Clone the primary agent config instead of the bundled template
@@ -777,7 +899,7 @@ class Context(metaclass=ABCMeta):
         primary_toml = Path.cwd() / "agent.toml"
         toml_path = Path.cwd() / "agent-sftp.toml"
         shutil.copy2(primary_toml, toml_path)
-        Path(service.sftp_agent_var_base_path).mkdir(parents=True, exist_ok=True)
+        Path(sftp.var_base_path).mkdir(parents=True, exist_ok=True)
 
         self.sed_in_place_multi(
             toml_path,
@@ -785,15 +907,15 @@ class Context(metaclass=ABCMeta):
                 # --- port collision avoidance ---
                 (
                     f"port = {service.agent_rpc_addr.face.port}",
-                    f"port = {service.sftp_agent_rpc_addr.face.port}",
+                    f"port = {sftp.rpc_addr.face.port}",
                 ),
                 (
                     f"agent-sock-port = {service.agent_sock_port}",
-                    f"agent-sock-port = {service.sftp_agent_sock_port}",
+                    f"agent-sock-port = {sftp.sock_port}",
                 ),
                 (
                     f"port = {service.agent_watcher_addr.face.port}",
-                    f"port = {service.sftp_agent_watcher_addr.face.port}",
+                    f"port = {sftp.watcher_addr.face.port}",
                 ),
                 # --- identity ---
                 (
@@ -802,18 +924,18 @@ class Context(metaclass=ABCMeta):
                 ),
                 (re.compile(r'^id = "i-.*"', flags=re.MULTILINE), 'id = "i-local-sftp"'),
                 (
-                    f'scaling-group = "{service.scaling_group}"',
-                    f'scaling-group = "{service.sftp_agent_scaling_group}"',
+                    f'initial-resource-group-name = "{service.scaling_group}"',
+                    f'initial-resource-group-name = "{sftp.scaling_group}"',
                 ),
                 # --- path isolation ---
                 ('pid-file = "./agent.pid"', 'pid-file = "./agent-sftp.pid"'),
                 (
                     f'ipc-base-path = "{service.agent_ipc_base_path}"',
-                    f'ipc-base-path = "{service.sftp_agent_ipc_base_path}"',
+                    f'ipc-base-path = "{sftp.ipc_base_path}"',
                 ),
                 (
                     f'var-base-path = "{service.agent_var_base_path}"',
-                    f'var-base-path = "{service.sftp_agent_var_base_path}"',
+                    f'var-base-path = "{sftp.var_base_path}"',
                 ),
                 # --- metric API service-addr (avoid port 6003 collision) ---
                 (
@@ -984,8 +1106,6 @@ class Context(metaclass=ABCMeta):
                 if halfstack.redis_password:
                     redis_table["password"] = halfstack.redis_password
             else:
-                if not halfstack.redis_addr:
-                    raise RuntimeError("redis_addr must be configured")
                 redis_table = tomlkit.table()
                 redis_table["addr"] = (
                     f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"
@@ -1019,7 +1139,6 @@ class Context(metaclass=ABCMeta):
 
     async def install_appproxy_db(self) -> None:
         halfstack = self.install_info.halfstack_config
-        service = self.install_info.service_config
 
         self.log_header("Setting up databases... (app-proxy)")
 
@@ -1063,33 +1182,16 @@ class Context(metaclass=ABCMeta):
         await app_conn.execute("GRANT ALL ON SCHEMA public TO appproxy;")
         await app_conn.close()
 
-        # 4. Run Alembic migration for app-proxy
+        # 4. Run the schema migration for app-proxy. The alembic scripts live
+        # inside the ai.backend.appproxy package (script_location is a package
+        # resource path), so this must run through the coordinator CLI -- the
+        # installer's own interpreter cannot import them in PACKAGE mode.
         alembic_ini = self.copy_config("alembic-appproxy.ini")
-        await self.run_exec(
-            [sys.executable, "-m", "alembic", "-c", str(alembic_ini), "upgrade", "head"],
-            cwd=self.install_info.base_path,
-        )
-
-        # 5. Update scaling_groups in core DB
-        # TODO: Still using wsproxy_* columns for backward compatibility (same with install-dev.sh logic)
-        core_conn = await asyncpg.connect(
-            host=halfstack.postgres_addr.face.host,
-            port=halfstack.postgres_addr.face.port,
-            user=halfstack.postgres_user,
-            password=halfstack.postgres_password,
-            database="backend",
-        )
-        await core_conn.execute(
-            """
-            UPDATE scaling_groups
-            SET wsproxy_api_token = $1,
-                wsproxy_addr = $2
-            WHERE name = 'default'
-            """,
-            service.appproxy_api_secret,
-            f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}",
-        )
-        await core_conn.close()
+        await self.run_appproxy_coordinator_cli(["schema", "oneshot", "-f", str(alembic_ini)])
+        # NOTE: The "default" scaling_group's wsproxy_addr/token are set by
+        # configure_appproxy_fixture(), which runs after load_fixtures() seeds
+        # the row. Do not update scaling_groups here -- the row does not exist
+        # yet at this point in the install flow.
 
     async def configure_appproxy(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -1325,11 +1427,18 @@ class Context(metaclass=ABCMeta):
         association in ``example-users.json`` for the default scaling group.
         """
         service = self.install_info.service_config
-        if not service.sftp_agent_enabled:
+        sftp = service.sftp_agent
+        if sftp is None:
             return
 
-        self.log_header(
-            f"Registering '{service.sftp_agent_scaling_group}' scaling group for SFTP agent..."
+        self.log_header(f"Registering '{sftp.scaling_group}' scaling group for SFTP agent...")
+        resource_group_id = str(
+            uuid.uuid5(uuid.NAMESPACE_URL, f"backend.ai/scaling-group/{sftp.scaling_group}")
+        )
+        with self.resource_path("ai.backend.install.fixtures", "example-users.json") as user_path:
+            user_fixture = json.loads(Path(user_path).read_bytes())
+        default_domain_id = next(
+            domain["id"] for domain in user_fixture["domains"] if domain["name"] == "default"
         )
         with tempfile.TemporaryDirectory() as tmpdir:
             fixture_path = Path(tmpdir) / "fixture.json"
@@ -1338,7 +1447,8 @@ class Context(metaclass=ABCMeta):
                     json.dumps({
                         "scaling_groups": [
                             {
-                                "name": service.sftp_agent_scaling_group,
+                                "id": resource_group_id,
+                                "name": sftp.scaling_group,
                                 "description": "Scaling group dedicated to SFTP upload sessions",
                                 "is_active": True,
                                 "driver": "static",
@@ -1354,8 +1464,8 @@ class Context(metaclass=ABCMeta):
                         ],
                         "sgroups_for_domains": [
                             {
-                                "scaling_group": service.sftp_agent_scaling_group,
-                                "domain": "default",
+                                "resource_group_id": resource_group_id,
+                                "domain_id": default_domain_id,
                             }
                         ],
                     })
@@ -1369,7 +1479,6 @@ class Context(metaclass=ABCMeta):
         with self.resource_path(
             "ai.backend.install.fixtures", "example-keypairs.json"
         ) as keypair_path:
-            current_shell = os.environ.get("SHELL", "sh")
             keypair_data = json.loads(Path(keypair_path).read_bytes())
         for keypair in keypair_data["keypairs"]:
             email = keypair["user_id"]
@@ -1452,7 +1561,8 @@ class Context(metaclass=ABCMeta):
         ``./dev harbor start/stop`` helpers.
         """
         service = self.install_info.service_config
-        if not service.harbor_enabled:
+        harbor = service.harbor
+        if harbor is None:
             return
 
         base_path = self.install_info.base_path
@@ -1460,7 +1570,7 @@ class Context(metaclass=ABCMeta):
         harbor_data_dir = base_path / "var" / "harbor"
         harbor_data_dir.mkdir(parents=True, exist_ok=True)
 
-        if service.harbor_admin_password == "Harbor12345":
+        if harbor.admin_password == "Harbor12345":
             self.log.write(
                 Text.from_markup(
                     "[yellow]WARNING: using the well-known default Harbor admin "
@@ -1483,7 +1593,7 @@ class Context(metaclass=ABCMeta):
                     "and re-run the installer to refresh the configuration.[/]"
                 )
             )
-            await self._register_local_harbor_registry()
+            await self._register_local_harbor_registry(harbor)
             return
 
         download_uri = self.install_variable.harbor_download_uri
@@ -1578,10 +1688,10 @@ class Context(metaclass=ABCMeta):
         yaml.preserve_quotes = True
         with harbor_template.open("r", encoding="utf-8") as fp:
             harbor_config = yaml.load(fp)
-        harbor_config["hostname"] = service.harbor_hostname
-        harbor_config["http"]["port"] = service.harbor_http_port
-        harbor_config["harbor_admin_password"] = service.harbor_admin_password
-        harbor_config["database"]["password"] = service.harbor_admin_password
+        harbor_config["hostname"] = harbor.hostname
+        harbor_config["http"]["port"] = harbor.http_port
+        harbor_config["harbor_admin_password"] = harbor.admin_password
+        harbor_config["database"]["password"] = harbor.admin_password
         harbor_config["data_volume"] = str(harbor_data_dir)
         # Drop the https section entirely so that ``prepare`` does not require
         # certificate files. The template keeps it commented out by default,
@@ -1630,13 +1740,13 @@ class Context(metaclass=ABCMeta):
 
         # 7) Register the local Harbor as a Backend.AI container registry so
         #    images can be scanned/pulled from it without an extra manual step.
-        await self._register_local_harbor_registry()
+        await self._register_local_harbor_registry(harbor)
 
         self.log.write(
             Text.from_markup(
                 f"[green]Harbor is configured.[/] "
                 f"Start it with [bold]./dev harbor start[/] and access it at "
-                f"[bold]http://{service.harbor_hostname}:{service.harbor_http_port}[/]"
+                f"[bold]http://{harbor.hostname}:{harbor.http_port}[/]"
             )
         )
 
@@ -1670,7 +1780,7 @@ class Context(metaclass=ABCMeta):
 
         return await asyncio.to_thread(_digest)
 
-    async def _register_local_harbor_registry(self) -> None:
+    async def _register_local_harbor_registry(self, harbor: HarborOptions) -> None:
         """
         Register the freshly configured local Harbor as a Backend.AI
         ``container_registries`` row (with admin credentials) so it shows up
@@ -1681,8 +1791,7 @@ class Context(metaclass=ABCMeta):
         manager's fixture loader treats a matching primary key as
         idempotent.
         """
-        service = self.install_info.service_config
-        harbor_url = f"http://{service.harbor_hostname}:{service.harbor_http_port}"
+        harbor_url = f"http://{harbor.hostname}:{harbor.http_port}"
         registry_name = "local-harbor"
         project = "library"
         registry_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{harbor_url}/{project}"))
@@ -1695,7 +1804,7 @@ class Context(metaclass=ABCMeta):
                     "type": "harbor2",
                     "project": project,
                     "username": "admin",
-                    "password": service.harbor_admin_password,
+                    "password": harbor.admin_password,
                     "ssl_verify": False,
                 }
             ]
@@ -1810,7 +1919,7 @@ class Context(metaclass=ABCMeta):
                             "x86_64",
                         )
 
-                    if self.install_info.service_config.sftp_agent_enabled:
+                    if self.install_info.service_config.sftp_agent is not None:
                         # Pre-pull the SFTP server image so the first SFTP
                         # session does not stall on a cold image fetch. The
                         # tag is single-arch (multi-arch manifest); the
@@ -1855,89 +1964,38 @@ class Context(metaclass=ABCMeta):
 
 
 class DevContext(Context):
+    @override
     def hydrate_install_info(self) -> InstallInfo:
-        # TODO: customize addr/user/password options
-        # TODO: multi-node setup
         public_facing_address = self.install_variable.public_facing_address
-        if public_facing_address in ("127.0.0.1", "localhost"):
-            public_component_bind_address = "127.0.0.1"
-        else:
-            public_component_bind_address = "0.0.0.0"
-        halfstack_config = HalfstackConfig(
-            ha_setup=False,
-            postgres_addr=ServerAddr(HostPortPair("127.0.0.1", 8100)),
-            postgres_user="postgres",
-            postgres_password="develove",
-            redis_addr=ServerAddr(HostPortPair("127.0.0.1", 8110)),
-            redis_sentinel_addrs=[],
-            redis_password=None,
-            etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8120))],
-            etcd_user=None,
-            etcd_password=None,
-        )
-        service_config = ServiceConfig(
-            webserver_addr=ServerAddr(
-                bind=HostPortPair(public_component_bind_address, 8090),
-                face=HostPortPair(public_facing_address, 8090),
-            ),
-            webserver_ipc_base_path="ipc/webserver",
-            webserver_var_base_path="var/webserver",
-            webui_menu_blocklist=["pipeline"],
-            webui_menu_inactivelist=["statistics"],
-            manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
-            storage_proxy_manager_auth_key=secrets.token_hex(32),
-            manager_ipc_base_path="ipc/manager",
-            manager_var_base_path="var/manager",
-            local_proxy_addr=ServerAddr(
-                bind=HostPortPair(public_component_bind_address, 5050),
-                face=HostPortPair(public_facing_address, 5050),
-            ),
-            scaling_group="default",
-            agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
-            agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
-            agent_sock_port=6007,
-            agent_ipc_base_path="ipc/agent",
-            agent_var_base_path="var/agent",
-            storage_proxy_client_facing_addr=ServerAddr(
-                bind=HostPortPair(public_component_bind_address, 6021),
-                face=HostPortPair(public_facing_address, 6021),
-            ),
-            storage_proxy_manager_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
-            storage_proxy_ipc_base_path="ipc/storage-proxy",
-            storage_proxy_var_base_path="var/storage-proxy",
-            storage_proxy_random=secrets.token_hex(32),
-            storage_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6029)),
-            storage_agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6012)),
-            storage_agent_ipc_base_path="ipc/storage-agent",
-            storage_agent_var_base_path="var/storage-agent",
-            vfolder_relpath="vfolder/local/volume1",
-            appproxy_api_secret=secrets.token_hex(32),
-            appproxy_jwt_secret=secrets.token_hex(32),
-            appproxy_permit_hash_secret=secrets.token_hex(32),
-            appproxy_coordinator_addr=ServerAddr(HostPortPair(public_facing_address, 10200)),
-            appproxy_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10201)),
-            appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
-            harbor_enabled=self.install_variable.with_harbor,
-            harbor_hostname=self._resolve_harbor_hostname(public_facing_address),
-            harbor_http_port=self.install_variable.harbor_http_port,
-            harbor_admin_password=self.install_variable.harbor_admin_password,
-            sftp_agent_enabled=self.install_variable.with_sftp_agent,
-            sftp_agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6013)),
-            sftp_agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6015)),
-            sftp_agent_var_base_path="var/agent-sftp",
-            sftp_agent_scaling_group="upload",
-        )
-
-        return InstallInfo(
-            version=self.dist_info.version,
+        return self._build_install_info(
+            install_type=InstallType.SOURCE,
             base_path=Path.cwd(),
-            type=InstallType.SOURCE,
-            last_updated=datetime.now(tzutc()),
-            halfstack_config=halfstack_config,
-            service_config=service_config,
-            accelerator=self.install_variable.accelerator,
+            local_proxy_port=5050,
+            loopback_aliases=("127.0.0.1", "localhost"),
+            harbor=(
+                HarborOptions(
+                    hostname=self._resolve_harbor_hostname(public_facing_address),
+                    http_port=self.install_variable.harbor_http_port,
+                    admin_password=self.install_variable.harbor_admin_password,
+                )
+                if self.install_variable.with_harbor
+                else None
+            ),
+            sftp_agent=(
+                SftpAgentOptions(
+                    rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6013)),
+                    watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6015)),
+                    sock_port=6017,
+                    ipc_base_path="ipc/agent-sftp",
+                    var_base_path="var/agent-sftp",
+                    scaling_group="upload",
+                )
+                if self.install_variable.with_sftp_agent
+                else None
+            ),
         )
 
+    @override
     def copy_config(self, template_name: str) -> Path:
         with self.resource_path("ai.backend.install.configs", template_name) as src_path:
             dst_path = Path.cwd() / template_name
@@ -1948,11 +2006,11 @@ class DevContext(Context):
                 shutil.copy(src_path, dst_path)
         return dst_path
 
+    @override
     async def check_prerequisites(self) -> None:
         await super().check_prerequisites()
         await install_git_lfs(self)
         await install_git_hooks(self)
-        await check_python(self)
         local_execution_root_dir = await get_preferred_pants_local_exec_root(self)
         await bootstrap_pants(self, local_execution_root_dir)
 
@@ -1960,24 +2018,6 @@ class DevContext(Context):
         await pants_export(self)
         await install_editable_webui(self)
         await self.install_halfstack()
-
-    async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
-        """
-        cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
-        """
-        mapping = {
-            Accelerator.CUDA_MOCK: "configs/accelerator/mock-accelerator.toml",
-            Accelerator.CUDA_MIG_MOCK: "configs/accelerator/cuda-mock-mig.toml",
-            Accelerator.ROCM_MOCK: "configs/accelerator/rocm-mock.toml",
-        }
-
-        src = mapping.get(accelerator)
-        if not src:
-            return
-
-        dst = Path("mock-accelerator.toml")
-        print(f"[Installer] Copying accelerator config: {src} -> {dst}")
-        shutil.copy(src, dst)
 
     async def configure(self) -> None:
         self.log_header("Configuring manager...")
@@ -2026,79 +2066,16 @@ class DevContext(Context):
 
 
 class PackageContext(Context):
+    @override
     def hydrate_install_info(self) -> InstallInfo:
-        # TODO: customize addr/user/password options
-        # TODO: multi-node setup
-        public_facing_address = self.install_variable.public_facing_address
-        if public_facing_address in ("127.0.0.1", "0.0.0.0"):
-            public_component_bind_address = "127.0.0.1"
-        else:
-            public_component_bind_address = "0.0.0.0"
-        halfstack_config = HalfstackConfig(
-            ha_setup=False,
-            postgres_addr=ServerAddr(HostPortPair("127.0.0.1", 8100)),
-            postgres_user="postgres",
-            postgres_password="develove",
-            redis_addr=ServerAddr(HostPortPair("127.0.0.1", 8110)),
-            redis_sentinel_addrs=[],
-            redis_password=None,
-            etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8120))],
-            etcd_user=None,
-            etcd_password=None,
-        )
-        service_config = ServiceConfig(
-            webserver_addr=ServerAddr(
-                bind=HostPortPair(public_component_bind_address, 8090),
-                face=HostPortPair(public_facing_address, 8090),
-            ),
-            webserver_ipc_base_path="ipc/webserver",
-            webserver_var_base_path="var/webserver",
-            webui_menu_blocklist=["pipeline"],
-            webui_menu_inactivelist=["statistics"],
-            manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
-            storage_proxy_manager_auth_key=secrets.token_urlsafe(32),
-            manager_ipc_base_path="ipc/manager",
-            manager_var_base_path="var/manager",
-            local_proxy_addr=ServerAddr(
-                bind=HostPortPair(public_component_bind_address, 15050),
-                face=HostPortPair(public_facing_address, 15050),
-            ),
-            scaling_group="default",
-            agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
-            agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
-            agent_sock_port=6007,
-            agent_ipc_base_path="ipc/agent",
-            agent_var_base_path="var/agent",
-            storage_proxy_client_facing_addr=ServerAddr(
-                bind=HostPortPair(public_component_bind_address, 6021),
-                face=HostPortPair(public_facing_address, 6021),
-            ),
-            storage_proxy_manager_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
-            storage_proxy_ipc_base_path="ipc/storage-proxy",
-            storage_proxy_var_base_path="var/storage-proxy",
-            storage_proxy_random=secrets.token_urlsafe(32),
-            storage_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6029)),
-            storage_agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6012)),
-            storage_agent_ipc_base_path="ipc/storage-agent",
-            storage_agent_var_base_path="var/storage-agent",
-            vfolder_relpath="vfolder/local/volume1",
-            appproxy_api_secret=secrets.token_hex(32),
-            appproxy_jwt_secret=secrets.token_hex(32),
-            appproxy_permit_hash_secret=secrets.token_hex(32),
-            appproxy_coordinator_addr=ServerAddr(HostPortPair(public_facing_address, 10200)),
-            appproxy_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10201)),
-            appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
-        )
-        return InstallInfo(
-            version=self.dist_info.version,
+        return self._build_install_info(
+            install_type=InstallType.PACKAGE,
             base_path=self.dist_info.target_path,
-            type=InstallType.PACKAGE,
-            last_updated=datetime.now(tzutc()),
-            halfstack_config=halfstack_config,
-            service_config=service_config,
-            accelerator=self.install_variable.accelerator,
+            local_proxy_port=15050,
+            loopback_aliases=("127.0.0.1", "0.0.0.0"),
         )
 
+    @override
     def copy_config(self, template_name: str) -> Path:
         with self.resource_path("ai.backend.install.configs", template_name) as src_path:
             dst_path = self.dist_info.target_path / template_name
@@ -2109,6 +2086,7 @@ class PackageContext(Context):
                 shutil.copy(src_path, dst_path)
         return dst_path
 
+    @override
     async def check_prerequisites(self) -> None:
         await super().check_prerequisites()
         if self.install_variable.with_harbor:
@@ -2275,24 +2253,6 @@ class PackageContext(Context):
         self.log_header("Installing databases (halfstack)...")
         await self.install_halfstack()
 
-    async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
-        """
-        cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
-        """
-        mapping = {
-            Accelerator.CUDA_MOCK: "configs/accelerator/mock-accelerator.toml",
-            Accelerator.CUDA_MIG_MOCK: "configs/accelerator/cuda-mock-mig.toml",
-            Accelerator.ROCM_MOCK: "configs/accelerator/rocm-mock.toml",
-        }
-
-        src = mapping.get(accelerator)
-        if not src:
-            return
-
-        dst = Path("mock-accelerator.toml")
-        print(f"[Installer] Copying accelerator config: {src} -> {dst}")
-        shutil.copy(src, dst)
-
     async def configure(self) -> None:
         self.log_header("Configuring manager...")
         await self.configure_manager()
@@ -2316,6 +2276,10 @@ class PackageContext(Context):
         await self.configure_client()
         self.log_header("Loading fixtures...")
         await self.load_fixtures()
+        # load_fixtures() seeds the "default" scaling_group with placeholder
+        # wsproxy_addr/token from the example fixture, so this must run *after*
+        # it to overwrite them with the real coordinator address and secret.
+        await self.configure_appproxy_fixture()
         self.log_header("Preparing vfolder volumes...")
         await self.prepare_local_vfolder_host()
         # TODO: install as systemd services?

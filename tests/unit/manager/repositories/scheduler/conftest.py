@@ -4,7 +4,7 @@ These cover the BA-6134 ``agent_resources.reserved`` feature. The fixtures
 build the FK-complete set of rows required to exercise ``ScheduleDBSource``
 against a real database via ``with_tables``, and the module-level helpers seed
 agent capacity, create PENDING sessions with pending ``resource_allocations``,
-and assemble ``AllocationBatch`` values.
+and assemble ``SessionAllocation`` values.
 """
 
 from __future__ import annotations
@@ -19,11 +19,23 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.events.event_types.kernel.types import (
+    KernelCreationInfo,
+    UsedDevice,
+    UsedDevices,
+)
+from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
+    ContainerId,
     DefaultForUnspecified,
+    DeviceId,
+    DeviceName,
     KernelId,
     ResourceSlot,
     SecretKey,
@@ -34,12 +46,6 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.sokovan import AllocationBatch, KernelCreationInfo
-from ai.backend.manager.data.sokovan.allocation import (
-    AgentAllocation,
-    KernelAllocation,
-    SessionAllocation,
-)
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -64,9 +70,15 @@ from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.views.sokovan.allocation import (
+    KernelAllocation,
+    SessionAllocation,
+)
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 # Tables required to satisfy FK constraints for ScheduleDBSource, in dependency order.
 _SCHEDULER_ROWS: list[type] = [
@@ -85,6 +97,7 @@ _SCHEDULER_ROWS: list[type] = [
     AgentRow,
     ContainerRegistryRow,
     ImageRow,
+    SessionGroupRow,
     SessionRow,
     KernelRow,
     ResourceSlotTypeRow,
@@ -107,13 +120,25 @@ async def db_with_cleanup(
 
 
 @pytest.fixture
-async def test_domain_name(
+def test_domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
+
+
+@pytest.fixture
+def test_scaling_group_id() -> ResourceGroupID:
+    return ResourceGroupID(uuid.uuid4())
+
+
+@pytest.fixture
+async def test_domain(
     db_with_cleanup: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[str, None]:
+    test_domain_id: DomainID,
+) -> AsyncGenerator[DomainFixtureData, None]:
     domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
             DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 total_resource_slots=ResourceSlot({
                     "cpu": Decimal("1000"),
@@ -122,17 +147,19 @@ async def test_domain_name(
             )
         )
         await db_sess.flush()
-    yield domain_name
+    yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
 
 
 @pytest.fixture
 async def test_scaling_group_name(
     db_with_cleanup: ExtendedAsyncSAEngine,
+    test_scaling_group_id: ResourceGroupID,
 ) -> AsyncGenerator[str, None]:
     sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
             ScalingGroupRow(
+                id=test_scaling_group_id,
                 name=sg_name,
                 driver="static",
                 scheduler="fifo",
@@ -214,7 +241,7 @@ async def test_keypair_resource_policy_name(
 @pytest.fixture
 async def test_user_uuid(
     db_with_cleanup: ExtendedAsyncSAEngine,
-    test_domain_name: str,
+    test_domain: DomainFixtureData,
     test_user_resource_policy_name: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     user_uuid = uuid.uuid4()
@@ -226,8 +253,9 @@ async def test_user_uuid(
                 username=f"test-user-{uuid.uuid4().hex[:8]}",
                 role=UserRole.USER,
                 status=UserStatus.ACTIVE,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=test_user_resource_policy_name,
+                domain_id=test_domain.domain_id,
             )
         )
         await db_sess.flush()
@@ -262,7 +290,7 @@ async def test_access_key(
 @pytest.fixture
 async def test_group_id(
     db_with_cleanup: ExtendedAsyncSAEngine,
-    test_domain_name: str,
+    test_domain: DomainFixtureData,
     test_resource_policy_name: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     group_id = uuid.uuid4()
@@ -273,7 +301,7 @@ async def test_group_id(
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group",
                 is_active=True,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 resource_policy=test_resource_policy_name,
@@ -287,6 +315,7 @@ async def test_group_id(
 async def test_agent_id(
     db_with_cleanup: ExtendedAsyncSAEngine,
     test_scaling_group_name: str,
+    test_scaling_group_id: ResourceGroupID,
 ) -> AsyncGenerator[str, None]:
     agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
@@ -296,6 +325,7 @@ async def test_agent_id(
                 status=AgentStatus.ALIVE,
                 region="local",
                 scaling_group=test_scaling_group_name,
+                resource_group_id=test_scaling_group_id,
                 available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
                 occupied_slots=ResourceSlot(),
                 addr=_AGENT_ADDR,
@@ -323,19 +353,33 @@ async def resource_slot_types(
 
 
 def make_creation_info(cpu: str = "2", mem: str = "4096") -> KernelCreationInfo:
-    """Build a KernelCreationInfo whose get_resource_allocations() returns the given slots."""
+    """Build a KernelCreationInfo whose used devices aggregate to the given slots."""
     return KernelCreationInfo(
-        container_id=f"container-{uuid.uuid4().hex[:8]}",
-        resource_spec={
-            "allocations": {
-                "cpu": {"cpu": {"0": cpu}},
-                "mem": {"mem": {"0": mem}},
-            },
-        },
+        container_id=ContainerId(f"container-{uuid.uuid4().hex[:8]}"),
+        kernel_host="127.0.0.1",
         repl_in_port=2001,
         repl_out_port=2002,
-        stdin_port=2003,
-        stdout_port=2004,
+        service_ports=[],
+        used_devices=UsedDevices(
+            units={
+                DeviceName("cpu"): {
+                    DeviceId("0"): UsedDevice(
+                        model_name=None,
+                        used={ResourceSlotName("cpu"): Decimal(cpu)},
+                        processing_units=None,
+                        memory_size=None,
+                    )
+                },
+                DeviceName("mem"): {
+                    DeviceId("0"): UsedDevice(
+                        model_name=None,
+                        used={ResourceSlotName("mem"): Decimal(mem)},
+                        processing_units=None,
+                        memory_size=None,
+                    )
+                },
+            }
+        ),
     )
 
 
@@ -371,42 +415,64 @@ async def seed_agent_resources(
 async def create_pending_session_with_kernels(
     db: ExtendedAsyncSAEngine,
     *,
+    domain_id: DomainID,
     domain_name: str,
+    resource_group_id: ResourceGroupID,
     scaling_group_name: str,
     group_id: uuid.UUID,
     user_uuid: uuid.UUID,
     access_key: AccessKey,
     agent_assignments: list[tuple[str, Decimal, Decimal]],
+    job_priority: int = 0,
+    is_preemptible: bool = True,
+    session_type: SessionTypes = SessionTypes.INTERACTIVE,
+    session_status: SessionStatus = SessionStatus.PENDING,
+    kernel_status: KernelStatus = KernelStatus.PENDING,
+    assign_agents: bool = False,
+    session_group_id: SessionGroupID | None = None,
 ) -> tuple[SessionId, list[KernelId]]:
-    """Create a PENDING session with one kernel per agent assignment.
+    """Create a session with one kernel per agent assignment.
 
-    Each entry in ``agent_assignments`` is ``(agent_id, cpu_requested,
-    mem_requested)``. Each kernel is created in PENDING status with pending
-    ``resource_allocations`` rows (``used``/``used_at``/``free_at`` all NULL).
-    Returns the session id and the kernel ids in assignment order.
+    The defaults create the PENDING shape: unassigned kernels with pending
+    ``resource_allocations`` rows (``used``/``used_at``/``free_at`` all
+    NULL). With ``assign_agents`` each kernel is placed on its assigned
+    agent, RUNNING kernels get usage-reported allocation rows, and
+    ``starts_at`` is set only for RUNNING sessions, mirroring the real
+    transitions. Each entry in ``agent_assignments`` is ``(agent_id, cpu,
+    mem)``. Returns the session id and the kernel ids in assignment order.
     """
     session_id = SessionId(uuid.uuid4())
     kernel_ids: list[KernelId] = []
+    now = datetime.now(tzutc())
 
     total_cpu = sum((cpu for _, cpu, _ in agent_assignments), Decimal("0"))
     total_mem = sum((mem for _, _, mem in agent_assignments), Decimal("0"))
+    cluster_mode = (
+        ClusterMode.SINGLE_NODE if len(agent_assignments) == 1 else ClusterMode.MULTI_NODE
+    )
 
     async with db.begin_session() as db_sess:
         db_sess.add(
             SessionRow(
                 id=session_id,
                 name=f"test-session-{uuid.uuid4().hex[:8]}",
-                session_type=SessionTypes.INTERACTIVE,
+                session_type=session_type,
+                domain_id=domain_id,
                 domain_name=domain_name,
                 group_id=group_id,
                 user_uuid=user_uuid,
                 access_key=access_key,
+                resource_group_id=resource_group_id,
                 scaling_group_name=scaling_group_name,
-                status=SessionStatus.PENDING,
+                status=session_status,
                 status_info="test",
-                cluster_mode=ClusterMode.SINGLE_NODE,
+                job_priority=job_priority,
+                is_preemptible=is_preemptible,
+                cluster_mode=cluster_mode,
                 requested_slots=ResourceSlot({"cpu": total_cpu, "mem": total_mem}),
-                created_at=datetime.now(tzutc()),
+                created_at=now,
+                starts_at=now if session_status == SessionStatus.RUNNING else None,
+                session_group_id=session_group_id,
                 images=["python:3.8"],
                 vfolder_mounts=[],
                 environ={},
@@ -415,6 +481,7 @@ async def create_pending_session_with_kernels(
         )
         await db_sess.flush()
 
+        usage_reported = kernel_status == KernelStatus.RUNNING
         for idx, (agent_id, cpu_requested, mem_requested) in enumerate(agent_assignments):
             kernel_id = KernelId(uuid.uuid4())
             kernel_ids.append(kernel_id)
@@ -422,18 +489,23 @@ async def create_pending_session_with_kernels(
                 KernelRow(
                     id=kernel_id,
                     session_id=session_id,
-                    agent=None,
-                    agent_addr=None,
+                    agent=agent_id if assign_agents else None,
+                    agent_addr="127.0.0.1:6001" if assign_agents else None,
                     scaling_group=scaling_group_name,
+                    resource_group_id=resource_group_id,
                     cluster_idx=idx,
                     cluster_role="main" if idx == 0 else "sub",
                     cluster_hostname=f"kernel-{uuid.uuid4().hex[:8]}",
                     image="python:3.8",
                     architecture="x86_64",
                     registry="docker.io",
-                    status=KernelStatus.PENDING,
-                    status_changed=datetime.now(tzutc()),
-                    occupied_slots=ResourceSlot(),
+                    status=kernel_status,
+                    status_changed=now,
+                    occupied_slots=(
+                        ResourceSlot({"cpu": cpu_requested, "mem": mem_requested})
+                        if usage_reported
+                        else ResourceSlot()
+                    ),
                     requested_slots=ResourceSlot({"cpu": cpu_requested, "mem": mem_requested}),
                     domain_name=domain_name,
                     group_id=group_id,
@@ -451,12 +523,27 @@ async def create_pending_session_with_kernels(
             )
             await db_sess.flush()
 
+            # Mirror the production ledger: the row's bucket matches the
+            # kernel's lifecycle interval (RESERVED -> prereserved,
+            # SCHEDULED..CREATING -> reserved, RUNNING -> used).
+            prereserving = kernel_status == KernelStatus.RESERVED
+            reserving = (
+                not prereserving
+                and not usage_reported
+                and kernel_status in KernelStatus.resource_requested_statuses()
+            )
             for slot_name, requested in [("cpu", cpu_requested), ("mem", mem_requested)]:
                 db_sess.add(
                     ResourceAllocationRow(
                         kernel_id=kernel_id,
                         slot_name=slot_name,
                         requested=requested,
+                        prereserved=requested if prereserving else Decimal(0),
+                        reserved=requested if reserving else Decimal(0),
+                        prereserved_at=now if prereserving else None,
+                        reserved_at=now if (reserving or usage_reported) else None,
+                        used=requested if usage_reported else None,
+                        used_at=now if usage_reported else None,
                     )
                 )
             await db_sess.flush()
@@ -464,46 +551,32 @@ async def create_pending_session_with_kernels(
     return session_id, kernel_ids
 
 
-def make_allocation_batch(
+def make_session_allocations(
     *,
     session_id: SessionId,
-    scaling_group_name: str,
-    access_key: AccessKey,
-    kernel_assignments: list[tuple[KernelId, str, Decimal, Decimal]],
-) -> AllocationBatch:
-    """Assemble a single-session AllocationBatch.
+    kernel_assignments: list[tuple[KernelId, str]],
+) -> list[SessionAllocation]:
+    """Assemble a single-session allocation batch.
 
-    Each entry in ``kernel_assignments`` is ``(kernel_id, agent_id,
-    cpu_slot, mem_slot)``. The reservation amount is taken by the db_source
-    from the kernel's pending ``resource_allocations`` rows, so the slots given
-    here only feed the (unused-by-reservation) agent_allocations metadata.
+    Each entry in ``kernel_assignments`` is ``(kernel_id, agent_id)``. The
+    reservation amount is taken by the db_source from the kernel's pending
+    ``resource_allocations`` rows.
     """
     kernel_allocations = [
         KernelAllocation(
             kernel_id=kernel_id,
             agent_id=AgentId(agent_id),
             agent_addr=_AGENT_ADDR,
-            scaling_group=scaling_group_name,
         )
-        for kernel_id, agent_id, _cpu, _mem in kernel_assignments
+        for kernel_id, agent_id in kernel_assignments
     ]
-    agent_slots: dict[str, list[ResourceSlot]] = {}
-    for _kernel_id, agent_id, cpu, mem in kernel_assignments:
-        agent_slots.setdefault(agent_id, []).append(ResourceSlot({"cpu": cpu, "mem": mem}))
-    agent_allocations = [
-        AgentAllocation(agent_id=AgentId(agent_id), allocated_slots=slots)
-        for agent_id, slots in agent_slots.items()
+    return [
+        SessionAllocation(
+            session_id=session_id,
+            kernel_allocations=kernel_allocations,
+            preempting_session_ids=(),
+        )
     ]
-    allocation = SessionAllocation(
-        session_id=session_id,
-        session_type=SessionTypes.INTERACTIVE,
-        cluster_mode=ClusterMode.SINGLE_NODE,
-        scaling_group=scaling_group_name,
-        kernel_allocations=kernel_allocations,
-        agent_allocations=agent_allocations,
-        access_key=access_key,
-    )
-    return AllocationBatch(allocations=[allocation], failures=[])
 
 
 async def fetch_agent_resources(

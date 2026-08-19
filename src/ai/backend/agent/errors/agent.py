@@ -4,7 +4,7 @@ Agent operation-related exceptions.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from aiohttp import web
 
@@ -23,6 +23,7 @@ class ImageArchitectureMismatchError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/image-architecture-mismatch"
     error_title = "Image architecture mismatch."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
@@ -37,6 +38,7 @@ class ImagePullTimeoutError(BackendAIError, web.HTTPGatewayTimeout):
     error_type = "https://api.backend.ai/probs/agent/image-pull-timeout"
     error_title = "Image pull timeout."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
@@ -51,6 +53,7 @@ class ContainerCreationFailedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/container-creation-failed"
     error_title = "Container creation failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -65,6 +68,7 @@ class ContainerStartupTimeoutError(BackendAIError, web.HTTPGatewayTimeout):
     error_type = "https://api.backend.ai/probs/agent/container-startup-timeout"
     error_title = "Container startup timeout."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -79,6 +83,7 @@ class ContainerStartupCancelledError(BackendAIError, web.HTTPInternalServerError
     error_type = "https://api.backend.ai/probs/agent/container-startup-cancelled"
     error_title = "Container startup cancelled."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -93,6 +98,7 @@ class ContainerStartupFailedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/container-startup-failed"
     error_title = "Container startup failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -107,6 +113,7 @@ class ReservedPortError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/reserved-port"
     error_title = "Reserved port cannot be used."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -121,6 +128,7 @@ class PortConflictError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/port-conflict"
     error_title = "Port conflicts with existing service."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -135,6 +143,7 @@ class ModelDefinitionNotFoundError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/model-definition-not-found"
     error_title = "Model definition file not found."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -149,6 +158,7 @@ class ModelDefinitionEmptyError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/model-definition-empty"
     error_title = "Model definition is empty."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -163,6 +173,7 @@ class ModelDefinitionInvalidYAMLError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/model-definition-invalid-yaml"
     error_title = "Invalid YAML syntax in model definition."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -177,6 +188,7 @@ class ModelFolderNotSpecifiedError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/model-folder-not-specified"
     error_title = "Model folder not specified."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -191,6 +203,7 @@ class ImageCommandRequiredError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/image-command-required"
     error_title = "Image command is required."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
@@ -205,6 +218,7 @@ class AgentInitializationError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/initialization-failed"
     error_title = "Agent initialization failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -219,6 +233,7 @@ class InvalidAgentConfigError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/invalid-config"
     error_title = "Invalid agent configuration."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -233,6 +248,7 @@ class InvalidMountPathError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/invalid-mount-path"
     error_title = "Invalid mount path."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -247,6 +263,7 @@ class InvalidLoggingConfigError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/invalid-logging-config"
     error_title = "Invalid logging configuration."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -261,6 +278,7 @@ class InvalidChunkSizeError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/invalid-chunk-size"
     error_title = "Invalid chunk size."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -275,6 +293,7 @@ class AsyncioTaskNotAvailableError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/asyncio-task-not-available"
     error_title = "Asyncio task context not available."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -289,6 +308,7 @@ class KernelNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/agent/kernel-not-found"
     error_title = "Kernel not found."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -303,6 +323,7 @@ class InitializationError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/initialization-error"
     error_title = "Agent initialization error."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -317,6 +338,7 @@ class InvalidArgumentError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/invalid-argument"
     error_title = "Invalid argument."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -331,6 +353,7 @@ class UnsupportedBaseDistroError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/unsupported-base-distro"
     error_title = "Unsupported base distribution."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
@@ -352,9 +375,11 @@ class ContainerCreationError(BackendAIError, web.HTTPInternalServerError):
         self.message = message
         super().__init__(extra_msg=message)
 
+    @override
     def __reduce__(self) -> tuple[type[BackendAIError], tuple[Any, ...], dict[str, Any]]:
         return (self.__class__, (self.container_id, self.message), self.__dict__)
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -373,9 +398,11 @@ class K8sError(BackendAIError, web.HTTPInternalServerError):
         self.message = message
         super().__init__(extra_msg=message)
 
+    @override
     def __reduce__(self) -> tuple[type[BackendAIError], tuple[Any, ...], dict[str, Any]]:
         return (self.__class__, (self.message,), self.__dict__)
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -390,6 +417,7 @@ class NetworkPluginNotFound(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/network-plugin-not-found"
     error_title = "Network plugin not found."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -404,6 +432,7 @@ class ServicePortAlreadyUsedError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/agent/service-port-already-used"
     error_title = "Service port already used."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -418,6 +447,7 @@ class InvalidSocket(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/invalid-socket"
     error_title = "Invalid socket."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,

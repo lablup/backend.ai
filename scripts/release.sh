@@ -1,9 +1,28 @@
 #!/bin/bash
 
+usage() {
+    echo "Usage: $0 [--lts] <target_version> [webui_version]"
+    echo "  --lts  the release line being cut is a long-term support one;"
+    echo "         only meaningful for an X.Y.0rc1 target, which cuts a line"
+}
+
+LTS_ARG=()
+POSITIONAL=()
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --lts) LTS_ARG=(--lts) ;;
+        -h|--help) usage; exit 0 ;;
+        -*) echo "Error: unknown option: $1"; usage; exit 1 ;;
+        *) POSITIONAL+=("$1") ;;
+    esac
+    shift
+done
+set -- "${POSITIONAL[@]}"
+
 # Check if at least target version is provided
 if [ "$#" -lt 1 ]; then
     echo "Error: Target version is required"
-    echo "Usage: $0 <target_version> [webui_version]"
+    usage
     exit 1
 fi
 
@@ -45,8 +64,8 @@ else
     pants fmt ::
 fi
 
-# Update the changelog (--yes consumes news fragments without an interactive prompt)
-LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml) ./py -m towncrier --yes
+# Update the version-branch changelog (consumes news fragments without an interactive prompt)
+python3 scripts/run-towncrier.py "${TARGET_VERSION}"
 
 # Update sample config files (unmask secrets to show actual default values)
 ./backend.ai mgr config generate-sample --overwrite --unmask-secrets
@@ -56,6 +75,11 @@ LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]'
 
 ./backend.ai mgr api dump-openapi --output docs/manager/rest-reference/openapi.json
 ./scripts/generate-graphql-schema.sh
+
+# Keep the maintained-versions registry in step. Only an `X.Y.0rc1` target cuts
+# a release line, so this is a no-op for every other release; it also retires
+# the lines that are due.
+.github/scripts/update-maintained-versions.sh "${TARGET_VERSION}" "${LTS_ARG[@]}"
 
 # Check dependencies
 pants tailor --check update-build-files --check '::'

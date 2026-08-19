@@ -1,28 +1,42 @@
-"""Main scheduling data type."""
+"""Repository-internal scheduling fetch types."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from functools import cached_property
+from datetime import datetime
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.identifier.session_group import SessionGroupID
+from ai.backend.common.types import AgentId
+from ai.backend.manager.views.sokovan.agent import AgentMeta
+from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta
+from ai.backend.manager.views.sokovan.snapshot import (
+    PreemptionCandidateSnapshot,
+    ResourceGroupSchedulingPolicy,
+    ResourceOccupancySnapshot,
+    ResourcePolicySnapshot,
+    SessionDependencySnapshot,
+)
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
-from .agent import AgentMeta
-from .base import SchedulingSpec
-from .scaling_group import ScalingGroupMeta
-from .session import PendingSessions
-from .snapshot import SnapshotData
 
+@dataclass(frozen=True)
+class SchedulingFetch:
+    """DB-side sources of one scheduling run (no Valkey/config involved).
 
-@dataclass
-class SchedulingData:
-    """Complete scheduling data structure."""
+    The repository composes this with the per-agent retry hints and the
+    configured agent limit into the final :class:`SchedulingData`.
+    """
 
-    scaling_group: ScalingGroupMeta
-    pending_sessions: PendingSessions
+    resource_group: ResourceGroupMeta
+    policy: ResourceGroupSchedulingPolicy
+    workloads: list[SessionWorkload]
     agents: list[AgentMeta]
-    snapshot_data: SnapshotData | None
-    spec: SchedulingSpec
-
-    @cached_property
-    def total_capacity(self) -> ResourceSlot:
-        """Calculate total available capacity from all agents."""
-        return sum((agent.available_slots for agent in self.agents), ResourceSlot())
+    occupancy: ResourceOccupancySnapshot
+    resource_policy: ResourcePolicySnapshot
+    session_dependencies: SessionDependencySnapshot
+    # DB-sourced time the fetch ran (single time authority across managers)
+    observed_at: datetime
+    # Preemption victim candidates per owner (empty when preemption disabled)
+    preemption_candidates: PreemptionCandidateSnapshot
+    # Live session-group members per agent (empty when no pending session
+    # carries a placement-engaged group)
+    session_group_members: Mapping[AgentId, Mapping[SessionGroupID, int]]

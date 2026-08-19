@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
@@ -32,10 +33,12 @@ class RedisProvider(DependencyProvider[AsyncEtcd, StorageProxyValkeyClients]):
     """Provider for Redis configuration and Valkey clients."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "redis"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: AsyncEtcd) -> AsyncIterator[StorageProxyValkeyClients]:
         """Load and provide Redis configuration and Valkey clients."""
         # Load Redis config from etcd
@@ -70,6 +73,7 @@ class RedisProvider(DependencyProvider[AsyncEtcd, StorageProxyValkeyClients]):
             await bgtask_client.close()
             await artifact_client.close()
 
+    @override
     def gen_liveness_checker(self, resource: StorageProxyValkeyClients) -> ServiceHealthChecker:
         """Liveness — Valkey connection-stuck observed; restart recovers."""
         return ValkeyHealthChecker(

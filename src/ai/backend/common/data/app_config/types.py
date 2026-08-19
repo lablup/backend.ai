@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import enum
 
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.identifier.app_config import AppConfigScopeID
 
 __all__ = ("AppConfigScopeType",)
 
@@ -34,10 +35,40 @@ class AppConfigScopeType(enum.StrEnum):
             case AppConfigScopeType.USER:
                 return ScopeType.USER
 
-    def to_rbac_scope_id(self, scope_id: str) -> str:
-        """The RBAC scope id for a write at this fragment scope.
+    def to_rbac_element_type(self) -> RBACElementType | None:
+        """The RBAC scope element a fragment at this scope belongs to.
 
-        ``public`` is system-wide (no per-entity scope id); ``domain`` / ``user`` carry
-        their own ``scope_id``.
+        ``public`` maps to the global scope, which has no RBAC scope element — a public
+        fragment is *global-scoped* (no scope association; superadmin-only writes), so it
+        returns ``None``.
         """
-        return "" if self is AppConfigScopeType.PUBLIC else scope_id
+        match self:
+            case AppConfigScopeType.PUBLIC:
+                return None
+            case AppConfigScopeType.DOMAIN:
+                return RBACElementType.DOMAIN
+            case AppConfigScopeType.USER:
+                return RBACElementType.USER
+
+    def to_rbac_scope_id(self, scope_id: AppConfigScopeID | None) -> str:
+        """The RBAC scope id for a write at this fragment scope, in RBAC's string form.
+
+        ``public`` is system-wide and names no owner.
+        """
+        return "" if self is AppConfigScopeType.PUBLIC else str(scope_id)
+
+    def default_rank(self) -> int:
+        """Default merge rank for an allow-list entry at this scope type (BEP-1052).
+
+        The merge applies fragments in rank order (low → high; higher wins), so the
+        defaults order the scopes as ``public`` < ``domain`` < ``user`` — a user's own
+        fragment overrides the domain default, which overrides the public value. The
+        100 gap leaves room for admins to place custom ranks in between.
+        """
+        match self:
+            case AppConfigScopeType.PUBLIC:
+                return 100
+            case AppConfigScopeType.DOMAIN:
+                return 200
+            case AppConfigScopeType.USER:
+                return 300

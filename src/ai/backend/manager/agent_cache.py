@@ -2,21 +2,20 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from contextvars import ContextVar
 from typing import Any
 
 import sqlalchemy as sa
 import zmq
 from callosum.exceptions import AuthenticationError
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
-from callosum.rpc import Peer, RPCUserError
+from callosum.rpc import RPCUserError
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common import msgpack
 from ai.backend.common.auth import ManagerAuthHandler, PublicKey, SecretKey
+from ai.backend.common.clients.agent.peer import PeerInvoker
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 
@@ -25,42 +24,6 @@ from .models.agent import agents
 from .models.utils import ExtendedAsyncSAEngine, execute_with_retry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-class PeerInvoker(Peer):
-    class _CallStub:
-        _cached_funcs: dict[str, Callable[..., Any]]
-        order_key: ContextVar[str | None]
-
-        def __init__(self, peer: Peer) -> None:
-            self._cached_funcs = {}
-            self.peer = peer
-            self.order_key = ContextVar("order_key", default=None)
-
-        def __getattr__(self, name: str) -> Callable[..., Any]:
-            if f := self._cached_funcs.get(name, None):
-                return f
-
-            async def _wrapped(*args: Any, **kwargs: Any) -> Any:
-                request_body = {
-                    "args": args,
-                    "kwargs": kwargs,
-                }
-                self.peer.last_used = time.monotonic()  # type: ignore[attr-defined]
-                ret = await self.peer.invoke(name, request_body, order_key=self.order_key.get())
-                self.peer.last_used = time.monotonic()  # type: ignore[attr-defined]
-                return ret
-
-            self._cached_funcs[name] = _wrapped
-            return _wrapped
-
-    call: _CallStub
-    last_used: float
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self.call = self._CallStub(self)
-        self.last_used = time.monotonic()
 
 
 class AgentRPCCache:

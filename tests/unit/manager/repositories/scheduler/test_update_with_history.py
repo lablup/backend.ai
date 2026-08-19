@@ -5,7 +5,7 @@ Tests that session status updates and history records are created atomically.
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -13,6 +13,8 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -34,7 +36,7 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
@@ -47,6 +49,7 @@ from ai.backend.manager.repositories.scheduling_history.creators import (
     SessionSchedulingHistoryCreatorSpec,
 )
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestUpdateWithHistory:
@@ -79,15 +82,25 @@ class TestUpdateWithHistory:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+        test_domain_id: DomainID,
+    ) -> AsyncGenerator[DomainFixtureData, None]:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 total_resource_slots=ResourceSlot({
                     "cpu": Decimal("1000"),
@@ -97,7 +110,35 @@ class TestUpdateWithHistory:
             db_sess.add(domain)
             await db_sess.flush()
 
-        yield domain_name
+        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
+
+    @pytest.fixture
+    async def test_scaling_group_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_id: ResourceGroupID,
+    ) -> AsyncGenerator[str, None]:
+        """Create test scaling group and return scaling group name."""
+        sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            sg = ScalingGroupRow(
+                id=test_scaling_group_id,
+                name=sg_name,
+                driver="static",
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(
+                    allowed_session_types=[],
+                    pending_timeout=timedelta(hours=1),
+                    config={},
+                ),
+                driver_opts={},
+                is_active=True,
+            )
+            db_sess.add(sg)
+            await db_sess.flush()
+
+        yield sg_name
 
     @pytest.fixture
     async def test_resource_policy_name(
@@ -171,7 +212,7 @@ class TestUpdateWithHistory:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create test user and return user UUID."""
@@ -184,8 +225,9 @@ class TestUpdateWithHistory:
                 username=f"test-user-{uuid.uuid4().hex[:8]}",
                 role=UserRole.USER,
                 status=UserStatus.ACTIVE,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=test_user_resource_policy_name,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -223,7 +265,7 @@ class TestUpdateWithHistory:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create test group and return group ID."""
@@ -235,7 +277,7 @@ class TestUpdateWithHistory:
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group",
                 is_active=True,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 resource_policy=test_resource_policy_name,
@@ -249,7 +291,10 @@ class TestUpdateWithHistory:
     async def test_session_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
         test_group_id: uuid.UUID,
     ) -> AsyncGenerator[SessionId, None]:
         """Create test session in PREPARING status and return session ID."""
@@ -261,8 +306,11 @@ class TestUpdateWithHistory:
                 creation_id=f"creation-{uuid.uuid4().hex[:8]}",
                 name=f"test-session-{uuid.uuid4().hex[:8]}",
                 session_type=SessionTypes.INTERACTIVE,
-                domain_name=test_domain_name,
+                domain_id=test_domain_id,
+                domain_name=test_domain.domain_name,
                 group_id=test_group_id,
+                resource_group_id=test_scaling_group_id,
+                scaling_group_name=test_scaling_group_name,
                 status=SessionStatus.PREPARING,
                 status_info="preparing",
                 result=SessionResult.UNDEFINED,
@@ -411,7 +459,10 @@ class TestUpdateWithHistory:
     async def test_update_with_history_multiple_sessions(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
         test_group_id: uuid.UUID,
     ) -> None:
         """Test update_with_history handles multiple sessions."""
@@ -427,8 +478,11 @@ class TestUpdateWithHistory:
                     creation_id=f"creation-{uuid.uuid4().hex[:8]}",
                     name=f"test-session-{uuid.uuid4().hex[:8]}",
                     session_type=SessionTypes.INTERACTIVE,
-                    domain_name=test_domain_name,
+                    domain_id=test_domain_id,
+                    domain_name=test_domain.domain_name,
                     group_id=test_group_id,
+                    resource_group_id=test_scaling_group_id,
+                    scaling_group_name=test_scaling_group_name,
                     status=SessionStatus.PREPARING,
                     status_info="preparing",
                     result=SessionResult.UNDEFINED,
@@ -593,7 +647,11 @@ class TestUpdateWithHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_session_id: SessionId,
     ) -> None:
-        """Test that repeated calls with same phase+error_code+to_status merge (increment attempts)."""
+        """Test that repeated calls with same phase+error_code+to_status merge (increment attempts).
+
+        Neither ``from_status`` nor which attempt result was recorded is part
+        of the merge key — only attempt-vs-skip is (see the skip test below).
+        """
         db_source = ScheduleDBSource(db_with_cleanup)
 
         # First call - creates history record
@@ -702,6 +760,70 @@ class TestUpdateWithHistory:
             records = (await db_sess.execute(history_stmt)).scalars().all()
             assert len(records) == 1
             assert records[0].attempts == 3
+
+    async def test_update_with_history_no_merge_skipped_after_failure(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_session_id: SessionId,
+    ) -> None:
+        """Skips are counted, but on their own record.
+
+        Skips must be visible and countable, while ``attempts`` on the
+        attempt record stays the number the give-up (deprioritization)
+        classification is allowed to see.
+        """
+        db_source = ScheduleDBSource(db_with_cleanup)
+
+        updater = BatchUpdater(
+            spec=SessionStatusBatchUpdaterSpec(
+                to_status=SessionStatus.PENDING,
+                status_changed_at=datetime.now(tzutc()),
+                reason="attempted",
+            ),
+            conditions=[lambda: SessionRow.id.in_([test_session_id])],
+        )
+        await db_source.update_with_history(
+            updater,
+            BulkCreator(
+                specs=[
+                    SessionSchedulingHistoryCreatorSpec(
+                        session_id=test_session_id,
+                        phase="schedule",
+                        result=SchedulingResult.NEED_RETRY,
+                        message="No resources available",
+                        to_status=SessionStatus.PENDING,
+                    )
+                ]
+            ),
+        )
+
+        # Same phase and to_status, but nothing was attempted these two cycles
+        for _ in range(2):
+            await db_source.update_with_history(
+                updater,
+                BulkCreator(
+                    specs=[
+                        SessionSchedulingHistoryCreatorSpec(
+                            session_id=test_session_id,
+                            phase="schedule",
+                            result=SchedulingResult.SKIPPED,
+                            message="Not attempted",
+                            to_status=SessionStatus.PENDING,
+                        )
+                    ]
+                ),
+            )
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            history_stmt = sa.select(SessionSchedulingHistoryRow).where(
+                SessionSchedulingHistoryRow.session_id == test_session_id
+            )
+            records = (await db_sess.execute(history_stmt)).scalars().all()
+            attempts_by_result = {r.result: r.attempts for r in records}
+            # The skips are counted on their own record...
+            assert attempts_by_result[str(SchedulingResult.SKIPPED)] == 2
+            # ...and the attempt record keeps the count give-up may see
+            assert attempts_by_result[str(SchedulingResult.NEED_RETRY)] == 1
 
     async def test_update_with_history_no_merge_different_phase(
         self,
@@ -899,7 +1021,10 @@ class TestUpdateWithHistory:
     async def test_update_with_history_merge_multiple_sessions_batch(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
         test_group_id: uuid.UUID,
     ) -> None:
         """Test merge logic works correctly with multiple sessions in batch."""
@@ -914,8 +1039,11 @@ class TestUpdateWithHistory:
                     creation_id=f"creation-{uuid.uuid4().hex[:8]}",
                     name=f"test-session-{uuid.uuid4().hex[:8]}",
                     session_type=SessionTypes.INTERACTIVE,
-                    domain_name=test_domain_name,
+                    domain_id=test_domain_id,
+                    domain_name=test_domain.domain_name,
                     group_id=test_group_id,
+                    resource_group_id=test_scaling_group_id,
+                    scaling_group_name=test_scaling_group_name,
                     status=SessionStatus.PREPARING,
                     status_info="preparing",
                     result=SessionResult.UNDEFINED,
@@ -999,3 +1127,78 @@ class TestUpdateWithHistory:
             records = (await db_sess.execute(history_stmt)).scalars().all()
             assert len(records) == 3
             assert all(r.attempts == 2 for r in records)
+
+    async def test_running_transition_preserves_requested_starts_at(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+    ) -> None:
+        """The RUNNING transition writes starts_at without touching the
+        reserved start time recorded at enqueue."""
+        session_id = SessionId(uuid.uuid4())
+        requested_starts_at = datetime.now(tzutc()) - timedelta(minutes=30)
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            session = SessionRow(
+                id=session_id,
+                creation_id=f"creation-{uuid.uuid4().hex[:8]}",
+                name=f"test-session-{uuid.uuid4().hex[:8]}",
+                session_type=SessionTypes.BATCH,
+                domain_id=test_domain_id,
+                domain_name=test_domain.domain_name,
+                group_id=test_group_id,
+                resource_group_id=test_scaling_group_id,
+                scaling_group_name=test_scaling_group_name,
+                status=SessionStatus.CREATING,
+                result=SessionResult.UNDEFINED,
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                occupying_slots=ResourceSlot(),
+                requested_slots=ResourceSlot(),
+                vfolder_mounts={},
+                environ={},
+                priority=0,
+                created_at=datetime.now(tzutc()),
+                requested_starts_at=requested_starts_at,
+                num_queries=0,
+                use_host_network=False,
+            )
+            db_sess.add(session)
+            await db_sess.flush()
+
+        status_changed_at = datetime.now(tzutc())
+        updater = BatchUpdater(
+            spec=SessionStatusBatchUpdaterSpec(
+                to_status=SessionStatus.RUNNING,
+                status_changed_at=status_changed_at,
+            ),
+            conditions=[lambda: SessionRow.id.in_([session_id])],
+        )
+        bulk_creator = BulkCreator(
+            specs=[
+                SessionSchedulingHistoryCreatorSpec(
+                    session_id=session_id,
+                    phase="start",
+                    result=SchedulingResult.SUCCESS,
+                    message="Session started",
+                    from_status=SessionStatus.CREATING,
+                    to_status=SessionStatus.RUNNING,
+                )
+            ]
+        )
+
+        db_source = ScheduleDBSource(db_with_cleanup)
+        updated_count = await db_source.update_with_history(updater, bulk_creator)
+        assert updated_count == 1
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
+            updated_session = await db_sess.scalar(stmt)
+            assert updated_session is not None
+            assert updated_session.status == SessionStatus.RUNNING
+            assert updated_session.starts_at == status_changed_at
+            assert updated_session.requested_starts_at == requested_starts_at

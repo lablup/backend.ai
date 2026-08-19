@@ -4,7 +4,7 @@ import logging
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider, ResourceT
 from ai.backend.common.etcd import AsyncEtcd
@@ -45,10 +45,12 @@ class ErrorMonitorDependency(MonitoringDependency[ManagerErrorPluginContext]):
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "error-monitor-plugin"
 
     @asynccontextmanager
+    @override
     async def provide(
         self, setup_input: MonitoringInput
     ) -> AsyncIterator[ManagerErrorPluginContext]:
@@ -74,10 +76,12 @@ class StatsMonitorDependency(MonitoringDependency[ManagerStatsPluginContext]):
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "stats-monitor-plugin"
 
     @asynccontextmanager
+    @override
     async def provide(
         self, setup_input: MonitoringInput
     ) -> AsyncIterator[ManagerStatsPluginContext]:

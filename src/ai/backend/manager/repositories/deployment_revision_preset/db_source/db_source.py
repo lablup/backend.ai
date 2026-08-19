@@ -15,11 +15,11 @@ from ai.backend.manager.errors.resource import DeploymentRevisionPresetNotFound
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow, ResourceSlotTypeRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
     NextValuePolicy,
-    NoPagination,
     Purger,
     Querier,
 )
@@ -30,6 +30,7 @@ from ai.backend.manager.repositories.deployment_revision_preset.creators import 
     PresetSlotDependency,
 )
 from ai.backend.manager.repositories.deployment_revision_preset.purgers import (
+    DeploymentRevisionPresetPurgerSpec,
     PresetResourceSlotBatchPurgerSpec,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
@@ -96,7 +97,7 @@ class DeploymentRevisionPresetDBSource:
     async def delete(self, preset_id: UUID) -> DeploymentRevisionPresetData:
         async with self._ops.write_ops() as w:
             result = await w.purge(
-                Purger(row_class=DeploymentRevisionPresetRow, pk_value=preset_id)
+                Purger(spec=DeploymentRevisionPresetPurgerSpec(preset_id=preset_id))
             )
             if result is None:
                 raise DeploymentRevisionPresetNotFound()

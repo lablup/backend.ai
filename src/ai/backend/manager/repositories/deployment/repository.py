@@ -3,7 +3,7 @@
 import logging
 import uuid
 from collections import defaultdict
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, DecimalException
@@ -24,6 +24,7 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -38,6 +39,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.clients.valkey_client.statistics import (
     EndpointStatistics,
     KernelStatistics,
@@ -92,7 +94,6 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scheduling_history import (
     RouteHistoryRow,
 )
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -109,7 +110,7 @@ from ai.backend.manager.repositories.scheduling_history.creators import Deployme
 from .db_source import DeploymentDBSource
 from .storage_source import DeploymentStorageSource
 from .types import (
-    ProjectDeploymentSearchScope,
+    ProjectDeploymentOperationScope,
     RouteData,
     RouteServiceDiscoveryInfo,
     RouteSessionInfo,
@@ -1142,6 +1143,17 @@ class DeploymentRepository:
         return await self._db_source.fetch_session_statuses_by_route_ids(route_ids)
 
     @deployment_repository_resilience.apply()
+    async def fetch_route_session_group_ids(
+        self,
+        route_ids: set[ReplicaID],
+    ) -> Mapping[ReplicaID, SessionGroupID]:
+        """Resolve the SessionGroup each route inherits from its replica group.
+
+        Routes with no replica group assigned are absent from the mapping.
+        """
+        return await self._db_source.fetch_route_session_group_ids(route_ids)
+
+    @deployment_repository_resilience.apply()
     async def fetch_route_session_kernel_infos(
         self,
         route_ids: set[ReplicaID],
@@ -1237,7 +1249,7 @@ class DeploymentRepository:
         )
 
     @deployment_repository_resilience.apply()
-    async def fetch_revision_required_slot_names(self) -> Iterable[SlotName]:
+    async def fetch_revision_required_slot_names(self) -> Collection[SlotName]:
         """Globally required resource slot names for revision validation."""
         return await self._db_source.fetch_revision_required_slot_names()
 
@@ -1521,7 +1533,7 @@ class DeploymentRepository:
     async def search_deployments_in_project(
         self,
         querier: BatchQuerier,
-        scope: ProjectDeploymentSearchScope,
+        scope: ProjectDeploymentOperationScope,
     ) -> DeploymentSummarySearchResult:
         """Search endpoints within a project scope with pagination and filtering."""
         return await self._db_source.search_deployments_in_project(querier, scope)

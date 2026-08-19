@@ -1,3 +1,5 @@
+from typing import override
+
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.test.contexts.client_session import (
     ClientSessionContext,
@@ -13,6 +15,7 @@ from ai.backend.test.utils.exceptions import UnexpectedSuccess
 
 
 class VFolderInviteFailure(TestCode):
+    @override
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         vfolder_meta = CreatedVFolderMetaContext.current()
@@ -28,6 +31,7 @@ class VFolderInviteFailure(TestCode):
 
 
 class VFolderAcceptDuplicatedInvitation(TestCode):
+    @override
     async def test(self) -> None:
         client_session = CreatedUserClientSessionContext.current()
         created_user_meta = CreatedUserContext.current()

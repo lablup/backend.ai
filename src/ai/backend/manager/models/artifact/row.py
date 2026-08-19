@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
@@ -36,7 +36,7 @@ def _get_artifact_revision_join_cond() -> sa.ColumnElement[bool]:
     return foreign(ArtifactRevisionRow.artifact_id) == ArtifactRow.id
 
 
-class ArtifactRow(Base):  # type: ignore[misc]
+class ArtifactRow(Base):
     """
     Represents an artifact in the system.
     Artifacts can be models, packages, or images.
@@ -84,24 +84,22 @@ class ArtifactRow(Base):  # type: ignore[misc]
 
     huggingface_registry: Mapped[HuggingFaceRegistryRow] = relationship(
         "HuggingFaceRegistryRow",
-        back_populates="artifacts",
         primaryjoin=lambda: foreign(ArtifactRow.registry_id) == HuggingFaceRegistryRow.id,
-        overlaps="reservoir_registry,artifacts",
+        overlaps="reservoir_registry",
     )
 
     reservoir_registry: Mapped[ReservoirRegistryRow] = relationship(
         "ReservoirRegistryRow",
-        back_populates="artifacts",
         primaryjoin=lambda: foreign(ArtifactRow.registry_id) == ReservoirRegistryRow.id,
-        overlaps="huggingface_registry,artifacts",
+        overlaps="huggingface_registry",
     )
 
     revision_rows: Mapped[list[ArtifactRevisionRow]] = relationship(
         "ArtifactRevisionRow",
-        back_populates="artifact",
         primaryjoin=_get_artifact_revision_join_cond,
     )
 
+    @override
     def __str__(self) -> str:
         return (
             f"ArtifactRow("
@@ -120,6 +118,7 @@ class ArtifactRow(Base):  # type: ignore[misc]
             f"extra={self.extra})"
         )
 
+    @override
     def __repr__(self) -> str:
         return self.__str__()
 

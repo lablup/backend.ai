@@ -7,12 +7,16 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.manager.data.auth.login_session_types import (
+    LoginAttemptResult,
+    LoginSessionStatus,
+)
 from ai.backend.manager.models.base import (
     GUID,
     Base,
     StrEnumType,
 )
-from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginSessionStatus
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
@@ -20,7 +24,7 @@ if TYPE_CHECKING:
 __all__ = ("LoginSessionRow", "LoginHistoryRow")
 
 
-class LoginSessionRow(Base):  # type: ignore[misc]
+class LoginSessionRow(CreatedAtMixin, Base):
     __tablename__ = "login_sessions"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -52,12 +56,6 @@ class LoginSessionRow(Base):  # type: ignore[misc]
         server_default=LoginSessionStatus.ACTIVE.value,
         index=True,
     )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        nullable=False,
-    )
     last_accessed_at: Mapped[datetime | None] = mapped_column(
         "last_accessed_at", sa.DateTime(timezone=True), nullable=True
     )
@@ -84,7 +82,7 @@ class LoginSessionRow(Base):  # type: ignore[misc]
         )
 
 
-class LoginHistoryRow(Base):  # type: ignore[misc]
+class LoginHistoryRow(Base):
     __tablename__ = "login_history"
 
     id: Mapped[uuid.UUID] = mapped_column(

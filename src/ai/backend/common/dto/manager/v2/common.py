@@ -5,6 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 from enum import StrEnum
 from functools import cached_property
+from uuid import UUID
 
 from pydantic import Field
 
@@ -48,9 +49,16 @@ class BinarySizeInput(BaseRequestModel):
 
 
 class BinarySizeInfo(BaseResponseModel):
-    """Binary size output with both raw bytes and human-readable format."""
+    """Binary size output with both the exact byte count and a human-readable form.
 
-    value: int = Field(description="Size in bytes.")
+    ``expr`` mirrors the ``expr`` input field: an exact decimal byte-count string
+    (e.g. '1073741824') that can be fed back into any ``BinarySizeInput``. It is a
+    string so sizes beyond the GraphQL ``Int`` range (2 GiB) serialize correctly.
+    """
+
+    expr: str = Field(
+        description="Exact size in bytes as a decimal string (e.g., '1073741824'); accepted as BinarySizeInput.expr.",
+    )
     display: str = Field(description="Size in human-readable format (e.g., '1g', '512m').")
 
 
@@ -113,6 +121,31 @@ class VFolderHostPermissionEntryInput(BaseRequestModel):
     host: str = Field(description="Virtual folder host name (e.g., 'default', 'nfs-vol1').")
     permissions: list[str] = Field(
         description="List of permission values (e.g., 'mount-in-session', 'upload-file')."
+    )
+
+
+class MountItemInput(BaseRequestModel):
+    """A single virtual folder mount specification.
+
+    Shared by the session enqueue input and the session-options kernel
+    execution spec (lives here to avoid a session <-> session_options
+    circular import).
+    """
+
+    vfolder_id: UUID = Field(description="Virtual folder UUID to mount.")
+    mount_path: str | None = Field(
+        default=None, description="Custom mount path. Uses default path if omitted."
+    )
+    permission: str | None = Field(
+        default=None, description="Mount permission override ('rw' or 'ro')."
+    )
+    subpath: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Subpath within the vfolder to mount. Omit (null) to mount the vfolder root."
+            " Empty string is rejected."
+        ),
     )
 
 

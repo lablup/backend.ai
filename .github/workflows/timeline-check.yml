@@ -24,6 +24,7 @@ jobs:
       always()
       && !contains(github.event.pull_request.labels.*.name, 'skip:changelog')
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+      && !startsWith(github.event.pull_request.title, 'release:')
       && needs.assign-pr-number.result != 'failure'
     needs: [assign-pr-number]
     runs-on: ubuntu-latest

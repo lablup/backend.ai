@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Protocol
+from typing import Protocol, override
 
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.exception import ErrorCode
@@ -37,6 +37,7 @@ class MetricObserverHook(AbstractTaskHook):
         self._observer = observer
 
     @asynccontextmanager
+    @override
     async def apply(self, context: TaskContext) -> AsyncIterator[TaskContext]:
         # Pre-execution: start metric observation
         self._observer.observe_bgtask_started(task_name=context.task_name.value)

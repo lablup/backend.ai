@@ -11,13 +11,16 @@ from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
+from ai.backend.manager.errors.repository import (
+    UnsupportedCompositePrimaryKeyError,
+)
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.repositories.base.creator import CreatorSpec
+from ai.backend.manager.repositories.base.creator import BulkCreatorError, CreatorSpec
 from ai.backend.manager.repositories.base.integrity import (
     match_integrity_error,
     parse_integrity_error,
@@ -25,6 +28,13 @@ from ai.backend.manager.repositories.base.integrity import (
 from ai.backend.manager.repositories.base.rbac.utils import bulk_insert_on_conflict_do_nothing
 
 TRow = TypeVar("TRow", bound=Base)
+
+
+def _flushed_pk(row: Base) -> object:
+    identity = inspect(row).identity
+    if identity is None:
+        raise UnreachableError("row must be flushed before extracting its pk")
+    return identity[0]
 
 
 # =============================================================================
@@ -36,22 +46,33 @@ TRow = TypeVar("TRow", bound=Base)
 class RBACEntityCreator[TRow: Base]:
     """Creator for a single entity with scope associations for RBAC.
 
-    Creates an entity row and associates it with one or more permission scopes.
-    The primary scope is required; additional scopes are optional.
+    Creates an entity row and associates it with the permission scopes it belongs to.
+    A ``scope_ref`` of ``None`` marks the entity as GLOBAL — outside the RBAC scope
+    hierarchy — so it binds to no scope at all and its create is a plain insert.
 
     Attributes:
         spec: CreatorSpec implementation defining the row to create.
         element_type: The RBAC element type for this entity.
-        scope_ref: Primary scope reference (scope_type + scope_id) for this entity.
+        scope_ref: Primary scope reference (scope_type + scope_id) for this entity, or
+            ``None`` for a GLOBAL entity. A GLOBAL entity has no scope to associate, so
+            ``additional_scope_refs`` and ``relation_type`` do not apply to it and are
+            ignored.
         additional_scope_refs: Additional scope references for multi-scope entities.
+            Only meaningful alongside a ``scope_ref``.
         relation_type: The relation type for the scope-entity association. Defaults to AUTO.
     """
 
     spec: CreatorSpec[TRow]
     element_type: RBACElementType
-    scope_ref: RBACElementRef
+    scope_ref: RBACElementRef | None
     additional_scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
     relation_type: RelationType = RelationType.AUTO
+
+    def all_scope_refs(self) -> list[RBACElementRef]:
+        """Every scope this entity binds to; empty for a GLOBAL entity (``scope_ref=None``)."""
+        if self.scope_ref is None:
+            return []
+        return [self.scope_ref, *self.additional_scope_refs]
 
 
 @dataclass
@@ -74,7 +95,9 @@ async def execute_rbac_entity_creator[TRow: Base](
     4. Insert AssociationScopesEntitiesRow (scope -> entity mapping)
 
     The AssociationScopesEntitiesRow maps the entity to its owning scope,
-    enabling scope-based entity discovery and permission inheritance.
+    enabling scope-based entity discovery and permission inheritance. A creator that
+    binds to no scope (see :attr:`RBACEntityCreator.scope_ref`) skips step 4, making
+    this a plain insert.
 
     Args:
         db_sess: Async SQLAlchemy session (must be writable).
@@ -89,7 +112,7 @@ async def execute_rbac_entity_creator[TRow: Base](
     pk_columns = mapper.primary_key
     if len(pk_columns) != 1:
         raise UnsupportedCompositePrimaryKeyError(
-            f"Entity creator only supports single-column primary keys (table: {mapper.local_table.name})",
+            f"Entity creator only supports single-column primary keys (table: {mapper.class_.__table__.name})",
         )
 
     # 1. Build and insert row
@@ -103,10 +126,8 @@ async def execute_rbac_entity_creator[TRow: Base](
         match_integrity_error(parsed, spec.integrity_error_checks)
 
     # 3. Extract RBAC info and insert associations for all scopes
-    instance_state = inspect(row)
-    pk_value = instance_state.identity[0]
+    pk_value = _flushed_pk(row)
     entity_type = creator.element_type.to_entity_type()
-    all_scope_refs = [creator.scope_ref, *creator.additional_scope_refs]
     associations = [
         AssociationScopesEntitiesRow(
             scope_type=scope_ref.element_type.to_scope_type(),
@@ -115,11 +136,23 @@ async def execute_rbac_entity_creator[TRow: Base](
             entity_id=str(pk_value),
             relation_type=creator.relation_type,
         )
-        for scope_ref in all_scope_refs
+        for scope_ref in creator.all_scope_refs()
     ]
     await bulk_insert_on_conflict_do_nothing(db_sess, associations)
 
     return RBACEntityCreatorResult(row=row)
+
+
+@dataclass
+class RBACBulkEntityCreatorResultWithFailures[TRow: Base]:
+    """Result of a scoped bulk create that isolates each entity.
+
+    Mirrors :class:`BulkCreatorResultWithFailures`. ``errors`` index into the sequence of
+    creators handed to the executor, not into any list the caller may have derived it from.
+    """
+
+    successes: list[TRow]
+    errors: list[BulkCreatorError[TRow]]
 
 
 # =============================================================================
@@ -180,7 +213,7 @@ async def execute_rbac_bulk_entity_creator[TRow: Base](
     pk_columns = mapper.primary_key
     if len(pk_columns) != 1:
         raise UnsupportedCompositePrimaryKeyError(
-            f"Entity creator only supports single-column primary keys (table: {mapper.local_table.name})",
+            f"Entity creator only supports single-column primary keys (table: {mapper.class_.__table__.name})",
         )
 
     # 2. Flush to get DB-generated IDs and insert associations
@@ -198,7 +231,7 @@ async def execute_rbac_bulk_entity_creator[TRow: Base](
             scope_type=creator.scope_ref.element_type.to_scope_type(),
             scope_id=creator.scope_ref.element_id,
             entity_type=entity_type,
-            entity_id=str(inspect(row).identity[0]),
+            entity_id=str(_flushed_pk(row)),
             relation_type=creator.relation_type,
         )
         for row in rows
@@ -242,7 +275,7 @@ async def execute_rbac_entity_creators[TRow: Base](
     pk_columns = mapper.primary_key
     if len(pk_columns) != 1:
         raise UnsupportedCompositePrimaryKeyError(
-            f"Entity creator only supports single-column primary keys (table: {mapper.local_table.name})",
+            f"Entity creator only supports single-column primary keys (table: {mapper.class_.__table__.name})",
         )
 
     # 2. Single flush to get all DB-generated IDs
@@ -257,10 +290,9 @@ async def execute_rbac_entity_creators[TRow: Base](
     # 3. Collect all associations from each creator's scope refs
     associations: list[AssociationScopesEntitiesRow] = []
     for creator, row in zip(creators, rows, strict=True):
-        pk_value = inspect(row).identity[0]
+        pk_value = _flushed_pk(row)
         entity_type = creator.element_type.to_entity_type()
-        all_scope_refs = [creator.scope_ref, *creator.additional_scope_refs]
-        for scope_ref in all_scope_refs:
+        for scope_ref in creator.all_scope_refs():
             associations.append(
                 AssociationScopesEntitiesRow(
                     scope_type=scope_ref.element_type.to_scope_type(),

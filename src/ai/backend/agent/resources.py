@@ -25,6 +25,7 @@ from typing import (
     Self,
     TextIO,
     cast,
+    override,
 )
 
 import aiodocker
@@ -173,7 +174,9 @@ class KernelResourceSpec:
     def write_to_string(self) -> str:
         mounts_str = ",".join(map(str, self.mounts))
         slots_str = dump_json_str({k: str(v) for k, v in self.slots.items()})
-        unified_devices_str = dump_json_str(self.unified_devices)
+        unified_devices_str = dump_json_str([
+            (str(device_name), str(slot_name)) for device_name, slot_name in self.unified_devices
+        ])
 
         resource_str = ""
         resource_str += f"SCRATCH_SIZE={BinarySize(self.scratch_disk_size):m}\n"
@@ -281,6 +284,9 @@ class KernelResourceSpec:
             serialized_allocations[str(dev_name)] = serialized_dev_alloc
         o["allocations"] = serialized_allocations
         o["mounts"] = list(map(str, self.mounts))
+        o["unified_devices"] = [
+            (str(device_name), str(slot_name)) for device_name, slot_name in self.unified_devices
+        ]
         return o
 
     def to_json(self) -> str:
@@ -331,9 +337,11 @@ class AbstractComputeDevice:
             return self._device_name
         return DeviceName(self.__class__.__name__.removesuffix("Device").lower())
 
+    @override
     def __hash__(self) -> int:
         return hash(f"{self.device_name}-{self.device_id}")
 
+    @override
     def __eq__(self, __o: object) -> bool:
         return hash(self) == hash(__o)
 
@@ -542,6 +550,7 @@ class ResourceAllocator(aobject):
         self.etcd = etcd
         self.agent_configs = local_config.get_agent_configs()
 
+    @override
     async def __ainit__(self) -> None:
         alloc_map_mod.log_alloc_map = self.local_config.debug.log_alloc_map
         computers = await self._load_resources()
@@ -818,6 +827,7 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
     plugin_group = "backendai_accelerator_v21"
 
     @classmethod
+    @override
     def discover_plugins(
         cls,
         plugin_group: str,
@@ -847,6 +857,7 @@ class Mount:
     permission: MountPermission = MountPermission.READ_ONLY
     opts: Mapping[str, Any] | None = None
 
+    @override
     def __str__(self) -> str:
         return f"{self.source}:{self.target}:{self.permission.value}"
 

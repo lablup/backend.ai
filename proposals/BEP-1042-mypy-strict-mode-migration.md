@@ -1,10 +1,10 @@
 ---
 Author: HyeokJin Kim (hyeokjin.kim@lablup.com)
-Status: Draft
+Status: Implemented
 Created: 2026-01-30
 Created-Version: 26.1.0
 Target-Version:
-Implemented-Version:
+Implemented-Version: 26.2.0
 ---
 
 # MyPy Strict Mode Migration

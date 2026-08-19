@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 
-from ai.backend.common.message_queue.types import BroadcastMessage
+from ai.backend.common.message_queue.payload import BroadcastMessagePayload
 
 
 class AbstractSubscriber(ABC):
@@ -13,7 +13,7 @@ class AbstractSubscriber(ABC):
     """
 
     @abstractmethod
-    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessage, None]:
+    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload, None]:
         """
         Subscribe to broadcast messages.
 
@@ -21,7 +21,7 @@ class AbstractSubscriber(ABC):
         Unlike consumer messages, broadcast messages don't require acknowledgment.
 
         Yields:
-            BroadcastMessage: Broadcast messages from subscribed channels
+            BroadcastMessagePayload: Broadcast messages from subscribed channels
 
         Raises:
             RuntimeError: If the component is closed

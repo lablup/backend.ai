@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
@@ -22,6 +22,7 @@ class CacheInvalidationPostProcessor(PostProcessor):
     def __init__(self, repository: SchedulerRepository) -> None:
         self._repository = repository
 
+    @override
     async def execute(self, context: PostProcessorContext) -> None:
         """Invalidate cache for all affected access keys."""
         affected_keys: set[AccessKey] = set()

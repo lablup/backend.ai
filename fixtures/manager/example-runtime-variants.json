@@ -9,7 +9,7 @@
           {
             "name": "vllm-model",
             "service": {
-              "start_command": ["vllm", "serve", "{model_path}"],
+              "start_command": "vllm serve '{model_path}'",
               "port": 8000,
               "health_check": {
                 "enable": true,
@@ -69,7 +69,7 @@
           {
             "name": "tgi-model",
             "service": {
-              "start_command": ["text-generation-launcher", "--model-id", "{model_path}"],
+              "start_command": "text-generation-launcher --model-id '{model_path}'",
               "port": 3000,
               "health_check": {
                 "enable": true,
@@ -92,13 +92,7 @@
           {
             "name": "sglang-model",
             "service": {
-              "start_command": [
-                "python",
-                "-m",
-                "sglang.launch_server",
-                "--model-path",
-                "{model_path}"
-              ],
+              "start_command": "python -m sglang.launch_server --model-path '{model_path}'",
               "port": 9001,
               "health_check": {
                 "enable": true,
@@ -121,7 +115,7 @@
           {
             "name": "max-model",
             "service": {
-              "start_command": ["max", "serve", "--model", "{model_path}"],
+              "start_command": "max serve --model '{model_path}'",
               "port": 8000,
               "health_check": {
                 "enable": true,
@@ -144,12 +138,7 @@
           {
             "name": "llamacpp-model",
             "service": {
-              "start_command": [
-                "sh",
-                "-c",
-                "llama-server -m \"$(ls /models/*.gguf | head -n1)\" \"$@\"",
-                "llama-cpp"
-              ],
+              "start_command": "sh -c 'llama-server -m \"$(ls /models/*.gguf | head -n1)\" \"$@\"' llama-cpp",
               "port": 8080,
               "health_check": {
                 "path": "/health",

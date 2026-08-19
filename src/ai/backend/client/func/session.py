@@ -1097,7 +1097,9 @@ class ComputeSession(BaseFunction):
         :param dest: The destination directory in the client-side.
         :param show_progress: Displays a progress bar during downloads.
         """
-        params = {}
+        params: dict[str, str | list[str]] = {
+            "files": [*map(str, files)],
+        }
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
@@ -1106,9 +1108,6 @@ class ComputeSession(BaseFunction):
             f"/{prefix}/{self.session_identifier}/download",
             params=params,
         )
-        rqst.set_json({
-            "files": [*map(str, files)],
-        })
         file_names = []
         async with rqst.fetch() as resp:
             loop = current_loop()

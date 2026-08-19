@@ -5,7 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
+from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
 
 
 class TestFairShareScalingGroupSpec:

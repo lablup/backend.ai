@@ -7,15 +7,22 @@
 - **Backport = fixes only** — do NOT backport feature-level schema changes.
 - **Idempotency** — every backport migration (both `d` and `d'`) must be safe to re-apply by using existence checks
   (`IF NOT EXISTS`, `IF EXISTS`, `inspector`).
-- **Release version comment** — every migration file places a
-  `# Part of: <major>.<minor>.<patch>` comment next to the revision identifier. For backports: `# Part of: 26.2.1 (backport), 26.3.0 (main)`.
+- **Release version comment** — every migration file places a `# Part of: NEXT_RELEASE_VERSION` comment next to the
+  revision identifier. Do NOT hardcode a version; the `NEXT_RELEASE_VERSION` placeholder is frozen to the actual version. For backports the placeholder freezes per branch, so both `d` and `d'` keep the same placeholder.
 - **Do NOT edit the revision of a released migration** — do not modify the `revision`/`down_revision` of an
   already-released migration. Editing `down_revision` is allowed only when inserting a backport into the main chain before merge.
 
+## Diverged heads
+
+- **Your migration diverged from main** (main has a single head; your `down_revision` points to an older revision):
+  repoint your **own unmerged** migration's `down_revision` to the current head. No merge migration.
+- **main itself has two or more heads** (independent migrations merged without reconciling): add an **empty merge
+  migration** whose `down_revision` is the tuple of the heads (`down_revision = ("<head_a>", "<head_b>")`, with
+  `upgrade`/`downgrade` = `pass`), then chain new migrations on top of it. Do NOT edit the diverged migrations'
+  `down_revision` to linearize them — they may already be released.
+
 ## Forward direction (under consideration)
 
-- Use `{NEXT_RELEASE_VERSION}` in the version comment so it auto-freezes at release time — do not hardcode the next version
-  (the same mechanism as the GQL `added_version`; `scripts/freeze_release_version.py` substitutes across `src/**/*.py`).
 - Avoid adding alembic migrations in a backport where possible. If you must, place the corresponding version on the backport
   branch, and afterwards reconcile so that main also includes that downgrade.
 

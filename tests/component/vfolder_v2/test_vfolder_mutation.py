@@ -68,6 +68,7 @@ from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
@@ -126,11 +127,12 @@ def vfolder_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
             rbac=RBACValidators(
                 scope=ScopeActionRBACValidator(rbac_permission_repo, MagicMock()),
                 single_entity=SingleEntityActionRBACValidator(rbac_permission_repo, MagicMock()),
                 bulk=BulkActionRBACValidator(rbac_permission_repo, MagicMock()),
-            )
+            ),
         ),
     )
 

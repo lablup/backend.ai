@@ -33,5 +33,6 @@ class AppConfigScopeTypeFilter(BaseRequestModel):
 class AppConfigAllowListOrderField(StrEnum):
     CONFIG_NAME = "config_name"
     SCOPE_TYPE = "scope_type"
+    RANK = "rank"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"

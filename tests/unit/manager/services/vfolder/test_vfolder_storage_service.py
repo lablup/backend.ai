@@ -279,6 +279,37 @@ class TestListHostsAction:
         assert "usage" in vol_info
         mock_storage_manager.get_manager_facing_client.return_value.get_fs_usage.assert_awaited_once()
 
+    async def test_usage_percentage_is_on_0_to_100_scale(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        mock_valkey_stat_client: MagicMock,
+        mock_storage_manager: MagicMock,
+        user_uuid: uuid.UUID,
+    ) -> None:
+        mock_valkey_stat_client.get_volume_usage = AsyncMock(return_value=None)
+        mock_storage_manager.get_manager_facing_client.return_value.get_fs_usage = AsyncMock(
+            return_value={"used_bytes": 50, "capacity_bytes": 200}
+        )
+
+        mock_vfolder_repository.get_allowed_hosts_for_listing = AsyncMock(
+            return_value=VFolderHostPermissionMap({
+                "proxy1:volume1": {VFolderHostPermission.CREATE},
+            })
+        )
+        action = ListHostsAction(
+            user_uuid=user_uuid,
+            domain_name="default",
+            group_id=None,
+            resource_policy={},
+        )
+        result = await vfolder_service.list_hosts(action)
+
+        usage = result.volume_info["proxy1:volume1"]["usage"]
+        assert usage["percentage"] == 25.0
+        assert usage["used"] == 50
+        assert usage["total"] == 200
+
 
 class TestGetQuotaAction:
     async def test_owner_returns_quota_bytes(

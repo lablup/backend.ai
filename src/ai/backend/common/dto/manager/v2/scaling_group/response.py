@@ -9,8 +9,9 @@ from datetime import datetime
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
 
-from .types import PreemptionMode, PreemptionOrder, SchedulerType
+from .types import PreemptionMode, SchedulerType
 
 __all__ = (
     "PreemptionConfigInfo",
@@ -61,6 +62,9 @@ class ScalingGroupNetworkInfo(BaseResponseModel):
 class PreemptionConfigInfo(BaseResponseModel):
     """Preemption configuration for a scaling group."""
 
+    enabled: bool = Field(
+        description="Whether preemption is enabled for this scaling group (opt-in).",
+    )
     preemptible_priority: int = Field(
         description="Priority of preemptible sessions (1=lowest, 10=highest).",
     )
@@ -69,6 +73,17 @@ class PreemptionConfigInfo(BaseResponseModel):
     )
     mode: PreemptionMode = Field(
         description="How to preempt a session when preemption is triggered.",
+    )
+    preemption_min_runtime: float = Field(
+        description=(
+            "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
+        ),
+    )
+    victim_scope: PreemptionVictimScope = Field(
+        default=PreemptionVictimScope.USER,
+        description=(
+            "Scope preemption victims are drawn from (user/project/domain/resource-group)."
+        ),
     )
 
 

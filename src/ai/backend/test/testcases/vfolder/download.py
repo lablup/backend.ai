@@ -1,5 +1,6 @@
 import tempfile
 from pathlib import Path
+from typing import override
 
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.vfolder import CreatedVFolderMetaContext, UploadedFilesContext
@@ -7,6 +8,7 @@ from ai.backend.test.templates.template import TestCode
 
 
 class VFolderDownloadSuccess(TestCode):
+    @override
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         vfolder_meta = CreatedVFolderMetaContext.current()

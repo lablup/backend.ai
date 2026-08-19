@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 from uuid import UUID
 
 import strawberry
@@ -49,6 +49,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ReplaceDeploymentOptionsGQLInput as ReplaceDeploymentOptionsGQLInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplicaNestedFilter as ReplicaNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     SyncReplicaInput as SyncReplicaInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -90,6 +93,13 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ProjectDeploymentScope as ProjectDeploymentScopeDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+    ScopedSearchReplicaGroupHistoriesInput,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.types import (
+    ReplicaGroupHistoryScopeDTO,
 )
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -154,16 +164,26 @@ from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import (
-    AccessTokenSearchScope,
-    AutoScalingRuleSearchScope,
-    ReplicaSearchScope,
-    RevisionSearchScope,
+    AccessTokenOperationScope,
+    AutoScalingRuleOperationScope,
+    ReplicaOperationScope,
+    RevisionOperationScope,
 )
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
     from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
+
+    # Kept lazy below: a runtime import closes the scheduling_history -> rbac
+    # -> deployment cycle.
+    from ai.backend.manager.api.gql.scheduling_history.resolver import (
+        ReplicaGroupHistoryConnectionGQL,
+    )
+    from ai.backend.manager.api.gql.scheduling_history.types import (
+        ReplicaGroupHistoryFilterGQL,
+        ReplicaGroupHistoryOrderByGQL,
+    )
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 DeploymentStatusGQL: type[ModelDeploymentStatus] = gql_enum(
@@ -239,7 +259,7 @@ class ModelDeploymentMetadata:
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
-            description="The resource group this deployment runs in, resolved via DataLoader.",
+            description="The resource group this deployment runs in.",
         )
     )  # type: ignore[misc]
     async def resource_group(
@@ -265,7 +285,7 @@ class ModelDeploymentMetadata:
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The project this deployment belongs to, resolved via DataLoader.",
+            description="The project this deployment belongs to.",
         )
     )  # type: ignore[misc]
     async def project_v2(
@@ -291,7 +311,7 @@ class ModelDeploymentMetadata:
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The domain this deployment belongs to, resolved via DataLoader.",
+            description="The domain this deployment belongs to.",
         )
     )  # type: ignore[misc]
     async def domain_v2(
@@ -352,7 +372,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The current active revision of this deployment, resolved via DataLoader.",
+            description="The current active revision of this deployment.",
         )
     )  # type: ignore[misc]
     async def current_revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
@@ -365,7 +385,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The revision currently being deployed (in progress, not yet active), resolved via DataLoader.",
+            description="The revision currently being deployed (in progress, not yet active).",
         )
     )  # type: ignore[misc]
     async def deploying_revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
@@ -378,7 +398,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The user who created this deployment, resolved via DataLoader.",
+            description="The user who created this deployment.",
         )
     )  # type: ignore[misc]
     async def creator(
@@ -422,7 +442,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_revisions(
-            scope=RevisionSearchScope(deployment_id=UUID(str(self.id))),
+            scope=RevisionOperationScope(deployment_id=UUID(str(self.id))),
             input=AdminSearchRevisionsInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
@@ -463,7 +483,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_replicas(
-            scope=ReplicaSearchScope(deployment_id=UUID(str(self.id))),
+            scope=ReplicaOperationScope(deployment_id=UUID(str(self.id))),
             input=SearchReplicasInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
@@ -478,6 +498,85 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         nodes = [ModelReplica.from_pydantic(item) for item in payload.items]
         edges = [ModelReplicaEdge(node=node, cursor=str(node.id)) for node in nodes]
         return ModelReplicaConnection(
+            count=payload.total_count,
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description=(
+                "The scheduling history of this deployment's replica groups. This is the"
+                " per-replica-group scaling status that the deprecated ``scaling_state``"
+                " field points to."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def replica_group_histories(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            ReplicaGroupHistoryFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.scheduling_history.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                ReplicaGroupHistoryOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.scheduling_history.types"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            ReplicaGroupHistoryConnectionGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.scheduling_history.resolver"),
+        ]
+        | None
+    ):
+        from ai.backend.manager.api.gql.scheduling_history.resolver import (
+            ReplicaGroupHistoryConnectionGQL,
+            ReplicaGroupHistoryEdgeGQL,
+        )
+        from ai.backend.manager.api.gql.scheduling_history.types import (
+            ReplicaGroupHistoryGQL,
+        )
+
+        payload = (
+            await info.context.adapters.scheduling_history.scoped_search_replica_group_history(
+                ScopedSearchReplicaGroupHistoriesInput(
+                    scope=ReplicaGroupHistoryScopeDTO(
+                        deployment=[UUIDScope(value=UUID(str(self.id)))]
+                    ),
+                    filter=filter.to_pydantic() if filter else None,
+                    order=[o.to_pydantic() for o in order_by] if order_by else None,
+                    first=first,
+                    after=after,
+                    last=last,
+                    before=before,
+                    limit=limit,
+                    offset=offset,
+                )
+            )
+        )
+        nodes = [ReplicaGroupHistoryGQL.from_pydantic(item) for item in payload.items]
+        edges = [
+            ReplicaGroupHistoryEdgeGQL(node=node, cursor=encode_cursor(str(node.id)))
+            for node in nodes
+        ]
+        return ReplicaGroupHistoryConnectionGQL(
             count=payload.total_count,
             edges=edges,
             page_info=PageInfo(
@@ -504,7 +603,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_rules(
-            scope=AutoScalingRuleSearchScope(deployment_id=UUID(str(self.id))),
+            scope=AutoScalingRuleOperationScope(deployment_id=UUID(str(self.id))),
             input=SearchAutoScalingRulesInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
@@ -547,7 +646,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_access_tokens(
-            scope=AccessTokenSearchScope(deployment_id=UUID(str(self.id))),
+            scope=AccessTokenOperationScope(deployment_id=UUID(str(self.id))),
             input=SearchAccessTokensInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
@@ -573,6 +672,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         )
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,
@@ -615,6 +715,31 @@ class ProjectDeploymentScopeGQL(PydanticInputMixin[ProjectDeploymentScopeDTO]):
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter deployments by conditions on their replicas.",
+        added_version="26.8.0",
+    ),
+    name="ReplicaNestedFilter",
+)
+class ReplicaNestedFilterGQL(PydanticInputMixin[ReplicaNestedFilterDTO]):
+    some: ReplicaFilter | None = gql_field(
+        description="Matches parents with at least one replica satisfying all conditions.",
+        default=None,
+    )
+    every: ReplicaFilter | None = gql_field(
+        description=(
+            "Matches parents where every replica satisfies all conditions "
+            "(also true when the parent has no replica)."
+        ),
+        default=None,
+    )
+    none: ReplicaFilter | None = gql_field(
+        description="Matches parents with no replica satisfying all conditions.",
+        default=None,
+    )
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
     name="DeploymentFilter",
 )
@@ -654,6 +779,13 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="Filter by deployment destruction datetime. Supports IS NULL / IS NOT NULL.",
+        ),
+        default=None,
+    )
+    replicas: ReplicaNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description="Filter by conditions on deployment replicas.",
         ),
         default=None,
     )

@@ -1,8 +1,8 @@
 """Regression test for auto-mount (dot-prefixed) vfolder resolution.
 
-Exercised through ``SchedulerRepository.fetch_session_spec_contexts`` (the
-repository-layer entry point the scheduling controller calls) against a real
-test database.
+Exercised through ``SchedulerRepository._resolve_vfolder_mounts_by_role`` (the
+repository-layer resolution step ``fetch_session_spec_context`` composes into
+the enqueue context) against a real test database.
 
 Reproduces the 26.4.4rc6 regression where the underlying db_source
 short-circuited a kernel group with no explicit mount requests::
@@ -24,6 +24,7 @@ is empty STILL resolves the user's accessible auto-mount vfolders into
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
@@ -31,16 +32,19 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.session.draft import (
     KernelGroupDraft,
+    ResourceSpecDraft,
     SessionIdentityDraft,
     SessionOptionsDraft,
+    SessionResourceSpecDraft,
     SessionScopeDraft,
     SessionSpecDraft,
 )
@@ -74,6 +78,7 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -139,15 +144,17 @@ class TestAutoMountVFolderResolution:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create a test domain that allows mounting on the noop host."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -157,7 +164,7 @@ class TestAutoMountVFolderResolution:
                 )
             )
             await db_sess.flush()
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_user_resource_policy_name(
@@ -202,7 +209,7 @@ class TestAutoMountVFolderResolution:
     async def test_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> UUID:
         """Create a test user that owns the auto-mount vfolder."""
@@ -216,11 +223,12 @@ class TestAutoMountVFolderResolution:
                     password=_password_info(),
                     need_password_change=False,
                     full_name="Test User",
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
                     status_info="active",
                     resource_policy=test_user_resource_policy_name,
+                    domain_id=test_domain.domain_id,
                 )
             )
             await db_sess.flush()
@@ -230,7 +238,7 @@ class TestAutoMountVFolderResolution:
     async def test_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> UUID:
         """Create a test group used as the session's project scope."""
@@ -242,7 +250,7 @@ class TestAutoMountVFolderResolution:
                     name=f"g-{group_id.hex[:6]}",
                     description="",
                     is_active=True,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_policy=test_project_resource_policy_name,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={NOOP_VFOLDER_HOST: ["mount-in-session"]},
@@ -255,7 +263,7 @@ class TestAutoMountVFolderResolution:
     async def automount_vfolder_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user: UUID,
     ) -> UUID:
         """Create a dot-prefixed (auto-mount) vfolder owned by ``test_user``."""
@@ -265,7 +273,7 @@ class TestAutoMountVFolderResolution:
                 VFolderRow(
                     id=vfolder_id,
                     host=NOOP_VFOLDER_HOST,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     quota_scope_id=QuotaScopeID.parse(f"user:{test_user}"),
                     name=AUTOMOUNT_VFOLDER_NAME,
                     creator=f"{test_user.hex[:6]}@example.com",
@@ -289,60 +297,71 @@ class TestAutoMountVFolderResolution:
         return sm
 
     @pytest.fixture
+    def mock_config_provider(self) -> MagicMock:
+        """A config provider whose vfolder-type lookup allows user vfolders."""
+        config_provider = MagicMock(spec=ManagerConfigProvider)
+        config_provider.legacy_etcd_config_loader.get_vfolder_types = AsyncMock(
+            return_value=["user"]
+        )
+        return config_provider
+
+    @pytest.fixture
     def scheduler_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        mock_config_provider: MagicMock,
+        mock_storage_manager: MagicMock,
     ) -> SchedulerRepository:
-        """A real repository over the test DB. The cache client and config
-        provider are unused by ``fetch_session_spec_contexts`` (DB-only path),
-        so they are mocked.
+        """A real repository over the test DB. The cache clients are unused by
+        ``_resolve_vfolder_mounts_by_role``, so they are mocked.
         """
         return SchedulerRepository(
             db_with_cleanup,
             AsyncMock(spec=ValkeyStatClient),
-            MagicMock(spec=ManagerConfigProvider),
+            AsyncMock(spec=ValkeyScheduleClient),
+            mock_config_provider,
+            mock_storage_manager,
         )
 
     async def test_automount_resolved_without_explicit_mount_requests(
         self,
         scheduler_repository: SchedulerRepository,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user: UUID,
         test_group: UUID,
         automount_vfolder_id: UUID,
-        mock_storage_manager: MagicMock,
     ) -> None:
         # A session with a single kernel group and NO explicit mounts —
         # exactly the case the regression dropped auto-mounts for.
         draft = SessionSpecDraft(
-            identity=SessionIdentityDraft(
-                creation_id="automount-regression",
-                session_name="automount-regression",
-                user_uuid=test_user,
+            resource_spec=SessionResourceSpecDraft(
+                identity=SessionIdentityDraft(
+                    creation_id="automount-regression",
+                    session_name="automount-regression",
+                    user_uuid=test_user,
+                ),
+                resource=ResourceSpecDraft(
+                    options=SessionOptionsDraft(
+                        kernel_groups=(KernelGroupDraft(role="main", replica_count=1),),
+                    ),
+                ),
             ),
             scope=SessionScopeDraft(
-                domain_name=DomainName(test_domain_name),
+                domain_name=DomainName(test_domain.domain_name),
                 project_id=ProjectID(test_group),
                 resource_group_name=None,
             ),
-            options=SessionOptionsDraft(
-                kernel_groups=(KernelGroupDraft(role="main", replica_count=1),),
-            ),
         )
 
-        result = await scheduler_repository.fetch_session_spec_contexts(
-            draft,
-            storage_manager=mock_storage_manager,
-            allowed_vfolder_types=["user"],
-        )
+        result = await scheduler_repository._resolve_vfolder_mounts_by_role(draft, None)
 
         # The "main" role must carry the auto-mount vfolder even though the
         # group requested no mounts explicitly.
-        assert "main" in result.vfolder_mounts_by_role
-        mounted_names = {mount.name for mount in result.vfolder_mounts_by_role["main"]}
+        assert "main" in result
+        mounted_names = {mount.name for mount in result["main"]}
         assert AUTOMOUNT_VFOLDER_NAME in mounted_names, (
             f"auto-mount vfolder {AUTOMOUNT_VFOLDER_NAME!r} must be resolved for a group "
             f"with no explicit mounts; got {mounted_names!r}"
         )
-        mounted_ids = {mount.vfid.folder_id for mount in result.vfolder_mounts_by_role["main"]}
+        mounted_ids = {mount.vfid.folder_id for mount in result["main"]}
         assert automount_vfolder_id in mounted_ids

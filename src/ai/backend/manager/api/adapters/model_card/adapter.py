@@ -43,6 +43,7 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardOrderField,
 )
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.types import MountPermission
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -64,7 +65,6 @@ from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequ
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ModelCardNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.model_card.conditions import ModelCardConditions
 from ai.backend.manager.models.model_card.orders import ModelCardOrders
 from ai.backend.manager.models.model_card.row import ModelCardRow
@@ -73,9 +73,10 @@ from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
+from ai.backend.manager.repositories.model_card.purgers import ModelCardPurgerSpec
 from ai.backend.manager.repositories.model_card.types import (
-    ProjectModelCardSearchScope,
-    VFolderModelCardSearchScope,
+    ProjectModelCardOperationScope,
+    VFolderModelCardOperationScope,
 )
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
@@ -194,7 +195,7 @@ class ModelCardAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = ProjectModelCardSearchScope(project_id=project_id, user_id=me.user_id)
+        scope = ProjectModelCardOperationScope(project_id=project_id, user_id=me.user_id)
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         querier = self._build_querier(
@@ -220,7 +221,7 @@ class ModelCardAdapter(BaseAdapter):
 
     async def search_by_vfolder(
         self,
-        scope: VFolderModelCardSearchScope,
+        scope: VFolderModelCardOperationScope,
         input: SearchModelCardsInput,
     ) -> SearchModelCardsPayload:
         """Search model cards backed by a specific VFolder.
@@ -419,7 +420,7 @@ class ModelCardAdapter(BaseAdapter):
     ) -> DeleteModelCardPayload:
         result = await self._processors.model_card.delete.wait_for_complete(
             DeleteModelCardAction(
-                purger=Purger(row_class=ModelCardRow, pk_value=card_id),
+                purger=Purger(spec=ModelCardPurgerSpec(card_id=card_id)),
                 options=options,
             )
         )
@@ -447,7 +448,7 @@ class ModelCardAdapter(BaseAdapter):
     ) -> BulkDeleteModelCardActionResult:
         return await self._processors.model_card.bulk_delete.wait_for_complete(
             BulkDeleteModelCardAction(
-                purgers=[Purger(row_class=ModelCardRow, pk_value=card_id) for card_id in card_ids],
+                purgers=[Purger(spec=ModelCardPurgerSpec(card_id=card_id)) for card_id in card_ids],
                 options=options,
             )
         )

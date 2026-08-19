@@ -3,7 +3,7 @@ import logging
 from collections.abc import Mapping
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import Any, Final
+from typing import Any, Final, override
 
 import aiofiles
 import aiofiles.os
@@ -140,6 +140,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         finally:
             await proc.wait()
 
+    @override
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -182,6 +183,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         if options is not None:
             await self._set_quota_by_project(project_id, qspath, options)
 
+    @override
     async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
         """
         $ lfs quota -p <projectId> <fs_mount_point>
@@ -207,6 +209,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
 
         return await self._get_quota_by_project(pid, qspath)
 
+    @override
     async def update_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -219,6 +222,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
             raise QuotaScopeNotFoundError
         await self._set_quota_by_project(pid, qspath, config)
 
+    @override
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         pid_path = qspath / PROJECT_ID_FILE_NAME
@@ -227,6 +231,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
             raise QuotaScopeNotFoundError
         await self._unset_quota_by_project(pid, qspath)
 
+    @override
     async def delete_quota_scope(self, quota_scope_id: QuotaScopeID) -> None:
         await self.unset_quota(quota_scope_id)
         qspath = self.mangle_qspath(quota_scope_id)
@@ -236,8 +241,10 @@ class EXAScalerQuotaModel(BaseQuotaModel):
 class EXAScalerFSVolume(BaseVolume):
     name = "exascaler"
 
+    @override
     async def create_quota_model(self) -> AbstractQuotaModel:
         return EXAScalerQuotaModel(self.mount_path, self.local_config, self.etcd)
 
+    @override
     async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA])

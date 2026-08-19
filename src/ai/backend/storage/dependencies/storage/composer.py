@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
@@ -29,10 +30,12 @@ class StorageComposer(DependencyComposer[StorageComposerInput, StorageResources]
     """Composer for storage layer dependencies."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "storage"
 
     @asynccontextmanager
+    @override
     async def compose(
         self,
         stack: DependencyStack,

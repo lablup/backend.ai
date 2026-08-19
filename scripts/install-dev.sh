@@ -1286,7 +1286,6 @@ configure_backendai() {
   ./backend.ai mgr fixture populate fixtures/manager/example-container-registries-harbor.json
   ./backend.ai mgr fixture populate fixtures/manager/example-users.json
   ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
-  ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-slot-types.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
   ./backend.ai mgr fixture populate fixtures/manager/example-runtime-variants.json
@@ -1295,6 +1294,7 @@ configure_backendai() {
   ./backend.ai mgr fixture populate fixtures/manager/example-roles.json
   ./backend.ai mgr fixture populate fixtures/manager/example-prometheus-query-preset-categories.json
   ./backend.ai mgr fixture populate fixtures/manager/example-prometheus-query-presets.json
+  ./backend.ai mgr fixture populate fixtures/manager/example-retention-policies.json
 
   # Populate artifact registries only when the storage halfstack profile is
   # active; the example registry points at the local MinIO and depends on

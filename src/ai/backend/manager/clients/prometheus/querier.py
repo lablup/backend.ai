@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import override
 from uuid import UUID
 
 from ai.backend.manager.clients.prometheus.preset import LabelMatcher
@@ -35,6 +36,7 @@ class ContainerMetricQuerier(MetricQuerier):
     user_id: UUID | None = None
     project_id: UUID | None = None
 
+    @override
     def labels(self) -> Mapping[str, LabelMatcher]:
         """Return the labels for the container metric query."""
         result: dict[str, LabelMatcher] = {

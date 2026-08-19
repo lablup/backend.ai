@@ -16,7 +16,9 @@ from aiotools.server import process_index
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.message_queue.abc import AbstractConsumer
-from ai.backend.common.message_queue.types import MessageId, MQMessage
+from ai.backend.common.message_queue.exceptions import InvalidMessagePayloadError
+from ai.backend.common.message_queue.message import MessageId, MQMessage
+from ai.backend.common.message_queue.payload import AnycastMessagePayload
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -290,8 +292,13 @@ class RedisConsumer(AbstractConsumer):
             return
 
         for msg in payload:
-            mq_msg = MQMessage(msg_id=msg.msg_id, payload={**msg.payload})
-            await self._consume_queue.put(mq_msg)
+            try:
+                anycast_payload = AnycastMessagePayload.from_stream_fields(msg.payload)
+            except InvalidMessagePayloadError as e:
+                # Leave it unacked: the auto-claim loop discards it once retries run out.
+                log.warning("Skipping malformed message {}: {}", msg.msg_id, e)
+                continue
+            await self._consume_queue.put(MQMessage(msg_id=msg.msg_id, payload=anycast_payload))
 
     async def _auto_claim_loop(
         self, stream_key: str, autoclaim_start_id: str, autoclaim_idle_timeout: int
@@ -362,12 +369,19 @@ class RedisConsumer(AbstractConsumer):
             return autoclaim_start_id, False
 
         for msg in message.messages:
-            mq_msg = MQMessage(msg.msg_id, {**msg.payload})
-            if mq_msg.retry():
-                await self._retry_message(stream_key, mq_msg)
+            try:
+                payload = AnycastMessagePayload.from_stream_fields(msg.payload)
+            except InvalidMessagePayloadError as e:
+                # A malformed message can never be handled, so discard it right away.
+                log.warning("Discarding malformed message {}: {}", msg.msg_id, e)
+                await self._client.done_stream_message(stream_key, self._group_name, msg.msg_id)
+                continue
+            retried = MQMessage(msg_id=msg.msg_id, payload=payload).retry()
+            if retried is not None:
+                await self._retry_message(stream_key, retried)
                 continue
             # Discard the message if retry limit exceeded
-            await self._client.done_stream_message(stream_key, self._group_name, mq_msg.msg_id)
+            await self._client.done_stream_message(stream_key, self._group_name, msg.msg_id)
 
         return autoclaim_start_id, len(message.messages) > 0
 

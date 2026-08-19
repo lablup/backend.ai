@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 from uuid import UUID
 
 import aiohttp.web
@@ -33,7 +33,7 @@ from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.repositories.base import IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACBulkEntityCreator,
@@ -56,7 +56,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class RBACEntityCreatorTestRow(Base):  # type: ignore[misc]
+class RBACEntityCreatorTestRow(Base):
     """ORM model for creator testing."""
 
     __tablename__ = "test_rbac_creator"
@@ -70,7 +70,7 @@ class RBACEntityCreatorTestRow(Base):  # type: ignore[misc]
     owner_scope_id: Mapped[str] = mapped_column(sa.String(64), nullable=False)
 
 
-class CompositePKTestRow(Base):  # type: ignore[misc]
+class CompositePKTestRow(Base):
     """ORM model with composite primary key for testing rejection."""
 
     __tablename__ = "test_rbac_creator_composite_pk"
@@ -101,6 +101,7 @@ class SimpleCreatorSpec(CreatorSpec[RBACEntityCreatorTestRow]):
         self._scope_id = scope_id
         self._entity_id = entity_id
 
+    @override
     def build_row(self) -> RBACEntityCreatorTestRow:
         row_kwargs: dict[str, Any] = {
             "name": self._name,
@@ -120,6 +121,7 @@ class CompositePKCreatorSpec(CreatorSpec[CompositePKTestRow]):
         self._item_id = item_id
         self._name = name
 
+    @override
     def build_row(self) -> CompositePKTestRow:
         return CompositePKTestRow(
             tenant_id=self._tenant_id,
@@ -148,7 +150,7 @@ async def create_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
     """Create RBAC entity creator test tables."""
-    async with with_tables(database_connection, ENTITY_CREATOR_TABLES):  # type: ignore[arg-type]
+    async with with_tables(database_connection, ENTITY_CREATOR_TABLES):
         yield
 
 
@@ -521,6 +523,37 @@ class TestRBACEntityCreatorBasic:
             assert assoc_row.scope_type == ScopeType.PROJECT
             assert assoc_row.scope_id == project_scope_id
 
+    async def test_create_entity_without_scope_inserts_row_only(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+        user_scope_id: str,
+    ) -> None:
+        """A GLOBAL entity (``scope_ref=None``) is inserted with no association at all.
+
+        ``additional_scope_refs`` does not apply to it and is ignored, so a stray one must not
+        resurrect an association.
+        """
+        creator = RBACEntityCreator(
+            spec=SimpleCreatorSpec(
+                name="global-entity",
+                scope_type=ScopeType.USER,
+                scope_id=user_scope_id,
+            ),
+            element_type=RBACElementType.VFOLDER,
+            scope_ref=None,
+            additional_scope_refs=[RBACElementRef(RBACElementType.USER, user_scope_id)],
+        )
+        async with database_connection.begin_session() as db_sess:
+            result = await execute_rbac_entity_creator(db_sess, creator)
+
+            assert result.row.name == "global-entity"
+            assert result.row.id is not None
+            assoc_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            )
+            assert assoc_count == 0
+
     async def test_create_multiple_entities_sequentially(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -850,7 +883,7 @@ class TestExecuteRBACEntityCreators:
 # =============================================================================
 
 
-class RBACCreatorUniqueTestRow(Base):  # type: ignore[misc]
+class RBACCreatorUniqueTestRow(Base):
     """ORM model with a unique constraint for integrity error testing."""
 
     __tablename__ = "test_rbac_creator_unique"
@@ -871,6 +904,7 @@ class _TestRBACDuplicateNameError(BackendAIError, aiohttp.web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/test-rbac-duplicate-name"
     error_title = "Duplicate name."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -886,6 +920,7 @@ class UniqueRBACCreatorSpec(CreatorSpec[RBACCreatorUniqueTestRow]):
         self._name = name
 
     @property
+    @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return (
             IntegrityErrorCheck(
@@ -895,6 +930,7 @@ class UniqueRBACCreatorSpec(CreatorSpec[RBACCreatorUniqueTestRow]):
             ),
         )
 
+    @override
     def build_row(self) -> RBACCreatorUniqueTestRow:
         return RBACCreatorUniqueTestRow(name=self._name)
 
@@ -910,7 +946,7 @@ async def create_unique_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
     """Create RBAC unique constraint test tables."""
-    async with with_tables(database_connection, INTEGRITY_TABLES):  # type: ignore[arg-type]
+    async with with_tables(database_connection, INTEGRITY_TABLES):
         yield
 
 

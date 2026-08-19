@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, override
 
 from ai.backend.common.cron import PeriodicTask
 
@@ -19,16 +19,20 @@ class SyncContainerLifecyclesTask(PeriodicTask):
         self._agent = agent
 
     @property
+    @override
     def name(self) -> str:
         return "sync_container_lifecycles"
 
     @property
+    @override
     def interval(self) -> float:
         return self._agent.local_config.agent.sync_container_lifecycles.interval
 
     @property
+    @override
     def initial_delay(self) -> float:
         return 0.0
 
+    @override
     async def run(self) -> None:
         await self._agent.sync_container_lifecycles()

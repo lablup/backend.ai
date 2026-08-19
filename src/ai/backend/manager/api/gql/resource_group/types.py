@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from decimal import Decimal
 from enum import StrEnum
-from typing import Self
+from typing import Self, override
 from uuid import UUID
 
 from strawberry import Info
@@ -80,6 +80,9 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     ReplaceResourceGroupDefaultSessionOptionsPayload as ReplaceResourceGroupDefaultSessionOptionsPayloadDTO,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -113,6 +116,7 @@ __all__ = (
     "PreemptionConfigInput",
     "PreemptionModeGQL",
     "PreemptionOrderGQL",
+    "PreemptionVictimScopeGQL",
     "ResourceGroupFilterGQL",
     "ResourceGroupGQL",
     "ResourceGroupMetadataGQL",
@@ -160,18 +164,32 @@ class PreemptionModeGQL(StrEnum):
     RESCHEDULE = "reschedule"
 
 
-@gql_enum(
+PreemptionOrderGQL: type[PreemptionOrder] = gql_enum(
     BackendAIGQLMeta(
         added_version="26.3.0",
-        description="Tie-breaking order for same-priority sessions during preemption.",
+        description=(
+            "Victim selection order for preemption. OLDEST/NEWEST break "
+            "same-priority ties by start time; FEWEST_SESSIONS evicts the "
+            "fewest sessions; SMALLEST_RESOURCES reclaims the least resources."
+        ),
     ),
+    PreemptionOrder,
     name="PreemptionOrder",
 )
-class PreemptionOrderGQL(StrEnum):
-    """Preemption order enumeration for GraphQL."""
 
-    OLDEST = "oldest"
-    NEWEST = "newest"
+
+PreemptionVictimScopeGQL: type[PreemptionVictimScope] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.8.1",
+        description=(
+            "Scope preemption victims are drawn from. USER limits victims to the "
+            "pending session's owner; PROJECT/DOMAIN widen to sessions of the same "
+            "project/domain; RESOURCE_GROUP allows any session in the resource group."
+        ),
+    ),
+    PreemptionVictimScope,
+    name="PreemptionVictimScope",
+)
 
 
 @gql_pydantic_type(
@@ -185,14 +203,34 @@ class PreemptionOrderGQL(StrEnum):
 class PreemptionConfigGQL(PydanticOutputMixin[PreemptionConfigInfo]):
     """Preemption configuration for GraphQL."""
 
+    enabled: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description="Whether preemption is enabled for this resource group (opt-in).",
+        )
+    )
     preemptible_priority: int = gql_field(
         description="Sessions with priority <= this value are eligible for preemption."
     )
-    order: PreemptionOrderGQL = gql_field(
-        description="Tie-breaking order for same-priority sessions during preemption."
-    )
+    order: PreemptionOrderGQL = gql_field(description="Victim selection order for preemption.")
     mode: PreemptionModeGQL = gql_field(
         description="How to preempt a session when preemption is triggered."
+    )
+    preemption_min_runtime: float = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description=(
+                "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
+            ),
+        )
+    )
+    victim_scope: PreemptionVictimScopeGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.1",
+            description=(
+                "Scope preemption victims are drawn from (USER, PROJECT, DOMAIN, RESOURCE_GROUP)."
+            ),
+        )
     )
 
 
@@ -310,13 +348,21 @@ class ResourceInfoGQL(PydanticOutputMixin[ResourceInfoNode]):
 @gql_node_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
-        description="Resource group with structured configuration",
+        description=(
+            "Resource group with structured configuration."
+            " Since 26.8.0, the node id value is the resource group UUID"
+            " instead of the name."
+        ),
     ),
     name="ResourceGroup",
 )
 class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
-    id: NodeID[str] = gql_field(
-        description="Relay-style global node identifier for the resource group"
+    id: NodeID[UUID] = gql_field(
+        description=(
+            "Relay-style global node identifier for the resource group."
+            " Since 26.8.0, the underlying value is the resource group UUID"
+            " instead of the name."
+        )
     )
     name: str = gql_field(
         description="Unique name identifying the resource group. Used as primary key and referenced by agents, sessions, and resource presets."
@@ -364,6 +410,7 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
     )
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,
@@ -371,7 +418,9 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[ResourceGroupGQL | None]:
-        return await info.context.data_loaders.resource_group_loader.load_many(node_ids)
+        return await info.context.data_loaders.resource_group_by_id_loader.load_many([
+            ResourceGroupID(UUID(nid)) for nid in node_ids
+        ])
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -424,6 +473,7 @@ class ResourceGroupFilterGQL(PydanticInputMixin[ResourceGroupFilterDTO]):
     description: StringFilter | None = None
     is_active: bool | None = None
     is_public: bool | None = None
+    is_default: bool | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -448,16 +498,43 @@ class ResourceGroupOrderByGQL(PydanticInputMixin[ResourceGroupOrderDTO]):
 class PreemptionConfigInput(PydanticInputMixin[PreemptionConfigInputDTO]):
     """Input for preemption configuration. Replaces entire preemption config when provided."""
 
+    enabled: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description="Whether preemption is enabled for this resource group (opt-in). Default is false.",
+        ),
+        default=False,
+    )
     preemptible_priority: int = gql_field(
         description="Sessions with priority <= this value are preemptible. Default is 5.", default=5
     )
     order: PreemptionOrderGQL = gql_field(
-        description="Tie-breaking order for same-priority sessions (OLDEST, NEWEST). Default is OLDEST.",
+        description="Victim selection order for preemption. Default is OLDEST.",
         default=PreemptionOrderGQL.OLDEST,
     )
     mode: PreemptionModeGQL = gql_field(
         description="How to preempt sessions (TERMINATE, RESCHEDULE). Default is TERMINATE.",
         default=PreemptionModeGQL.TERMINATE,
+    )
+    preemption_min_runtime: float = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description=(
+                "Minimum session runtime in seconds before it becomes preemptible "
+                "(0 = disabled). Default is 0."
+            ),
+        ),
+        default=0.0,
+    )
+    victim_scope: PreemptionVictimScopeGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.1",
+            description=(
+                "Scope preemption victims are drawn from (USER, PROJECT, DOMAIN, "
+                "RESOURCE_GROUP). Default is USER."
+            ),
+        ),
+        default=PreemptionVictimScopeGQL.USER,
     )
 
 
@@ -537,6 +614,17 @@ class UpdateResourceGroupInput(PydanticInputMixin[UpdateResourceGroupConfigInput
         description="Whether the resource group is public. Leave null to keep existing value.",
         default=None,
     )
+    is_default: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether this is the default resource group. At most one resource group may"
+                " hold the flag, so setting it to true is rejected while another one holds it;"
+                " clear that one first. Leave null to keep existing value."
+            ),
+        ),
+        default=None,
+    )
 
     # Metadata fields (ScalingGroupMetadataUpdaterSpec)
     description: str | None = gql_field(
@@ -598,6 +686,16 @@ class CreateResourceGroupInputGQL(PydanticInputMixin[CreateResourceGroupInputDTO
     name: str = gql_field(description="Resource group name.")
     domain_name: str = gql_field(description="Domain to create the resource group in.")
     description: str | None = gql_field(default=None, description="Optional description.")
+    is_default: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Make this the default resource group. At most one resource group may hold"
+                " the flag, so this is rejected while another one holds it; clear that one first."
+            ),
+        ),
+        default=False,
+    )
 
 
 @gql_pydantic_type(
@@ -621,7 +719,12 @@ class CreateResourceGroupPayloadGQL(PydanticOutputMixin[CreateResourceGroupPaylo
     name="DeleteResourceGroupPayload",
 )
 class DeleteResourceGroupPayloadGQL(PydanticOutputMixin[DeleteResourceGroupPayloadDTO]):
-    id: str = gql_field(description="ID of the deleted resource group.")
+    id: UUID = gql_field(
+        description=(
+            "UUID of the deleted resource group."
+            " Since 26.8.0, the value is the UUID instead of the name."
+        )
+    )
 
 
 # Allow / Disallow types

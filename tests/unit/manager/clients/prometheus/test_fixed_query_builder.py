@@ -12,12 +12,11 @@ from ai.backend.manager.clients.prometheus import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
 )
-from ai.backend.manager.clients.prometheus.fixed_query_builder import _regex_union
 from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
     MetricType,
 )
-from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset, regex_union
 from ai.backend.manager.clients.prometheus.types import ValueType
 
 
@@ -154,7 +153,7 @@ class TestGetContainerLiveStatQueries:
 
 class TestRegexUnion:
     def test_escapes_special_chars(self) -> None:
-        result = _regex_union(["a.b", "c+d"])
+        result = regex_union(["a.b", "c+d"])
         assert r"a\.b" in result
         assert r"c\+d" in result
         assert "|" in result

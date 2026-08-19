@@ -9,12 +9,16 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
 from decimal import Decimal
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -54,8 +58,10 @@ from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHi
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestEnqueueSessionSchedulingHistory:
@@ -97,15 +103,17 @@ class TestEnqueueSessionSchedulingHistory:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[DomainFixtureData, None]:
         """Create test domain and return domain name."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 total_resource_slots=ResourceSlot({
                     "cpu": Decimal("1000"),
@@ -115,7 +123,7 @@ class TestEnqueueSessionSchedulingHistory:
             db_sess.add(domain)
             await db_sess.flush()
 
-        yield domain_name
+        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(
@@ -215,7 +223,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create test user and return user UUID."""
@@ -228,8 +236,9 @@ class TestEnqueueSessionSchedulingHistory:
                 username=f"test-user-{uuid.uuid4().hex[:8]}",
                 role=UserRole.USER,
                 status=UserStatus.ACTIVE,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=test_user_resource_policy_name,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -267,7 +276,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create test group and return group ID."""
@@ -279,7 +288,7 @@ class TestEnqueueSessionSchedulingHistory:
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group",
                 is_active=True,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 resource_policy=test_resource_policy_name,
@@ -299,7 +308,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def test_enqueue_session_creates_scheduling_history(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -344,15 +353,25 @@ class TestMarkTerminatingSchedulingHistory:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+        test_domain_id: DomainID,
+    ) -> AsyncGenerator[DomainFixtureData, None]:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 total_resource_slots=ResourceSlot({
                     "cpu": Decimal("1000"),
@@ -362,18 +381,20 @@ class TestMarkTerminatingSchedulingHistory:
             db_sess.add(domain)
             await db_sess.flush()
 
-        yield domain_name
+        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         """Create test scaling group and return scaling group name."""
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(
+                id=test_scaling_group_id,
                 name=sg_name,
                 driver="static",
                 scheduler="fifo",
@@ -462,7 +483,7 @@ class TestMarkTerminatingSchedulingHistory:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create test user and return user UUID."""
@@ -475,8 +496,9 @@ class TestMarkTerminatingSchedulingHistory:
                 username=f"test-user-{uuid.uuid4().hex[:8]}",
                 role=UserRole.USER,
                 status=UserStatus.ACTIVE,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=test_user_resource_policy_name,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -514,7 +536,7 @@ class TestMarkTerminatingSchedulingHistory:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create test group and return group ID."""
@@ -526,7 +548,7 @@ class TestMarkTerminatingSchedulingHistory:
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group",
                 is_active=True,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 resource_policy=test_resource_policy_name,
@@ -541,6 +563,7 @@ class TestMarkTerminatingSchedulingHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         """Create test agent and return agent ID."""
         agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
@@ -551,6 +574,7 @@ class TestMarkTerminatingSchedulingHistory:
                 status=AgentStatus.ALIVE,
                 region="local",
                 scaling_group=test_scaling_group_name,
+                resource_group_id=test_scaling_group_id,
                 available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
                 occupied_slots=ResourceSlot(),
                 addr="127.0.0.1:6001",
@@ -569,7 +593,9 @@ class TestMarkTerminatingSchedulingHistory:
         session_status: SessionStatus,
         kernel_status: KernelStatus,
         domain_name: str,
+        domain_id: DomainID,
         scaling_group_name: str,
+        resource_group_id: ResourceGroupID,
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
         access_key: AccessKey,
@@ -585,8 +611,10 @@ class TestMarkTerminatingSchedulingHistory:
                 name=f"test-session-{uuid.uuid4().hex[:8]}",
                 session_type=SessionTypes.INTERACTIVE,
                 domain_name=domain_name,
+                domain_id=domain_id,
                 group_id=group_id,
                 scaling_group_name=scaling_group_name,
+                resource_group_id=resource_group_id,
                 status=session_status,
                 status_info="test",
                 cluster_mode=ClusterMode.SINGLE_NODE,
@@ -606,6 +634,7 @@ class TestMarkTerminatingSchedulingHistory:
                 agent=agent_id,
                 agent_addr="127.0.0.1:6001",
                 scaling_group=scaling_group_name,
+                resource_group_id=resource_group_id,
                 cluster_idx=0,
                 cluster_role="main",
                 cluster_hostname=f"kernel-{uuid.uuid4().hex[:8]}",
@@ -635,38 +664,57 @@ class TestMarkTerminatingSchedulingHistory:
 
         return session_id
 
-    async def test_mark_sessions_as_terminating_creates_scheduling_history(
+    @pytest.fixture
+    def scheduler_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+    ) -> SchedulerRepository:
+        return SchedulerRepository(
+            db_with_cleanup, MagicMock(), MagicMock(), MagicMock(), MagicMock()
+        )
+
+    @pytest.fixture
+    async def running_session_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_domain_id: DomainID,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
         test_agent_id: str,
-    ) -> None:
-        """Test that mark_sessions_terminating() creates history records for RUNNING sessions."""
-        db_source = ScheduleDBSource(db_with_cleanup)
-
-        session_id = await self._create_session_with_kernel(
+    ) -> SessionId:
+        return await self._create_session_with_kernel(
             db_with_cleanup,
             session_status=SessionStatus.RUNNING,
             kernel_status=KernelStatus.RUNNING,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
+            domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
             agent_id=test_agent_id,
         )
 
-        result = await db_source.mark_sessions_terminating([session_id])
-        assert session_id in result.terminating_sessions
+    async def test_mark_sessions_as_terminating_creates_scheduling_history(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        running_session_id: SessionId,
+    ) -> None:
+        """Test that mark_sessions_terminating() creates history records for RUNNING sessions."""
+        db_source = ScheduleDBSource(db_with_cleanup)
+
+        result = await db_source.mark_sessions_terminating([running_session_id])
+        assert running_session_id in result.terminating_sessions
 
         # Verify scheduling history record was created
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             history_stmt = sa.select(SessionSchedulingHistoryRow).where(
-                SessionSchedulingHistoryRow.session_id == session_id
+                SessionSchedulingHistoryRow.session_id == running_session_id
             )
             history_record = await db_sess.scalar(history_stmt)
             assert history_record is not None
@@ -676,11 +724,35 @@ class TestMarkTerminatingSchedulingHistory:
             assert history_record.to_status == str(SessionStatus.TERMINATING)
             assert history_record.message == "mark_terminating success"
 
+    async def test_mark_sessions_as_terminating_records_custom_history_message(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        running_session_id: SessionId,
+        scheduler_repository: SchedulerRepository,
+    ) -> None:
+        result = await scheduler_repository.mark_sessions_terminating(
+            [running_session_id],
+            reason=KernelLifecycleEventReason.IDLE_TIMEOUT.value,
+            message="idle check timeout",
+        )
+
+        assert result.terminating_sessions == [running_session_id]
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            history = await db_sess.scalar(
+                sa.select(SessionSchedulingHistoryRow).where(
+                    SessionSchedulingHistoryRow.session_id == running_session_id
+                )
+            )
+        assert history is not None
+        assert history.message == "idle check timeout"
+
     async def test_cancel_pending_creates_scheduling_history(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
+        test_domain_id: DomainID,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
@@ -693,8 +765,10 @@ class TestMarkTerminatingSchedulingHistory:
             db_with_cleanup,
             session_status=SessionStatus.PENDING,
             kernel_status=KernelStatus.PENDING,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
+            domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -720,8 +794,10 @@ class TestMarkTerminatingSchedulingHistory:
     async def test_force_terminate_creates_scheduling_history(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
+        test_domain_id: DomainID,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
@@ -734,8 +810,10 @@ class TestMarkTerminatingSchedulingHistory:
             db_with_cleanup,
             session_status=SessionStatus.RUNNING,
             kernel_status=KernelStatus.RUNNING,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
+            domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -760,8 +838,10 @@ class TestMarkTerminatingSchedulingHistory:
     async def test_force_terminate_from_terminating_creates_scheduling_history(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
+        test_domain_id: DomainID,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
@@ -774,8 +854,10 @@ class TestMarkTerminatingSchedulingHistory:
             db_with_cleanup,
             session_status=SessionStatus.TERMINATING,
             kernel_status=KernelStatus.TERMINATING,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
+            domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -800,8 +882,10 @@ class TestMarkTerminatingSchedulingHistory:
     async def test_mark_sessions_as_terminating_captures_correct_from_status(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
+        test_domain_id: DomainID,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
@@ -815,8 +899,10 @@ class TestMarkTerminatingSchedulingHistory:
             db_with_cleanup,
             session_status=SessionStatus.RUNNING,
             kernel_status=KernelStatus.RUNNING,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
+            domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -826,8 +912,10 @@ class TestMarkTerminatingSchedulingHistory:
             db_with_cleanup,
             session_status=SessionStatus.SCHEDULED,
             kernel_status=KernelStatus.SCHEDULED,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
+            domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,

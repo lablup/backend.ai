@@ -7,9 +7,10 @@ from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
 import jwt
-from aiohttp import web
+from aiohttp import hdrs, web
 from pydantic import AnyUrl, Field
 
+from ai.backend.appproxy.common.defs import MEDIA_TYPE_HTML, MEDIA_TYPE_JSON
 from ai.backend.appproxy.common.errors import (
     InvalidCredentials,
     ObjectNotFound,
@@ -25,7 +26,6 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.common.utils import mime_match, pydantic_api_handler
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
-from ai.backend.appproxy.coordinator.errors import CircuitCreationError
 from ai.backend.appproxy.coordinator.models import Circuit, Token, Worker, add_circuit
 from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
 from ai.backend.appproxy.coordinator.types import RootContext
@@ -194,9 +194,6 @@ async def proxy(
             )
         log.debug("created new circuit {}", circuit.id)
 
-    if not circuit or not worker:
-        raise CircuitCreationError("Failed to create circuit and worker.")
-
     await root_ctx.circuit_manager.initialize_circuits([circuit])
     log.debug("Circuit is set (id:{})", str(circuit.id))
     token_to_generate_body = {
@@ -212,7 +209,8 @@ async def proxy(
     app_url = f"{worker.api_endpoint}/setup?{urllib.parse.urlencode(qdict)}"
     log.debug("Redirect URL created: {}", app_url)
 
-    if mime_match(request.headers.get("accept", "text/html"), "application/json", strict=True):
+    accept = request.headers.get(hdrs.ACCEPT, MEDIA_TYPE_HTML)
+    if mime_match(accept, MEDIA_TYPE_JSON, strict=True):
         # Web browsers block redirect between cross-origins if Access-Control-Allow-Origin value is set to a concrete Origin instead of wildcard;
         # Hence we need to send "*" as allowed origin manually, instead of benefiting from aiohttp-cors
         return PydanticResponse(

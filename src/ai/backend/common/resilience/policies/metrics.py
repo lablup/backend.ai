@@ -4,7 +4,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import ParamSpec, TypeVar
+from typing import ParamSpec, TypeVar, override
 
 from ai.backend.common.metrics.metric import DomainType, LayerMetricObserver, LayerType
 from ai.backend.common.resilience.policy import Policy
@@ -57,6 +57,7 @@ class MetricPolicy(Policy):
         self._layer = args.layer
         self._observer = LayerMetricObserver.instance()
 
+    @override
     async def execute(
         self,
         next_call: Callable[P, Awaitable[R]],

@@ -23,11 +23,10 @@
   # each agent must use a unique port.
   # Added in 25.12.0
   agent-sock-port = 6007
-  # Name of the scaling group this agent belongs to. Scaling groups organize
-  # agents into logical clusters for resource allocation. Users can target
-  # specific scaling groups when creating sessions.
-  # Added in 25.12.0
-  scaling-group = "gpu-cluster"
+  # Name of the resource group used as the seed only at the agent's first
+  # registration. When unset, the default resource group is used.
+  # Added in 26.8.0
+  ## initial-resource-group-name = "gpu-cluster"
   # Type of resource group this agent serves. 'compute' for general-purpose
   # computation nodes. 'storage' for storage-optimized nodes. Determines how the
   # agent is used in workload scheduling.
@@ -177,21 +176,21 @@
   # are loaded except those in block_compute_plugins. Plugin names use Python
   # package notation (e.g., 'ai.backend.accelerator.cuda').
   # Added in 25.12.0
-  ## allow-compute-plugins = "[\"ai.backend.accelerator.cuda\", \"ai.backend.accelerator.rocm\"]"
+  ## allow-compute-plugins = ["ai.backend.accelerator.cuda", "ai.backend.accelerator.rocm"]
   # Blocklist of compute plugin names that should not be loaded by this agent.
   # Plugins in this list are excluded even if discovered. Use to disable
   # specific accelerators or features on certain nodes.
   # Added in 25.12.0
-  ## block-compute-plugins = "[\"ai.backend.accelerator.mock\"]"
+  ## block-compute-plugins = ["ai.backend.accelerator.mock"]
   # Allowlist of network plugin names that can be loaded by this agent. Network
   # plugins provide custom networking configurations for containers. If set,
   # only plugins in this list are loaded.
   # Added in 25.12.0
-  ## allow-network-plugins = "[\"ai.backend.network.overlay\"]"
+  ## allow-network-plugins = ["ai.backend.network.overlay"]
   # Blocklist of network plugin names that should not be loaded by this agent.
   # Use to disable specific network configurations on certain nodes.
   # Added in 25.12.0
-  ## block-network-plugins = "[\"ai.backend.network.legacy\"]"
+  ## block-network-plugins = ["ai.backend.network.legacy"]
   # Directory path for storing temporary image commit data. Used when users
   # commit their running containers as new images. Requires sufficient disk
   # space for container filesystem layers.
@@ -202,11 +201,6 @@
   # here for review by administrators.
   # Added in 25.12.0
   ## abuse-report-path = "/var/log/backend.ai/abuse"
-  # Enables the experimental Redis-based event dispatcher for agent-manager
-  # communication. Provides improved event delivery reliability and scalability.
-  # Requires Redis to be configured. Still in experimental phase.
-  # Added in 25.12.0
-  use-experimental-redis-event-dispatcher = false
   # Docker runtime mode, auto-detected based on the kernel version. 'linuxkit'
   # indicates Docker Desktop with LinuxKit VM (macOS/Windows). 'native'
   # indicates native Docker on Linux. Affects filesystem and networking
@@ -300,7 +294,7 @@
   # Jupyter, and other services. In multi-agent mode, ensure non-overlapping
   # ranges.
   # Added in 25.12.0
-  port-range = "[30000, 32000]"
+  port-range = [30000, 32000]
   # Minimum seconds between releasing a host port and reallocating it to a new
   # container. Mitigates TCP TIME_WAIT and stale firewall/monitoring state by
   # ensuring recently freed ports are not immediately reused. Set to 0 to

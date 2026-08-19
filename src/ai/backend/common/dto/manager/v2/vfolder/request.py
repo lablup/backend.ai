@@ -162,6 +162,15 @@ class PurgeVFolderOptions(BaseRequestModel):
             "If false, the request is rejected when any model card still references it."
         ),
     )
+    force: bool = Field(
+        default=False,
+        description=(
+            "If true, bypass the in-use guards and purge the vfolder even when it is "
+            "mounted by a live session, referenced by an active model-service endpoint, "
+            "or not in a purgable status. Irreversible — use with caution. "
+            "If false (default), the request is rejected in those cases."
+        ),
+    )
 
 
 class PurgeVFolderInput(BaseRequestModel):

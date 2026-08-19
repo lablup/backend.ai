@@ -25,7 +25,6 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response import (
     DeleteCategoryPayload as DeleteCategoryPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
@@ -72,21 +71,15 @@ class CategoryGQL(PydanticOutputMixin[CategoryNode]):
 class CategoryFilterGQL(PydanticInputMixin[CategoryFilterDTO]):
     name: StringFilter | None = gql_field(description="Filter by name.", default=None)
     AND: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Match all of the given sub-filters."),
         default=None,
     )
     OR: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Match any of the given sub-filters."),
         default=None,
     )
     NOT: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Negate the given sub-filters."),
         default=None,
     )
 

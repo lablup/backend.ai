@@ -5,6 +5,7 @@ from typing import Self, override
 
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.message_queue.abc import AbstractAnycaster
+from ai.backend.common.message_queue.payload import AnycastMessagePayload
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -59,7 +60,7 @@ class RedisAnycaster(AbstractAnycaster):
         return cls(client, stream_key)
 
     @override
-    async def anycast(self, payload: dict[bytes, bytes]) -> None:
+    async def anycast(self, payload: AnycastMessagePayload) -> None:
         """
         Send a message to the anycast stream.
 
@@ -68,7 +69,7 @@ class RedisAnycaster(AbstractAnycaster):
         message will be added to the end of the stream.
 
         Args:
-            payload: Message payload as a dictionary of bytes
+            payload: Message payload as an anycast envelope
 
         Raises:
             MessageQueueClosedError: If the anycaster is closed

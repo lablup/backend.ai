@@ -4,6 +4,7 @@ import dataclasses
 import enum
 from datetime import datetime
 from pathlib import Path
+from typing import override
 
 from pydantic import Field
 from rich.console import ConsoleRenderable, RichCast
@@ -64,6 +65,8 @@ class CliArgs:
     public_facing_address: str
     accelerator: str | None = None
     fqdn_prefix: str | None = None
+    app_base_domain: str | None = None
+    storage_base_domain: str | None = None
     tls_advertised: bool = False
     advertised_port: int = 443
     endpoint_protocol: EndpointProtocol | None = None
@@ -92,6 +95,7 @@ class PrerequisiteError(RichCast, Exception):
         self.msg = msg
         self.instruction = instruction
 
+    @override
     def __rich__(self) -> ConsoleRenderable:
         text = f"[bold red]:warning: [bold white]{self.msg}[/]"
         if self.instruction:
@@ -138,6 +142,7 @@ class OSInfo(RichCast):
     distro: str
     distro_variants: set[str]
 
+    @override
     def __rich__(self) -> ConsoleRenderable:
         variants = [self.distro, *sorted(self.distro_variants)]
         variant = ", ".join(variants)
@@ -172,6 +177,23 @@ class HalfstackConfig:
     etcd_addr: list[ServerAddr]  # multiple if HA
     etcd_user: str | None
     etcd_password: str | None
+
+
+@dataclasses.dataclass(frozen=True)
+class HarborOptions:
+    hostname: str
+    http_port: int
+    admin_password: str
+
+
+@dataclasses.dataclass(frozen=True)
+class SftpAgentOptions:
+    rpc_addr: ServerAddr
+    watcher_addr: ServerAddr
+    sock_port: int
+    ipc_base_path: str
+    var_base_path: str
+    scaling_group: str
 
 
 @dataclasses.dataclass()
@@ -214,27 +236,10 @@ class ServiceConfig:
     appproxy_tcp_worker_addr: ServerAddr = dataclasses.field(
         default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 10202))
     )
-    # Harbor (optional local container registry)
-    harbor_enabled: bool = False
-    harbor_hostname: str = "127.0.0.1"
-    harbor_http_port: int = 8084
-    harbor_admin_password: str = "Harbor12345"
-    # Optional dedicated SFTP agent (multi-agent per node).
-    # The actual port / path values live in
-    # ``configs/agent/halfstack-sftp.toml`` — these fields simply mirror
-    # that sample for UI display (InstallReport) and for etcd / fixture
-    # population. Keep them in sync with the sample.
-    sftp_agent_enabled: bool = False
-    sftp_agent_rpc_addr: ServerAddr = dataclasses.field(
-        default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 6013))
-    )
-    sftp_agent_watcher_addr: ServerAddr = dataclasses.field(
-        default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 6015))
-    )
-    sftp_agent_sock_port: int = 6017
-    sftp_agent_ipc_base_path: str = "ipc/agent-sftp"
-    sftp_agent_var_base_path: str = "var/agent-sftp"
-    sftp_agent_scaling_group: str = "upload"
+    # Optional local Harbor container registry (None when not installed).
+    harbor: HarborOptions | None = None
+    # Optional dedicated SFTP agent, multi-agent per node (None when disabled).
+    sftp_agent: SftpAgentOptions | None = None
 
 
 @dataclasses.dataclass
@@ -242,6 +247,8 @@ class InstallVariable:
     public_facing_address: str = "127.0.0.1"
     accelerator: Accelerator | None = None
     fqdn_prefix: str | None = None
+    app_base_domain: str | None = None
+    storage_base_domain: str | None = None
     tls_advertised: bool = False
     advertised_port: int = 443
     endpoint_protocol: EndpointProtocol | None = None
@@ -265,24 +272,24 @@ class InstallVariable:
 
     @property
     def apphub_address(self) -> str:
-        if self.fqdn_prefix:
-            return f"{self.fqdn_prefix}.apphub.backend.ai"
+        if self.fqdn_prefix and self.app_base_domain:
+            return f"{self.fqdn_prefix}.apphub.{self.app_base_domain}"
         return self.public_facing_address
 
     @property
     def app_address(self) -> str:
-        if self.fqdn_prefix:
-            return f"{self.fqdn_prefix}.app.backend.ai"
+        if self.fqdn_prefix and self.app_base_domain:
+            return f"{self.fqdn_prefix}.app.{self.app_base_domain}"
         return self.public_facing_address
 
     @property
     def wildcard_domain(self) -> str | None:
-        if self.fqdn_prefix:
-            return f".{self.fqdn_prefix}.app.backend.ai"
+        if self.fqdn_prefix and self.app_base_domain:
+            return f".{self.fqdn_prefix}.app.{self.app_base_domain}"
         return None
 
     @property
     def storage_public_address(self) -> str:
-        if self.fqdn_prefix:
-            return f"{self.fqdn_prefix}.public.isla-sorna.backend.ai"
+        if self.fqdn_prefix and self.storage_base_domain:
+            return f"{self.fqdn_prefix}.public.{self.storage_base_domain}"
         return self.public_facing_address

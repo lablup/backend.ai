@@ -28,6 +28,12 @@ def register_v2_session_routes(
     )
     registry.add(
         "POST",
+        "/compute-schedule",
+        handler.compute_schedule,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/search",
         handler.admin_search_sessions,
         middlewares=[superadmin_required],
@@ -78,6 +84,18 @@ def register_v2_session_routes(
         "POST",
         "/terminate",
         handler.terminate,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/exclude-idle-checks",
+        handler.exclude_idle_checks,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/include-idle-checks",
+        handler.include_idle_checks,
         middlewares=[auth_required],
     )
     registry.add(

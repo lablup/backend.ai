@@ -35,6 +35,7 @@ class RelayHandler(logging.Handler):
         else:
             self._sock = None
 
+    @override
     def close(self) -> None:
         if self._sock is not None:
             self._sock.close()

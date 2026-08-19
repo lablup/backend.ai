@@ -13,6 +13,11 @@
 #   - configs/graphql/README.md
 #   - https://www.apollographql.com/docs/rover/commands/supergraphs
 
+# Pin the composition (supergraph) plugin version. Without this, `rover supergraph
+# compose` floats to the latest Federation 2 plugin; v2.15.0 changed the SDL printer
+# layout and rewrites the whole dump. 2.14.0 keeps the existing committed format.
+federation_version: "=2.14.0"
+
 subgraphs:
   # Legacy GraphQL API (Graphene-based)
   graphene:
@@ -25,3 +30,10 @@ subgraphs:
     routing_url: http://host.docker.internal:8091/admin/gql/strawberry
     schema:
       file: ../../docs/manager/graphql-reference/v2-schema.graphql
+
+  # Unauthenticated fields. Its routing URL carries no auth middleware, so an anonymous query
+  # composed entirely of these fields resolves without credentials.
+  public:
+    routing_url: http://host.docker.internal:8091/admin/gql/strawberry/public
+    schema:
+      file: ../../docs/manager/graphql-reference/v2-public-schema.graphql

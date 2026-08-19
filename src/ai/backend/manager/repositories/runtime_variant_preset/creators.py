@@ -13,8 +13,8 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import RuntimeVariantPresetConflict
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base.creator import CreatorSpec
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
 @dataclass

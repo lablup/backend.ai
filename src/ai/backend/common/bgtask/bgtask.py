@@ -15,6 +15,7 @@ from typing import (
     Final,
     ParamSpec,
     Self,
+    override,
 )
 
 from ai.backend.common.bgtask.exception import InvalidTaskMetadataError
@@ -170,12 +171,15 @@ class LocalBgtask(BackgroundTaskMeta):
     def __init__(self, task: asyncio.Task[Any]) -> None:
         self._task = task
 
+    @override
     def total_info(self) -> TaskTotalInfo:
         raise NotImplementedError("LocalBgtask is not recoverable and cannot be stored")
 
+    @override
     def retriable(self) -> bool:
         return False
 
+    @override
     def async_tasks(self) -> Sequence[asyncio.Task[Any]]:
         return [self._task]
 
@@ -192,12 +196,15 @@ class SingleBgtask(BackgroundTaskMeta):
         self._total_info = total_info
         self._task = task
 
+    @override
     def total_info(self) -> TaskTotalInfo:
         return self._total_info
 
+    @override
     def retriable(self) -> bool:
         return True
 
+    @override
     def async_tasks(self) -> Sequence[asyncio.Task[Any]]:
         return [self._task]
 
@@ -214,12 +221,15 @@ class ParallelBgtask(BackgroundTaskMeta):
         self._total_info = total_info
         self._tasks = tasks
 
+    @override
     def total_info(self) -> TaskTotalInfo:
         return self._total_info
 
+    @override
     def retriable(self) -> bool:
         return True
 
+    @override
     def async_tasks(self) -> Sequence[asyncio.Task[Any]]:
         return self._tasks
 
@@ -344,7 +354,7 @@ class BackgroundTaskManager:
     ) -> BaseBgtaskDoneEvent:
         # legacy
         if bgtask_result is None or isinstance(bgtask_result, str):
-            return BgtaskDoneEvent(task_id, bgtask_result)
+            return BgtaskDoneEvent(task_id=task_id, message=bgtask_result)
 
         message = bgtask_result.message()
         if bgtask_result.has_error():
@@ -389,13 +399,13 @@ class BackgroundTaskManager:
             )
             log.warning("Task {} ({}): cancelled", task_id, task_name)
             msg = "Task cancelled"
-            return BgtaskCancelledEvent(task_id, msg)
+            return BgtaskCancelledEvent(task_id=task_id, message=msg)
         except BackendAIError as e:
             status = BgtaskStatus.FAILED
             error_code = e.error_code()
             log.exception("Task {} ({}): BackendAIError: {}", task_id, task_name, e)
             msg = repr(e)
-            return BgtaskFailedEvent(task_id, msg)
+            return BgtaskFailedEvent(task_id=task_id, message=msg)
         except Exception as e:
             status = BgtaskStatus.FAILED
             error_code = ErrorCode(
@@ -405,7 +415,7 @@ class BackgroundTaskManager:
             )
             log.exception("Task {} ({}): unhandled error: {}", task_id, task_name, e)
             msg = repr(e)
-            return BgtaskFailedEvent(task_id, msg)
+            return BgtaskFailedEvent(task_id=task_id, message=msg)
         finally:
             duration = time.perf_counter() - start_time
             self._metric_observer.observe_bgtask_done(

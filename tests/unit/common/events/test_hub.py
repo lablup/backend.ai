@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Self
+from typing import override
 from unittest.mock import AsyncMock
 
 from ai.backend.common.events.hub import WILDCARD, EventHub, EventPropagator
@@ -10,39 +10,37 @@ from ai.backend.common.events.user_event.user_event import UserEvent
 
 
 class DummyBaseEvent(AbstractEvent):
-    def __init__(self, domain_id: str) -> None:
-        self._domain_id = domain_id
+    target_id: str
 
+    @override
     def domain_id(self) -> str | None:
-        return self._domain_id
+        return self.target_id
 
     @classmethod
+    @override
     def delivery_pattern(cls) -> DeliveryPattern:
         return DeliveryPattern.BROADCAST
 
-    def serialize(self) -> tuple[bytes, ...]:
-        raise NotImplementedError
-
     @classmethod
-    def deserialize(cls, value: tuple[bytes, ...]) -> Self:
-        raise NotImplementedError
-
-    @classmethod
+    @override
     def event_name(cls) -> str:
         return "dummy"
 
+    @override
     def user_event(self) -> UserEvent | None:
         return None
 
 
 class DummySessionEvent(DummyBaseEvent):
     @classmethod
+    @override
     def event_domain(cls) -> EventDomain:
         return EventDomain.SESSION
 
 
 class DummyKernelEvent(DummyBaseEvent):
     @classmethod
+    @override
     def event_domain(cls) -> EventDomain:
         return EventDomain.KERNEL
 
@@ -54,12 +52,15 @@ class DummyEventPropagator(EventPropagator):
         self._id = uuid.uuid4()
         self.records = []
 
+    @override
     def id(self) -> uuid.UUID:
         return self._id
 
+    @override
     async def propagate_event(self, event: AbstractEvent) -> None:
         self.records.append(event.domain_id() or "")
 
+    @override
     async def close(self) -> None:
         pass
 
@@ -80,11 +81,11 @@ async def test_hub_normal_aliases() -> None:
     propagator2 = DummyEventPropagator()
     hub.register_event_propagator(propagator2, aliases)
 
-    await hub.propagate_event(DummySessionEvent("s001"))
-    await hub.propagate_event(DummySessionEvent("s001"))
-    await hub.propagate_event(DummySessionEvent("s004"))
-    await hub.propagate_event(DummyKernelEvent("k102"))  # skipped
-    await hub.propagate_event(DummyKernelEvent("k103"))  # skipped
+    await hub.propagate_event(DummySessionEvent(target_id="s001"))
+    await hub.propagate_event(DummySessionEvent(target_id="s001"))
+    await hub.propagate_event(DummySessionEvent(target_id="s004"))
+    await hub.propagate_event(DummyKernelEvent(target_id="k102"))  # skipped
+    await hub.propagate_event(DummyKernelEvent(target_id="k103"))  # skipped
 
     hub.unregister_event_propagator(propagator1.id())
     assert (EventDomain.SESSION, "s001") not in hub._key_alias
@@ -93,9 +94,9 @@ async def test_hub_normal_aliases() -> None:
     assert (EventDomain.SESSION, "s004") in hub._key_alias
     assert (EventDomain.SESSION, "s005") in hub._key_alias
 
-    await hub.propagate_event(DummySessionEvent("s002"))  # skipped
-    await hub.propagate_event(DummyKernelEvent("k101"))  # skipped
-    await hub.propagate_event(DummySessionEvent("s005"))
+    await hub.propagate_event(DummySessionEvent(target_id="s002"))  # skipped
+    await hub.propagate_event(DummyKernelEvent(target_id="k101"))  # skipped
+    await hub.propagate_event(DummySessionEvent(target_id="s005"))
 
     assert propagator1.records == [
         "s001",
@@ -121,21 +122,21 @@ async def test_hub_wildcard_aliases() -> None:
     propagator2 = DummyEventPropagator()
     hub.register_event_propagator(propagator2, aliases)
 
-    await hub.propagate_event(DummySessionEvent("s001"))
-    await hub.propagate_event(DummySessionEvent("s001"))
-    await hub.propagate_event(DummySessionEvent("s003"))
-    await hub.propagate_event(DummySessionEvent("s004"))  # sent to both propagators
-    await hub.propagate_event(DummyKernelEvent("k102"))  # skipped
-    await hub.propagate_event(DummyKernelEvent("k103"))  # skipped
+    await hub.propagate_event(DummySessionEvent(target_id="s001"))
+    await hub.propagate_event(DummySessionEvent(target_id="s001"))
+    await hub.propagate_event(DummySessionEvent(target_id="s003"))
+    await hub.propagate_event(DummySessionEvent(target_id="s004"))  # sent to both propagators
+    await hub.propagate_event(DummyKernelEvent(target_id="k102"))  # skipped
+    await hub.propagate_event(DummyKernelEvent(target_id="k103"))  # skipped
 
     hub.unregister_event_propagator(propagator1.id())
     assert EventDomain.SESSION not in hub._wildcard_alias
     assert (EventDomain.SESSION, "s004") in hub._key_alias
     assert (EventDomain.SESSION, "s005") in hub._key_alias
 
-    await hub.propagate_event(DummySessionEvent("s002"))  # skipped
-    await hub.propagate_event(DummyKernelEvent("k101"))  # skipped
-    await hub.propagate_event(DummySessionEvent("s005"))
+    await hub.propagate_event(DummySessionEvent(target_id="s002"))  # skipped
+    await hub.propagate_event(DummyKernelEvent(target_id="k101"))  # skipped
+    await hub.propagate_event(DummySessionEvent(target_id="s005"))
 
     assert propagator1.records == [
         "s001",

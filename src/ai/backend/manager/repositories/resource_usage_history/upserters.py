@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, override
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
@@ -20,11 +21,12 @@ from ai.backend.manager.repositories.base import UpserterSpec
 class DomainUsageBucketUpserterSpec(UpserterSpec[DomainUsageBucketRow]):
     """Upserter spec for DomainUsageBucketRow.
 
-    Unique constraint: (domain_name, resource_group, period_start)
+    Unique constraint: (domain_name, resource_group_id, period_start)
     """
 
     domain_name: str
     resource_group: str
+    resource_group_id: ResourceGroupID
     period_start: date
     period_end: date
     decay_unit_days: int = 1
@@ -41,6 +43,7 @@ class DomainUsageBucketUpserterSpec(UpserterSpec[DomainUsageBucketRow]):
         return {
             "domain_name": self.domain_name,
             "resource_group": self.resource_group,
+            "resource_group_id": self.resource_group_id,
             "period_start": self.period_start,
             "period_end": self.period_end,
             "decay_unit_days": self.decay_unit_days,
@@ -50,7 +53,10 @@ class DomainUsageBucketUpserterSpec(UpserterSpec[DomainUsageBucketRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        values: dict[str, Any] = {"period_end": self.period_end}
+        values: dict[str, Any] = {
+            "resource_group_id": self.resource_group_id,
+            "period_end": self.period_end,
+        }
         if self.resource_usage is not None:
             values["resource_usage"] = self.resource_usage
         if self.capacity_snapshot is not None:
@@ -62,12 +68,13 @@ class DomainUsageBucketUpserterSpec(UpserterSpec[DomainUsageBucketRow]):
 class ProjectUsageBucketUpserterSpec(UpserterSpec[ProjectUsageBucketRow]):
     """Upserter spec for ProjectUsageBucketRow.
 
-    Unique constraint: (project_id, resource_group, period_start)
+    Unique constraint: (project_id, resource_group_id, period_start)
     """
 
     project_id: uuid.UUID
     domain_name: str
     resource_group: str
+    resource_group_id: ResourceGroupID
     period_start: date
     period_end: date
     decay_unit_days: int = 1
@@ -85,6 +92,7 @@ class ProjectUsageBucketUpserterSpec(UpserterSpec[ProjectUsageBucketRow]):
             "project_id": self.project_id,
             "domain_name": self.domain_name,
             "resource_group": self.resource_group,
+            "resource_group_id": self.resource_group_id,
             "period_start": self.period_start,
             "period_end": self.period_end,
             "decay_unit_days": self.decay_unit_days,
@@ -94,7 +102,10 @@ class ProjectUsageBucketUpserterSpec(UpserterSpec[ProjectUsageBucketRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        values: dict[str, Any] = {"period_end": self.period_end}
+        values: dict[str, Any] = {
+            "resource_group_id": self.resource_group_id,
+            "period_end": self.period_end,
+        }
         if self.resource_usage is not None:
             values["resource_usage"] = self.resource_usage
         if self.capacity_snapshot is not None:
@@ -106,13 +117,14 @@ class ProjectUsageBucketUpserterSpec(UpserterSpec[ProjectUsageBucketRow]):
 class UserUsageBucketUpserterSpec(UpserterSpec[UserUsageBucketRow]):
     """Upserter spec for UserUsageBucketRow.
 
-    Unique constraint: (user_uuid, project_id, resource_group, period_start)
+    Unique constraint: (user_uuid, project_id, resource_group_id, period_start)
     """
 
     user_uuid: uuid.UUID
     project_id: uuid.UUID
     domain_name: str
     resource_group: str
+    resource_group_id: ResourceGroupID
     period_start: date
     period_end: date
     decay_unit_days: int = 1
@@ -131,6 +143,7 @@ class UserUsageBucketUpserterSpec(UpserterSpec[UserUsageBucketRow]):
             "project_id": self.project_id,
             "domain_name": self.domain_name,
             "resource_group": self.resource_group,
+            "resource_group_id": self.resource_group_id,
             "period_start": self.period_start,
             "period_end": self.period_end,
             "decay_unit_days": self.decay_unit_days,
@@ -140,7 +153,10 @@ class UserUsageBucketUpserterSpec(UpserterSpec[UserUsageBucketRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        values: dict[str, Any] = {"period_end": self.period_end}
+        values: dict[str, Any] = {
+            "resource_group_id": self.resource_group_id,
+            "period_end": self.period_end,
+        }
         if self.resource_usage is not None:
             values["resource_usage"] = self.resource_usage
         if self.capacity_snapshot is not None:

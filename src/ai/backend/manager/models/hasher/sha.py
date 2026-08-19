@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+from typing import override
 
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 
@@ -16,6 +17,7 @@ from .types import HashInfo, PasswordInfo
 class SHA256Hasher(PasswordHasher):
     """SHA-256 password hashing implementation with PBKDF2-like iterations."""
 
+    @override
     def generate_new_hash(self, password_info: PasswordInfo) -> HashInfo:
         salt = secrets.token_bytes(password_info.salt_size).hex()
         hashed = password_info.password
@@ -29,6 +31,7 @@ class SHA256Hasher(PasswordHasher):
             hash_value=hashed,
         )
 
+    @override
     def verify(self, password: str, hash_info: HashInfo) -> bool:
         if hash_info.algorithm != PasswordHashAlgorithm.SHA256:
             return False
@@ -46,6 +49,7 @@ class SHA256Hasher(PasswordHasher):
 class SHA3_256Hasher(PasswordHasher):
     """SHA3-256 password hashing implementation with PBKDF2-like iterations."""
 
+    @override
     def generate_new_hash(self, password_info: PasswordInfo) -> HashInfo:
         salt = secrets.token_bytes(password_info.salt_size).hex()
         hashed = password_info.password
@@ -59,6 +63,7 @@ class SHA3_256Hasher(PasswordHasher):
             hash_value=hashed,
         )
 
+    @override
     def verify(self, password: str, hash_info: HashInfo) -> bool:
         if hash_info.algorithm != PasswordHashAlgorithm.SHA3_256:
             return False

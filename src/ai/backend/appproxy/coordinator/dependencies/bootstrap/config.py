@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import override
 
 from ai.backend.appproxy.coordinator.config import ServerConfig, load
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
@@ -20,10 +21,12 @@ class ConfigProvider(NonMonitorableDependencyProvider[ConfigInput, ServerConfig]
     """Provider for app proxy coordinator configuration."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "config"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: ConfigInput) -> AsyncIterator[ServerConfig]:
         """Load and provide server configuration.
 

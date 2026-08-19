@@ -52,6 +52,7 @@ class BraceMessage:
         self.args = args
         self.kwargs = kwargs
 
+    @override
     def __str__(self) -> str:
         return self.fmt.format(*self.args, **self.kwargs)
 

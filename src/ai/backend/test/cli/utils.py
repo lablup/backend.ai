@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 import click
 
 
 class CommaSeparatedChoice(click.Choice):
+    @override
     def convert(
         self,
         value: str,
@@ -21,6 +22,7 @@ class CustomUsageArgsCommand(click.Command):
         self._usage_args = kwargs.pop("usage_args")
         super().__init__(*args, **kwargs)
 
+    @override
     def format_usage(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
         if self._usage_args:
             formatter.write_usage(ctx.command_path, self._usage_args)

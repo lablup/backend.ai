@@ -28,6 +28,7 @@ class TestCreateResourceGroupInput:
         assert req.allowed_vfolder_hosts is None
         assert req.integration_name is None
         assert req.resource_policy is None
+        assert req.is_default is False
 
     def test_valid_creation_with_all_fields(self) -> None:
         req = CreateResourceGroupInput(
@@ -38,10 +39,12 @@ class TestCreateResourceGroupInput:
             allowed_vfolder_hosts={"default": "rw"},
             integration_name="ext-001",
             resource_policy="default",
+            is_default=True,
         )
         assert req.name == "my-group"
         assert req.description == "A test group"
         assert req.total_resource_slots == {"cpu": "4"}
+        assert req.is_default is True
 
     def test_name_whitespace_is_stripped(self) -> None:
         req = CreateResourceGroupInput(name="  my-group  ", domain_name="default")

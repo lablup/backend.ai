@@ -36,6 +36,8 @@ class TestDatabaseProvider:
             user="postgres",
             password="develove",
             pool_size=8,
+            pool_recycle=-1,
+            pool_pre_ping=True,
             max_overflow=64,
         )
 

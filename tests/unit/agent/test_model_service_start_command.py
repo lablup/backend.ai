@@ -17,7 +17,7 @@ class ModelServiceStartCommandScenario:
     id: str
     image_command: list[str] | None
     models: list[ModelConfig]
-    expected_start_commands: dict[str, list[str]]
+    expected_start_commands: dict[str, str]
     expected_image_command_calls: int = 1
     expected_unset_models: set[str] = field(default_factory=set)
 
@@ -43,7 +43,7 @@ class _ModelServiceCommandAgent:
 def _model(
     name: str,
     port: int,
-    start_command: list[str] | None = None,
+    start_command: str | None = None,
     shell: str = "/bin/bash",
 ) -> ModelConfig:
     return ModelConfig.model_validate({
@@ -84,11 +84,11 @@ class TestPopulateMissingModelServiceStartCommands:
                 image_command=["/etc/container/start-vllm.sh"],
                 models=[
                     _model("vllm", 8000),
-                    _model("explicit", 8001, ["python", "serve.py"]),
+                    _model("explicit", 8001, "python serve.py"),
                 ],
                 expected_start_commands={
-                    "vllm": ["/etc/container/start-vllm.sh"],
-                    "explicit": ["python", "serve.py"],
+                    "vllm": "/etc/container/start-vllm.sh",
+                    "explicit": "python serve.py",
                 },
             ),
             ModelServiceStartCommandScenario(
@@ -104,12 +104,12 @@ class TestPopulateMissingModelServiceStartCommands:
                 id="skips_image_command_lookup_when_all_commands_are_explicit",
                 image_command=["/etc/container/start-vllm.sh"],
                 models=[
-                    _model("explicit-a", 8000, ["python", "serve-a.py"]),
-                    _model("explicit-b", 8001, ["python", "serve-b.py"]),
+                    _model("explicit-a", 8000, "python serve-a.py"),
+                    _model("explicit-b", 8001, "python serve-b.py"),
                 ],
                 expected_start_commands={
-                    "explicit-a": ["python", "serve-a.py"],
-                    "explicit-b": ["python", "serve-b.py"],
+                    "explicit-a": "python serve-a.py",
+                    "explicit-b": "python serve-b.py",
                 },
                 expected_image_command_calls=0,
             ),

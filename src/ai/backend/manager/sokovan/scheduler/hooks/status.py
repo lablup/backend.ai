@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.types import (
     AgentId,
@@ -19,12 +20,12 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.sokovan import SessionWithKernels
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.resource import AgentNotAllocated
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -72,6 +73,7 @@ class RunningTransitionHook(StatusTransitionHook):
     def __init__(self, deps: RunningHookDependencies) -> None:
         self._deps = deps
 
+    @override
     async def execute(self, session: SessionWithKernels) -> None:
         """Execute RUNNING transition hook.
 
@@ -149,6 +151,7 @@ class TerminatedTransitionHook(StatusTransitionHook):
     def __init__(self, deps: TerminatedHookDependencies) -> None:
         self._deps = deps
 
+    @override
     async def execute(self, session: SessionWithKernels) -> None:
         """Execute TERMINATED transition hook."""
         await self._destroy_network(session)

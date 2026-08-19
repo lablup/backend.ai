@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.vfolder import verify_vfolder_name
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidatorRule,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    SessionSpecContext,
 )
 
 
@@ -20,15 +24,17 @@ class MountNameValidationRule(SessionSpecValidatorRule):
     vfolder at the same path.
     """
 
+    @override
     def name(self) -> str:
         return "mount_name_validation"
 
+    @override
     def validate(
         self,
         spec: SessionSpec,
-        _context: SessionSpecValidationContext,
+        _context: SessionSpecContext,
     ) -> None:
-        for kernel_idx, kernel in enumerate(spec.kernel_specs):
+        for kernel_idx, kernel in enumerate(spec.resource_spec.kernel_specs):
             seen_paths: set[str] = set()
             for mount_idx, mount in enumerate(kernel.vfolder_mounts):
                 path = str(mount.kernel_path)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Annotated, Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 from uuid import UUID
 
 import strawberry
@@ -160,10 +160,10 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             ProjectUsageBucketGQL,
         )
         from ai.backend.manager.repositories.resource_usage_history.types import (
-            ProjectUsageBucketSearchScope,
+            ProjectUsageBucketOperationScope,
         )
 
-        repository_scope = ProjectUsageBucketSearchScope(
+        repository_scope = ProjectUsageBucketOperationScope(
             resource_group=scope.resource_group_name,
             domain_name=self.organization.domain_name,
             project_id=UUID(str(self.id)),
@@ -251,9 +251,9 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             UserV2Edge,
             UserV2GQL,
         )
-        from ai.backend.manager.repositories.user.types import ProjectUserSearchScope
+        from ai.backend.manager.repositories.user.types import ProjectUserOperationScope
 
-        repo_scope = ProjectUserSearchScope(project_id=UUID(str(self.id)))
+        repo_scope = ProjectUserOperationScope(project_id=UUID(str(self.id)))
         payload = await info.context.adapters.user.gql_search_by_project(
             scope=repo_scope,
             input=AdminSearchUsersInput(
@@ -281,6 +281,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         )
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,

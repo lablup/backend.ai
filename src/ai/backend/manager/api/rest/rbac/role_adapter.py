@@ -20,14 +20,19 @@ from ai.backend.common.dto.manager.rbac import (
     SearchRolesRequest,
     UpdateRoleRequest,
 )
-from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.permission.role import RoleData, RoleDetailData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.rbac_models.conditions import RoleConditions
 from ai.backend.manager.models.rbac_models.orders import RoleOrders
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Purger
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Purger,
+)
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.permission_controller.purgers import RolePurgerSpec
 from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -59,10 +64,7 @@ class RoleAdapter(BaseFilterAdapter):
 
     def build_purger(self, role_id: UUID) -> Purger[RoleRow]:
         """Build a purger for the given role ID."""
-        return Purger(
-            row_class=RoleRow,
-            pk_value=role_id,
-        )
+        return Purger(spec=RolePurgerSpec(role_id=role_id))
 
     def build_updater(self, request: UpdateRoleRequest, role_id: UUID) -> Updater[RoleRow]:
         """Convert update request to updater."""

@@ -223,6 +223,7 @@ def _make_session_data(
         name=name,
         session_type=session_type,
         priority=0,
+        job_priority=0,
         is_preemptible=True,
         cluster_mode=ClusterMode.SINGLE_NODE,
         cluster_size=1,

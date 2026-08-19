@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.bgtask.task.registry import BackgroundTaskHandlerRegistry
@@ -42,10 +43,12 @@ class BgtaskRegistryDependency(
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "bgtask-registry"
 
     @asynccontextmanager
+    @override
     async def provide(
         self, setup_input: BgtaskRegistryInput
     ) -> AsyncIterator[BackgroundTaskHandlerRegistry]:

@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.types import (
@@ -136,6 +136,7 @@ class AccessKeyFilter(ResourceOccupancyFilter):
     def __init__(self, access_key: AccessKey) -> None:
         self.access_key = access_key
 
+    @override
     def get_condition(self) -> Any:
         return KernelRow.access_key == self.access_key
 
@@ -146,6 +147,7 @@ class GroupIdFilter(ResourceOccupancyFilter):
     def __init__(self, group_id: UUID) -> None:
         self.group_id = group_id
 
+    @override
     def get_condition(self) -> Any:
         return KernelRow.group_id == self.group_id
 
@@ -156,5 +158,6 @@ class DomainNameFilter(ResourceOccupancyFilter):
     def __init__(self, domain_name: str) -> None:
         self.domain_name = domain_name
 
+    @override
     def get_condition(self) -> Any:
         return KernelRow.domain_name == self.domain_name

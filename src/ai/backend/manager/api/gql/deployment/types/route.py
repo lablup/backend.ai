@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Annotated, Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 from uuid import UUID
 
 import strawberry
@@ -145,7 +145,7 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The compute session associated with this route, resolved via DataLoader.",
+            description="The compute session associated with this route.",
         )
     )  # type: ignore[misc]
     async def session_v2(
@@ -175,6 +175,7 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
         return await info.context.data_loaders.revision_loader.load(UUID(str(self.revision_id)))
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,

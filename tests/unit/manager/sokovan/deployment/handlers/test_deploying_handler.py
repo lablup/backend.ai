@@ -15,10 +15,10 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.schema.deployment import IntOrPercent, RollingUpdateSpec
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
@@ -30,7 +30,6 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaData,
     ReplicaGroupLifecycle,
 )
-from ai.backend.manager.models.deployment_policy import RollingUpdateSpec
 from ai.backend.manager.sokovan.deployment.handlers.deploying_provisioned import (
     DeployingProvisionedHandler,
 )

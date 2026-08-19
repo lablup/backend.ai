@@ -81,10 +81,13 @@ class Manager(BaseFunction):
     @classmethod
     async def update_announcement(cls, enabled: bool = True, message: str | None = None) -> None:
         """
-        Update (create / delete) announcement.
+        Update the announcement.
 
-        :param enabled: If set ``False``, delete announcement.
+        :param enabled: If set ``False``, hide the announcement while keeping the
+            stored message.
         :param message: Announcement message. Required if ``enabled`` is True.
+            If omitted, the stored message is kept as-is; pass an empty string to
+            clear it.
         """
         rqst = Request("POST", "/manager/announcement")
         rqst.set_json({

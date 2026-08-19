@@ -17,6 +17,7 @@ from ai.backend.test.templates.template import (
 
 class KeypairAuthTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "keypair_auth"
 
@@ -39,6 +40,7 @@ class KeypairAuthTemplate(WrapperTestTemplate):
 
 class KeypairAuthAsCreatedUserTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "keypair_auth_as_created_user"
 

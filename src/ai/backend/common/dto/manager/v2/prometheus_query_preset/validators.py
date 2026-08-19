@@ -30,11 +30,18 @@ def escape_non_placeholders(template: str) -> str:
         already_wrapped = (
             start > 0 and text[start - 1] == "{" and end < len(text) and text[end] == "}"
         )
+        inside_escaped_braces = (
+            text.rfind("{{", 0, start) > text.rfind("}}", 0, start) and text.find("}}", end) != -1
+        )
         if name not in PLACEHOLDER_NAMES:
             return match.group(0) if already_wrapped else "{{" + name + "}}"
         if name != "labels":
             return match.group(0)
-        return match.group(0) if already_wrapped else "{{" + match.group(0) + "}}"
+        return (
+            match.group(0)
+            if already_wrapped or inside_escaped_braces
+            else "{{" + match.group(0) + "}}"
+        )
 
     return _BRACE_BLOCK_RE.sub(repl, template)
 

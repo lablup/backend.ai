@@ -1,3 +1,5 @@
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -10,6 +12,7 @@ from ai.backend.common.exception import (
 
 
 class InvalidContainerRegistryProject(BackendAIError, web.HTTPBadRequest):
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.CONTAINER_REGISTRY,
@@ -19,6 +22,7 @@ class InvalidContainerRegistryProject(BackendAIError, web.HTTPBadRequest):
 
 
 class InvalidContainerRegistryURL(BackendAIError, web.HTTPBadRequest):
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.CONTAINER_REGISTRY,

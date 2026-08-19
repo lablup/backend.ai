@@ -1,10 +1,10 @@
 ---
 Author: HyeokJin Kim (hyeokjin@lablup.com)
-Status: Draft
+Status: Implemented
 Created: 2026-01-17
 Created-Version: 26.1.0
 Target-Version:
-Implemented-Version:
+Implemented-Version: 26.4.0
 ---
 
 # BEP-1032: Unified Input Validation for REST and GraphQL

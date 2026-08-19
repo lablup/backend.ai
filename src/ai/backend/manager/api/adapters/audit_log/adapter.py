@@ -28,10 +28,10 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.audit_log.options import AuditLogConditions, AuditLogOrders
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    OffsetPagination,
     combine_conditions_or,
     negate_conditions,
 )
@@ -175,6 +175,14 @@ class AuditLogAdapter(BaseAdapter):
             )
             if condition is not None:
                 conditions.append(condition)
+        if f.acted_as is not None:
+            condition = self.convert_uuid_filter(
+                f.acted_as,
+                equals_factory=AuditLogConditions.by_acted_as_equals,
+                in_factory=AuditLogConditions.by_acted_as_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
         if f.status is not None:
             self._apply_status_filter(f.status, conditions)
         if f.created_at is not None:
@@ -240,6 +248,7 @@ class AuditLogAdapter(BaseAdapter):
             created_at=data.created_at,
             request_id=data.request_id,
             triggered_by=data.triggered_by,
+            acted_as=data.acted_as,
             description=data.description,
             duration=str(data.duration) if data.duration is not None else None,
             status=AuditLogStatus(data.status.value),

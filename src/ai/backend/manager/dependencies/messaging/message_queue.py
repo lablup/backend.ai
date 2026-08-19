@@ -3,11 +3,10 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, override
 
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
-from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
@@ -31,14 +30,14 @@ class MessageQueueDependency(
     """Provides AbstractMessageQueue lifecycle management."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "message-queue"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: MessageQueueInput) -> AsyncIterator[AbstractMessageQueue]:
         """Initialize and provide the message queue.
-
-        Creates a RedisQueue or HiRedisQueue based on the configuration flag.
 
         Args:
             setup_input: Input containing configuration for Redis connection
@@ -63,16 +62,10 @@ class MessageQueueDependency(
             node_id=node_id,
             db=REDIS_STREAM_DB,
         )
-        if config.manager.use_experimental_redis_event_dispatcher:
-            queue: AbstractMessageQueue = HiRedisQueue(
-                stream_redis_target,
-                args,
-            )
-        else:
-            queue = await RedisQueue.create(
-                stream_redis_target,
-                args,
-            )
+        queue = await RedisQueue.create(
+            stream_redis_target,
+            args,
+        )
         try:
             yield queue
         finally:

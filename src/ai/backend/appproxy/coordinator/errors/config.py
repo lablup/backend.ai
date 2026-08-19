@@ -4,6 +4,8 @@ Configuration-related exceptions for the coordinator.
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -19,6 +21,7 @@ class MissingTraefikConfigError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/missing-traefik-config"
     error_title = "Traefik configuration is missing."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -33,6 +36,7 @@ class MissingDatabaseURLError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/missing-database-url"
     error_title = "Database URL is missing."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -47,6 +51,7 @@ class MissingConfigFileError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/missing-config-file"
     error_title = "Configuration file is missing."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -61,6 +66,7 @@ class MissingFrontendConfigError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/missing-frontend-config"
     error_title = "Frontend configuration is missing."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -75,6 +81,7 @@ class InvalidURLError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/invalid-url"
     error_title = "Invalid URL."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -89,6 +96,7 @@ class InvalidSessionParameterError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/invalid-session-parameter"
     error_title = "Invalid session parameter."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -103,6 +111,7 @@ class InvalidEnumTypeError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/invalid-enum-type"
     error_title = "Invalid enum type."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -117,6 +126,7 @@ class TransactionResultError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/transaction-result-error"
     error_title = "Transaction did not produce a result."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -131,6 +141,7 @@ class LockContextNotInitializedError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/lock-context-not-initialized"
     error_title = "Lock context is not initialized."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -145,6 +156,7 @@ class CleanupContextNotInitializedError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/cleanup-context-not-initialized"
     error_title = "Cleanup context is not initialized."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -159,6 +171,7 @@ class MissingProfilingConfigError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/missing-profiling-config"
     error_title = "Profiling configuration is missing."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -173,6 +186,7 @@ class MissingRouteInfoError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/missing-route-info"
     error_title = "Route connection info is missing."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -187,6 +201,7 @@ class MissingHealthCheckInfoError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/missing-health-check-info"
     error_title = "Health check info is missing."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,

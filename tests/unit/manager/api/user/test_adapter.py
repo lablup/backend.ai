@@ -23,11 +23,12 @@ from ai.backend.common.dto.manager.user import (
 )
 from ai.backend.common.dto.manager.user.types import UserRole as UserRoleDTO
 from ai.backend.common.dto.manager.user.types import UserStatus as UserStatusDTO
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.api.rest.user.adapter import UserAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.repositories.base import OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 
 
@@ -400,7 +401,6 @@ class TestUserAdapterUpdater:
         assert spec.totp_activated.value() is True
         assert spec.resource_policy.value() == "default"
         assert spec.sudo_session_enabled.value() is True
-        assert spec.main_access_key.value() == "AKIAIOSFODNN7EXAMPLE"
         assert spec.container_uid.value() == 1000
         assert spec.container_main_gid.value() == 1000
         assert spec.container_gids.value() == [1000, 1001]
@@ -432,7 +432,6 @@ class TestUserAdapterUpdater:
         assert spec.totp_activated.optional_value() is None
         assert spec.resource_policy.optional_value() is None
         assert spec.sudo_session_enabled.optional_value() is None
-        assert spec.main_access_key.optional_value() is None
         assert spec.container_uid.optional_value() is None
         assert spec.container_main_gid.optional_value() is None
         assert spec.container_gids.optional_value() is None
@@ -482,13 +481,14 @@ class TestUserAdapterConversion:
             created_at=now,
             modified_at=now,
             domain_name="default",
+            domain_id=DomainID(uuid4()),
             role=DataUserRole.USER,
             resource_policy="default",
             allowed_client_ip=["10.0.0.1"],
             totp_activated=True,
             totp_activated_at=now,
             sudo_session_enabled=False,
-            main_access_key="AKIAIOSFODNN7EXAMPLE",
+            default_access_key="AKIAIOSFODNN7EXAMPLE",
             container_uid=1000,
             container_main_gid=1000,
             container_gids=[1000, 1001],
@@ -520,15 +520,15 @@ class TestUserAdapterConversion:
         assert dto.container_gids == [1000, 1001]
 
     def test_convert_to_dto_with_nulls(self) -> None:
-        """Test converting UserData with optional fields as None"""
+        """Test converting UserData with every optional field as None"""
         user_id = uuid4()
 
         user_data = UserData(
             id=user_id,
             uuid=user_id,
-            username=None,
+            username="minimal",
             email="minimal@example.com",
-            need_password_change=None,
+            need_password_change=False,
             full_name=None,
             description=None,
             is_active=True,
@@ -536,14 +536,15 @@ class TestUserAdapterConversion:
             status_info=None,
             created_at=None,
             modified_at=None,
-            domain_name=None,
-            role=None,
+            domain_name="default",
+            domain_id=DomainID(uuid4()),
+            role=DataUserRole.USER,
             resource_policy="default",
             allowed_client_ip=None,
-            totp_activated=None,
+            totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key=None,
+            default_access_key=None,
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
@@ -554,20 +555,20 @@ class TestUserAdapterConversion:
 
         assert isinstance(dto, UserDTO)
         assert dto.id == user_id
-        assert dto.username is None
+        assert dto.username == "minimal"
         assert dto.email == "minimal@example.com"
-        assert dto.need_password_change is None
+        assert dto.need_password_change is False
         assert dto.full_name is None
         assert dto.description is None
         assert dto.status == UserStatusDTO.ACTIVE
         assert dto.status_info is None
         assert dto.created_at is None
         assert dto.modified_at is None
-        assert dto.domain_name is None
-        assert dto.role is None
+        assert dto.domain_name == "default"
+        assert dto.role == UserRoleDTO.USER
         assert dto.resource_policy == "default"
         assert dto.allowed_client_ip is None
-        assert dto.totp_activated is None
+        assert dto.totp_activated is False
         assert dto.sudo_session_enabled is False
         assert dto.main_access_key is None
         assert dto.container_uid is None

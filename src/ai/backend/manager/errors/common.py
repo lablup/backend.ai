@@ -4,7 +4,7 @@ Common and generic exceptions that don't belong to a specific domain.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from aiohttp import web
 
@@ -22,6 +22,7 @@ class URLNotFound(BackendAIError, web.HTTPNotFound):  # TODO: Misused now.
     error_type = "https://api.backend.ai/probs/url-not-found"
     error_title = "Unknown URL path."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
@@ -47,6 +48,7 @@ class ObjectNotFound(BackendAIError, web.HTTPNotFound):
         self.error_title = f"No such {self.object_name}."
         super().__init__(extra_msg, extra_data, **kwargs)
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -59,6 +61,7 @@ class GenericBadRequest(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Bad request."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -71,6 +74,7 @@ class GenericForbidden(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/generic-forbidden"
     error_title = "Forbidden operation."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -83,6 +87,7 @@ class RejectedByHook(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/rejected-by-hook"
     error_title = "Operation rejected by a hook plugin."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.PLUGIN,
@@ -104,6 +109,7 @@ class MethodNotAllowed(BackendAIError, web.HTTPMethodNotAllowed):
     error_type = "https://api.backend.ai/probs/method-not-allowed"
     error_title = "HTTP Method Not Allowed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
@@ -116,6 +122,7 @@ class InternalServerError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/internal-server-error"
     error_title = "Internal server error."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -128,6 +135,7 @@ class ServerMisconfiguredError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/server-misconfigured"
     error_title = "Service misconfigured."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -140,6 +148,7 @@ class ServiceUnavailable(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/service-unavailable"
     error_title = "Serivce unavailable."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -152,6 +161,7 @@ class ServerFrozen(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/server-frozen"
     error_title = "The server is frozen due to maintenance. Please try again later."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
@@ -164,6 +174,7 @@ class Forbidden(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/forbidden"
     error_title = "Forbidden operation."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,

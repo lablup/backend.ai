@@ -66,16 +66,16 @@ class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneManifest, No
             )
             await self._event_producer.anycast_event(
                 VFolderCloneFailureEvent(
-                    manifest.src_vfolder,
-                    manifest.dst_vfolder,
-                    str(e),
+                    vfid=manifest.src_vfolder,
+                    dst_vfid=manifest.dst_vfolder,
+                    message=str(e),
                 )
             )
             raise e
         else:
             await self._event_producer.anycast_event(
                 VFolderCloneSuccessEvent(
-                    manifest.src_vfolder,
-                    manifest.dst_vfolder,
+                    vfid=manifest.src_vfolder,
+                    dst_vfid=manifest.dst_vfolder,
                 )
             )

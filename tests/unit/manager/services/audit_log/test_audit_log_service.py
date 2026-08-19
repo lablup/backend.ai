@@ -13,16 +13,22 @@ import pytest
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.action.types import SearchableActionTarget
-from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogListResult
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.audit_log import (
     AuditLogRepository,
-    EntityAuditLogSearchScope,
-    TriggeredByAuditLogSearchScope,
+    EntityAuditLogOperationScope,
+    TriggeredByAuditLogOperationScope,
 )
-from ai.backend.manager.repositories.audit_log.creators import AuditLogCreatorSpec
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.audit_log.creators import (
+    SingleEntityAuditLogCreatorSpec,
+)
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+)
 from ai.backend.manager.services.audit_log.actions.create import CreateAuditLogAction
 from ai.backend.manager.services.audit_log.actions.scoped_search import (
     EntityAuditLogTarget,
@@ -31,6 +37,8 @@ from ai.backend.manager.services.audit_log.actions.scoped_search import (
 )
 from ai.backend.manager.services.audit_log.actions.search import SearchAuditLogsAction
 from ai.backend.manager.services.audit_log.service import AuditLogService
+
+_SAMPLE_ENTITY_ID = uuid.uuid4()
 
 
 class TestAuditLogService:
@@ -54,12 +62,17 @@ class TestAuditLogService:
             action_id=uuid.uuid4(),
             entity_type="session",
             operation="create",
+            action_name="create_session",
             created_at=datetime.now(UTC),
             description="Session created",
             status=OperationStatus.SUCCESS,
-            entity_id="session-123",
+            action_kind=ActionKind.SINGLE_ENTITY,
+            entity_id=str(_SAMPLE_ENTITY_ID),
+            lookup_kind=None,
+            lookup_key=None,
             request_id="req-456",
             triggered_by="user-789",
+            acted_as=uuid.UUID("11111111-1111-1111-1111-111111111111"),
             duration=timedelta(seconds=1),
         )
 
@@ -77,16 +90,18 @@ class TestAuditLogService:
         mock_repository.create = AsyncMock(return_value=sample_audit_log_data)
 
         creator = Creator(
-            spec=AuditLogCreatorSpec(
+            spec=SingleEntityAuditLogCreatorSpec(
                 action_id=sample_audit_log_data.action_id,
                 entity_type=sample_audit_log_data.entity_type,
                 operation=sample_audit_log_data.operation,
+                action_name="create_session",
                 created_at=sample_audit_log_data.created_at,
                 description=sample_audit_log_data.description,
                 status=sample_audit_log_data.status,
-                entity_id=sample_audit_log_data.entity_id,
+                entity_id=_SAMPLE_ENTITY_ID,
                 request_id=sample_audit_log_data.request_id,
                 triggered_by=sample_audit_log_data.triggered_by,
+                acted_as=sample_audit_log_data.acted_as,
                 duration=sample_audit_log_data.duration,
             )
         )
@@ -260,7 +275,7 @@ class TestAuditLogService:
         scoped_search_user_id: uuid.UUID,
         sample_audit_log_data: AuditLogData,
     ) -> None:
-        """Service calls repository.scoped_search with one SearchScope per target."""
+        """Service calls repository.scoped_search with one OperationScope per target."""
         result = await audit_log_service.scoped_search(scoped_search_action)
 
         assert result.data == [sample_audit_log_data]
@@ -270,8 +285,8 @@ class TestAuditLogService:
         assert call_args.args[0] is scoped_search_querier
         scopes = list(call_args.args[1])
         assert scopes == [
-            EntityAuditLogSearchScope(entity_type=RBACElementType.VFOLDER, entity_id="vf-1"),
-            TriggeredByAuditLogSearchScope(triggered_by=str(scoped_search_user_id)),
+            EntityAuditLogOperationScope(entity_type=RBACElementType.VFOLDER, entity_id="vf-1"),
+            TriggeredByAuditLogOperationScope(triggered_by=str(scoped_search_user_id)),
         ]
 
     async def test_scoped_search_records_queried_rbac_refs_on_result(

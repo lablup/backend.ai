@@ -22,10 +22,17 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RBACElementRef
+
+# ORM cluster registration: configure_mappers() (triggered when this isolated
+# test registers a domain-cluster row) resolves string relationships against the
+# registry. These rows are reachable via relationships but are not otherwise
+# imported/registered by this test; _ORM_CLUSTER keeps them live.
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.permission_controller.creators import RoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
@@ -44,6 +51,12 @@ CREATE_ROLE_TABLES: Sequence[TableOrORM] = [
     RoleRow,
     AssociationScopesEntitiesRow,
 ]
+
+
+_ORM_CLUSTER = (
+    AgentRow,
+    ScalingGroupForDomainRow,
+)
 
 
 class TestCreateRoleWithScopeRefs:

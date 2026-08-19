@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator, Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import aiohttp.web
 import pytest
@@ -24,13 +24,13 @@ from ai.backend.manager.errors.repository import (
     UniqueConstraintViolationError,
 )
 from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base import (
     BulkCreator,
     BulkCreatorResult,
     Creator,
     CreatorResult,
     CreatorSpec,
-    IntegrityErrorCheck,
     execute_bulk_creator,
     execute_bulk_creator_partial,
     execute_creator,
@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
-class CreatorTestRow(Base):  # type: ignore[misc]
+class CreatorTestRow(Base):
     """ORM model for creator testing using declarative mapping."""
 
     __tablename__ = "test_creator_orm"
@@ -59,6 +59,7 @@ class SimpleCreatorSpec(CreatorSpec[CreatorTestRow]):
         self._name = name
         self._value = value
 
+    @override
     def build_row(self) -> CreatorTestRow:
         return CreatorTestRow(name=self._name, value=self._value)
 
@@ -70,6 +71,7 @@ class FailingCreatorSpec(CreatorSpec[CreatorTestRow]):
         self._should_fail = should_fail
         self._name = name
 
+    @override
     def build_row(self) -> CreatorTestRow:
         if self._should_fail:
             raise ValueError(f"Simulated failure for {self._name}")
@@ -315,7 +317,7 @@ class TestBulkCreator:
 # =============================================================================
 
 
-class CreatorTestRowWithDefaults(Base):  # type: ignore[misc]
+class CreatorTestRowWithDefaults(Base):
     """ORM model with server_default columns for testing.
 
     This model uses server_default for:
@@ -341,6 +343,7 @@ class DefaultsCreatorSpec(CreatorSpec[CreatorTestRowWithDefaults]):
     def __init__(self, name: str) -> None:
         self._name = name
 
+    @override
     def build_row(self) -> CreatorTestRowWithDefaults:
         return CreatorTestRowWithDefaults(name=self._name)
 
@@ -455,7 +458,7 @@ class TestCreatorServerDefaults:
 # =============================================================================
 
 
-class CreatorTestRowWithPythonDefaults(Base):  # type: ignore[misc]
+class CreatorTestRowWithPythonDefaults(Base):
     """ORM model with Python-side default columns for testing.
 
     This model uses Python default for:
@@ -479,6 +482,7 @@ class PythonDefaultsCreatorSpec(CreatorSpec[CreatorTestRowWithPythonDefaults]):
     def __init__(self, name: str) -> None:
         self._name = name
 
+    @override
     def build_row(self) -> CreatorTestRowWithPythonDefaults:
         return CreatorTestRowWithPythonDefaults(name=self._name)
 
@@ -712,7 +716,7 @@ class TestBulkCreatorPartialFailure:
 # =============================================================================
 
 
-class CreatorTestRowWithUnique(Base):  # type: ignore[misc]
+class CreatorTestRowWithUnique(Base):
     """ORM model with a unique constraint for integrity error testing."""
 
     __tablename__ = "test_creator_unique"
@@ -731,6 +735,7 @@ class _TestDuplicateNameError(BackendAIError, aiohttp.web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/test-duplicate-name"
     error_title = "Duplicate name."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -746,6 +751,7 @@ class UniqueCreatorSpec(CreatorSpec[CreatorTestRowWithUnique]):
         self._name = name
 
     @property
+    @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return (
             IntegrityErrorCheck(
@@ -755,6 +761,7 @@ class UniqueCreatorSpec(CreatorSpec[CreatorTestRowWithUnique]):
             ),
         )
 
+    @override
     def build_row(self) -> CreatorTestRowWithUnique:
         return CreatorTestRowWithUnique(name=self._name)
 
@@ -765,6 +772,7 @@ class PlainUniqueCreatorSpec(CreatorSpec[CreatorTestRowWithUnique]):
     def __init__(self, name: str) -> None:
         self._name = name
 
+    @override
     def build_row(self) -> CreatorTestRowWithUnique:
         return CreatorTestRowWithUnique(name=self._name)
 
@@ -776,6 +784,7 @@ class NonMatchingUniqueCreatorSpec(CreatorSpec[CreatorTestRowWithUnique]):
         self._name = name
 
     @property
+    @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return (
             IntegrityErrorCheck(
@@ -785,6 +794,7 @@ class NonMatchingUniqueCreatorSpec(CreatorSpec[CreatorTestRowWithUnique]):
             ),
         )
 
+    @override
     def build_row(self) -> CreatorTestRowWithUnique:
         return CreatorTestRowWithUnique(name=self._name)
 

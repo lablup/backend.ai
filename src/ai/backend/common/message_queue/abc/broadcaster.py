@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from typing import Any
 
-from ai.backend.common.message_queue.types import BroadcastPayload
+from ai.backend.common.message_queue.payload import (
+    BroadcastMessagePayload,
+    CachedBroadcastMessagePayload,
+)
 
 
 class AbstractBroadcaster(ABC):
@@ -14,12 +15,12 @@ class AbstractBroadcaster(ABC):
     """
 
     @abstractmethod
-    async def broadcast(self, payload: Mapping[str, Any]) -> None:
+    async def broadcast(self, payload: BroadcastMessagePayload) -> None:
         """
         Broadcast a message to all subscribers.
 
         Args:
-            payload: Message payload as a mapping
+            payload: Message payload as a broadcast envelope
 
         Raises:
             RuntimeError: If the component is closed
@@ -27,13 +28,13 @@ class AbstractBroadcaster(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def broadcast_with_cache(self, cache_id: str, payload: Mapping[str, str]) -> None:
+    async def broadcast_with_cache(self, cache_id: str, payload: BroadcastMessagePayload) -> None:
         """
         Broadcast a message with caching support.
 
         Args:
             cache_id: Unique identifier for caching the message
-            payload: Message payload as string mapping
+            payload: Message payload as a broadcast envelope
 
         Raises:
             RuntimeError: If the component is closed
@@ -41,7 +42,7 @@ class AbstractBroadcaster(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def fetch_cached_broadcast_message(self, cache_id: str) -> Mapping[str, str] | None:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> BroadcastMessagePayload | None:
         """
         Retrieve a cached broadcast message.
 
@@ -57,7 +58,7 @@ class AbstractBroadcaster(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def broadcast_batch(self, events: list[BroadcastPayload]) -> None:
+    async def broadcast_batch(self, events: list[CachedBroadcastMessagePayload]) -> None:
         """
         Broadcast multiple messages in a batch.
 

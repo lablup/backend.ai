@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from asyncio import subprocess
-from typing import Any
+from typing import Any, override
 
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend
@@ -23,6 +23,7 @@ class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKe
 
         self.api_port_pool = set(range(h2_config.api_port_pool[0], h2_config.api_port_pool[1] + 1))
 
+    @override
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
         # We can't measure activeness of HTTP/2 circuits
         return []

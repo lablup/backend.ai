@@ -92,9 +92,9 @@ if TYPE_CHECKING:
         SlotName,
         SlotTypes,
     )
+    from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
     from ai.backend.manager.data.manager_status.types import ManagerStatus
     from ai.backend.manager.idle import IdleCheckerHost
-    from ai.backend.manager.models.storage import StorageSessionManager
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
     from ai.backend.manager.registry import AgentRegistry
     from ai.backend.manager.repositories.agent.repository import AgentRepository
@@ -104,6 +104,16 @@ if TYPE_CHECKING:
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.data.permission.permission_defs import (
+    AgentPermission,
+    ComputeSessionPermission,
+    DomainPermission,
+    ImagePermission,
+    ProjectPermission,
+)
+from ai.backend.manager.data.permission.permission_defs import (
+    VFolderPermission as VFolderRBACPermission,
+)
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -116,16 +126,6 @@ from ai.backend.manager.models.image.row import (
     PublicImageLoadFilter,
 )
 from ai.backend.manager.models.rbac import ProjectScope, ScopeType, SystemScope
-from ai.backend.manager.models.rbac.permission_defs import (
-    AgentPermission,
-    ComputeSessionPermission,
-    DomainPermission,
-    ImagePermission,
-    ProjectPermission,
-)
-from ai.backend.manager.models.rbac.permission_defs import (
-    VFolderPermission as VFolderRBACPermission,
-)
 from ai.backend.manager.models.scaling_group.row import (
     ScalingGroupRow,
     and_names,
@@ -1108,6 +1108,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             graphene.String,
             default_value=None,
             description=(
+                "Added in 25.5.0. "
                 "`statuses` argument is an array of session statuses. "
                 "Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. "
                 f"The argument should be an array of the following valid status values: {[s.name for s in SessionStatus]}.\n"
@@ -2285,8 +2286,8 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
                 db_conn, domain_name, ProjectID(project_id), access_key
             )
         conditions = [and_names([sgroup.name for sgroup in sgroup_rows])]
-        sgroup_rows = await ScalingGroupRow.list_by_condition(conditions, db=ctx.db)
-        return [ScalingGroup.from_orm_row(row).masked for row in sgroup_rows]
+        sgroup_orm_rows = await ScalingGroupRow.list_by_condition(conditions, db=ctx.db)
+        return [ScalingGroup.from_orm_row(row).masked for row in sgroup_orm_rows]
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -3341,26 +3342,48 @@ class GQLExceptionMiddleware:
     ) -> Any:
         try:
             res = next(root, info, **args)
+        except GraphQLError:
+            raise
         except BackendAIError as e:
-            if e.status_code // 100 == 4:
-                log.debug("GraphQL client error: {}", e)
-            elif e.status_code // 100 == 5:
-                log.exception("GraphQL Server error: {}", e)
-            raise GraphQLError(
-                message=str(e),
-                extensions={
-                    "code": str(e.error_code()),
-                },
-            ) from e
+            raise self._wrap_backend_error(e) from e
         except Exception as e:
-            log.exception("GraphQL unexpected error: {}", e)
-            raise GraphQLError(
-                message=str(e),
-                extensions={
-                    "code": str(ErrorCode.default()),
-                },
-            ) from e
+            raise self._wrap_unexpected_error(e) from e
+        if asyncio.iscoroutine(res):
+            # Async resolvers raise while being awaited by graphql-core,
+            # outside this try block; wrap the coroutine to catch them.
+            return self._resolve_async(res)
         return res
+
+    async def _resolve_async(self, coro: Awaitable[Any]) -> Any:
+        try:
+            return await coro
+        except GraphQLError:
+            raise
+        except BackendAIError as e:
+            raise self._wrap_backend_error(e) from e
+        except BaseException as e:
+            raise self._wrap_unexpected_error(e) from e
+
+    def _wrap_backend_error(self, e: BackendAIError) -> GraphQLError:
+        if e.status_code // 100 == 4:
+            log.debug("GraphQL client error: {}", e)
+        elif e.status_code // 100 == 5:
+            log.exception("GraphQL Server error: {}", e)
+        return GraphQLError(
+            message=str(e),
+            extensions={
+                "code": str(e.error_code()),
+            },
+        )
+
+    def _wrap_unexpected_error(self, e: BaseException) -> GraphQLError:
+        log.exception("GraphQL unexpected error: {}", e)
+        return GraphQLError(
+            message=str(e),
+            extensions={
+                "code": str(ErrorCode.default()),
+            },
+        )
 
 
 class GQLMetricMiddleware:
@@ -3456,5 +3479,7 @@ graphene_schema = graphene_federation.build_schema(
     query=Query,
     mutation=Mutation,
     auto_camelcase=False,
-    federation_version=graphene_federation.LATEST_VERSION,
+    # Pin the federation version so the emitted subgraph SDL (and thus the composed
+    # supergraph) stays stable; LATEST_VERSION floats as graphene_federation upgrades.
+    federation_version=graphene_federation.FederationVersion.VERSION_2_7,
 )

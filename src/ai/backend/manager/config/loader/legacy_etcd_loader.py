@@ -42,6 +42,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
     async def load(self) -> Mapping[str, Any]:
         return await self._etcd.get_prefix(self._config_prefix)
 
+    @override
     def __hash__(self) -> int:
         # When used as a key in dicts, we don't care our contents.
         # Just treat it like an opaque object.

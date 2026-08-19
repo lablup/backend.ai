@@ -32,7 +32,7 @@ import jinja2
 import memray
 import pyroscope
 import uvloop
-from aiohttp import web
+from aiohttp import hdrs, web
 from aiohttp.web_app import CleanupError
 from setproctitle import setproctitle
 from tenacity import AsyncRetrying, TryAgain, retry_if_exception_type, wait_exponential
@@ -42,6 +42,9 @@ from ai.backend.appproxy.common.defs import (
     AGENTID_WORKER,
     APPPROXY_ANYCAST_STREAM_KEY,
     APPPROXY_BROADCAST_CHANNEL,
+    ERROR_TEMPLATE_NAME,
+    MEDIA_TYPE_HTML,
+    MEDIA_TYPE_JSON,
 )
 from ai.backend.appproxy.common.errors import (
     CoordinatorConnectionError,
@@ -94,12 +97,12 @@ from ai.backend.common.exception import BackendAIError
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
-from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
     RedisServiceDiscovery,
@@ -199,14 +202,15 @@ async def exception_middleware(
     except BackendAIError as ex:
         if ex.status_code == 500:
             log.exception("Internal server error raised inside handlers")
-        if mime_match(request.headers.get("accept", "text/html"), "application/json", strict=True):
+        accept = request.headers.get(hdrs.ACCEPT, MEDIA_TYPE_HTML)
+        if mime_match(accept, MEDIA_TYPE_JSON, strict=True):
             return web.json_response(
                 ensure_json_serializable(ex.body_dict),
                 status=ex.status_code,
                 headers={"Access-Control-Allow-Origin": "*"},
             )
         return aiohttp_jinja2.render_template(
-            "error.jinja2",
+            ERROR_TEMPLATE_NAME,
             request,
             ex.body_dict,
             status=ex.status_code,
@@ -337,11 +341,6 @@ async def _make_message_queue(
         db=REDIS_STREAM_DB,
     )
 
-    if root_ctx.local_config.proxy_worker.use_experimental_redis_event_dispatcher:
-        return HiRedisQueue(
-            stream_redis_target,
-            args,
-        )
     return await RedisQueue.create(
         stream_redis_target,
         args,
@@ -982,6 +981,7 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
     """
     Start the proxy-worker service as a foreground process.
     """
+    force_threaded_dns_resolver()
     log_level = LogLevel.DEBUG if debug else log_level
     server_config = load_config(config_path, log_level)
 

@@ -18,16 +18,16 @@ from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 
 from ai.backend.common import msgpack
 from ai.backend.common.auth import ManagerAuthHandler
+from ai.backend.common.clients.agent.client import AgentClient
+from ai.backend.common.clients.agent.peer import PeerInvoker
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.agent_cache import PeerInvoker
 from ai.backend.manager.errors.agent import AgentConnectionUnavailable
 
-from .client import AgentClient
 from .types import AgentPoolSpec
 
 if TYPE_CHECKING:
-    from ai.backend.manager.agent_cache import AgentRPCCache, PeerInvoker
+    from ai.backend.manager.agent_cache import AgentRPCCache
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

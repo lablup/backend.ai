@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
+from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.domain.request import (
     CreateDomainInput,
     DeleteDomainInput,
@@ -205,6 +208,13 @@ class TestDomainFilter:
         json_data = f.model_dump_json()
         restored = DomainFilter.model_validate_json(json_data)
         assert restored.is_active is True
+
+    def test_id_round_trip(self) -> None:
+        domain_id = uuid.uuid4()
+        f = DomainFilter(id=UUIDFilter(equals=domain_id))
+        restored = DomainFilter.model_validate_json(f.model_dump_json())
+        assert restored.id is not None
+        assert restored.id.equals == domain_id
 
 
 class TestDomainOrder:

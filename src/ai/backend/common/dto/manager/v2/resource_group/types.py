@@ -11,7 +11,6 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 __all__ = (
     "OrderDirection",
     "PreemptionModeDTO",
-    "PreemptionOrderDTO",
     "ResourceGroupOrderDirection",
     "ResourceGroupOrderField",
     "SchedulerTypeDTO",
@@ -40,13 +39,6 @@ class SchedulerTypeDTO(StrEnum):
     LIFO = "lifo"
     DRF = "drf"
     FAIR_SHARE = "fair-share"
-
-
-class PreemptionOrderDTO(StrEnum):
-    """Tie-breaking order for same-priority sessions during preemption."""
-
-    OLDEST = "oldest"
-    NEWEST = "newest"
 
 
 class PreemptionModeDTO(StrEnum):

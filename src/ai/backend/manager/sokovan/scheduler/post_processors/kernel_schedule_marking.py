@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -32,6 +32,7 @@ class KernelScheduleMarkingPostProcessor(KernelPostProcessor):
     def __init__(self, scheduling_controller: SchedulingController) -> None:
         self._scheduling_controller = scheduling_controller
 
+    @override
     async def execute(self, context: KernelPostProcessorContext) -> None:
         """Mark the next schedule types for all target statuses."""
         if not context.target_statuses:

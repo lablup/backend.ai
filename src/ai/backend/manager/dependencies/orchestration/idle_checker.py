@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.events.dispatcher import EventProducer
@@ -32,10 +33,12 @@ class IdleCheckerHostDependency(
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "idle-checker-host"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: IdleCheckerInput) -> AsyncIterator[IdleCheckerHost]:
         """Initialize and provide idle checker host.
 

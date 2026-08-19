@@ -7,6 +7,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from typing import override
 from uuid import UUID
 
 from ai.backend.common.events.types import AbstractAnycastEvent
@@ -219,9 +220,11 @@ class ReconcilerStage[
         self._metadata = metadata
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         return self._metadata.lock_id
 
+    @override
     async def run(self) -> None:
         metrics = ReconcilerMetricObserver.instance()
         kind = self._metadata.kind

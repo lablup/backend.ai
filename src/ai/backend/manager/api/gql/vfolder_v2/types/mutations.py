@@ -459,6 +459,18 @@ class PurgeVFolderOptionsInputGQL(PydanticInputMixin[PurgeVFolderOptionsDTO]):
             "If false, the request is rejected when any model card still references it."
         ),
     )
+    force: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description=(
+                "If true, bypass the in-use guards and purge the vfolder even when it is "
+                "mounted by a live session, referenced by an active model-service endpoint, "
+                "or not in a purgable status. Irreversible — use with caution. "
+                "If false (default), the request is rejected in those cases."
+            ),
+        ),
+        default=False,
+    )
 
 
 @gql_pydantic_input(

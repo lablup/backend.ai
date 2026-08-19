@@ -259,15 +259,11 @@ class SchedulingTarget(_OptionsBaseModel):
     )
 
 
-class KernelExecutionSpec(_OptionsBaseModel):
-    """Per-kernel execution spec.
+class KernelResourceConfig(_OptionsBaseModel):
+    """Resolved per-kernel resource inputs (image + slots).
 
-    Used both as the shared baseline in
-    ``DefaultSessionOptions.default_kernel_execution_spec`` (merged
-    into every group unless overridden) and as the per-group override on
-    ``KernelGroup.execution_spec``. All fields are resolved; ``None`` on the
-    optional fields carries real meaning (for example ``starts_at=None``
-    = "start immediately on schedule").
+    The resolved counterpart of the draft's ``KernelResourceInput``; grouped as
+    a single field so the same shape is shared with the compute-schedule flow.
     """
 
     image_id: ImageID = Field(
@@ -288,6 +284,22 @@ class KernelExecutionSpec(_OptionsBaseModel):
     resource_opts: ResourceOpts = Field(
         default_factory=ResourceOpts,
         description="Qualitative resource hints such as shared memory.",
+    )
+
+
+class KernelExecutionSpec(_OptionsBaseModel):
+    """Per-kernel execution spec.
+
+    Used both as the shared baseline in
+    ``DefaultSessionOptions.default_kernel_execution_spec`` (merged
+    into every group unless overridden) and as the per-group override on
+    ``KernelGroup.execution_spec``. All fields are resolved; ``None`` on the
+    optional fields carries real meaning (for example ``starts_at=None``
+    = "start immediately on schedule").
+    """
+
+    resource_input: KernelResourceConfig = Field(
+        description="Resolved image + resource-slot inputs for this kernel.",
     )
     environ: Mapping[str, str] = Field(
         default_factory=dict,
@@ -399,6 +411,13 @@ class DefaultSessionOptions(_OptionsBaseModel):
         default=10,
         description="Default scheduling priority for new sessions.",
     )
+    job_priority: int = Field(
+        default=0,
+        description=(
+            "Default scope-local preemption priority for new sessions "
+            "(ranks the owner's own sessions; decoupled from `priority`)."
+        ),
+    )
     is_preemptible: bool = Field(
         default=True,
         description="Default preemption flag for new sessions.",
@@ -488,6 +507,7 @@ class SessionOptions(_OptionsBaseModel):
       | Field                                          | Location                                       |
       | ---------------------------------------------- | ---------------------------------------------- |
       | ``priority``                                   | ``SessionRow.priority`` column                 |
+      | ``job_priority``                               | ``SessionRow.job_priority`` column             |
       | ``is_preemptible``                             | ``SessionRow.is_preemptible`` column           |
       | ``cluster_mode``                               | ``SessionRow.cluster_mode`` column             |
       | ``cluster_size``                               | ``SessionRow.cluster_size`` column             |
@@ -501,6 +521,13 @@ class SessionOptions(_OptionsBaseModel):
     """
 
     priority: int = Field(description="Scheduling priority.")
+    # Defaults to the neutral baseline (0) when unresolved — unlike `priority`,
+    # job_priority has a meaningful "no preference" value, so a missing value
+    # resolves to neutral rather than being an error.
+    job_priority: int = Field(
+        default=0,
+        description="Scope-local preemption priority among the owner's own sessions.",
+    )
     is_preemptible: bool = Field(description="Preemption flag.")
     cluster_mode: ClusterMode = Field(description="Placement constraint.")
     cluster_size: int = Field(

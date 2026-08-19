@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from datetime import date, datetime
-from typing import TypeVar
+from typing import TypeVar, override
 
 from pydantic import Field
 
@@ -173,6 +173,7 @@ class NullableDateTimeFilter(DateTimeFilter):
         description="Filter by null status: true = IS NULL, false = IS NOT NULL",
     )
 
+    @override
     def build_query_condition(
         self,
         before_factory: Callable[[datetime], _QC],

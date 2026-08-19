@@ -36,9 +36,11 @@ class ImagePullSpec:
 
 class ImagePullSpecProvisioner(Provisioner[ImagePullCheckSpec, ImagePullSpec]):
     @property
+    @override
     def name(self) -> str:
         return "docker-image-pull-check"
 
+    @override
     async def setup(self, spec: ImagePullCheckSpec) -> ImagePullSpec:
         do_pull = (not spec.image_ref.is_local) and await self._check_image_exist(spec)
         return ImagePullSpec(
@@ -66,6 +68,7 @@ class ImagePullSpecProvisioner(Provisioner[ImagePullCheckSpec, ImagePullSpec]):
                 raise
         return False
 
+    @override
     async def teardown(self, resource: ImagePullSpec) -> None:
         pass
 

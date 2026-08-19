@@ -8,6 +8,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.fair_share import (
     DomainFairShareRow,
@@ -15,6 +16,7 @@ from ai.backend.manager.models.fair_share import (
     UserFairShareRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestDomainFairShareRow:
@@ -51,13 +53,15 @@ class TestDomainFairShareRow:
         self,
         database_with_fair_share_tables: ExtendedAsyncSAEngine,
         domain_fair_share_id: uuid.UUID,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> None:
-        """Duplicate (scaling_group, domain_name) should raise IntegrityError."""
+        """Duplicate (resource_group_id, domain_name) should raise IntegrityError."""
         duplicate = DomainFairShareRow(
-            domain_name=domain_name,
+            domain_name=domain_fixture.domain_name,
             resource_group=scaling_group,
+            resource_group_id=resource_group_id,
             weight=Decimal("1.0"),
             total_decayed_usage=ResourceSlot(),
             normalized_usage=Decimal("0"),
@@ -72,13 +76,15 @@ class TestDomainFairShareRow:
     async def test_decimal_precision_weight(
         self,
         database_with_fair_share_tables: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """Weight field should preserve Numeric(10, 4) precision."""
         row = DomainFairShareRow(
-            domain_name=domain_name,
+            domain_name=domain_fixture.domain_name,
             resource_group=scaling_group,
+            resource_group_id=resource_group_id,
             weight=Decimal("1234.5678"),
             total_decayed_usage=ResourceSlot(),
             normalized_usage=Decimal("0"),
@@ -117,14 +123,16 @@ class TestProjectFairShareRow:
         database_with_fair_share_tables: ExtendedAsyncSAEngine,
         project_fair_share_id: uuid.UUID,
         project_id: uuid.UUID,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> None:
-        """Duplicate (scaling_group, project_id) should raise IntegrityError."""
+        """Duplicate (resource_group_id, project_id) should raise IntegrityError."""
         duplicate = ProjectFairShareRow(
             project_id=project_id,
-            domain_name=domain_name,
+            domain_name=domain_fixture.domain_name,
             resource_group=scaling_group,
+            resource_group_id=resource_group_id,
             weight=Decimal("1.0"),
             total_decayed_usage=ResourceSlot(),
             normalized_usage=Decimal("0"),
@@ -161,15 +169,17 @@ class TestUserFairShareRow:
         user_fair_share_id: uuid.UUID,
         user_uuid: uuid.UUID,
         project_id: uuid.UUID,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> None:
-        """Duplicate (scaling_group, user_uuid, project_id) should raise IntegrityError."""
+        """Duplicate (resource_group_id, user_uuid, project_id) should raise IntegrityError."""
         duplicate = UserFairShareRow(
             user_uuid=user_uuid,
             project_id=project_id,
-            domain_name=domain_name,
+            domain_name=domain_fixture.domain_name,
             resource_group=scaling_group,
+            resource_group_id=resource_group_id,
             weight=Decimal("1.0"),
             total_decayed_usage=ResourceSlot(),
             normalized_usage=Decimal("0"),

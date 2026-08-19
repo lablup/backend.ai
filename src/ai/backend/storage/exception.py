@@ -1,4 +1,5 @@
 from pathlib import PurePosixPath
+from typing import override
 
 from aiohttp import web
 
@@ -17,6 +18,7 @@ class StorageProxyError(BackendAIError, web.HTTPInternalServerError):
     error_title = "Storage Proxy Error"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -30,6 +32,7 @@ class ProcessExecutionError(BackendAIError, web.HTTPInternalServerError):
     error_title = "Storage Operation Execution Failed"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -43,6 +46,7 @@ class ExternalStorageServiceError(BackendAIError, web.HTTPInternalServerError):
     error_title = "External Operation Failed"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -56,6 +60,7 @@ class NetAppClientError(ExternalStorageServiceError, web.HTTPServiceUnavailable)
     error_title = "NetApp API Error"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -69,6 +74,7 @@ class VFolderNotFoundError(BackendAIError, web.HTTPNotFound):
     error_title = "VFolder Not Found"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
@@ -82,6 +88,7 @@ class QuotaDirectoryNotEmptyError(BackendAIError, web.HTTPConflict):
     error_title = "Quota Directory Not Empty"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -95,6 +102,7 @@ class QuotaScopeNotFoundError(BackendAIError, web.HTTPNotFound):
     error_title = "Quota Scope Not Found"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.QUOTA_SCOPE,
@@ -108,6 +116,7 @@ class QuotaScopeRequiredError(BackendAIError, web.HTTPPreconditionRequired):
     error_title = "Quota Scope Required"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.QUOTA_SCOPE,
@@ -121,6 +130,7 @@ class QuotaScopeAlreadyExists(BackendAIError, web.HTTPConflict):
     error_title = "Quota Scope Already Exists"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -134,6 +144,7 @@ class InvalidQuotaConfig(BackendAIError, web.HTTPBadRequest):
     error_title = "Invalid Quota Config"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -151,6 +162,7 @@ class InvalidSubpathError(BackendAIError, web.HTTPBadRequest):
         super().__init__(extra_msg=msg_str, extra_data=msg_str)
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -164,6 +176,7 @@ class InvalidQuotaScopeError(BackendAIError, web.HTTPBadRequest):
     error_title = "Invalid Quota Scope"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -177,6 +190,7 @@ class InvalidVolumeError(BackendAIError, web.HTTPBadRequest):
     error_title = "Invalid Volume"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -190,6 +204,7 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
     error_title = "Invalid API parameters"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -203,6 +218,7 @@ class FileStreamUploadError(ProcessExecutionError):
     error_title = "Failed to upload file stream"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -216,6 +232,7 @@ class FileStreamDownloadError(ProcessExecutionError):
     error_title = "Failed to download file stream"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -229,6 +246,7 @@ class PresignedUploadURLGenerationError(ProcessExecutionError):
     error_title = "Failed to generate presigned upload URL"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -242,6 +260,7 @@ class PresignedDownloadURLGenerationError(ProcessExecutionError):
     error_title = "Failed to generate presigned download URL"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -255,6 +274,7 @@ class ObjectInfoFetchError(ProcessExecutionError):
     error_title = "Failed to fetch object info"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -268,6 +288,7 @@ class StorageNotFoundError(BackendAIError, web.HTTPNotFound):
     error_title = "Storage Config Not Found"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -281,6 +302,7 @@ class StorageTypeInvalidError(BackendAIError, web.HTTPBadRequest):
     error_title = "Storage Config Invalid Type"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -294,6 +316,7 @@ class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
     error_title = "Storage Bucket Not Found"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -307,6 +330,7 @@ class StorageBucketFileNotFoundError(BackendAIError, web.HTTPNotFound):
     error_title = "Storage Bucket File Not Found"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -320,6 +344,7 @@ class RegistryNotFoundError(BackendAIError, web.HTTPNotFound):
     error_title = "Registry Not Found"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT_REGISTRY,
@@ -333,6 +358,7 @@ class HuggingFaceAPIError(BackendAIError, web.HTTPInternalServerError):
     error_title = "HuggingFace API Error"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT_REGISTRY,
@@ -346,6 +372,7 @@ class HuggingFaceModelNotFoundError(BackendAIError, web.HTTPNotFound):
     error_title = "HuggingFace Model Not Found"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
@@ -359,6 +386,7 @@ class ObjectStorageConfigInvalidError(BackendAIError, web.HTTPBadRequest):
     error_title = "Object Storage Config Invalid"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -372,6 +400,7 @@ class ReservoirStorageConfigInvalidError(BackendAIError, web.HTTPBadRequest):
     error_title = "Reservoir Storage Config Invalid"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -385,6 +414,7 @@ class ArtifactStorageEmptyError(BackendAIError, web.HTTPNotFound):
     error_title = "Artifact Storage Empty"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
@@ -398,6 +428,7 @@ class ArtifactRevisionEmptyError(BackendAIError, web.HTTPBadRequest):
     error_title = "Artifact Revision Empty"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
@@ -411,6 +442,7 @@ class ArtifactImportError(BackendAIError, web.HTTPInternalServerError):
     error_title = "Artifact Import Failed"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
@@ -424,6 +456,7 @@ class NotImplementedAPI(BackendAIError, web.HTTPBadRequest):
     error_title = "API Not Implemented"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -437,6 +470,7 @@ class ObjectStorageObjectDeletionError(BackendAIError, web.HTTPBadRequest):
     error_title = "Object Deletion Failed"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.OBJECT_STORAGE,
@@ -450,6 +484,7 @@ class StorageTransferError(BackendAIError, web.HTTPInternalServerError):
     error_title = "Storage Transfer Failed"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -463,6 +498,7 @@ class StorageStepRequiredStepNotProvided(BackendAIError, web.HTTPBadRequest):
     error_title = "Storage Step Mapping Not Provided"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,

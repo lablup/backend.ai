@@ -17,6 +17,7 @@ from ai.backend.test.tester.dependency import DomainDep, GroupDep
 
 class UserTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "create_user"
 
@@ -100,7 +101,6 @@ class UserTemplate(WrapperTestTemplate):
         email = f"{username}@tester_email.com"
         description = f"Test user for {test_id}, used in tester package"
 
-        user_meta: CreatedUserMeta | None = None
         user_meta = await self._create_user_with_keypair(
             client_session,
             domain_ctx.name,
@@ -114,6 +114,5 @@ class UserTemplate(WrapperTestTemplate):
             with CreatedUserContext.with_current(user_meta):
                 yield
         finally:
-            if user_meta:
-                await client_session.User.delete(email)
-                await client_session.User.purge(email)
+            await client_session.User.delete(email)
+            await client_session.User.purge(email)

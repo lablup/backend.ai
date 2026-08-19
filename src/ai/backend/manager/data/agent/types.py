@@ -8,10 +8,17 @@ from typing import TYPE_CHECKING, Any, Self, override
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
-from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
+from ai.backend.common.types import (
+    AgentId,
+    DeviceName,
+    ResourceSlot,
+    ResourceSlotEntry,
+    SlotName,
+    SlotTypes,
+)
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.rbac.permission_defs import AgentPermission
+    from ai.backend.manager.data.permission.permission_defs import AgentPermission
 
 
 class AgentStatus(enum.Enum):
@@ -52,7 +59,6 @@ class AgentStatus(enum.Enum):
 class AgentDataForHeartbeatUpdate:
     status: AgentStatus
     status_changed: datetime | None
-    scaling_group: str
     available_slots: ResourceSlot
     addr: str
     public_host: str | None
@@ -90,7 +96,7 @@ class AgentMetadata:
     id: AgentId
     status: AgentStatus
     region: str | None
-    scaling_group: str
+    scaling_group: str | None
     architecture: str
     version: str
     auto_terminate_abusing_kernel: bool
@@ -124,7 +130,6 @@ class AgentHeartbeatUpsert:
             "id": self.metadata.id,
             "status": AgentStatus.ALIVE,
             "region": self.metadata.region,
-            "scaling_group": self.metadata.scaling_group,
             "available_slots": self.resource_info.available_slots,
             "addr": self.network_info.addr,
             "public_host": self.network_info.public_host,
@@ -144,7 +149,6 @@ class AgentHeartbeatUpsert:
             "id": self.metadata.id,
             "status": AgentStatus.ALIVE,
             "region": self.metadata.region,
-            "scaling_group": self.metadata.scaling_group,
             "available_slots": self.resource_info.available_slots,
             "addr": self.network_info.addr,
             "public_host": self.network_info.public_host,
@@ -175,9 +179,17 @@ class AgentHeartbeatUpsert:
                 public_host=agent_info.public_host,
                 public_key=agent_info.public_key,
             ),
+            # The heartbeat carries the list-friendly `ResourceSlotEntry` form, while the
+            # agents table still stores a `ResourceSlot`, so the wire form is collapsed
+            # back here at the boundary rather than downstream.
             resource_info=AgentResourceInfo(
-                slot_key_and_units=agent_info.slot_key_and_units,
-                available_slots=agent_info.available_resource_slots,
+                slot_key_and_units={
+                    SlotName(slot_name): slot_type
+                    for slot_name, slot_type in agent_info.slot_key_and_units.items()
+                },
+                available_slots=ResourceSlotEntry.inputs_to_resource_slot(
+                    agent_info.available_resource_slots
+                ),
                 compute_plugins=agent_info.compute_plugins,
             ),
             lost_at=None,
@@ -203,7 +215,6 @@ class UpsertResult:
         was_revived = existing_data.status in (AgentStatus.LOST, AgentStatus.TERMINATED)
         need_resource_slot_update = (
             existing_data.available_slots != upsert_data.resource_info.available_slots
-            or existing_data.scaling_group != upsert_data.metadata.scaling_group
             or existing_data.addr != upsert_data.network_info.addr
             or existing_data.public_host != upsert_data.network_info.public_host
             or existing_data.public_key != upsert_data.network_info.public_key

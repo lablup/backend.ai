@@ -5,6 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Self
 
+from strawberry import UNSET
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
@@ -31,7 +32,6 @@ from ai.backend.common.dto.manager.v2.login_client_type.response import (
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
     UpdateLoginClientTypePayload as UpdateLoginClientTypePayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -122,21 +122,15 @@ class LoginClientTypeFilterGQL(PydanticInputMixin[LoginClientTypeFilterDTO]):
         description="Filter by last modification datetime.", default=None
     )
     AND: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Match all of the given sub-filters."),
         default=None,
     )
     OR: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Match any of the given sub-filters."),
         default=None,
     )
     NOT: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Negate the given sub-filters."),
         default=None,
     )
 
@@ -211,7 +205,7 @@ class CreateLoginClientTypePayloadGQL(PydanticOutputMixin[CreateLoginClientTypeP
 class UpdateLoginClientTypeInputGQL(PydanticInputMixin[UpdateLoginClientTypeInputDTO]):
     name: str | None = gql_field(default=None, description="Updated name.")
     description: str | None = gql_field(
-        default=None,
+        default=UNSET,
         description="Updated description. Pass null to clear, omit to leave unchanged.",
     )
 

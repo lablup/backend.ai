@@ -1,6 +1,49 @@
 from typing import Any
 
-from ai.backend.kernel.service import ServiceArgumentInterpolator
+import pytest
+
+from ai.backend.kernel.service import ServiceArgumentInterpolator, ServiceParser
+
+
+class TestModelServiceStringCommand:
+    @pytest.fixture
+    def service_parser(self) -> ServiceParser:
+        return ServiceParser({})
+
+    @pytest.mark.parametrize("shell", [None, ""])
+    async def test_without_shell_is_split(
+        self,
+        service_parser: ServiceParser,
+        shell: str | None,
+    ) -> None:
+        service_parser.add_model_service(
+            "model",
+            {
+                "start_command": "python service.py --flag 'a b'",
+                "shell": shell,
+                "pre_start_actions": [],
+            },
+        )
+
+        cmdargs, env = await service_parser.start_service("model", set(), {})
+
+        assert cmdargs == ["python", "service.py", "--flag", "a b"]
+        assert env == {}
+
+    async def test_with_shell_uses_shell_c(self, service_parser: ServiceParser) -> None:
+        service_parser.add_model_service(
+            "model",
+            {
+                "start_command": "python service.py && echo ok",
+                "shell": "/bin/bash",
+                "pre_start_actions": [],
+            },
+        )
+
+        cmdargs, env = await service_parser.start_service("model", set(), {})
+
+        assert cmdargs == ["/bin/bash", "-c", "python service.py && echo ok"]
+        assert env == {}
 
 
 def test_service_argument_interpolation_intrinsic_python_style() -> None:

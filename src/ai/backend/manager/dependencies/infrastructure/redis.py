@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
@@ -79,10 +80,12 @@ class ValkeyDependency(InfrastructureDependency[ValkeyClients]):
     """Provides lifecycle management for 9 specialized Valkey clients."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "valkey"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: ManagerUnifiedConfig) -> AsyncIterator[ValkeyClients]:
         """Initialize and provide all Valkey clients.
 
@@ -156,6 +159,7 @@ class ValkeyDependency(InfrastructureDependency[ValkeyClients]):
         finally:
             await clients.close()
 
+    @override
     def gen_liveness_checker(
         self,
         resource: ValkeyClients,

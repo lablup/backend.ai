@@ -5,15 +5,16 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Self, TypeVar, cast
+from typing import Any, Self, TypeVar, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload, with_loader_criteria
 
+from ai.backend.manager.data.permission.permission_defs import BasePermission
+
 from .context import ClientContext
 from .exceptions import InvalidScope, ScopeTypeMismatch
-from .permission_defs import BasePermission
 
 __all__: Sequence[str] = (
     "AbstractPermissionContext",
@@ -93,7 +94,7 @@ async def _calculate_role_in_scope_for_suadmin(
                 return frozenset([PredefinedRole.ADMIN])
             return _EMPTY_FSET
         case ProjectScope(project_id):
-            stmt = (
+            project_stmt = (
                 sa.select(GroupRow)
                 .where(GroupRow.id == project_id)
                 .options(
@@ -103,7 +104,7 @@ async def _calculate_role_in_scope_for_suadmin(
                     ),
                 )
             )
-            project_row = cast(GroupRow | None, await db_session.scalar(stmt))
+            project_row = cast(GroupRow | None, await db_session.scalar(project_stmt))
             if project_row is None:
                 return _EMPTY_FSET
             result = frozenset([PredefinedRole.ADMIN])
@@ -113,10 +114,10 @@ async def _calculate_role_in_scope_for_suadmin(
         case UserScope(user_id):
             if ctx.user_id == user_id:
                 return frozenset([PredefinedRole.OWNER])
-            stmt = (
+            user_stmt = (
                 sa.select(UserRow).where(UserRow.uuid == user_id).options(load_only(UserRow.uuid))
             )
-            user_row = cast(UserRow | None, await db_session.scalar(stmt))
+            user_row = cast(UserRow | None, await db_session.scalar(user_stmt))
             if user_row is not None:
                 return frozenset([PredefinedRole.ADMIN])
             return _EMPTY_FSET
@@ -143,7 +144,7 @@ async def _calculate_role_in_scope_for_monitor(
                 return frozenset([PredefinedRole.MONITOR])
             return _EMPTY_FSET
         case ProjectScope(project_id):
-            stmt = (
+            project_stmt = (
                 sa.select(GroupRow)
                 .where(GroupRow.id == project_id)
                 .options(
@@ -154,7 +155,7 @@ async def _calculate_role_in_scope_for_monitor(
                     ),
                 )
             )
-            project_row = cast(GroupRow | None, await db_session.scalar(stmt))
+            project_row = cast(GroupRow | None, await db_session.scalar(project_stmt))
             if project_row is None:
                 return _EMPTY_FSET
             if project_row.domain_name == ctx.domain_name:
@@ -167,10 +168,10 @@ async def _calculate_role_in_scope_for_monitor(
         case UserScope(user_id):
             if ctx.user_id == user_id:
                 return frozenset([PredefinedRole.OWNER])
-            stmt = (
+            user_stmt = (
                 sa.select(UserRow).where(UserRow.uuid == user_id).options(load_only(UserRow.uuid))
             )
-            user_row = cast(UserRow | None, await db_session.scalar(stmt))
+            user_row = cast(UserRow | None, await db_session.scalar(user_stmt))
             if user_row is not None:
                 return frozenset([PredefinedRole.MONITOR])
             return _EMPTY_FSET
@@ -190,7 +191,7 @@ async def _calculate_role_in_scope_for_admin(
                 return frozenset([PredefinedRole.ADMIN])
             return _EMPTY_FSET
         case ProjectScope(project_id):
-            stmt = (
+            project_stmt = (
                 sa.select(GroupRow)
                 .where(GroupRow.id == project_id)
                 .options(
@@ -201,7 +202,7 @@ async def _calculate_role_in_scope_for_admin(
                     ),
                 )
             )
-            project_row = cast(GroupRow | None, await db_session.scalar(stmt))
+            project_row = cast(GroupRow | None, await db_session.scalar(project_stmt))
             if project_row is None:
                 return _EMPTY_FSET
 
@@ -218,15 +219,13 @@ async def _calculate_role_in_scope_for_admin(
             if domain_name is not None:
                 _domain_name = domain_name
             else:
-                stmt = (
+                user_stmt = (
                     sa.select(UserRow)
                     .where(UserRow.uuid == user_id)
                     .options(load_only(UserRow.domain_name))
                 )
-                user_row = cast(UserRow | None, await db_session.scalar(stmt))
+                user_row = cast(UserRow | None, await db_session.scalar(user_stmt))
                 if user_row is None:
-                    return _EMPTY_FSET
-                if user_row.domain_name is None:
                     return _EMPTY_FSET
                 _domain_name = user_row.domain_name
             if _domain_name == ctx.domain_name:
@@ -267,6 +266,7 @@ async def _calculate_role_in_scope_for_user(
 
 class BaseScope(metaclass=ABCMeta):
     @abstractmethod
+    @override
     def __str__(self) -> str:
         pass
 
@@ -282,13 +282,16 @@ class BaseScope(metaclass=ABCMeta):
 
 @dataclass(frozen=True)
 class SystemScope(BaseScope):
+    @override
     def __str__(self) -> str:
         return "system scope()"
 
+    @override
     def serialize(self) -> str:
         return "system:"
 
     @classmethod
+    @override
     def deserialize(cls, val: str) -> Self:
         type_, _, _ = val.partition(":")
         if type_ != "system":
@@ -300,13 +303,16 @@ class SystemScope(BaseScope):
 class DomainScope(BaseScope):
     domain_name: str
 
+    @override
     def __str__(self) -> str:
         return f"Domain(name: {self.domain_name})"
 
+    @override
     def serialize(self) -> str:
         return f"domain:{self.domain_name}"
 
     @classmethod
+    @override
     def deserialize(cls, val: str) -> Self:
         type_, _, domain_name = val.partition(":")
         if type_ != "domain":
@@ -319,15 +325,18 @@ class ProjectScope(BaseScope):
     project_id: uuid.UUID
     domain_name: str | None = None
 
+    @override
     def __str__(self) -> str:
         return f"Project(id: {self.project_id}, domain: {self.domain_name}])"
 
+    @override
     def serialize(self) -> str:
         if self.domain_name is not None:
             return f"project:{self.project_id}:{self.domain_name}"
         return f"project:{self.project_id}"
 
     @classmethod
+    @override
     def deserialize(cls, val: str) -> Self:
         type_, _, values = val.partition(":")
         if type_ != "project":
@@ -343,15 +352,18 @@ class UserScope(BaseScope):
     user_id: uuid.UUID
     domain_name: str | None = None
 
+    @override
     def __str__(self) -> str:
         return f"User(id: {self.user_id}, domain: {self.domain_name})"
 
+    @override
     def serialize(self) -> str:
         if self.domain_name is not None:
             return f"user:{self.user_id}:{self.domain_name}"
         return f"user:{self.user_id}"
 
     @classmethod
+    @override
     def deserialize(cls, val: str) -> Self:
         type_, _, values = val.partition(":")
         if type_ != "user":
@@ -438,9 +450,11 @@ class ScalingGroup(ExtraScope):
 class ContainerRegistryScope(ExtraScope):
     registry_id: uuid.UUID
 
+    @override
     def __str__(self) -> str:
         return f"container_registry:{self.registry_id!s}"
 
+    @override
     def __repr__(self) -> str:
         return self.__str__()
 

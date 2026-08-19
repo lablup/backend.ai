@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import AsyncExitStack
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.common.dependencies.base import DependencyStack
 
@@ -35,6 +35,7 @@ class DependencyBuilderStack(DependencyStack):
         self._liveness_checkers = {}
         self._readiness_checkers = {}
 
+    @override
     async def enter_dependency(
         self,
         provider: DependencyProvider[SetupInputT, ResourceT],
@@ -55,6 +56,7 @@ class DependencyBuilderStack(DependencyStack):
 
         return resource
 
+    @override
     async def enter_composer(
         self,
         composer: DependencyComposer[SetupInputT, ResourcesT],

@@ -7,16 +7,18 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 
 @dataclass
 class RepositoryArgs:
     db: ExtendedAsyncSAEngine
     ops_provider: DBOpsProvider
+    v2_ops_provider: V2DBOpsProvider
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
     valkey_stat_client: ValkeyStatClient

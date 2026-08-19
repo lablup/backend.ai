@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import HostPortPair, ResourceSlot
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.error_log.handler import ErrorLogHandler
@@ -22,7 +23,7 @@ from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.agent import agents
-from ai.backend.manager.models.error_logs import error_logs
+from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.error_log.repository import ErrorLogRepository
 from ai.backend.manager.repositories.manager_admin.repository import ManagerAdminRepository
@@ -96,7 +97,8 @@ def server_module_registries(
 @pytest.fixture()
 async def agent_fixture(
     db_engine: SAEngine,
-    scaling_group_fixture: str,
+    scaling_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[str]:
     """Insert a test agent record and yield its ID."""
     agent_id = f"i-test-agent-{secrets.token_hex(4)}"
@@ -105,7 +107,8 @@ async def agent_fixture(
             sa.insert(agents).values(
                 id=agent_id,
                 region="local",
-                scaling_group=scaling_group_fixture,
+                scaling_group=scaling_group_name,
+                resource_group_id=resource_group_id,
                 available_slots=ResourceSlot(),
                 occupied_slots=ResourceSlot(),
                 addr="127.0.0.1:6001",
@@ -128,5 +131,5 @@ async def _cleanup_side_effects(
     """
     yield
     async with db_engine.begin() as conn:
-        await conn.execute(sa.delete(error_logs))
+        await conn.execute(sa.delete(ErrorLogRow))
         await conn.execute(sa.delete(agents))

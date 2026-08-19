@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Self, override
+from typing import override
 
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
@@ -33,7 +33,6 @@ class ModelMetadataInfo:
     size: int
 
 
-@dataclass
 class ModelVerifyingEvent(BaseArtifactEvent):
     """
     Mark the model revision's status to verifying.
@@ -49,18 +48,6 @@ class ModelVerifyingEvent(BaseArtifactEvent):
     def event_name(cls) -> str:
         return "model_verifying"
 
-    def serialize(self) -> tuple[Any, ...]:
-        return (self.model_id, self.revision, self.registry_type, self.registry_name)
-
-    @classmethod
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(
-            model_id=value[0],
-            revision=value[1],
-            registry_type=value[2],
-            registry_name=value[3],
-        )
-
     @override
     def domain_id(self) -> str | None:
         return None
@@ -70,7 +57,6 @@ class ModelVerifyingEvent(BaseArtifactEvent):
         return None
 
 
-@dataclass
 class ModelImportDoneEvent(BaseArtifactEvent):
     model_id: str
     revision: str
@@ -85,37 +71,6 @@ class ModelImportDoneEvent(BaseArtifactEvent):
     def event_name(cls) -> str:
         return "model_import_done"
 
-    def serialize(self) -> tuple[Any, ...]:
-        verification_result = None
-        if self.verification_result is not None:
-            verification_result = self.verification_result.model_dump()
-
-        return (
-            self.model_id,
-            self.revision,
-            self.registry_type,
-            self.registry_name,
-            self.success,
-            self.digest,
-            verification_result,
-        )
-
-    @classmethod
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        verification_result = None
-        if value[6] is not None:
-            verification_result = VerificationStepResult.model_validate(value[6])
-
-        return cls(
-            model_id=value[0],
-            revision=value[1],
-            registry_type=value[2],
-            registry_name=value[3],
-            success=value[4],
-            digest=value[5],
-            verification_result=verification_result,
-        )
-
     @override
     def domain_id(self) -> str | None:
         return None
@@ -125,7 +80,6 @@ class ModelImportDoneEvent(BaseArtifactEvent):
         return None
 
 
-@dataclass
 class ModelMetadataFetchDoneEvent(BaseArtifactEvent):
     model: ModelMetadataInfo
 
@@ -133,29 +87,6 @@ class ModelMetadataFetchDoneEvent(BaseArtifactEvent):
     @override
     def event_name(cls) -> str:
         return "models_metadata_fetch_done"
-
-    def serialize(self) -> tuple[Any, ...]:
-        return (
-            self.model.model_id,
-            self.model.revision,
-            self.model.readme_content,
-            self.model.registry_name,
-            self.model.registry_type,
-            self.model.size,
-        )
-
-    @classmethod
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(
-            model=ModelMetadataInfo(
-                model_id=value[0],
-                revision=value[1],
-                readme_content=value[2],
-                registry_name=value[3],
-                registry_type=value[4],
-                size=value[5],
-            )
-        )
 
     @override
     def domain_id(self) -> str | None:

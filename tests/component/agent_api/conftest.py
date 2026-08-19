@@ -3,7 +3,7 @@ from __future__ import annotations
 import secrets
 from collections.abc import AsyncIterator
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair, ResourceSlot
 from ai.backend.manager.actions.validators import ActionValidators
@@ -74,7 +75,9 @@ def agent_processors(
     scheduler_repository = SchedulerRepository(
         database_engine,
         valkey_stat=valkey_clients.stat,
+        valkey_schedule=valkey_clients.schedule,
         config_provider=config_provider,
+        storage_manager=MagicMock(),
     )
     service = AgentService(
         etcd=async_etcd,
@@ -82,6 +85,7 @@ def agent_processors(
         config_provider=config_provider,
         agent_repository=agent_repository,
         scheduler_repository=scheduler_repository,
+        scheduling_controller=AsyncMock(),
         hook_plugin_ctx=hook_plugin_ctx,
         event_producer=event_producer,
         agent_cache=agent_cache,
@@ -105,11 +109,12 @@ def server_module_registries(
 @pytest.fixture()
 async def agent_fixture(
     db_engine: SAEngine,
-    scaling_group_fixture: str,
+    scaling_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[str]:
     """Insert a test agent row and yield its ID.
 
-    The agent references the scaling_group_fixture via FK.
+    The agent references the scaling_group_name via FK.
     Teardown deletes the agent row (cascade deletes agent_resources).
     """
     agent_id = f"i-test-agent-{secrets.token_hex(6)}"
@@ -119,7 +124,8 @@ async def agent_fixture(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 region="local",
-                scaling_group=scaling_group_fixture,
+                scaling_group=scaling_group_name,
+                resource_group_id=resource_group_id,
                 schedulable=True,
                 available_slots=ResourceSlot({"cpu": "4", "mem": "8589934592"}),
                 occupied_slots=ResourceSlot(),

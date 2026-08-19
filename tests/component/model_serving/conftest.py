@@ -37,6 +37,7 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 
 @pytest.fixture()
@@ -77,6 +78,7 @@ def model_serving_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
             rbac=RBACValidators(
                 scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
                 single_entity=SingleEntityActionRBACValidator(
@@ -100,6 +102,7 @@ def auto_scaling_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
             rbac=RBACValidators(
                 scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
                 single_entity=SingleEntityActionRBACValidator(
@@ -143,6 +146,7 @@ def deployment_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
             rbac=RBACValidators(
                 scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
                 single_entity=SingleEntityActionRBACValidator(

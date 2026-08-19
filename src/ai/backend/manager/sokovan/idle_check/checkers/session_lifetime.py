@@ -1,0 +1,63 @@
+from __future__ import annotations
+
+import logging
+from collections.abc import Sequence
+from datetime import timedelta
+from decimal import Decimal
+from typing import override
+
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.sokovan.idle_check.checkers.base import (
+    CheckerAssignment,
+    IdleActivityDecision,
+    IdleChecker,
+    IdleCheckerContext,
+)
+
+log = BraceStyleAdapter(logging.getLogger(__name__))
+
+
+class SessionLifetimeChecker(IdleChecker):
+    """Judge sessions solely against each checker definition's lifetime setting."""
+
+    @override
+    async def judge(
+        self,
+        assignments: Sequence[CheckerAssignment],
+        *,
+        context: IdleCheckerContext,
+    ) -> Sequence[IdleActivityDecision]:
+        decisions: list[IdleActivityDecision] = []
+        for assignment in assignments:
+            lifetime_spec = assignment.definition.spec.session_lifetime
+            if lifetime_spec is None:
+                log.error(
+                    "Session lifetime checker {} has mismatched spec type: {}",
+                    assignment.definition.checker_id,
+                    assignment.definition.spec.type,
+                )
+                continue
+            max_lifetime_seconds = Decimal(lifetime_spec.max_lifetime_seconds)
+            for session in assignment.sessions:
+                if session.starts_at is None:
+                    continue
+                running_seconds = Decimal(
+                    str((context.current_time - session.starts_at).total_seconds())
+                ).normalize()
+                expires_at = session.starts_at + timedelta(
+                    seconds=lifetime_spec.max_lifetime_seconds
+                )
+                decisions.append(
+                    IdleActivityDecision(
+                        checker_id=assignment.definition.checker_id,
+                        session_id=session.session_id,
+                        expire_at=expires_at,
+                        is_active=False,
+                        message=(
+                            "Session lifetime check: "
+                            f"max_lifetime_seconds={max_lifetime_seconds:f}, "
+                            f"running_seconds={running_seconds:f}"
+                        ),
+                    )
+                )
+        return decisions

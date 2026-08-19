@@ -103,7 +103,7 @@ class DomainService:
         domain_data = await self._repository.create_domain_node_with_permissions(
             action.creator,
             action.user_info,
-            action.scaling_groups,
+            action.scaling_group_ids,
         )
 
         return CreateDomainNodeActionResult(
@@ -113,18 +113,18 @@ class DomainService:
     async def modify_domain_node(
         self, action: ModifyDomainNodeAction
     ) -> ModifyDomainNodeActionResult:
-        if action.sgroups_to_add is not None and action.sgroups_to_remove is not None:
-            if conflict := action.sgroups_to_add & action.sgroups_to_remove:
+        if action.sgroup_ids_to_add is not None and action.sgroup_ids_to_remove is not None:
+            if conflict := action.sgroup_ids_to_add & action.sgroup_ids_to_remove:
                 raise InvalidAPIParameters(
-                    "Should be no scaling group names included in both `sgroups_to_add` and `sgroups_to_remove` "
+                    "Should be no scaling groups included in both `sgroups_to_add` and `sgroups_to_remove` "
                     f"(sg:{conflict})."
                 )
 
         domain_data = await self._repository.modify_domain_node_with_permissions(
             action.updater,
             action.user_info,
-            action.sgroups_to_add,
-            action.sgroups_to_remove,
+            action.sgroup_ids_to_add,
+            action.sgroup_ids_to_remove,
         )
         return ModifyDomainNodeActionResult(
             domain_data=domain_data,

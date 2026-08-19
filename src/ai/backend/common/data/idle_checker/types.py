@@ -1,0 +1,142 @@
+from __future__ import annotations
+
+import enum
+from decimal import Decimal
+from typing import Final, Self
+
+from pydantic import Field, model_validator
+
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
+from ai.backend.common.types import BackendAISchema
+
+# Metric label carrying the session UUID; grouping by it enables per-session mapping.
+SESSION_ID_LABEL: Final = "session_id"
+
+
+class CheckerType(enum.StrEnum):
+    """Discriminator for the kind of idle checker; selects the concrete spec."""
+
+    SESSION_LIFETIME = "session_lifetime"
+    NETWORK_TIMEOUT = "network_timeout"
+    UTILIZATION = "utilization"
+
+
+class IdleCheckPhase(enum.StrEnum):
+    NOT_CHECKED = "not_checked"
+    READY_TO_CHECK = "ready_to_check"
+    ACTIVE = "active"
+    IDLE = "idle"
+    IDLE_EXPIRED = "idle_expired"
+    EXCLUDED = "excluded"
+
+
+class MetricLabel(BackendAISchema):
+    """Single metric label key-value pair."""
+
+    key: str = Field(description="Label key.")
+    value: str = Field(description="Label value.")
+
+
+class UtilizationThresholdEntry(BackendAISchema):
+    """One preset-backed session utilization threshold."""
+
+    preset_id: PrometheusQueryPresetID = Field(
+        description="Prometheus query preset used to evaluate utilization."
+    )
+    threshold: Decimal = Field(
+        description="Underutilization threshold compared against the preset's query result.",
+    )
+    filter_labels: list[MetricLabel] = Field(
+        default_factory=list,
+        description="Label filters injected into the preset's {labels} placeholder.",
+    )
+    group_labels: list[str] = Field(
+        default_factory=lambda: [SESSION_ID_LABEL],
+        description=(
+            "Labels injected into the preset's {group_by} placeholder. "
+            "Must include 'session_id' for per-session values to be mapped. "
+            "When 'session_id' is grouped, the checker adds a session_id filter that "
+            "limits the query to the sessions being evaluated; a user-provided "
+            "'session_id' entry in filter_labels takes precedence over it."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _validate_unique_filter_label_keys(self) -> Self:
+        keys = [label.key for label in self.filter_labels]
+        if len(keys) != len(set(keys)):
+            raise ValueError("filter_labels must not contain duplicate keys.")
+        return self
+
+
+class SessionLifetimeSpec(BackendAISchema):
+    """Config for ``CheckerType.SESSION_LIFETIME``."""
+
+    max_lifetime_seconds: int = Field(
+        ge=1,
+        description=(
+            "Maximum time in seconds that a session may remain running. "
+            "This is the sole lifetime limit used by the reconciler idle checker."
+        ),
+    )
+
+
+class NetworkTimeoutSpec(BackendAISchema):
+    """Config for ``CheckerType.NETWORK_TIMEOUT``."""
+
+    max_network_inactivity_seconds: int = Field(
+        ge=1,
+        description=(
+            "Maximum time in seconds that an interactive session may have neither recent "
+            "network access nor an active connection."
+        ),
+    )
+
+
+class UtilizationSpec(BackendAISchema):
+    """Config for ``CheckerType.UTILIZATION``."""
+
+    max_underutilized_duration_seconds: int = Field(
+        ge=1,
+        description=(
+            "Maximum duration that the configured utilization conditions may remain satisfied."
+        ),
+    )
+    threshold: UtilizationThresholdEntry = Field(
+        description="Preset-backed utilization threshold evaluated for the session.",
+    )
+
+
+class IdleCheckerSpec(BackendAISchema):
+    """Config payload stored in ``idle_checkers.spec`` as a single JSONB document.
+
+    ``type`` selects which sub-config is valid; exactly one sub-config field must
+    be present for the chosen type (validated below). Stored via ``PydanticColumn``.
+    """
+
+    type: CheckerType = Field(description="Idle checker kind; selects the sub-config.")
+    session_lifetime: SessionLifetimeSpec | None = Field(
+        default=None, description="session_lifetime config."
+    )
+    network: NetworkTimeoutSpec | None = Field(default=None, description="network_timeout config.")
+    utilization: UtilizationSpec | None = Field(default=None, description="utilization config.")
+
+    @model_validator(mode="after")
+    def validate_spec_matches_type(self) -> Self:
+        match self.type:
+            case CheckerType.SESSION_LIFETIME:
+                if self.session_lifetime is None:
+                    raise ValueError("session_lifetime is required for type=session_lifetime.")
+                if self.network or self.utilization:
+                    raise ValueError("Only session_lifetime is allowed for type=session_lifetime.")
+            case CheckerType.NETWORK_TIMEOUT:
+                if self.network is None:
+                    raise ValueError("network is required for type=network_timeout.")
+                if self.session_lifetime or self.utilization:
+                    raise ValueError("Only network is allowed for type=network_timeout.")
+            case CheckerType.UTILIZATION:
+                if self.utilization is None:
+                    raise ValueError("utilization is required for type=utilization.")
+                if self.session_lifetime or self.network:
+                    raise ValueError("Only utilization is allowed for type=utilization.")
+        return self

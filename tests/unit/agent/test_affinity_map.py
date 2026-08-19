@@ -4,7 +4,7 @@ from collections import defaultdict
 from collections.abc import MutableMapping, Sequence
 from decimal import Decimal
 from pprint import pprint
-from typing import Any
+from typing import Any, override
 
 import pytest
 
@@ -27,9 +27,11 @@ class DummyDevice(AbstractComputeDevice):
         super().__init__(*args, **kwargs)
         self.extra_prop1 = extra_prop1
 
+    @override
     def __str__(self) -> str:
         return self.device_id
 
+    @override
     def __repr__(self) -> str:
         # for simpler output of debug prints
         return self.device_id
@@ -42,9 +44,11 @@ class CPUDevice(AbstractComputeDevice):
         super().__init__(*args, **kwargs)
         self.extra_prop1 = extra_prop1
 
+    @override
     def __str__(self) -> str:
         return self.device_id
 
+    @override
     def __repr__(self) -> str:
         # for simpler output of debug prints
         return self.device_id

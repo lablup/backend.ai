@@ -15,6 +15,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
+    RBACElementType,
     RoleSource,
     ScopeType,
 )
@@ -31,6 +32,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
@@ -57,9 +59,14 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderPermissionRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreateSpec, UserCreatorSpec
@@ -124,12 +131,18 @@ class TestUserRepository:
                 RuntimeVariantRow,
                 DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
+                SessionGroupRow,
                 SessionRow,
                 AgentRow,
                 KernelRow,
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
+                ErrorLogRow,
+                VFolderPermissionRow,
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -206,11 +219,12 @@ class TestUserRepository:
         sample_domain: DomainFixtureData,
         user_resource_policy: str,
     ) -> str:
-        """Create a test user and return the email."""
+        """Create a test user (with its own virtual scope) and return the email."""
         email = f"test-{uuid.uuid4().hex[:8]}@example.com"
+        user_uuid = uuid.uuid4()
         async with db_with_cleanup.begin_session() as session:
             user = UserRow(
-                uuid=uuid.uuid4(),
+                uuid=user_uuid,
                 username=f"testuser-{uuid.uuid4().hex[:8]}",
                 email=email,
                 password=create_test_password_info("test_password"),
@@ -222,8 +236,10 @@ class TestUserRepository:
                 domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
+                domain_id=sample_domain.domain_id,
             )
             session.add(user)
+            session.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
             await session.commit()
         return email
 
@@ -250,6 +266,7 @@ class TestUserRepository:
                 domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
+                domain_id=sample_domain.domain_id,
             )
             session.add(user)
             await session.commit()
@@ -422,6 +439,88 @@ class TestUserRepository:
         assert result.user.role == spec.role
         assert result.keypair is not None
         assert result.keypair.access_key is not None
+
+    async def test_create_user_validated_writes_the_domain_id_from_the_name(
+        self,
+        user_repository: UserRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_domain: DomainFixtureData,
+        default_keypair_resource_policy: str,
+        sample_user_creator: Creator[UserRow],
+    ) -> None:
+        """The insert resolves the named domain into its id, so the two columns agree."""
+        result = await user_repository.create_user_validated(sample_user_creator, group_ids=[])
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            row = await session.scalar(sa.select(UserRow).where(UserRow.uuid == result.user.uuid))
+        assert row is not None
+        assert row.domain_name == sample_domain.domain_name
+        assert row.domain_id == sample_domain.domain_id
+
+    async def test_create_user_validated_materializes_virtual_scope(
+        self,
+        user_repository: UserRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        default_keypair_resource_policy: str,
+        sample_user_creator: Creator[UserRow],
+    ) -> None:
+        """User creation materializes the user's virtual scope with its self
+        membership and self scope binding."""
+        result = await user_repository.create_user_validated(sample_user_creator, group_ids=[])
+        user_uuid = result.user.uuid
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            vs = (
+                await session.execute(
+                    sa.select(VirtualScopeRow).where(VirtualScopeRow.scope_id == user_uuid)
+                )
+            ).scalar_one()
+            membership_count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(EntityMembershipRow)
+                .where(
+                    EntityMembershipRow.virtual_scope_id == vs.id,
+                    EntityMembershipRow.entity_id == user_uuid,
+                )
+            )
+            binding_count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(ScopeBindingRow)
+                .where(
+                    ScopeBindingRow.virtual_scope_id == vs.id,
+                    ScopeBindingRow.scope_id == user_uuid,
+                )
+            )
+
+        assert vs.scope_type == RBACElementType.USER.value
+        assert membership_count == 1
+        assert binding_count == 1
+
+    async def test_purge_user_removes_virtual_scope(
+        self,
+        user_repository: UserRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        default_keypair_resource_policy: str,
+        sample_user_creator: Creator[UserRow],
+    ) -> None:
+        """Purging a user drops its virtual scope node along with the user row."""
+        result = await user_repository.create_user_validated(sample_user_creator, group_ids=[])
+        user_uuid = result.user.uuid
+
+        await user_repository.purge_user(result.user.email)
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            user_count = await session.scalar(
+                sa.select(sa.func.count()).select_from(UserRow).where(UserRow.uuid == user_uuid)
+            )
+            vs_count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(VirtualScopeRow)
+                .where(VirtualScopeRow.scope_id == user_uuid)
+            )
+
+        assert user_count == 0
+        assert vs_count == 0
 
     @pytest.fixture
     async def user_scope_presets(self, db_with_cleanup: ExtendedAsyncSAEngine) -> tuple[str, str]:
@@ -662,14 +761,14 @@ class TestUserRepository:
 
         result = await user_repository.create_user_validated(creator, group_ids=[])
 
-        # Verify domain scope association was created
+        # Verify domain scope association was created (keyed by the domain UUID)
         async with db_with_cleanup.begin_session() as session:
             domain_assoc = await session.scalar(
                 sa.select(AssociationScopesEntitiesRow).where(
                     AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                     AssociationScopesEntitiesRow.entity_id == str(result.user.uuid),
                     AssociationScopesEntitiesRow.scope_type == ScopeType.DOMAIN,
-                    AssociationScopesEntitiesRow.scope_id == sample_domain.domain_name,
+                    AssociationScopesEntitiesRow.scope_id == str(sample_domain.domain_id),
                 )
             )
             assert domain_assoc is not None
@@ -1283,13 +1382,13 @@ class TestUserDataConversion:
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key="test_access_key",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
+            domain_id=uuid.uuid4(),
         )
 
-        user_data = UserData.from_row(user_row)
+        user_data = user_row.to_data()
 
         assert user_data.uuid == user_row.uuid
         assert user_data.username == user_row.username
@@ -1300,7 +1399,7 @@ class TestUserDataConversion:
         assert user_data.domain_name == user_row.domain_name
 
     def test_user_data_from_row_converts_readable_cidr_to_str(self) -> None:
-        """Test that UserData.from_row() converts ReadableCIDR objects to str for allowed_client_ip."""
+        """Test that UserRow.to_data() converts ReadableCIDR objects to str for allowed_client_ip."""
         user_row = UserRow(
             uuid=uuid.uuid4(),
             username="testuser",
@@ -1321,13 +1420,13 @@ class TestUserDataConversion:
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key="test_access_key",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
+            domain_id=uuid.uuid4(),
         )
 
-        user_data = UserData.from_row(user_row)
+        user_data = user_row.to_data()
 
         assert user_data.allowed_client_ip is not None
         assert user_data.allowed_client_ip == ["192.168.1.0/24", "10.0.0.0/8"]
@@ -1335,7 +1434,7 @@ class TestUserDataConversion:
             assert isinstance(ip, str)
 
     def test_user_data_from_row_with_none_allowed_client_ip(self) -> None:
-        """Test that UserData.from_row() passes through None for allowed_client_ip."""
+        """Test that UserRow.to_data() passes through None for allowed_client_ip."""
         user_row = UserRow(
             uuid=uuid.uuid4(),
             username="testuser",
@@ -1353,13 +1452,13 @@ class TestUserDataConversion:
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key="test_access_key",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
+            domain_id=uuid.uuid4(),
         )
 
-        user_data = UserData.from_row(user_row)
+        user_data = user_row.to_data()
 
         assert user_data.allowed_client_ip is None
 

@@ -2,6 +2,8 @@
 Exceptions for deployment management.
 """
 
+from typing import override
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -17,6 +19,7 @@ class DeploymentError(BackendAIError):
     error_type = "https://api.backend.ai/probs/deployment-failed"
     error_title = "Deployment operation failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_DEPLOYMENT,
@@ -31,6 +34,7 @@ class InvalidEndpointState(DeploymentError):
     error_type = "https://api.backend.ai/probs/invalid-endpoint-state"
     error_title = "Invalid endpoint state."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_DEPLOYMENT,
@@ -45,6 +49,7 @@ class RouteCreationFailed(DeploymentError):
     error_type = "https://api.backend.ai/probs/route-creation-failed"
     error_title = "Failed to create route."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_DEPLOYMENT,
@@ -59,6 +64,7 @@ class ScalingOperationFailed(DeploymentError):
     error_type = "https://api.backend.ai/probs/scaling-failed"
     error_title = "Scaling operation failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_DEPLOYMENT,
@@ -73,6 +79,7 @@ class ServiceInfoRetrievalFailed(DeploymentError):
     error_type = "https://api.backend.ai/probs/service-info-retrieval-failed"
     error_title = "Failed to retrieve service information."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_DEPLOYMENT,

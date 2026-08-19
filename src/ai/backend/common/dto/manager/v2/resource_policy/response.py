@@ -58,6 +58,10 @@ class KeypairResourcePolicyNode(BaseResponseModel):
         default=None,
         description="Maximum number of sessions in pending state. Null means unlimited.",
     )
+    max_priority: int | None = Field(
+        default=None,
+        description="Highest scheduling priority a session may declare. Null means uncapped.",
+    )
     max_pending_session_resource_slots: list[ResourceLimitEntryInfo] | None = Field(
         default=None,
         description="Maximum resource slots occupied by pending sessions. Null means unlimited.",

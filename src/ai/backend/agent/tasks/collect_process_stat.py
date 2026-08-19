@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, override
 
 from ai.backend.common.cron import PeriodicTask
 
@@ -22,16 +22,20 @@ class CollectProcessStatTask(PeriodicTask):
         self._local_config = local_config
 
     @property
+    @override
     def name(self) -> str:
         return "collect_process_stat"
 
     @property
+    @override
     def interval(self) -> float:
         return self._local_config.agent.utilization_metric.process.interval
 
     @property
+    @override
     def initial_delay(self) -> float:
         return 0.0
 
+    @override
     async def run(self) -> None:
         await self._agent.collect_process_stat()

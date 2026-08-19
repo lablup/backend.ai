@@ -62,7 +62,7 @@ class TestRevisionDataToDTO:
                         name="demo-model",
                         model_path="/models/demo",
                         service=ModelServiceConfig(
-                            start_command=["python", "serve.py"],
+                            start_command="python serve.py",
                             port=8000,
                         ),
                     ),
@@ -85,6 +85,7 @@ class TestRevisionDataToDTO:
         service = dto.model_definition.models[0].service
         assert service is not None
         assert service.port == 8000
+        assert service.command == "python serve.py"
         assert service.start_command == ["python", "serve.py"]
 
 

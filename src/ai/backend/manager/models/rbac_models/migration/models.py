@@ -14,9 +14,10 @@ define tables inline or use raw SQL instead of calling these shared helpers.
 import sqlalchemy as sa
 from sqlalchemy.orm import registry
 
-from ai.backend.manager.models.base import GUID, IDColumn, metadata
+from ai.backend.manager.models.base import GUID, IDColumn
 
-mapper_registry = registry(metadata=metadata)
+# Use an isolated metadata so the frozen table definitions in this module stay frozen.
+mapper_registry = registry(metadata=sa.MetaData())
 
 
 def get_user_roles_table() -> sa.Table:

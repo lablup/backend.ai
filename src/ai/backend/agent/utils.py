@@ -20,6 +20,7 @@ from typing import (
     TypedDict,
     TypeVar,
     overload,
+    override,
 )
 from uuid import UUID
 
@@ -30,6 +31,7 @@ from aiodocker.docker import DockerContainer
 from ai.backend.common import identity
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.cgroup import (
+    CgroupController,
     get_cgroup_of_pid,
     get_container_id_of_cgroup,
     get_container_pids,
@@ -65,9 +67,11 @@ class closing_async(AbstractAsyncContextManager[_SupportsAsyncCloseT]):
     def __init__(self, obj: _SupportsAsyncCloseT) -> None:
         self.obj = obj
 
+    @override
     async def __aenter__(self) -> _SupportsAsyncCloseT:
         return self.obj
 
+    @override
     async def __aexit__(self, *exc_info: Any) -> None:
         await self.obj.close()
 
@@ -169,7 +173,7 @@ async def read_tail(path: Path, nbytes: int) -> bytes:
 
 async def get_kernel_id_from_container(val: str | DockerContainer) -> KernelId | None:
     if isinstance(val, DockerContainer):
-        if "Name" not in val._container:
+        if not val._container.get("Name"):
             await val.show()
         name = val["Name"]
     elif isinstance(val, str):
@@ -315,7 +319,7 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
                     await docker.close()
 
     try:
-        cgroup = get_cgroup_of_pid("pids", host_pid)
+        cgroup = get_cgroup_of_pid(CgroupController.PIDS, host_pid)
         cgroup_container_id = get_container_id_of_cgroup(cgroup)
         if cgroup_container_id is None:
             return NotContainerPID

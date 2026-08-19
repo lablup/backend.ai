@@ -1,6 +1,6 @@
 # Manager API layer — Guardrails
 
-> For background and verification procedures, see `CONTEXTS.md` in the same directory; for implementation patterns, see the `/api-guide` skill.
+> For background and verification procedures, see `KNOWLEDGE.md` in the same directory; for implementation patterns, see the `/api-guide` skill.
 
 ## Handler style
 
@@ -15,6 +15,8 @@
   no direct Processor/Service calls. The Adapter is shared with the GQL layer.
 - **Legacy REST (v1):** The handler calls the Processor directly (`await self._foo.wait_for_complete(FooAction(...))`).
 - All new API endpoints follow the v2 pattern.
+- **Avoid both adding to and modifying REST v1 and the graphene GQL line (`gql_legacy/`)** —
+  changes go to v2; v1 accepts critical fixes only (rationale: `KNOWLEDGE.md`).
 
 ## Naming & scope
 

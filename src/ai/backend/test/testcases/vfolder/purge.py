@@ -1,3 +1,5 @@
+from typing import override
+
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.tester import TestSpecMetaContext
 from ai.backend.test.contexts.vfolder import VFolderContext
@@ -6,6 +8,7 @@ from ai.backend.test.utils.exceptions import UnexpectedSuccess
 
 
 class VFolderPurgeSuccess(TestCode):
+    @override
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         spec_meta = TestSpecMetaContext.current()

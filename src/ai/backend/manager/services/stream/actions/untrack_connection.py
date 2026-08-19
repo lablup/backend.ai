@@ -28,9 +28,9 @@ class UntrackConnectionAction(StreamAction):
 
 @dataclass(frozen=True)
 class UntrackConnectionActionResult(BaseActionResult):
-    kernel_id: str
+    kernel_id: KernelId
     remaining_count: int
 
     @override
     def entity_id(self) -> str | None:
-        return self.kernel_id
+        return str(self.kernel_id)

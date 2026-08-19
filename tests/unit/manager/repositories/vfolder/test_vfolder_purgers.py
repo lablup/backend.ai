@@ -120,6 +120,7 @@ class TestVFolderPurgersIntegration:
                 domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
+                domain_id=sample_domain.domain_id,
             )
             session.add(user)
             await session.flush()
@@ -157,6 +158,7 @@ class TestVFolderPurgersIntegration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_vfolder: VFolderRow,
+        sample_domain: DomainFixtureData,
         sample_user: UserRow,
     ) -> list[VFolderInvitationRow]:
         """Create test vfolder invitations."""
@@ -181,6 +183,7 @@ class TestVFolderPurgersIntegration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_vfolder: VFolderRow,
+        sample_domain: DomainFixtureData,
         sample_user: UserRow,
     ) -> list[VFolderPermissionRow]:
         """Create test vfolder permissions."""
@@ -203,9 +206,10 @@ class TestVFolderPurgersIntegration:
                     full_name="Permission User",
                     status=UserStatus.ACTIVE,
                     status_info="",
-                    domain_name=sample_vfolder.domain_name,
+                    domain_name=sample_domain.domain_name,
                     role=UserRole.USER,
                     resource_policy=sample_user.resource_policy,
+                    domain_id=sample_domain.domain_id,
                 )
                 session.add(perm_user)
                 await session.flush()

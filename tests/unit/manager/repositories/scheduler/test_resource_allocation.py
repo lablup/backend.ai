@@ -16,10 +16,21 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.events.event_types.kernel.types import (
+    KernelCreationInfo,
+    UsedDevice,
+    UsedDevices,
+)
+from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
+    ContainerId,
     DefaultForUnspecified,
+    DeviceId,
+    DeviceName,
     KernelId,
     ResourceSlot,
     SecretKey,
@@ -30,7 +41,6 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.sokovan import KernelCreationInfo
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -59,25 +69,40 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 def _make_creation_info(
     cpu: str = "2",
     mem: str = "4096",
 ) -> KernelCreationInfo:
-    """Build a KernelCreationInfo whose get_resource_allocations() returns the given slots."""
+    """Build a KernelCreationInfo whose used devices aggregate to the given slots."""
     return KernelCreationInfo(
-        container_id="test-container",
-        resource_spec={
-            "allocations": {
-                "cpu": {"cpu": {"0": cpu}},
-                "mem": {"mem": {"0": mem}},
-            },
-        },
+        container_id=ContainerId("test-container"),
+        kernel_host="127.0.0.1",
         repl_in_port=2001,
         repl_out_port=2002,
-        stdin_port=2003,
-        stdout_port=2004,
+        service_ports=[],
+        used_devices=UsedDevices(
+            units={
+                DeviceName("cpu"): {
+                    DeviceId("0"): UsedDevice(
+                        model_name=None,
+                        used={ResourceSlotName("cpu"): Decimal(cpu)},
+                        processing_units=None,
+                        memory_size=None,
+                    )
+                },
+                DeviceName("mem"): {
+                    DeviceId("0"): UsedDevice(
+                        model_name=None,
+                        used={ResourceSlotName("mem"): Decimal(mem)},
+                        processing_units=None,
+                        memory_size=None,
+                    )
+                },
+            }
+        ),
     )
 
 
@@ -119,14 +144,24 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+        test_domain_id: DomainID,
+    ) -> AsyncGenerator[DomainFixtureData, None]:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=test_domain_id,
                     name=domain_name,
                     total_resource_slots=ResourceSlot({
                         "cpu": Decimal("1000"),
@@ -135,17 +170,19 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                 )
             )
             await db_sess.flush()
-        yield domain_name
+        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 ScalingGroupRow(
+                    id=test_scaling_group_id,
                     name=sg_name,
                     driver="static",
                     scheduler="fifo",
@@ -227,7 +264,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         user_uuid = uuid.uuid4()
@@ -239,8 +276,9 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                     username=f"test-user-{uuid.uuid4().hex[:8]}",
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_policy=test_user_resource_policy_name,
+                    domain_id=test_domain.domain_id,
                 )
             )
             await db_sess.flush()
@@ -275,7 +313,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         group_id = uuid.uuid4()
@@ -286,7 +324,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     description="Test group",
                     is_active=True,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     resource_policy=test_resource_policy_name,
@@ -300,6 +338,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
@@ -309,6 +348,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                     status=AgentStatus.ALIVE,
                     region="local",
                     scaling_group=test_scaling_group_name,
+                    resource_group_id=test_scaling_group_id,
                     available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
                     occupied_slots=ResourceSlot(),
                     addr="127.0.0.1:6001",
@@ -334,7 +374,9 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         self,
         db: ExtendedAsyncSAEngine,
         *,
+        domain_id: DomainID,
         domain_name: str,
+        resource_group_id: ResourceGroupID,
         scaling_group_name: str,
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
@@ -358,8 +400,10 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                     id=session_id,
                     name=f"test-session-{uuid.uuid4().hex[:8]}",
                     session_type=SessionTypes.INTERACTIVE,
+                    domain_id=domain_id,
                     domain_name=domain_name,
                     group_id=group_id,
+                    resource_group_id=resource_group_id,
                     scaling_group_name=scaling_group_name,
                     status=SessionStatus.CREATING,
                     status_info="test",
@@ -381,6 +425,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                     agent=agent_id,
                     agent_addr="127.0.0.1:6001" if agent_id else None,
                     scaling_group=scaling_group_name,
+                    resource_group_id=resource_group_id,
                     cluster_idx=0,
                     cluster_role="main",
                     cluster_hostname=f"kernel-{uuid.uuid4().hex[:8]}",
@@ -451,7 +496,9 @@ class TestUpdateKernelStatusRunningResourceAllocation:
     async def test_sets_used_and_used_at_on_resource_allocations(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -463,7 +510,9 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         await self._seed_agent_resources(db_with_cleanup, test_agent_id)
         _, kernel_id = await self._create_kernel_with_pending_allocations(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -500,7 +549,9 @@ class TestUpdateKernelStatusRunningResourceAllocation:
     async def test_increments_agent_resources_used(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -514,7 +565,9 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         )
         _, kernel_id = await self._create_kernel_with_pending_allocations(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -548,7 +601,9 @@ class TestUpdateKernelStatusRunningResourceAllocation:
     async def test_updates_kernel_status_to_running(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -560,7 +615,9 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         await self._seed_agent_resources(db_with_cleanup, test_agent_id)
         _, kernel_id = await self._create_kernel_with_pending_allocations(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -586,7 +643,9 @@ class TestUpdateKernelStatusRunningResourceAllocation:
     async def test_is_idempotent_via_double_call(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -598,7 +657,9 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         await self._seed_agent_resources(db_with_cleanup, test_agent_id)
         _, kernel_id = await self._create_kernel_with_pending_allocations(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -635,7 +696,9 @@ class TestUpdateKernelStatusRunningResourceAllocation:
     async def test_running_does_not_reject_over_capacity(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -657,7 +720,9 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         )
         _, kernel_id = await self._create_kernel_with_pending_allocations(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -692,7 +757,9 @@ class TestUpdateKernelStatusRunningResourceAllocation:
     async def test_returns_false_when_kernel_not_in_valid_status(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -704,7 +771,9 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         await self._seed_agent_resources(db_with_cleanup, test_agent_id)
         _, kernel_id = await self._create_kernel_with_pending_allocations(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -739,7 +808,9 @@ class TestUpdateKernelStatusRunningResourceAllocation:
     async def test_handles_no_agent_gracefully(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -750,7 +821,9 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         """update_kernel_status_running succeeds without allocating when agent_id is None."""
         _, kernel_id = await self._create_kernel_with_pending_allocations(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,

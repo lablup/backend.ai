@@ -4,15 +4,16 @@ import dataclasses
 import logging
 import uuid
 from collections import Counter, defaultdict
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Collection, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -29,11 +30,15 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.session_group import SessionGroupID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
@@ -43,6 +48,7 @@ from ai.backend.common.types import (
     SlotName,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
@@ -105,6 +111,7 @@ from ai.backend.manager.errors.deployment import (
     UserNotFoundInDeployment,
 )
 from ai.backend.manager.errors.resource import (
+    DomainNotFound,
     ProjectNotFound,
     RuntimeVariantNotFound,
     ScalingGroupNotFound,
@@ -124,6 +131,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset.row import (
     DeploymentRevisionPresetRow,
 )
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
@@ -148,7 +156,6 @@ from ai.backend.manager.models.scheduling_history import (
     RouteHistoryRow,
 )
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow, query_accessible_vfolders
@@ -183,7 +190,7 @@ from ai.backend.manager.repositories.deployment.creators import (
     DeploymentRevisionCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment.types import (
-    ProjectDeploymentSearchScope,
+    ProjectDeploymentOperationScope,
     RouteData,
     RouteServiceDiscoveryInfo,
     RouteSessionInfo,
@@ -192,6 +199,7 @@ from ai.backend.manager.repositories.deployment.types import (
 from ai.backend.manager.repositories.scheduling_history.creators import (
     DeploymentHistoryCreatorSpec,
 )
+from ai.backend.manager.repositories.session_group.creators import SessionGroupCreatorSpec
 from ai.backend.manager.utils import query_userinfo_from_session
 
 
@@ -335,12 +343,23 @@ class DeploymentDBSource:
             await execute_rbac_entity_creator(db_sess, policy_creator)
             await db_sess.flush()
 
+            # Every replica group owns a session group (1:1) carrying the
+            # placement policy of its replicas.
+            primary_session_group = SessionGroupCreatorSpec.for_replica_group(
+                domain_name=endpoint.domain,
+                project_id=ProjectID(endpoint.project),
+                owner_user_id=UserID(endpoint.session_owner),
+            ).build_row()
+            db_sess.add(primary_session_group)
+            await db_sess.flush()
+
             # Every deployment owns a primary replica group that holds its
             # revision pointers and per-revision desired replica counts. The
             # revision pointers start empty; the first rollout populates them
             # via ``activate_revision`` / the deployment swap.
             primary_replica_group = ReplicaGroupRow(
                 deployment_id=endpoint.id,
+                session_group_id=primary_session_group.id,
                 desired_current_replica_count=endpoint.replicas,
                 rollout=policy_creator_spec.strategy_spec.to_rollout_spec(),
             )
@@ -869,11 +888,11 @@ class DeploymentDBSource:
             endpoint = result.scalar_one_or_none()
             if not endpoint:
                 raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
-            query = sa.select(EndpointAutoScalingRuleRow).where(
+            rules_query = sa.select(EndpointAutoScalingRuleRow).where(
                 EndpointAutoScalingRuleRow.endpoint == endpoint_id
             )
-            result = await db_sess.execute(query)
-            rows = result.scalars().all()
+            rules_result = await db_sess.execute(rules_query)
+            rows = rules_result.scalars().all()
             return [row.to_autoscaling_rule() for row in rows]
 
     async def update_autoscaling_rule(
@@ -1213,7 +1232,7 @@ class DeploymentDBSource:
     async def search_deployments_in_project(
         self,
         querier: BatchQuerier,
-        scope: ProjectDeploymentSearchScope,
+        scope: ProjectDeploymentOperationScope,
     ) -> DeploymentSummarySearchResult:
         """Search endpoints within a project scope with pagination and filtering.
 
@@ -1409,7 +1428,7 @@ class DeploymentDBSource:
                 .where(EndpointRow.lifecycle_stage.in_(EndpointLifecycle.need_scaling_states()))
                 .join(
                     EndpointAutoScalingRuleRow,
-                    EndpointRow.id == EndpointAutoScalingRuleRow.endpoint_id,
+                    EndpointRow.id == EndpointAutoScalingRuleRow.endpoint,
                 )
                 .options(
                     selectinload(EndpointRow.current_revision_row),
@@ -1432,9 +1451,9 @@ class DeploymentDBSource:
             # Group rules by endpoint
             rules_by_endpoint: dict[uuid.UUID, list[AutoScalingRule]] = {}
             for rule_row in rule_rows:
-                if rule_row.endpoint_id not in rules_by_endpoint:
-                    rules_by_endpoint[rule_row.endpoint_id] = []
-                rules_by_endpoint[rule_row.endpoint_id].append(rule_row.to_autoscaling_rule())
+                if rule_row.endpoint not in rules_by_endpoint:
+                    rules_by_endpoint[rule_row.endpoint] = []
+                rules_by_endpoint[rule_row.endpoint].append(rule_row.to_autoscaling_rule())
 
             # Build result
             result = []
@@ -2067,19 +2086,15 @@ class DeploymentDBSource:
         user_uuid: uuid.UUID,
     ) -> _DeploymentUserResolution:
         # Pick a deterministic, currently-active keypair for the given user.
-        # Preference order: main_access_key match, then latest created_at,
+        # Preference order: the default keypair, then latest created_at,
         # then access_key lexicographic order as a final stable tie-break.
-        is_main_access_key = sa.case(
-            (UserRow.main_access_key == keypairs.c.access_key, 1),
-            else_=0,
-        )
         active_stmt = (
             sa.select(UserRow, keypairs.c.access_key)
             .select_from(sa.join(UserRow, keypairs, UserRow.uuid == keypairs.c.user))
             .where(UserRow.uuid == user_uuid)
             .where(keypairs.c.is_active.is_(True))
             .order_by(
-                is_main_access_key.desc(),
+                keypairs.c.is_default.desc(),
                 keypairs.c.created_at.desc(),
                 keypairs.c.access_key.asc(),
             )
@@ -2098,6 +2113,29 @@ class DeploymentDBSource:
         if user_row is None:
             raise UserNotFoundInDeployment(f"{user_uuid} not found")
         raise NoActiveKeypairForDeployment(f"{user_uuid} has no active keypair")
+
+    async def _resolve_deployment_scope_ids(
+        self,
+        db_sess: SASession,
+        deployment_info: DeploymentInfo,
+    ) -> tuple[DomainID, ResourceGroupID]:
+        domain_id = await db_sess.scalar(
+            sa.select(DomainRow.id).where(DomainRow.name == deployment_info.metadata.domain)
+        )
+        if domain_id is None:
+            raise DomainNotFound(deployment_info.metadata.domain)
+
+        resource_group_id = await db_sess.scalar(
+            sa.select(ScalingGroupRow.id).where(
+                ScalingGroupRow.name == deployment_info.metadata.resource_group
+            )
+        )
+        if resource_group_id is None:
+            raise ScalingGroupNotFound(
+                f"Resource group {deployment_info.metadata.resource_group!r} not found"
+            )
+
+        return DomainID(domain_id), ResourceGroupID(resource_group_id)
 
     async def fetch_deployment_context(
         self,
@@ -2146,6 +2184,10 @@ class DeploymentDBSource:
             )
             group_id = user_info.group_id
             resource_policy = user_info.resource_policy
+
+            domain_id, resource_group_id = await self._resolve_deployment_scope_ids(
+                db_sess, deployment_info
+            )
 
             revision_query = (
                 sa.select(DeploymentRevisionRow)
@@ -2212,7 +2254,9 @@ class DeploymentDBSource:
                     main_gid=session_owner_user.container_main_gid,
                     supplementary_gids=session_owner_user.container_gids or [],
                 ),
+                domain_id=domain_id,
                 group_id=group_id,
+                resource_group_id=resource_group_id,
                 resource_policy=dict(resource_policy),
                 image=ImageContext(
                     ref=image_row.image_ref,
@@ -2257,6 +2301,32 @@ class DeploymentDBSource:
                 status_map[ReplicaID(route_id)] = session_status
 
             return status_map
+
+    async def fetch_route_session_group_ids(
+        self,
+        route_ids: set[ReplicaID],
+    ) -> Mapping[ReplicaID, SessionGroupID]:
+        """Resolve the SessionGroup each route inherits from its replica group.
+
+        A replica group always owns exactly one SessionGroup, so the join
+        yields at most one row per route. Routes whose ``replica_group_id``
+        is NULL are absent from the mapping.
+        """
+        if not route_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(RoutingRow.id, ReplicaGroupRow.session_group_id)
+                .select_from(RoutingRow)
+                .join(ReplicaGroupRow, RoutingRow.replica_group_id == ReplicaGroupRow.id)
+                .where(RoutingRow.id.in_(route_ids))
+            )
+            result = await db_sess.execute(query)
+            return {
+                ReplicaID(route_id): SessionGroupID(session_group_id)
+                for route_id, session_group_id in result.all()
+            }
 
     async def fetch_route_session_kernel_infos(
         self,
@@ -2430,13 +2500,14 @@ class DeploymentDBSource:
         spec being deployed. No vfolder re-reads at runtime.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            endpoint = await EndpointRow.get(
-                db_sess,
-                endpoint_id,
-                load_revisions=True,
-            )
-            if not endpoint:
-                raise EndpointNotFound(str(endpoint_id))
+            try:
+                endpoint = await EndpointRow.get(
+                    db_sess,
+                    endpoint_id,
+                    load_revisions=True,
+                )
+            except NoResultFound as e:
+                raise EndpointNotFound(str(endpoint_id)) from e
             active_rev = endpoint._find_active_revision()
             if active_rev is None or active_rev.model_definition is None:
                 return None
@@ -2573,7 +2644,7 @@ class DeploymentDBSource:
                 preset_resource_slots=_project_preset_slots(preset_row, preset_slots),
             )
 
-    async def fetch_revision_required_slot_names(self) -> Iterable[SlotName]:
+    async def fetch_revision_required_slot_names(self) -> Collection[SlotName]:
         """Return the globally required resource slot names"""
         async with self._db.begin_readonly_session_read_committed() as session:
             stmt = sa.select(ResourceSlotTypeRow.slot_name).where(
@@ -3159,7 +3230,7 @@ class DeploymentDBSource:
                 id=row.id,
                 token=row.token,
                 expires_at=row.expires_at,
-                created_at=row.created_at or datetime.now(UTC),
+                created_at=row.created_at,
             )
 
     async def delete_access_token(

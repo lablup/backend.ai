@@ -7,19 +7,23 @@ from .creators import (
 from .repositories import SchedulingHistoryRepositories
 from .repository import SchedulingHistoryRepository
 from .types import (
-    DeploymentHistorySearchScope,
-    RouteHistorySearchScope,
-    SessionSchedulingHistorySearchScope,
+    DeploymentHistoryOperationScope,
+    KernelKernelHistoryOperationScope,
+    RouteHistoryOperationScope,
+    SessionKernelHistoryOperationScope,
+    SessionSchedulingHistoryOperationScope,
 )
 
 __all__ = (
     "DeploymentHistoryCreatorSpec",
-    "DeploymentHistorySearchScope",
+    "DeploymentHistoryOperationScope",
+    "KernelKernelHistoryOperationScope",
     "KernelSchedulingHistoryCreatorSpec",
     "RouteHistoryCreatorSpec",
-    "RouteHistorySearchScope",
+    "RouteHistoryOperationScope",
     "SchedulingHistoryRepositories",
     "SchedulingHistoryRepository",
+    "SessionKernelHistoryOperationScope",
     "SessionSchedulingHistoryCreatorSpec",
-    "SessionSchedulingHistorySearchScope",
+    "SessionSchedulingHistoryOperationScope",
 )

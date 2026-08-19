@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import override
 
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.logging import BraceStyleAdapter
@@ -20,10 +21,12 @@ class HookPluginDependency(PluginDependency[HookPluginContext]):
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "hook-plugin"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: PluginsInput) -> AsyncIterator[HookPluginContext]:
         """Initialize and provide a HookPluginContext.
 

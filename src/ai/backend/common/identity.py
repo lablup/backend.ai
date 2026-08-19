@@ -17,7 +17,6 @@ from ipaddress import ip_address
 from pathlib import Path, PosixPath
 from typing import Any
 
-import aiodns
 import aiohttp
 import ifaddr
 import psutil
@@ -395,11 +394,16 @@ def _define_functions() -> None:
                     )
                 try:
                     myself = socket.gethostname()
-                    resolver = aiodns.DNSResolver()
-                    result = await resolver.gethostbyname(myself, socket.AF_INET)
-                    address: str = result.addresses[0]
+                    loop = asyncio.get_running_loop()
+                    addrinfo = await loop.getaddrinfo(
+                        myself,
+                        None,
+                        family=socket.AF_INET,
+                        type=socket.SOCK_STREAM,
+                    )
+                    address: str = addrinfo[0][4][0]
                     return address
-                except aiodns.error.DNSError:
+                except (socket.gaierror, IndexError):
                     return "127.0.0.1"
 
             async def _get_instance_type() -> str:

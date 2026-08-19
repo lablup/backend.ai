@@ -18,6 +18,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     TypeVar,
+    override,
 )
 
 import aiofiles
@@ -278,9 +279,11 @@ class FstabEntry:
         self.d = d
         self.p = p
 
+    @override
     def __eq__(self, o: Any) -> bool:
         return str(self) == str(o)
 
+    @override
     def __str__(self) -> str:
         return f"{self.device} {self.mountpoint} {self.fstype} {self.options} {self.d} {self.p}"
 

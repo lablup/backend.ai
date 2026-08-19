@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from graphql import get_named_type, is_leaf_type
 from opentelemetry import trace
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 class GQLMetricExtension(SchemaExtension):
     """Records per-field GraphQL metrics with OpenTelemetry tracing."""
 
+    @override
     def resolve(
         self,
         _next: Callable[..., AwaitableOrValue[object]],

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 
 import click
 
@@ -47,6 +48,12 @@ def audit_log() -> None:
     help="Filter by triggered-by user (contains).",
 )
 @click.option(
+    "--acted-as",
+    type=click.UUID,
+    default=None,
+    help="Filter by acted-as (effective/acting user UUID, exact match).",
+)
+@click.option(
     "--order-by",
     multiple=True,
     help=(
@@ -61,10 +68,11 @@ def search(
     operation: str | None,
     status: str | None,
     triggered_by: str | None,
+    acted_as: uuid.UUID | None,
     order_by: tuple[str, ...],
 ) -> None:
     """Search audit logs."""
-    from ai.backend.common.dto.manager.query import StringFilter
+    from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
     from ai.backend.common.dto.manager.v2.audit_log.request import (
         AdminSearchAuditLogsInput,
         AuditLogFilter,
@@ -78,7 +86,7 @@ def search(
 
     # Build filter only if any filter option is provided
     filter_dto: AuditLogFilter | None = None
-    if any(opt is not None for opt in (entity_type, operation, status, triggered_by)):
+    if any(opt is not None for opt in (entity_type, operation, status, triggered_by, acted_as)):
         filter_dto = AuditLogFilter(
             entity_type=(StringFilter(contains=entity_type) if entity_type is not None else None),
             operation=StringFilter(contains=operation) if operation is not None else None,
@@ -88,6 +96,7 @@ def search(
             triggered_by=(
                 StringFilter(contains=triggered_by) if triggered_by is not None else None
             ),
+            acted_as=(UUIDFilter(equals=acted_as) if acted_as is not None else None),
         )
 
     # Build order only if --order-by is provided

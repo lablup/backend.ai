@@ -1,6 +1,5 @@
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
-from ai.backend.common.message_queue.types import MessagePayload
 
 
 class EventFetcher:
@@ -20,5 +19,4 @@ class EventFetcher:
         payload = await self._msg_queue.fetch_cached_broadcast_message(cache_id)
         if payload is None:
             return None
-        message_payload = MessagePayload.from_broadcast(payload)
-        return AbstractBroadcastEvent.deserialize_from_wrapper(message_payload)
+        return AbstractBroadcastEvent.from_broadcast_payload(payload)

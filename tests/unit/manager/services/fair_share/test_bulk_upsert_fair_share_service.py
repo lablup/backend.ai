@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.repositories.base import BulkUpserterResult
 from ai.backend.manager.repositories.fair_share import (
     DomainFairShareBulkWeightUpserterSpec,
@@ -27,6 +28,8 @@ from ai.backend.manager.services.fair_share.actions import (
     ProjectWeightInput,
     UserWeightInput,
 )
+
+RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
 
 
 @pytest.fixture
@@ -57,6 +60,7 @@ class TestBulkUpsertDomainFairShareWeight:
 
         action = BulkUpsertDomainFairShareWeightAction(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             inputs=[
                 DomainWeightInput(domain_name="domain1", weight=Decimal("1.5")),
             ],
@@ -80,6 +84,7 @@ class TestBulkUpsertDomainFairShareWeight:
 
         action = BulkUpsertDomainFairShareWeightAction(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             inputs=[
                 DomainWeightInput(domain_name="domain1", weight=Decimal("1.0")),
                 DomainWeightInput(domain_name="domain2", weight=Decimal("2.0")),
@@ -101,9 +106,9 @@ class TestBulkUpsertDomainFairShareWeight:
         mock_repository.bulk_upsert_domain_fair_share = AsyncMock(
             return_value=BulkUpserterResult(upserted_count=2)
         )
-
         action = BulkUpsertDomainFairShareWeightAction(
             resource_group="test-rg",
+            resource_group_id=RESOURCE_GROUP_ID,
             inputs=[
                 DomainWeightInput(domain_name="domain1", weight=Decimal("1.5")),
                 DomainWeightInput(domain_name="domain2", weight=None),
@@ -120,6 +125,7 @@ class TestBulkUpsertDomainFairShareWeight:
         assert len(specs) == 2
         assert all(isinstance(s, DomainFairShareBulkWeightUpserterSpec) for s in specs)
         assert specs[0].resource_group == "test-rg"
+        assert specs[0].resource_group_id == RESOURCE_GROUP_ID
         assert specs[0].domain_name == "domain1"
         assert specs[0].weight == Decimal("1.5")
         assert specs[1].resource_group == "test-rg"
@@ -134,6 +140,7 @@ class TestBulkUpsertDomainFairShareWeight:
         """Should return zero count for empty inputs without calling repository."""
         action = BulkUpsertDomainFairShareWeightAction(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             inputs=[],
         )
 
@@ -162,6 +169,7 @@ class TestBulkUpsertProjectFairShareWeight:
 
         action = BulkUpsertProjectFairShareWeightAction(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             inputs=[
                 ProjectWeightInput(
                     project_id=project_id,
@@ -190,6 +198,7 @@ class TestBulkUpsertProjectFairShareWeight:
 
         action = BulkUpsertProjectFairShareWeightAction(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             inputs=[
                 ProjectWeightInput(
                     project_id=project_ids[0],
@@ -225,9 +234,9 @@ class TestBulkUpsertProjectFairShareWeight:
         mock_repository.bulk_upsert_project_fair_share = AsyncMock(
             return_value=BulkUpserterResult(upserted_count=2)
         )
-
         action = BulkUpsertProjectFairShareWeightAction(
             resource_group="test-rg",
+            resource_group_id=RESOURCE_GROUP_ID,
             inputs=[
                 ProjectWeightInput(
                     project_id=project_id1,
@@ -251,6 +260,7 @@ class TestBulkUpsertProjectFairShareWeight:
         assert len(specs) == 2
         assert all(isinstance(s, ProjectFairShareBulkWeightUpserterSpec) for s in specs)
         assert specs[0].resource_group == "test-rg"
+        assert specs[0].resource_group_id == RESOURCE_GROUP_ID
         assert specs[0].project_id == project_id1
         assert specs[0].domain_name == "domain1"
         assert specs[0].weight == Decimal("1.5")
@@ -267,6 +277,7 @@ class TestBulkUpsertProjectFairShareWeight:
         """Should return zero count for empty inputs without calling repository."""
         action = BulkUpsertProjectFairShareWeightAction(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             inputs=[],
         )
 
@@ -296,6 +307,7 @@ class TestBulkUpsertUserFairShareWeight:
 
         action = BulkUpsertUserFairShareWeightAction(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             inputs=[
                 UserWeightInput(
                     user_uuid=user_uuid,
@@ -326,6 +338,7 @@ class TestBulkUpsertUserFairShareWeight:
 
         action = BulkUpsertUserFairShareWeightAction(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             inputs=[
                 UserWeightInput(
                     user_uuid=user_uuids[0],
@@ -366,9 +379,9 @@ class TestBulkUpsertUserFairShareWeight:
         mock_repository.bulk_upsert_user_fair_share = AsyncMock(
             return_value=BulkUpserterResult(upserted_count=2)
         )
-
         action = BulkUpsertUserFairShareWeightAction(
             resource_group="test-rg",
+            resource_group_id=RESOURCE_GROUP_ID,
             inputs=[
                 UserWeightInput(
                     user_uuid=user_uuid1,
@@ -394,6 +407,7 @@ class TestBulkUpsertUserFairShareWeight:
         assert len(specs) == 2
         assert all(isinstance(s, UserFairShareBulkWeightUpserterSpec) for s in specs)
         assert specs[0].resource_group == "test-rg"
+        assert specs[0].resource_group_id == RESOURCE_GROUP_ID
         assert specs[0].user_uuid == user_uuid1
         assert specs[0].project_id == project_id1
         assert specs[0].domain_name == "domain1"
@@ -412,6 +426,7 @@ class TestBulkUpsertUserFairShareWeight:
         """Should return zero count for empty inputs without calling repository."""
         action = BulkUpsertUserFairShareWeightAction(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             inputs=[],
         )
 

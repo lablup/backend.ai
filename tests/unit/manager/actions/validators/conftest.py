@@ -5,7 +5,8 @@ from collections.abc import AsyncIterator
 import pytest
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, create_async_engine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.testutils.bootstrap import postgres_container  # noqa: F401
 
 

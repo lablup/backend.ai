@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import enum
 import uuid
 from collections.abc import Mapping
-from datetime import datetime
 from typing import TYPE_CHECKING, Any, Final
 
 import sqlalchemy as sa
@@ -12,11 +10,13 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship, selectinload
 
+from ai.backend.manager.data.network.types import NetworkType
 from ai.backend.manager.models.base import (
     GUID,
     Base,
     SlugType,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.domain import DomainRow
@@ -26,12 +26,6 @@ __all__: Final[tuple[str, ...]] = (
     "NetworkRow",
     "NetworkType",
 )
-
-
-class NetworkType(enum.StrEnum):
-    VOLATILE = "volatile"
-    PERSISTENT = "persistent"
-    HOST = "host"
 
 
 def _get_project_join_condition() -> sa.ColumnElement[bool]:
@@ -46,7 +40,7 @@ def _get_domain_join_condition() -> sa.ColumnElement[bool]:
     return DomainRow.name == foreign(NetworkRow.domain_name)
 
 
-class NetworkRow(Base):  # type: ignore[misc]
+class NetworkRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "networks"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -74,27 +68,12 @@ class NetworkRow(Base):  # type: ignore[misc]
         nullable=False,
     )
 
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.text("now()"),
-        nullable=True,
-    )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.text("now()"),
-        nullable=True,
-    )
-
     project_row: Mapped[GroupRow] = relationship(
         "GroupRow",
-        back_populates="networks",
         primaryjoin=_get_project_join_condition,
     )
     domain_row: Mapped[DomainRow] = relationship(
         "DomainRow",
-        back_populates="networks",
         primaryjoin=_get_domain_join_condition,
     )
 

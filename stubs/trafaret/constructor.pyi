@@ -1,8 +1,10 @@
 from typing import Any as _Any
+from typing import override
 
 from .base import Key, Trafaret
 
 class ConstructMeta(type):
+    @override
     def __or__(self, other: _Any) -> _Any: ...
     def __and__(self, other: _Any) -> _Any: ...
 

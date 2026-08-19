@@ -94,6 +94,42 @@ Each section has a specific purpose. Write in this order:
 - Submit PR with the BEP document
 - Iterate based on review feedback
 
+## Tech-spec BEP Format
+
+For **implementation-level** BEPs — those that specify how an existing feature is
+built across the layers (as opposed to high-level motivation/spec BEPs) — use the
+tech-spec format below. Reference the upstream motivation BEP instead of expanding it.
+
+### What goes in the BEP vs. the PR
+
+The boundary is **"does this need a structural design decision?"** — not "does it
+cross teams." Internal-only structural decisions still belong in the BEP.
+
+| In the BEP (tech spec) | In the PR (implementer's discretion) |
+|------------------------|--------------------------------------|
+| Component responsibilities & boundaries, layer placement | Exact dataclass fields / function signatures |
+| Observable contracts: state transitions, API / config field *meaning*, why a piece of data is needed | File / function / line anchors |
+| Design decisions and their rationale (including internal ones) | Algorithm optimizations, data-structure choices |
+| The core flow across layers | Marker/storage locations, wiring details |
+
+Symbol/file references in the "current design" section are **status evidence**
+(pointers for the reader), not implementation detail — keep them minimal but allowed.
+
+### Recommended structure
+
+| Section | Purpose |
+|---------|---------|
+| Goal | The problem + what this BEP defines (link the upstream motivation BEP) |
+| Current design & scope, by area | Split by area (e.g. API / DB / Scheduler); within each, separate **✅ exists** vs **➕ to add** |
+| Implementation design | Contract-level: component responsibilities, the core flow, design decisions |
+| Decision Summary | Settled decisions in one table |
+| Open Questions | Unresolved items |
+| References | Upstream BEP, prior art |
+
+The **by-area current-design table** is the distinguishing element: it makes "what
+exists vs. what is missing" explicit per area, which a single prose "Current Design"
+section obscures. Reference example: `BEP-1055-preemption-scheduler-mechanics.md`.
+
 ## Document Segmentation
 
 ### When to Segment

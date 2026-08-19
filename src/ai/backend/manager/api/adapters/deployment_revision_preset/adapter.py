@@ -5,27 +5,25 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.config import (
-    ModelConfig,
-    ModelDefinition,
     ModelHealthCheck,
     ModelMetadata,
-    ModelServiceConfig,
+    PresetModelConfig,
+    PresetModelDefinition,
+    PresetModelServiceConfig,
     PreStartAction,
 )
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment.types import (
-    ModelConfigInfoDTO,
-    ModelDefinitionInfoDTO,
     ModelHealthCheckInfoDTO,
     ModelMetadataInfoDTO,
-    ModelServiceConfigInfoDTO,
     PreStartActionInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput,
     DeploymentRevisionPresetFilter,
     DeploymentRevisionPresetOrder,
+    PresetModelDefinitionInput,
     SearchDeploymentRevisionPresetsInput,
     UpdateDeploymentRevisionPresetInput,
 )
@@ -45,6 +43,9 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
+    PresetModelConfigInfoDTO,
+    PresetModelDefinitionInfoDTO,
+    PresetModelServiceConfigInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AllocatedResourceSlotFilter,
@@ -54,6 +55,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AllocatedResourceSlotNode,
     SearchAllocatedResourceSlotsPayload,
 )
+from ai.backend.common.model_service_start_command_compat import to_legacy_start_command
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.deployment_revision_preset.types import (
@@ -113,8 +115,8 @@ from ai.backend.manager.types import OptionalState, TriState
 
 def _preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=DeploymentRevisionPresetOrders.rank(ascending=True),
-        backward_order=DeploymentRevisionPresetOrders.rank(ascending=False),
+        forward_order=DeploymentRevisionPresetOrders.created_at(ascending=False),
+        backward_order=DeploymentRevisionPresetOrders.created_at(ascending=True),
         forward_condition_factory=DeploymentRevisionPresetConditions.by_cursor_forward,
         backward_condition_factory=DeploymentRevisionPresetConditions.by_cursor_backward,
         tiebreaker_order=DeploymentRevisionPresetRow.id.asc(),
@@ -147,14 +149,18 @@ def _model_health_check_to_dto(check: ModelHealthCheck) -> ModelHealthCheckInfoD
     )
 
 
-def _model_service_config_to_dto(service: ModelServiceConfig) -> ModelServiceConfigInfoDTO:
-    return ModelServiceConfigInfoDTO(
-        pre_start_actions=[_pre_start_action_to_dto(a) for a in service.pre_start_actions],
-        start_command=service.start_command,
+def _model_service_config_to_dto(
+    service: PresetModelServiceConfig,
+) -> PresetModelServiceConfigInfoDTO:
+    return PresetModelServiceConfigInfoDTO(
+        pre_start_actions=[_pre_start_action_to_dto(a) for a in (service.pre_start_actions or [])],
+        command=service.start_command,
+        start_command=to_legacy_start_command(service.start_command),
         shell=service.shell,
         port=service.port,
         health_check=(
-            _model_health_check_to_dto(service.health_check)
+            # Resolve fills the strict defaults so the response shows effective values.
+            _model_health_check_to_dto(service.health_check.to_resolved())
             if service.health_check is not None
             else None
         ),
@@ -179,8 +185,8 @@ def _model_metadata_to_dto(metadata: ModelMetadata) -> ModelMetadataInfoDTO:
     )
 
 
-def _model_config_to_dto(config: ModelConfig) -> ModelConfigInfoDTO:
-    return ModelConfigInfoDTO(
+def _model_config_to_dto(config: PresetModelConfig) -> PresetModelConfigInfoDTO:
+    return PresetModelConfigInfoDTO(
         name=config.name,
         model_path=config.model_path,
         service=(
@@ -191,11 +197,11 @@ def _model_config_to_dto(config: ModelConfig) -> ModelConfigInfoDTO:
 
 
 def _model_definition_to_dto(
-    definition: ModelDefinition | None,
-) -> ModelDefinitionInfoDTO | None:
+    definition: PresetModelDefinition | None,
+) -> PresetModelDefinitionInfoDTO | None:
     if definition is None:
         return None
-    return ModelDefinitionInfoDTO(
+    return PresetModelDefinitionInfoDTO(
         models=[_model_config_to_dto(m) for m in definition.models],
     )
 
@@ -255,7 +261,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         environ = self._convert_environ_input(input.environ)
         preset_values = self._convert_preset_values_input(input.preset_values)
         model_def = (
-            ModelDefinition.model_validate(input.model_definition.model_dump())
+            input.model_definition.to_model_definition()
             if input.model_definition is not None
             else None
         )
@@ -307,7 +313,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             if input.preset_values is not None
             else OptionalState.nop()
         )
-        model_def_state: TriState[ModelDefinition] = self._convert_model_definition_state(
+        model_def_state: TriState[PresetModelDefinition] = self._convert_model_definition_state(
             input.model_definition
         )
 
@@ -566,13 +572,13 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_model_definition_state(
-        value: ModelDefinition | Sentinel | None,
-    ) -> TriState[ModelDefinition]:
+        value: PresetModelDefinitionInput | Sentinel | None,
+    ) -> TriState[PresetModelDefinition]:
         if value is SENTINEL:
             return TriState.nop()
         if value is None:
             return TriState.nullify()
-        return TriState.update(value)
+        return TriState.update(value.to_model_definition())
 
     @staticmethod
     def _convert_tri_state(value: Any) -> TriState[Any]:

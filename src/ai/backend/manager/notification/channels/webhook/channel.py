@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import override
 from urllib.parse import urlparse
 
 import aiohttp
@@ -37,6 +38,7 @@ class WebhookChannel(AbstractNotificationChannel):
         self._http_client_pool = http_client_pool
         self._webhook_spec = webhook_spec
 
+    @override
     async def send(
         self,
         message: NotificationMessage,

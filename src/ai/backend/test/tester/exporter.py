@@ -3,6 +3,7 @@ import traceback
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
+from typing import override
 
 from ai.backend.common.json import pretty_json_str
 from ai.backend.test.contexts.tester import TestSpecMetaContext
@@ -85,20 +86,24 @@ class DefaultExporter(TestExporter):
             self._output_directory.mkdir(parents=True, exist_ok=True)
 
     @classmethod
+    @override
     async def create(cls, sub_name: str | None = None) -> TestExporter:
         return cls(sub_name, started=0.0, last_stage_done=0.0)
 
+    @override
     async def export_start(self) -> None:
         current = time.perf_counter()
         self._started = current
         self._last_stage_done = current
         print(f"Starting '{self._spec_name()}'...")
 
+    @override
     async def export_done(self) -> None:
         current = time.perf_counter()
         elapsed = current - self._started
         print(f"\033[92m✓ '{self._spec_name()}' completed in {elapsed:.2f} seconds.\033[0m")
 
+    @override
     async def export_stage_done(self, stage: str) -> None:
         current = time.perf_counter()
         elapsed = current - self._last_stage_done
@@ -106,6 +111,7 @@ class DefaultExporter(TestExporter):
         self._last_stage = stage
         print(f"\033[92m✓ '{self._stage_name(stage)}' completed in {elapsed:.2f} seconds.\033[0m")
 
+    @override
     async def export_stage_exception(self, stage: str, exception: BaseException) -> None:
         current = time.perf_counter()
         elapsed = current - self._last_stage_done
@@ -115,6 +121,7 @@ class DefaultExporter(TestExporter):
             f"{exception.__class__.__name__}\033[0m"
         )
 
+    @override
     async def export_exception(self, exception: BaseException) -> None:
         current = time.perf_counter()
         elapsed = current - self._started

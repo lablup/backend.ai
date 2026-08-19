@@ -11,7 +11,6 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 __all__ = (
     "OrderDirection",
     "PreemptionMode",
-    "PreemptionOrder",
     "ScalingGroupOrderField",
     "SchedulerType",
 )
@@ -45,13 +44,3 @@ class PreemptionMode(StrEnum):
 
     TERMINATE = "terminate"
     RESCHEDULE = "reschedule"
-
-
-class PreemptionOrder(StrEnum):
-    """Preemption order for selecting sessions to preempt.
-
-    Re-defined in DTO namespace to avoid importing from manager/data layer.
-    """
-
-    OLDEST = "oldest"
-    NEWEST = "newest"

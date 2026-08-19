@@ -10,6 +10,7 @@ from typing import (
     Annotated,
     Any,
     TypeVar,
+    override,
 )
 from uuid import UUID
 
@@ -151,6 +152,7 @@ class RouteInfo(BackendAISchema):
     protocol: ProxyProtocol
     traffic_ratio: Annotated[float, Field(default=1.0)]
 
+    @override
     def __hash__(self) -> int:
         return hash(json.dumps(self.model_dump(mode="json")))
 

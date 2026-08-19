@@ -27,8 +27,9 @@ from ai.backend.manager.data.reservoir_registry.types import (
     ReservoirRegistryListResult,
 )
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository

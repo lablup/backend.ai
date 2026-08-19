@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from unittest.mock import AsyncMock
 
 from ai.backend.common.configs.loader import (
@@ -14,6 +14,7 @@ from ai.backend.common.configs.loader.types import AbstractConfigLoader
 
 
 class CustomLoader(AbstractConfigLoader):
+    @override
     async def load(self) -> dict[str, Any]:
         return {}
 

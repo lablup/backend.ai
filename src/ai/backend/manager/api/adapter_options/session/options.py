@@ -44,6 +44,7 @@ from ai.backend.common.dto.manager.v2.session_options import (
 )
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     BinarySize,
@@ -59,6 +60,7 @@ from ai.backend.manager.data.session.options import (
     FailurePolicy,
     HandlerOptions,
     KernelExecutionSpec,
+    KernelResourceConfig,
     ResourceOpts,
     SessionHandlerOptions,
 )
@@ -176,7 +178,10 @@ def _resource_entry_list_from_input(
     """Project DTO resource-slot input entries into the data-layer
     :class:`ResourceSlotEntry` list used by ``KernelExecutionSpec``.
     """
-    return [ResourceSlotEntry(resource_type=e.resource_type, quantity=e.quantity) for e in entries]
+    return [
+        ResourceSlotEntry(resource_type=ResourceSlotName(e.resource_type), quantity=e.quantity)
+        for e in entries
+    ]
 
 
 def _resource_opts_from_input(value: ResourceOptsInput | None) -> ResourceOpts:
@@ -223,9 +228,11 @@ def _kernel_execution_spec_from_input(
     if input.resources is None:
         raise InvalidAPIParameters("default_kernel_execution_spec.resources is required when set")
     return KernelExecutionSpec(
-        image_id=ImageID(input.image_id),
-        resources=_resource_entry_list_from_input(input.resources),
-        resource_opts=_resource_opts_from_input(input.resource_opts),
+        resource_input=KernelResourceConfig(
+            image_id=ImageID(input.image_id),
+            resources=_resource_entry_list_from_input(input.resources),
+            resource_opts=_resource_opts_from_input(input.resource_opts),
+        ),
         environ=dict(input.environ or {}),
         mounts=_mount_items_to_entries(input.mounts or ()),
         startup_command=input.startup_command,
@@ -239,15 +246,15 @@ def _kernel_execution_spec_to_info(
     spec: KernelExecutionSpec,
 ) -> KernelExecutionSpecInfo:
     return KernelExecutionSpecInfo(
-        image_id=spec.image_id,
+        image_id=spec.resource_input.image_id,
         resources=[
             ResourceSlotEntryInfo(
                 resource_type=entry.resource_type,
                 quantity=Decimal(entry.quantity),
             )
-            for entry in spec.resources
+            for entry in spec.resource_input.resources
         ],
-        resource_opts=_resource_opts_to_info(spec.resource_opts),
+        resource_opts=_resource_opts_to_info(spec.resource_input.resource_opts),
         environ=dict(spec.environ),
         startup_command=spec.startup_command,
         bootstrap_script=spec.bootstrap_script,

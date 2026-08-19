@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from asyncio import subprocess
-from typing import Any
+from typing import Any, override
 
 from yarl import URL
 
@@ -31,6 +31,7 @@ class SubdomainFrontend(H2Frontend[str]):
         self.log_monitor_tasks = []
         self.proc_monitor_task = None
 
+    @override
     async def start(self) -> None:
         self.api_port = self.api_port_pool.pop()
         worker_config = self.root_context.local_config.proxy_worker
@@ -67,6 +68,7 @@ class SubdomainFrontend(H2Frontend[str]):
         self.proc_monitor_task = asyncio.create_task(self._proc_monitor_task(proc))
         log.info("accepting proxy requests at {}:{}", service_addr.host, service_addr.port)
 
+    @override
     async def stop(self) -> None:
         if not self.proc_monitor_task:
             return
@@ -84,18 +86,22 @@ class SubdomainFrontend(H2Frontend[str]):
             if self.api_port:
                 self.api_port_pool.add(self.api_port)
 
+    @override
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> H2Backend:
         backend = H2Backend(URL(f"http://localhost:{self.api_port}"), self.root_context, circuit)
         return await self.update_backend(backend, routes)
 
+    @override
     async def update_backend(self, backend: H2Backend, routes: list[RouteInfo]) -> H2Backend:
         backend_configs = [BackendConfig(r.current_kernel_host, r.kernel_port) for r in routes]
         await backend.update_config(backend_configs)
         return backend
 
+    @override
     async def terminate_backend(self, backend: H2Backend) -> None:
         await backend.update_config([])
 
+    @override
     def get_circuit_key(self, circuit: Circuit) -> str:
         if not isinstance(circuit.frontend, SubdomainFrontendInfo):
             raise InvalidFrontendTypeError(

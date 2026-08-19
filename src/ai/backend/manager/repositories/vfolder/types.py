@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import override
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -14,14 +15,14 @@ from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 
 __all__ = (
     "BulkVFolderPurgeResult",
-    "ProjectVFolderSearchScope",
-    "UserVFolderSearchScope",
+    "ProjectVFolderOperationScope",
+    "UserVFolderOperationScope",
     "VFolderPurgeFailure",
 )
 
@@ -43,7 +44,7 @@ class BulkVFolderPurgeResult:
 
 
 @dataclass(frozen=True)
-class ProjectVFolderSearchScope(SearchScope):
+class ProjectVFolderOperationScope(OperationScope):
     """Required scope for searching vfolders within a project.
 
     Used for project-scoped vfolder search (project admin).
@@ -52,6 +53,7 @@ class ProjectVFolderSearchScope(SearchScope):
     project_id: UUID
     """Required. The project (group) to search within."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for VFolderRow."""
         project_id = self.project_id
@@ -62,6 +64,7 @@ class ProjectVFolderSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         """Return existence checks for scope validation."""
         return [
@@ -74,7 +77,7 @@ class ProjectVFolderSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class UserVFolderSearchScope(SearchScope):
+class UserVFolderOperationScope(OperationScope):
     """Required scope for searching vfolders owned by a specific user.
 
     Used for my_vfolders query (current authenticated user).
@@ -83,6 +86,7 @@ class UserVFolderSearchScope(SearchScope):
     user_id: UUID
     """Required. The user whose vfolders to search."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for VFolderRow.
 
@@ -103,6 +107,7 @@ class UserVFolderSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         """Return existence checks for scope validation."""
         return [

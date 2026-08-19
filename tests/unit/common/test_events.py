@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 from types import TracebackType
-from typing import Any
+from typing import override
 
 import aiotools
 
@@ -22,28 +21,24 @@ from ai.backend.common.message_queue.redis_queue import RedisQueue
 from ai.backend.common.types import AgentId
 
 
-@dataclass
 class DummyBroadcastEvent(AbstractBroadcastEvent):
     value: int
 
-    def serialize(self) -> tuple[Any, ...]:
-        return (self.value + 1,)
-
     @classmethod
-    def deserialize(cls, value: tuple[Any, ...]) -> DummyBroadcastEvent:
-        return cls(value[0] + 1)
-
-    @classmethod
+    @override
     def event_domain(cls) -> EventDomain:
         return EventDomain.AGENT
 
+    @override
     def domain_id(self) -> str | None:
         return None
 
+    @override
     def user_event(self) -> UserEvent | None:
         return None
 
     @classmethod
+    @override
     def event_name(cls) -> str:
         return "testing"
 
@@ -66,7 +61,7 @@ async def test_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id: str) ->
         assert source == AgentId("i-test")
         assert isinstance(event, DummyBroadcastEvent)
         assert event.event_name() == "testing"
-        assert event.value == 1001
+        assert event.value == 999
         await asyncio.sleep(0.01)
         records.add("async")
 
@@ -75,7 +70,7 @@ async def test_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id: str) ->
         assert source == AgentId("i-test")
         assert isinstance(event, DummyBroadcastEvent)
         assert event.event_name() == "testing"
-        assert event.value == 1001
+        assert event.value == 999
         records.add("sync")
 
     dispatcher.subscribe(DummyBroadcastEvent, app, acb)
@@ -84,7 +79,9 @@ async def test_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id: str) ->
     await asyncio.sleep(0.1)
 
     # Dispatch the event
-    await producer.broadcast_event(DummyBroadcastEvent(999), source_override=AgentId("i-test"))
+    await producer.broadcast_event(
+        DummyBroadcastEvent(value=999), source_override=AgentId("i-test")
+    )
     await asyncio.sleep(0.2)
     assert records == {"async", "sync"}
 
@@ -127,7 +124,7 @@ async def test_error_on_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id
     await dispatcher.start()
     await asyncio.sleep(0.1)
 
-    await producer.broadcast_event(DummyBroadcastEvent(0), source_override=AgentId("i-test"))
+    await producer.broadcast_event(DummyBroadcastEvent(value=0), source_override=AgentId("i-test"))
     await asyncio.sleep(0.5)
     assert len(exception_log) == 2
     assert "ZeroDivisionError" in exception_log

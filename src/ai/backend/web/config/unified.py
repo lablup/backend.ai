@@ -555,6 +555,23 @@ class ServiceConfig(BaseConfigSchema):
             example=ConfigExample(local="true", prod="true"),
         ),
     ]
+    allow_theme_mode: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("allow_theme_mode", "allow-theme-mode"),
+            serialization_alias="allow-theme-mode",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Allow users to select a theme (family) and customize its primary color "
+                "in user settings. The light/dark theme mode selector is always available "
+                "regardless of this flag."
+            ),
+            added_version="26.8.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
     edu_appname_prefix: Annotated[
         str,
         Field(

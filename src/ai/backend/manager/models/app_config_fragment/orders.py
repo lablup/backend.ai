@@ -34,12 +34,6 @@ class AppConfigFragmentOrders:
         return AppConfigFragmentRow.scope_id.desc()
 
     @staticmethod
-    def rank(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return AppConfigFragmentRow.rank.asc()
-        return AppConfigFragmentRow.rank.desc()
-
-    @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return AppConfigFragmentRow.created_at.asc()

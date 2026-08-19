@@ -31,6 +31,7 @@ from ai.backend.test.utils.exceptions import DependencyNotSet
 
 class SessionTemplateTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "session_template"
 
@@ -99,6 +100,7 @@ class SessionTemplateTemplate(WrapperTestTemplate):
 
 class BatchSessionFromTemplateTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "batch_session_from_template"
 
@@ -159,6 +161,7 @@ class BatchSessionFromTemplateTemplate(WrapperTestTemplate):
 
 class InteractiveSessionFromTemplateTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "interactive_session_from_template"
 
@@ -227,7 +230,7 @@ class InteractiveSessionFromTemplateTemplate(WrapperTestTemplate):
         test_id = spec_meta.test_id
         client_session = ClientSessionContext.current()
         session_name = f"test_session_{test_id!s}"
-        session_id = None
+        session_id: UUID | None = None
         try:
             session_id = await self._verify_session_creation(client_session, session_name)
             with CreatedSessionMetaContext.with_current(
@@ -235,5 +238,5 @@ class InteractiveSessionFromTemplateTemplate(WrapperTestTemplate):
             ):
                 yield
         finally:
-            if session_id:
+            if session_id is not None:
                 await self._verify_session_destruction(client_session, session_name)

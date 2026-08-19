@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import override
 from unittest.mock import AsyncMock
 
 import pytest
@@ -112,6 +113,7 @@ class TestValkeyLeaderClient:
         # Mock the Lua script to raise an exception
         class MockBackendAIError(BackendAIError):
             @classmethod
+            @override
             def error_code(cls) -> ErrorCode:
                 return ErrorCode.default()
 

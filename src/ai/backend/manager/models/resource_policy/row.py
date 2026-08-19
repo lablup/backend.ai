@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime
-from typing import TYPE_CHECKING, Self
+from typing import Self
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
@@ -23,11 +23,7 @@ from ai.backend.manager.models.base import (
     ResourceSlotColumn,
     VFolderHostPermissionColumn,
 )
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.group import GroupRow
-    from ai.backend.manager.models.keypair import KeyPairRow
-    from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 __all__: Sequence[str] = (
     "DefaultForUnspecified",
@@ -40,13 +36,18 @@ __all__: Sequence[str] = (
 )
 
 
-class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
+class KeyPairResourcePolicyRow(CreatedAtMixin, Base):
     __tablename__ = "keypair_resource_policies"
+    # A cap outside the requestable priority range is unsatisfiable: a
+    # negative one would reject every session create for the keypair.
+    __table_args__ = (
+        sa.CheckConstraint(
+            f"max_priority >= {SESSION_PRIORITY_MIN} AND max_priority <= {SESSION_PRIORITY_MAX}",
+            name="max_priority_within_session_priority_range",
+        ),
+    )
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
     default_for_unspecified: Mapped[DefaultForUnspecified] = mapped_column(
         "default_for_unspecified",
         EnumType(DefaultForUnspecified),
@@ -68,6 +69,8 @@ class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
     max_pending_session_resource_slots: Mapped[ResourceSlot | None] = mapped_column(
         "max_pending_session_resource_slots", ResourceSlotColumn(), nullable=True
     )
+    # Cap on the global scheduler priority a session may declare (NULL = no cap).
+    max_priority: Mapped[int | None] = mapped_column("max_priority", sa.Integer(), nullable=True)
     max_concurrent_sftp_sessions: Mapped[int] = mapped_column(
         "max_concurrent_sftp_sessions", sa.Integer(), nullable=False, server_default=sa.text("1")
     )
@@ -84,10 +87,6 @@ class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
     # TODO: implement with a many-to-many association table
     # allowed_scaling_groups: Mapped[list[str]] = mapped_column(sa.Array(sa.String), nullable=False)
 
-    keypairs: Mapped[list[KeyPairRow]] = relationship(
-        "KeyPairRow", back_populates="resource_policy_row"
-    )
-
     def to_dataclass(
         self,
     ) -> KeyPairResourcePolicyData:
@@ -99,6 +98,7 @@ class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
             max_session_lifetime=self.max_session_lifetime,
             max_concurrent_sessions=self.max_concurrent_sessions,
             max_pending_session_count=self.max_pending_session_count,
+            max_priority=self.max_priority,
             max_pending_session_resource_slots=self.max_pending_session_resource_slots,
             max_concurrent_sftp_sessions=self.max_concurrent_sftp_sessions,
             max_containers_per_session=self.max_containers_per_session,
@@ -112,13 +112,10 @@ class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
 keypair_resource_policies = KeyPairResourcePolicyRow.__table__
 
 
-class UserResourcePolicyRow(Base):  # type: ignore[misc]
+class UserResourcePolicyRow(CreatedAtMixin, Base):
     __tablename__ = "user_resource_policies"
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
     max_vfolder_count: Mapped[int] = mapped_column(
         "max_vfolder_count", sa.Integer(), nullable=False
     )
@@ -134,8 +131,6 @@ class UserResourcePolicyRow(Base):  # type: ignore[misc]
     max_concurrent_logins: Mapped[int | None] = mapped_column(
         "max_concurrent_logins", sa.Integer(), nullable=True, default=None
     )
-
-    users: Mapped[list[UserRow]] = relationship("UserRow", back_populates="resource_policy_row")
 
     def __init__(
         self,
@@ -167,6 +162,7 @@ class UserResourcePolicyRow(Base):  # type: ignore[misc]
     def to_dataclass(self) -> UserResourcePolicyData:
         return UserResourcePolicyData(
             name=self.name,
+            created_at=self.created_at,
             max_vfolder_count=self.max_vfolder_count,
             max_quota_scope_size=self.max_quota_scope_size,
             max_session_count_per_model_session=self.max_session_count_per_model_session,
@@ -180,13 +176,10 @@ class UserResourcePolicyRow(Base):  # type: ignore[misc]
 user_resource_policies = UserResourcePolicyRow.__table__
 
 
-class ProjectResourcePolicyRow(Base):  # type: ignore[misc]
+class ProjectResourcePolicyRow(CreatedAtMixin, Base):
     __tablename__ = "project_resource_policies"
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
     max_vfolder_count: Mapped[int] = mapped_column(
         "max_vfolder_count", sa.Integer(), nullable=False
     )
@@ -195,10 +188,6 @@ class ProjectResourcePolicyRow(Base):  # type: ignore[misc]
     )
     max_network_count: Mapped[int] = mapped_column(
         "max_network_count", sa.Integer(), nullable=False
-    )
-
-    projects: Mapped[list[GroupRow]] = relationship(
-        "GroupRow", back_populates="resource_policy_row"
     )
 
     def __init__(
@@ -225,6 +214,7 @@ class ProjectResourcePolicyRow(Base):  # type: ignore[misc]
     def to_dataclass(self) -> ProjectResourcePolicyData:
         return ProjectResourcePolicyData(
             name=self.name,
+            created_at=self.created_at,
             max_vfolder_count=self.max_vfolder_count,
             max_quota_scope_size=self.max_quota_scope_size,
             max_network_count=self.max_network_count,

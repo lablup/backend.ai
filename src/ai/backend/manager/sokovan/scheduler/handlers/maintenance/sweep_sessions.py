@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
+from typing import override
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
-from ai.backend.manager.data.sokovan import SessionWithKernels
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
@@ -16,6 +17,7 @@ from ai.backend.manager.sokovan.scheduler.results import (
     SessionExecutionResult,
     SessionTransitionInfo,
 )
+from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -36,21 +38,25 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         self._repository = repository
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "sweep-sessions"
 
     @classmethod
+    @override
     def target_statuses(cls) -> list[SessionStatus]:
         """Sessions that may need sweeping - PENDING with timeout."""
         return [SessionStatus.PENDING]
 
     @classmethod
+    @override
     def target_kernel_statuses(cls) -> list[KernelStatus] | None:
         """No kernel filtering for sweep check."""
         return None
 
     @classmethod
+    @override
     def status_transitions(cls) -> StatusTransitions:
         """Define state transitions for sweep sessions handler (BEP-1030).
 
@@ -75,13 +81,15 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         )
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """No lock needed for sweeping stale sessions."""
         return None
 
+    @override
     async def execute(
         self,
-        _scaling_group: str,
+        _resource_group_id: ResourceGroupID,
         sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Sweep stale sessions including those with pending timeout.

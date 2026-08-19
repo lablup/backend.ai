@@ -1,23 +1,19 @@
 import logging
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.user import UserID
-from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.user.types import (
     BulkPurgeError,
     BulkUserPurgeResultData,
     UserInfoContext,
 )
 from ai.backend.manager.errors.user import UserPurgeFailure
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
@@ -64,8 +60,8 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     SearchKeypairsByResourcePolicyActionResult,
     SearchMyKeypairsAction,
     SearchMyKeypairsActionResult,
-    SwitchMyMainAccessKeyAction,
-    SwitchMyMainAccessKeyActionResult,
+    SwitchDefaultAccessKeyAction,
+    SwitchDefaultAccessKeyActionResult,
     UpdateMyKeypairAction,
     UpdateMyKeypairActionResult,
 )
@@ -142,41 +138,12 @@ class UserService:
         user_data_result = await self._user_repository.create_user_validated(
             action.creator, action.group_ids
         )
-        # Grant the scope-level auto_assign roles for the user's initial domain
-        # and project memberships (user creation only provisions user-scope roles).
-        # action.scope_id() is the user's domain name (the action's DOMAIN scope).
-        await self._user_repository.assign_users_to_scope(
-            UserID(user_data_result.user.uuid),
-            user_data_result.user.domain_name,
-            [ProjectID(UUID(gid)) for gid in action.group_ids] if action.group_ids else [],
-        )
-        # The user is also a member of its domain's model-store project at
-        # creation, so grant that project scope's auto_assign roles too.
-        await self._user_repository.assign_user_to_model_store(
-            UserID(user_data_result.user.uuid), user_data_result.user.domain_name
-        )
         return CreateUserActionResult(
             data=user_data_result,
         )
 
     async def bulk_create_users(self, action: BulkCreateUserAction) -> BulkCreateUserActionResult:
         result = await self._user_repository.bulk_create_users_validated(action.items)
-        # Grant the scope-level auto_assign roles for each created user's initial
-        # domain/project memberships, the same as the single-user create path.
-        # group_ids are not carried in the result, so correlate them by email.
-        group_ids_by_email = {
-            cast(UserCreatorSpec, item.creator.spec).email: item.group_ids for item in action.items
-        }
-        for created in result.successes:
-            group_ids = group_ids_by_email.get(created.user.email)
-            await self._user_repository.assign_users_to_scope(
-                UserID(created.user.uuid),
-                created.user.domain_name,
-                [ProjectID(UUID(gid)) for gid in group_ids] if group_ids else [],
-            )
-            await self._user_repository.assign_user_to_model_store(
-                UserID(created.user.uuid), created.user.domain_name
-            )
         return BulkCreateUserActionResult(data=result)
 
     async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
@@ -214,7 +181,6 @@ class UserService:
         user_info_ctx = UserInfoContext(
             uuid=admin_user.uuid,
             email=admin_user.email,
-            main_access_key=AccessKey(admin_user.main_access_key or ""),
         )
         # Reuse the internal UUID-based purge logic shared with bulk_purge_users
         bulk_action = BulkPurgeUserAction(
@@ -271,7 +237,6 @@ class UserService:
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=action.user_info_ctx.uuid,
-                target_main_access_key=action.user_info_ctx.main_access_key,
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,
@@ -333,7 +298,6 @@ class UserService:
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=user_info_ctx.uuid,
-                target_main_access_key=user_info_ctx.main_access_key,
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,
@@ -370,7 +334,6 @@ class UserService:
         user_info_ctx = UserInfoContext(
             uuid=admin_user.uuid,
             email=admin_user.email,
-            main_access_key=AccessKey(admin_user.main_access_key or ""),
         )
 
         purged_user_ids: list[UUID] = []
@@ -475,13 +438,13 @@ class UserService:
         )
         return UpdateMyKeypairActionResult(keypair=keypair_data)
 
-    async def switch_my_main_access_key(
-        self, action: SwitchMyMainAccessKeyAction
-    ) -> SwitchMyMainAccessKeyActionResult:
-        await self._user_repository.switch_my_main_access_key(
-            user_uuid=action.user_uuid, access_key=action.access_key
+    async def switch_default_access_key(
+        self, action: SwitchDefaultAccessKeyAction
+    ) -> SwitchDefaultAccessKeyActionResult:
+        await self._user_repository.switch_default_access_key(
+            user_id=action.user_id, access_key=action.access_key
         )
-        return SwitchMyMainAccessKeyActionResult(success=True)
+        return SwitchDefaultAccessKeyActionResult(success=True)
 
     async def search_my_keypairs(
         self, action: SearchMyKeypairsAction

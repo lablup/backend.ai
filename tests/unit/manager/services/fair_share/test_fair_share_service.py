@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
@@ -22,18 +23,19 @@ from ai.backend.manager.data.fair_share import (
     UserFairShareData,
     UserFairShareSearchResult,
 )
+from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareEntitySearchResult,
-    DomainFairShareSearchScope,
+    DomainFairShareOperationScope,
     ProjectFairShareEntitySearchResult,
-    ProjectFairShareSearchScope,
+    ProjectFairShareOperationScope,
     UserFairShareEntitySearchResult,
-    UserFairShareSearchScope,
+    UserFairShareOperationScope,
 )
 from ai.backend.manager.services.fair_share import (
     FairShareService,
@@ -52,6 +54,8 @@ from ai.backend.manager.services.fair_share.actions import (
     UpsertProjectFairShareWeightAction,
     UpsertUserFairShareWeightAction,
 )
+
+RESOURCE_GROUP_ID = ResourceGroupID(uuid.UUID("00000000-0000-0000-0000-000000000001"))
 
 
 @pytest.fixture
@@ -78,14 +82,14 @@ class TestGetDomainFairShare:
         mock_repository.get_domain_fair_share = AsyncMock(return_value=expected_data)
 
         action = GetDomainFairShareAction(
-            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="test-domain",
         )
 
         result = await service.get_domain_fair_share(action)
 
         mock_repository.get_domain_fair_share.assert_called_once_with(
-            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="test-domain",
         )
         assert result.data == expected_data
@@ -101,6 +105,7 @@ class TestGetDomainFairShare:
         # Repository now creates and returns complete default data internally
         default_data = DomainFairShareData(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="test-domain",
             data=FairShareData(
                 spec=FairShareSpec(
@@ -128,7 +133,7 @@ class TestGetDomainFairShare:
         mock_repository.get_domain_fair_share = AsyncMock(return_value=default_data)
 
         action = GetDomainFairShareAction(
-            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="test-domain",
         )
 
@@ -151,7 +156,7 @@ class TestGetDomainFairShare:
         )
 
         action = GetDomainFairShareAction(
-            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="nonexistent-domain",
         )
 
@@ -177,6 +182,7 @@ class TestGetDomainFairShare:
 
         default_data = DomainFairShareData(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="test-domain",
             data=FairShareData(
                 spec=FairShareSpec(
@@ -204,7 +210,7 @@ class TestGetDomainFairShare:
         mock_repository.get_domain_fair_share = AsyncMock(return_value=default_data)
 
         action = GetDomainFairShareAction(
-            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="test-domain",
         )
 
@@ -295,14 +301,14 @@ class TestGetProjectFairShare:
         mock_repository.get_project_fair_share = AsyncMock(return_value=expected_data)
 
         action = GetProjectFairShareAction(
-            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
         )
 
         result = await service.get_project_fair_share(action)
 
         mock_repository.get_project_fair_share.assert_called_once_with(
-            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
         )
         assert result.data == expected_data
@@ -319,6 +325,7 @@ class TestGetProjectFairShare:
         # Repository now creates and returns complete default data internally
         default_data = ProjectFairShareData(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
             domain_name="test-domain",
             data=FairShareData(
@@ -347,7 +354,7 @@ class TestGetProjectFairShare:
         mock_repository.get_project_fair_share = AsyncMock(return_value=default_data)
 
         action = GetProjectFairShareAction(
-            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
         )
 
@@ -372,7 +379,7 @@ class TestGetProjectFairShare:
         )
 
         action = GetProjectFairShareAction(
-            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
         )
 
@@ -399,6 +406,7 @@ class TestGetProjectFairShare:
 
         default_data = ProjectFairShareData(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
             domain_name="test-domain",
             data=FairShareData(
@@ -427,7 +435,7 @@ class TestGetProjectFairShare:
         mock_repository.get_project_fair_share = AsyncMock(return_value=default_data)
 
         action = GetProjectFairShareAction(
-            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
         )
 
@@ -519,7 +527,7 @@ class TestGetUserFairShare:
         mock_repository.get_user_fair_share = AsyncMock(return_value=expected_data)
 
         action = GetUserFairShareAction(
-            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
             user_uuid=user_uuid,
         )
@@ -527,7 +535,7 @@ class TestGetUserFairShare:
         result = await service.get_user_fair_share(action)
 
         mock_repository.get_user_fair_share.assert_called_once_with(
-            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
             user_uuid=user_uuid,
         )
@@ -546,6 +554,7 @@ class TestGetUserFairShare:
         # Repository now creates and returns complete default data internally
         default_data = UserFairShareData(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             user_uuid=user_uuid,
             project_id=project_id,
             domain_name="test-domain",
@@ -576,7 +585,7 @@ class TestGetUserFairShare:
         mock_repository.get_user_fair_share = AsyncMock(return_value=default_data)
 
         action = GetUserFairShareAction(
-            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
             user_uuid=user_uuid,
         )
@@ -604,7 +613,7 @@ class TestGetUserFairShare:
         )
 
         action = GetUserFairShareAction(
-            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
             user_uuid=user_uuid,
         )
@@ -633,6 +642,7 @@ class TestGetUserFairShare:
 
         default_data = UserFairShareData(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             user_uuid=user_uuid,
             project_id=project_id,
             domain_name="test-domain",
@@ -663,7 +673,7 @@ class TestGetUserFairShare:
         mock_repository.get_user_fair_share = AsyncMock(return_value=default_data)
 
         action = GetUserFairShareAction(
-            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
             user_uuid=user_uuid,
         )
@@ -754,6 +764,7 @@ class TestSearchDomainFairShareEntities:
         # Mock domain with record
         domain_with_record = DomainFairShareData(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="domain-with-record",
             data=FairShareData(
                 spec=FairShareSpec(
@@ -772,6 +783,7 @@ class TestSearchDomainFairShareEntities:
         # Mock default domain (without record in DB, created by Repository)
         domain_without_record = DomainFairShareData(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="domain-without-record",
             data=FairShareData(
                 spec=FairShareSpec(
@@ -797,7 +809,7 @@ class TestSearchDomainFairShareEntities:
 
         mock_repository.search_rg_domain_fair_shares = AsyncMock(return_value=entity_result)
 
-        scope = DomainFairShareSearchScope(resource_group="default")
+        scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
         querier = BatchQuerier(
             pagination=OffsetPagination(offset=0, limit=100),
             conditions=[],
@@ -824,6 +836,7 @@ class TestSearchDomainFairShareEntities:
         # Repository creates default with weight set to default_weight
         default_domain = DomainFairShareData(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="domain-without-record",
             data=FairShareData(
                 spec=FairShareSpec(
@@ -848,7 +861,7 @@ class TestSearchDomainFairShareEntities:
 
         mock_repository.search_rg_domain_fair_shares = AsyncMock(return_value=entity_result)
 
-        scope = DomainFairShareSearchScope(resource_group="default")
+        scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
         querier = BatchQuerier(
             pagination=OffsetPagination(offset=0, limit=100),
             conditions=[],
@@ -879,6 +892,7 @@ class TestSearchDomainFairShareEntities:
 
         default_domain = DomainFairShareData(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="domain-without-record",
             data=FairShareData(
                 spec=FairShareSpec(
@@ -903,7 +917,7 @@ class TestSearchDomainFairShareEntities:
 
         mock_repository.search_rg_domain_fair_shares = AsyncMock(return_value=entity_result)
 
-        scope = DomainFairShareSearchScope(resource_group="default")
+        scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
         querier = BatchQuerier(
             pagination=OffsetPagination(offset=0, limit=100),
             conditions=[],
@@ -938,6 +952,7 @@ class TestSearchProjectFairShareEntities:
         # Mock project with record
         project_with_record = ProjectFairShareData(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id_with_record,
             domain_name="test-domain",
             data=FairShareData(
@@ -957,6 +972,7 @@ class TestSearchProjectFairShareEntities:
         # Mock default project
         project_without_record = ProjectFairShareData(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id_without_record,
             domain_name="test-domain",
             data=FairShareData(
@@ -983,7 +999,9 @@ class TestSearchProjectFairShareEntities:
 
         mock_repository.search_rg_project_fair_shares = AsyncMock(return_value=entity_result)
 
-        scope = ProjectFairShareSearchScope(resource_group="default", domain_name="test-domain")
+        scope = ProjectFairShareOperationScope(
+            domain_name="test-domain", resource_group_id=RESOURCE_GROUP_ID
+        )
         querier = BatchQuerier(
             pagination=OffsetPagination(offset=0, limit=100),
             conditions=[],
@@ -1013,6 +1031,7 @@ class TestSearchUserFairShareEntities:
         # Mock user with record
         user_with_record = UserFairShareData(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             user_uuid=user_uuid_with_record,
             project_id=project_id,
             domain_name="test-domain",
@@ -1034,6 +1053,7 @@ class TestSearchUserFairShareEntities:
         # Mock default user
         user_without_record = UserFairShareData(
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             user_uuid=user_uuid_without_record,
             project_id=project_id,
             domain_name="test-domain",
@@ -1062,10 +1082,10 @@ class TestSearchUserFairShareEntities:
 
         mock_repository.search_rg_user_fair_shares = AsyncMock(return_value=entity_result)
 
-        scope = UserFairShareSearchScope(
-            resource_group="default",
+        scope = UserFairShareOperationScope(
             domain_name="test-domain",
             project_id=project_id,
+            resource_group_id=RESOURCE_GROUP_ID,
         )
         querier = BatchQuerier(
             pagination=OffsetPagination(offset=0, limit=100),
@@ -1097,6 +1117,7 @@ class TestUpsertFairShareWeightWithoutResourceGroup:
         today = now.date()
         expected_data = DomainFairShareData(
             resource_group="non-existent-sg",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="test-domain",
             data=FairShareData(
                 spec=FairShareSpec(
@@ -1122,6 +1143,7 @@ class TestUpsertFairShareWeightWithoutResourceGroup:
 
         action = UpsertDomainFairShareWeightAction(
             resource_group="non-existent-sg",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="test-domain",
             weight=Decimal("2.5"),
         )
@@ -1143,6 +1165,7 @@ class TestUpsertFairShareWeightWithoutResourceGroup:
         today = now.date()
         expected_data = ProjectFairShareData(
             resource_group="non-existent-sg",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
             domain_name="test-domain",
             data=FairShareData(
@@ -1169,6 +1192,7 @@ class TestUpsertFairShareWeightWithoutResourceGroup:
 
         action = UpsertProjectFairShareWeightAction(
             resource_group="non-existent-sg",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
             domain_name="test-domain",
             weight=Decimal("3.0"),
@@ -1192,6 +1216,7 @@ class TestUpsertFairShareWeightWithoutResourceGroup:
         today = now.date()
         expected_data = UserFairShareData(
             resource_group="non-existent-sg",
+            resource_group_id=RESOURCE_GROUP_ID,
             user_uuid=user_uuid,
             project_id=project_id,
             domain_name="test-domain",
@@ -1220,6 +1245,7 @@ class TestUpsertFairShareWeightWithoutResourceGroup:
 
         action = UpsertUserFairShareWeightAction(
             resource_group="non-existent-sg",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
             user_uuid=user_uuid,
             domain_name="test-domain",

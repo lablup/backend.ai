@@ -189,10 +189,14 @@
   # Added in 25.8.0
   ## ssl-privkey = "/etc/backend.ai/ssl/manager.key"
   # List of trusted reverse proxy IP addresses or CIDR ranges. When configured,
-  # the manager uses aiohttp_remotes.XForwardedStrict middleware to securely
-  # resolve client IPs from X-Forwarded-For headers. Only proxies in this list
-  # are trusted to set forwarding headers. If empty (default), the manager falls
-  # back to manual X-Forwarded-For parsing.
+  # the client IP is resolved by walking the X-Forwarded-For chain inwards from
+  # the peer of the connection and taking the first address that is not one of
+  # these proxies, so any number of proxy hops is supported. The X-Forwarded-URL
+  # header, which overrides the host and path used for HMAC signature
+  # verification, is honored only when the request comes directly from one of
+  # these proxies. If empty (default), the manager falls back to manual
+  # X-Forwarded-For parsing and accepts X-Forwarded-URL from any client, which
+  # is deprecated.
   # Added in 26.4.2
   trusted-proxies = ["10.0.0.0/8", "172.16.0.0/12"]
   # Event loop implementation to use for async operations. 'asyncio' is the
@@ -252,12 +256,12 @@
   # exactly which plugins are active in production. Leave as None to load all
   # available plugins except disabled_plugins.
   # Added in 25.8.0
-  ## allowed-plugins = "[\"example.plugin.what.you.want\"]"
+  ## allowed-plugins = ["example.plugin.what.you.want"]
   # List of plugins to explicitly disable (blacklist). These plugins won't be
   # loaded even if they're installed. Useful for disabling problematic or
   # unwanted plugins without uninstalling.
   # Added in 25.8.0
-  ## disabled-plugins = "[\"example.plugin.what.you.want\"]"
+  ## disabled-plugins = ["example.plugin.what.you.want"]
   # Whether to hide detailed agent information in API responses. When enabled,
   # agent details are obscured in user-facing APIs. Recommended for multi-tenant
   # environments to improve security and privacy.
@@ -285,11 +289,6 @@
   # only from trusted networks for security.
   # Added in 25.8.0
   aiomonitor-webui-port = 39100
-  # Whether to use the experimental Redis-based event dispatcher. May provide
-  # better performance for event handling in large clusters. Not recommended for
-  # production use unless specifically tested and needed.
-  # Added in 25.8.0
-  use-experimental-redis-event-dispatcher = false
   # Interval in seconds between manager status updates to the cluster. Controls
   # how frequently the manager broadcasts its health status. Smaller values
   # provide more real-time information but increase network overhead.
@@ -513,6 +512,20 @@
   # customizable alerting based on system events.
   # Added in 25.8.0
   [reporter.action-monitors]
+
+# Audit log recording policy. Mutating operations are always recorded, as are
+# failures and permission denials; this section only opts successful read
+# operations in.
+# Added in 26.9.0
+[audit-log]
+  # Opt-in list: a read operation is recorded only if it is named here. The
+  # default is an empty list, so successful reads are not recorded at all and
+  # read volume stays off until an operator turns it on. A listed operation is
+  # recorded for every entity type. Must be 'get' or 'search': mutating
+  # operations are always recorded and listing them here is rejected. Failed and
+  # denied reads are recorded either way.
+  # Added in 26.9.0
+  record-read-operations = []
 
 # System-wide configuration settings. Controls general Backend.AI system
 # behavior that affects all components. These settings typically apply globally
@@ -1101,3 +1114,25 @@
   # overload from too many simultaneous export operations.
   # Added in 26.1.0
   max-concurrent-exports = 10
+
+# DB record retention sweep configuration. Controls the leader-cron sweep that
+# deletes accumulated records past each enabled retention policy's age boundary,
+# including tick cadence, delete chunk size, and an optional per-tick budget.
+# Added in 26.7.0
+[retention]
+  # Interval in seconds between retention sweep ticks. A single tick loads all
+  # enabled retention policies and purges records older than each policy's
+  # boundary. The sweep runs only on the leader manager.
+  # Added in 26.7.0
+  sweep-interval = 3600.0
+  # Number of rows deleted per chunk during a sweep. Each category's tables are
+  # drained in delete-and-advance chunks of this size so a large backlog never
+  # becomes a single huge DELETE.
+  # Added in 26.7.0
+  batch-size = 1000
+  # Optional upper bound on the total rows deleted in one tick, enforced across
+  # categories at category boundaries: once a tick's cumulative deletions reach
+  # this budget the remaining categories are deferred to the next tick. Null
+  # means no budget (every enabled category is fully drained each tick).
+  # Added in 26.7.0
+  ## per-tick-budget = 100000

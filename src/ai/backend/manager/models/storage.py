@@ -18,11 +18,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.storage_proxy.session_manager import (
-    StorageProxyInfo,
-    StorageSessionManager,
-    VolumeInfo,
-)  # For compatibility with existing code
+from ai.backend.manager.data.permission.permission_defs import StorageHostPermission
 
 from .rbac import (
     AbstractPermissionContext,
@@ -34,17 +30,10 @@ from .rbac import (
     get_predefined_roles_in_scope,
 )
 from .rbac.context import ClientContext
-from .rbac.permission_defs import StorageHostPermission
 from .resource_policy import KeyPairResourcePolicyRow
 from .user import UserRow
 
 # Left this for compatibility with existing code
-__all__ = (
-    "StorageProxyInfo",
-    "StorageSessionManager",
-    "VolumeInfo",
-)
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
@@ -114,9 +103,11 @@ class PermissionContext(AbstractPermissionContext[StorageHostPermission, str, st
     def host_to_permissions_map(self) -> StorageHostToPermissionMap:
         return self.object_id_to_additional_permission_map
 
+    @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
         return None
 
+    @override
     async def calculate_final_permission(self, rbac_obj: str) -> frozenset[StorageHostPermission]:
         host_name = rbac_obj
         return self.object_id_to_additional_permission_map.get(host_name, frozenset())

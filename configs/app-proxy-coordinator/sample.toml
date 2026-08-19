@@ -187,11 +187,6 @@
   # older Backend.AI clusters. Keep this disabled in production environments.
   # Added in 25.9.0
   allow_unauthorized_configure_request = false
-  # Enable the experimental Redis-based event dispatcher for real-time event
-  # propagation between coordinator and workers. This feature is under
-  # development and may have stability issues. Use with caution in production.
-  # Added in 25.9.0
-  use_experimental_redis_event_dispatcher = false
   # Enable Traefik integration as the proxy worker's data plane. When enabled,
   # the coordinator will manage routing rules through Traefik instead of the
   # built-in proxy workers. Requires Traefik to be deployed and configured

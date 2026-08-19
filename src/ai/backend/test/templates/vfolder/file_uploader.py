@@ -17,6 +17,7 @@ from ai.backend.test.templates.vfolder.utils import retrieve_all_files
 
 class PlainTextFilesUploader(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "upload_plain_text_files"
 

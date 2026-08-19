@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInput
 from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.types import PreemptionVictimScope
 
 __all__ = (
     "AdminSearchResourceGroupsInput",
@@ -73,6 +74,13 @@ class CreateResourceGroupInput(BaseRequestModel):
         default=None,
         description="Resource policy name to apply to this resource group.",
     )
+    is_default: bool = Field(
+        default=False,
+        description=(
+            "Make this the default resource group. At most one resource group may hold the"
+            " flag, so this is rejected while another one holds it; clear that one first."
+        ),
+    )
 
     @field_validator("name", mode="before")
     @classmethod
@@ -98,6 +106,14 @@ class UpdateResourceGroupInput(BaseRequestModel):
     is_active: bool | None = Field(
         default=None,
         description="Whether the resource group is active. Leave null to keep existing value.",
+    )
+    is_default: bool | None = Field(
+        default=None,
+        description=(
+            "Whether this is the default resource group. At most one resource group may hold"
+            " the flag, so setting it to true is rejected while another one holds it; clear"
+            " that one first. Leave null to keep existing value."
+        ),
     )
     total_resource_slots: dict[str, Any] | Sentinel | None = Field(
         default=SENTINEL,
@@ -141,6 +157,9 @@ class ResourceGroupFilter(BaseRequestModel):
     description: StringFilter | None = Field(default=None, description="Filter by description.")
     is_active: bool | None = Field(default=None, description="Filter by active status.")
     is_public: bool | None = Field(default=None, description="Filter by public status.")
+    is_default: bool | None = Field(
+        default=None, description="Filter by whether the resource group is the default one."
+    )
     AND: list[ResourceGroupFilter] | None = Field(default=None, description="AND conjunction.")
     OR: list[ResourceGroupFilter] | None = Field(default=None, description="OR conjunction.")
     NOT: list[ResourceGroupFilter] | None = Field(default=None, description="NOT negation.")
@@ -186,6 +205,10 @@ class ResourceWeightEntryInput(BaseRequestModel):
 class PreemptionConfigInputDTO(BaseRequestModel):
     """Input for preemption configuration."""
 
+    enabled: bool = Field(
+        default=False,
+        description="Whether preemption is enabled for this resource group (opt-in).",
+    )
     preemptible_priority: int = Field(
         default=5,
         description="Sessions with priority <= this value are eligible for preemption.",
@@ -197,6 +220,20 @@ class PreemptionConfigInputDTO(BaseRequestModel):
     mode: str = Field(
         default="terminate",
         description="How to preempt sessions (terminate/reschedule).",
+    )
+    preemption_min_runtime: float = Field(
+        default=0.0,
+        ge=0.0,
+        description=(
+            "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
+        ),
+    )
+    victim_scope: PreemptionVictimScope = Field(
+        default=PreemptionVictimScope.USER,
+        description=(
+            "Scope preemption victims are drawn from (user/project/domain/resource-group). "
+            "Default is user."
+        ),
     )
 
 
@@ -237,6 +274,14 @@ class UpdateResourceGroupConfigInput(BaseRequestModel):
     is_public: bool | None = Field(
         default=None,
         description="Whether the resource group is public. Leave null to keep existing value.",
+    )
+    is_default: bool | None = Field(
+        default=None,
+        description=(
+            "Whether this is the default resource group. At most one resource group may hold"
+            " the flag, so setting it to true is rejected while another one holds it; clear"
+            " that one first. Leave null to keep existing value."
+        ),
     )
     description: str | None = Field(
         default=None,

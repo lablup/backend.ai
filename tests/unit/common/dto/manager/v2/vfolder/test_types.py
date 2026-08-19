@@ -188,16 +188,16 @@ class TestVFolderUsageInfo:
     def test_creation(self) -> None:
         info = VFolderUsageInfo(
             num_files=10,
-            used_bytes=BinarySizeInfo(value=1024, display="1024"),
+            used_bytes=BinarySizeInfo(expr="1024", display="1024"),
         )
         assert info.num_files == 10
-        assert info.used_bytes.value == 1024
+        assert info.used_bytes.expr == "1024"
 
     def test_round_trip(self) -> None:
         info = VFolderUsageInfo(
             num_files=5,
-            used_bytes=BinarySizeInfo(value=512, display="512"),
+            used_bytes=BinarySizeInfo(expr="512", display="512"),
         )
         restored = VFolderUsageInfo.model_validate_json(info.model_dump_json())
         assert restored.num_files == 5
-        assert restored.used_bytes.value == 512
+        assert restored.used_bytes.expr == "512"

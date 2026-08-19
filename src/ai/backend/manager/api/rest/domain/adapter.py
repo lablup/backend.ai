@@ -17,12 +17,13 @@ from ai.backend.common.dto.manager.domain import (
 )
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.domain.types import DomainData
-from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.orders import DomainOrders
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.domain.updaters import DomainUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
@@ -40,7 +41,7 @@ class DomainAdapter(BaseFilterAdapter):
             description=data.description,
             is_active=data.is_active,
             created_at=data.created_at,
-            modified_at=data.modified_at,
+            modified_at=data.updated_at,
             total_resource_slots=dict(data.total_resource_slots),
             allowed_vfolder_hosts=dict(data.allowed_vfolder_hosts),
             allowed_docker_registries=data.allowed_docker_registries,
@@ -121,7 +122,7 @@ class DomainAdapter(BaseFilterAdapter):
         if order.field == DomainOrderField.CREATED_AT:
             return DomainOrders.created_at(ascending=ascending)
         if order.field == DomainOrderField.MODIFIED_AT:
-            return DomainOrders.modified_at(ascending=ascending)
+            return DomainOrders.updated_at(ascending=ascending)
         raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:

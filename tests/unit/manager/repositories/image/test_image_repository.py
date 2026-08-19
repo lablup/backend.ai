@@ -5,6 +5,7 @@ Tests the repository layer with real database operations.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator, Callable, Coroutine
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -15,6 +16,7 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import BinarySize, KernelId, ResourceSlot, SessionId
 from ai.backend.manager.models.agent import AgentRow
@@ -30,11 +32,12 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.testutils.db import with_tables
@@ -487,11 +490,30 @@ class TestImageRepositoryLastUsedAt:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> DomainRow:
-        domain = DomainRow(name=f"test-{uuid4()}")
+        name = f"test-{uuid4()}"
+        domain_id = DomainID(uuid.uuid4())
+        domain = DomainRow(id=domain_id, name=name)
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(domain)
             await db_sess.flush()
         return domain
+
+    @pytest.fixture
+    async def scaling_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        scaling_group = ScalingGroupRow(
+            name="test-sg",
+            driver="static",
+            driver_opts={},
+            scheduler="fifo",
+            scheduler_opts=ScalingGroupOpts(),
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(scaling_group)
+            await db_sess.flush()
+        return scaling_group.name
 
     @pytest.fixture
     async def user_policy(
@@ -535,9 +557,11 @@ class TestImageRepositoryLastUsedAt:
     ) -> UserRow:
         user = UserRow(
             uuid=uuid4(),
+            username=f"testuser-{uuid4().hex[:8]}",
             email=f"test-{uuid4().hex[:8]}@example.com",
             domain_name=domain.name,
             resource_policy=user_policy.name,
+            domain_id=DomainID(domain.id),
         )
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(user)
@@ -625,6 +649,7 @@ class TestImageRepositoryLastUsedAt:
         user: UserRow,
         group: GroupRow,
         domain: DomainRow,
+        scaling_group: str,
     ) -> CreateKernelForImageFunc:
         """Return a factory that creates a session + kernel for the given image."""
 
@@ -637,6 +662,7 @@ class TestImageRepositoryLastUsedAt:
                     user_uuid=user.uuid,
                     group_id=group.id,
                     domain_name=domain.name,
+                    scaling_group_name=scaling_group,
                     occupying_slots=ResourceSlot(),
                     requested_slots=ResourceSlot(),
                     vfolder_mounts=[],

@@ -228,6 +228,19 @@ class UserNestedFilter(BaseRequestModel):
 UserNestedFilter.model_rebuild()
 
 
+class MappedScopeNestedFilter(BaseRequestModel):
+    """Filter roles by the scope they are mapped (registered) to."""
+
+    scope_type: RBACElementTypeFilter | None = None
+    scope_id: StringFilter | None = None
+    AND: list[MappedScopeNestedFilter] | None = None
+    OR: list[MappedScopeNestedFilter] | None = None
+    NOT: list[MappedScopeNestedFilter] | None = None
+
+
+MappedScopeNestedFilter.model_rebuild()
+
+
 class RoleFilter(BaseRequestModel):
     """Filter for roles."""
 
@@ -235,6 +248,7 @@ class RoleFilter(BaseRequestModel):
     source: RoleSourceFilter | None = None
     status: RoleStatusFilter | None = None
     assigned_user: UserNestedFilter | None = None
+    mapped_scope: MappedScopeNestedFilter | None = None
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None
     NOT: list[RoleFilter] | None = None
@@ -293,6 +307,8 @@ class EntityFilter(BaseRequestModel):
 
     entity_type: RBACElementTypeFilter | None = None
     entity_id: StringFilter | None = None
+    scope_type: RBACElementTypeFilter | None = None
+    scope_id: StringFilter | None = None
     AND: list[EntityFilter] | None = None
     OR: list[EntityFilter] | None = None
     NOT: list[EntityFilter] | None = None

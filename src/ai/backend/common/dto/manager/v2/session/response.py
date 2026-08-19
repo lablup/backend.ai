@@ -14,15 +14,23 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 
 __all__ = (
     "AdminSearchSessionsPayload",
     "CommitSessionPayload",
     "DestroySessionPayload",
+    "ExcludeSessionIdleChecksFailureInfo",
+    "ExcludeSessionIdleChecksPayload",
     "ExecutePayload",
+    "IncludeSessionIdleChecksFailureInfo",
+    "IncludeSessionIdleChecksPayload",
     "RestartSessionPayload",
     "SearchSessionsPayload",
+    "SessionIdleCheckTargetInfo",
     "SessionLifecycleInfo",
     "SessionLifecycleInfoGQLDTO",
     "SessionLogsPayload",
@@ -63,6 +71,17 @@ class SessionMetadataInfo(BaseResponseModel):
     )
     cluster_size: int = Field(description="Number of nodes in the cluster.")
     priority: int = Field(description="Scheduling priority of the session.")
+    job_priority: int = Field(
+        description=(
+            "Preemption priority among the owner's own sessions. A pending "
+            "session may reclaim another session's resources only when both "
+            "belong to the same user and the other session's value is strictly "
+            "lower, so equal values never preempt each other; among the "
+            "eligible sessions the lowest value is reclaimed first. Independent "
+            "of `priority`, which orders the pending queue and takes no part in "
+            "this comparison."
+        )
+    )
     is_preemptible: bool = Field(
         description="Whether this session is eligible for preemption by higher-priority sessions."
     )
@@ -256,6 +275,67 @@ class TerminateSessionsPayload(BaseResponseModel):
     )
 
 
+class SessionIdleCheckTargetInfo(BaseResponseModel):
+    """One (checker, session) pair an idle-check exclusion or inclusion applied to."""
+
+    checker_id: IdleCheckerID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker UUID of the pair."
+    )
+    session_id: SessionID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Session UUID of the pair."
+    )
+
+
+class ExcludeSessionIdleChecksFailureInfo(BaseResponseModel):
+    """Why one pair could not be excluded from idle checks."""
+
+    checker_id: IdleCheckerID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker of the pair the failure applies to."
+    )
+    session_id: SessionID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Session of the pair the failure applies to."
+    )
+    message: str = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Why the pair was not excluded."
+    )
+
+
+class ExcludeSessionIdleChecksPayload(BaseResponseModel):
+    """Payload for idle-check exclusion with per-pair partial success."""
+
+    items: list[SessionIdleCheckTargetInfo] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs successfully excluded."
+    )
+    failed: list[ExcludeSessionIdleChecksFailureInfo] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs that could not be excluded."
+    )
+
+
+class IncludeSessionIdleChecksFailureInfo(BaseResponseModel):
+    """Why one pair could not be included into idle checks."""
+
+    checker_id: IdleCheckerID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker of the pair the failure applies to."
+    )
+    session_id: SessionID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Session of the pair the failure applies to."
+    )
+    message: str = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Why the pair was not included."
+    )
+
+
+class IncludeSessionIdleChecksPayload(BaseResponseModel):
+    """Payload for idle-check inclusion with per-pair partial success."""
+
+    items: list[SessionIdleCheckTargetInfo] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs successfully included."
+    )
+    failed: list[IncludeSessionIdleChecksFailureInfo] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs that could not be included."
+    )
+
+
 class StartSessionServicePayload(BaseResponseModel):
     """Payload for starting a service in a session."""
 
@@ -302,6 +382,17 @@ class SessionMetadataInfoGQLDTO(BaseResponseModel):
     )
     cluster_size: int = Field(description="Number of nodes in the cluster.")
     priority: int = Field(description="Scheduling priority of the session.")
+    job_priority: int = Field(
+        description=(
+            "Preemption priority among the owner's own sessions. A pending "
+            "session may reclaim another session's resources only when both "
+            "belong to the same user and the other session's value is strictly "
+            "lower, so equal values never preempt each other; among the "
+            "eligible sessions the lowest value is reclaimed first. Independent "
+            "of `priority`, which orders the pending queue and takes no part in "
+            "this comparison."
+        )
+    )
     is_preemptible: bool = Field(
         description="Whether this session is eligible for preemption by higher-priority sessions."
     )

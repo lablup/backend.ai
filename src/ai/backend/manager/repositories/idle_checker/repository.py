@@ -1,0 +1,148 @@
+from __future__ import annotations
+
+from collections.abc import Collection, Sequence
+
+from ai.backend.common.data.idle_checker.types import IdleCheckPhase
+from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleCheckerData
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.idle_checker.row import (
+    IdleCheckerBindingRow,
+    IdleCheckerRow,
+    SessionIdleCheckRow,
+)
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    BulkUpserter,
+    Creator,
+    Purger,
+    Updater,
+)
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
+from ai.backend.manager.repositories.idle_checker.creators import IdleCheckerAssignmentCreatorSpec
+from ai.backend.manager.repositories.idle_checker.db_source.db_source import IdleCheckerDBSource
+from ai.backend.manager.repositories.idle_checker.types import (
+    ExpiredIdleCheckBatchData,
+    IdleCheckBatchData,
+    IdleJudgmentData,
+    InitialGracePeriodBatchData,
+    SessionIdleCheckAssignmentData,
+    SessionIdleCheckBatchResult,
+    SessionIdleCheckPair,
+)
+from ai.backend.manager.repositories.ops import DBOpsProvider
+
+__all__ = ("IdleCheckerRepository",)
+
+
+class IdleCheckerRepository:
+    """Idle checker persistence and reconciler data access."""
+
+    _db_source: IdleCheckerDBSource
+
+    def __init__(self, ops_provider: DBOpsProvider) -> None:
+        self._db_source = IdleCheckerDBSource(ops_provider)
+
+    async def create(self, creator: Creator[IdleCheckerRow]) -> IdleCheckerData:
+        return await self._db_source.create(creator)
+
+    async def update(self, updater: Updater[IdleCheckerRow]) -> IdleCheckerData:
+        return await self._db_source.update(updater)
+
+    async def purge(self, purger: Purger[IdleCheckerRow]) -> IdleCheckerData:
+        return await self._db_source.purge(purger)
+
+    async def admin_search(self, querier: BatchQuerier) -> SearchResult[IdleCheckerData]:
+        return await self._db_source.admin_search(querier)
+
+    async def create_assignment(
+        self, spec: IdleCheckerAssignmentCreatorSpec
+    ) -> IdleCheckerAssignmentData:
+        return await self._db_source.create_assignment(spec)
+
+    async def update_assignment(
+        self, updater: Updater[IdleCheckerBindingRow]
+    ) -> IdleCheckerAssignmentData:
+        return await self._db_source.update_assignment(updater)
+
+    async def purge_assignment(
+        self, purger: RBACEntityPurger[IdleCheckerBindingRow]
+    ) -> IdleCheckerAssignmentData:
+        return await self._db_source.purge_assignment(purger)
+
+    async def admin_search_assignments(
+        self, querier: BatchQuerier
+    ) -> SearchResult[IdleCheckerAssignmentData]:
+        return await self._db_source.admin_search_assignments(querier)
+
+    async def scoped_search_assignments(
+        self,
+        querier: BatchQuerier,
+        scopes: Sequence[OperationScope],
+    ) -> SearchResult[IdleCheckerAssignmentData]:
+        """Search bindings whose rows match any of ``scopes`` (OR), narrowed by ``querier``."""
+        return await self._db_source.scoped_search_assignments(querier, scopes)
+
+    async def fetch_judgment_batch(
+        self, session_statuses: Collection[SessionStatus]
+    ) -> IdleCheckBatchData:
+        return await self._db_source.fetch_judgment_batch(session_statuses)
+
+    async def fetch_session_idle_check_assignments(
+        self,
+        session_statuses: Collection[SessionStatus],
+    ) -> SessionIdleCheckAssignmentData:
+        return await self._db_source.fetch_session_idle_check_assignments(session_statuses)
+
+    async def fetch_initial_grace_period_checks(
+        self,
+        session_statuses: Collection[SessionStatus],
+    ) -> InitialGracePeriodBatchData:
+        return await self._db_source.fetch_initial_grace_period_checks(session_statuses)
+
+    async def fetch_expired_idle_checks(
+        self, session_statuses: Collection[SessionStatus]
+    ) -> ExpiredIdleCheckBatchData:
+        return await self._db_source.fetch_expired_idle_checks(session_statuses)
+
+    async def sync_session_idle_check_assignments(
+        self,
+        pairs_to_create: Sequence[SessionIdleCheckPair],
+        pairs_to_delete: Sequence[SessionIdleCheckPair],
+    ) -> None:
+        await self._db_source.sync_session_idle_check_assignments(
+            pairs_to_create,
+            pairs_to_delete,
+        )
+
+    async def batch_update_session_idle_check_phase(
+        self,
+        pairs: Sequence[SessionIdleCheckPair],
+        *,
+        from_phase: IdleCheckPhase,
+        to_phase: IdleCheckPhase,
+    ) -> None:
+        await self._db_source.batch_update_session_idle_check_phase(
+            pairs,
+            from_phase=from_phase,
+            to_phase=to_phase,
+        )
+
+    async def batch_exclude_session_idle_checks(
+        self,
+        upserter: BulkUpserter[SessionIdleCheckRow],
+    ) -> SessionIdleCheckBatchResult:
+        return await self._db_source.batch_exclude_session_idle_checks(upserter)
+
+    async def batch_include_session_idle_checks(
+        self,
+        upserter: BulkUpserter[SessionIdleCheckRow],
+    ) -> SessionIdleCheckBatchResult:
+        return await self._db_source.batch_include_session_idle_checks(upserter)
+
+    async def batch_apply_session_idle_check_judgments(
+        self,
+        judgments: Sequence[IdleJudgmentData],
+    ) -> None:
+        await self._db_source.batch_apply_session_idle_check_judgments(judgments)

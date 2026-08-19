@@ -11,7 +11,6 @@ from typing import Any
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.common import (
-    BinarySizeInfo,
     BinarySizeInput,
     ResourceLimitEntryInfo,
     ResourceSlotEntryInfo,
@@ -166,17 +165,6 @@ from ai.backend.manager.services.user_resource_policy.actions.search_user_resour
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-
-def _humanize_bytes(value: int) -> str:
-    """Convert bytes integer to human-readable string (e.g., 1073741824 -> '1g')."""
-    return f"{BinarySize(value):s}"
-
-
-def _to_binary_size_info(value: int) -> BinarySizeInfo:
-    """Convert bytes integer to BinarySizeInfo DTO."""
-    return BinarySizeInfo(value=value, display=_humanize_bytes(value))
-
-
 _KEYPAIR_RP_PAGINATION_SPEC = PaginationSpec(
     forward_order=KeypairResourcePolicyOrders.created_at(ascending=False),
     backward_order=KeypairResourcePolicyOrders.created_at(ascending=True),
@@ -246,6 +234,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             max_session_lifetime=input.max_session_lifetime,
             max_concurrent_sessions=input.max_concurrent_sessions,
             max_pending_session_count=input.max_pending_session_count,
+            max_priority=input.max_priority,
             max_pending_session_resource_slots=(
                 self._entries_to_resource_slot(input.max_pending_session_resource_slots)
                 if input.max_pending_session_resource_slots is not None
@@ -309,8 +298,15 @@ class ResourcePolicyAdapter(BaseAdapter):
                 else TriState.nullify()
                 if input.max_pending_session_resource_slots is None
                 else TriState.update(
-                    self._entries_to_resource_slot_dict(input.max_pending_session_resource_slots)
+                    self._entries_to_resource_slot(input.max_pending_session_resource_slots)
                 )
+            ),
+            max_priority=(
+                TriState.nop()
+                if isinstance(input.max_priority, Sentinel)
+                else TriState.nullify()
+                if input.max_priority is None
+                else TriState.update(input.max_priority)
             ),
             max_concurrent_sftp_sessions=(
                 OptionalState.update(input.max_concurrent_sftp_sessions)
@@ -631,6 +627,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             max_session_lifetime=data.max_session_lifetime,
             max_concurrent_sessions=data.max_concurrent_sessions,
             max_pending_session_count=data.max_pending_session_count,
+            max_priority=data.max_priority,
             max_pending_session_resource_slots=(
                 cls._resource_slot_to_limit_entries(data.max_pending_session_resource_slots)
                 if data.max_pending_session_resource_slots is not None
@@ -649,9 +646,10 @@ class ResourcePolicyAdapter(BaseAdapter):
         return UserResourcePolicyNode(
             id=data.name,
             name=data.name,
+            created_at=data.created_at,
             max_vfolder_count=data.max_vfolder_count,
             max_concurrent_logins=data.max_concurrent_logins,
-            max_quota_scope_size=_to_binary_size_info(data.max_quota_scope_size),
+            max_quota_scope_size=BinarySize.to_size_info(data.max_quota_scope_size),
             max_session_count_per_model_session=data.max_session_count_per_model_session,
             max_customized_image_count=data.max_customized_image_count,
         )
@@ -663,8 +661,9 @@ class ResourcePolicyAdapter(BaseAdapter):
         return ProjectResourcePolicyNode(
             id=data.name,
             name=data.name,
+            created_at=data.created_at,
             max_vfolder_count=data.max_vfolder_count,
-            max_quota_scope_size=_to_binary_size_info(data.max_quota_scope_size),
+            max_quota_scope_size=BinarySize.to_size_info(data.max_quota_scope_size),
             max_network_count=data.max_network_count,
         )
 
@@ -730,6 +729,13 @@ class ResourcePolicyAdapter(BaseAdapter):
             cond = self.convert_int_filter(
                 filter.max_pending_session_count,
                 KeypairResourcePolicyConditions.by_max_pending_session_count,
+            )
+            if cond is not None:
+                conditions.append(cond)
+        if filter.max_priority is not None:
+            cond = self.convert_int_filter(
+                filter.max_priority,
+                KeypairResourcePolicyConditions.by_max_priority,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -947,6 +953,8 @@ def _resolve_keypair_order(
             return KeypairResourcePolicyOrders.max_concurrent_sftp_sessions(ascending)
         case KeypairResourcePolicyOrderField.MAX_PENDING_SESSION_COUNT:
             return KeypairResourcePolicyOrders.max_pending_session_count(ascending)
+        case KeypairResourcePolicyOrderField.MAX_PRIORITY:
+            return KeypairResourcePolicyOrders.max_priority(ascending)
 
 
 def _resolve_user_order(

@@ -18,7 +18,6 @@ from ai.backend.common.dto.manager.v2.scaling_group.response import (
 from ai.backend.common.dto.manager.v2.scaling_group.types import (
     OrderDirection,
     PreemptionMode,
-    PreemptionOrder,
     ScalingGroupOrderField,
     SchedulerType,
 )
@@ -27,7 +26,6 @@ __all__ = (
     # Types
     "OrderDirection",
     "PreemptionMode",
-    "PreemptionOrder",
     "ScalingGroupOrderField",
     "SchedulerType",
     # Input models (request)

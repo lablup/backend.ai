@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import override
 
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import (
     TaskSetKey,
@@ -23,6 +24,7 @@ class ValkeyUnregisterHook(AbstractTaskHook):
         self._task_set_key = task_set_key
 
     @asynccontextmanager
+    @override
     async def apply(self, context: TaskContext) -> AsyncIterator[TaskContext]:
         try:
             yield context

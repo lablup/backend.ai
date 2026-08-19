@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, override
 
 from tenacity import AsyncRetrying, TryAgain, retry_if_exception_type, wait_exponential
 
@@ -28,17 +28,21 @@ class WorkerHeartbeatTask(PeriodicTask):
         self._root_ctx = root_ctx
 
     @property
+    @override
     def name(self) -> str:
         return "worker_heartbeat"
 
     @property
+    @override
     def interval(self) -> float:
         return self._root_ctx.local_config.proxy_worker.heartbeat_period
 
     @property
+    @override
     def initial_delay(self) -> float:
         return 0.0
 
+    @override
     async def run(self) -> None:
         try:
             async for attempt in AsyncRetrying(

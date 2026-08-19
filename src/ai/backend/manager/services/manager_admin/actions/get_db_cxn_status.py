@@ -5,7 +5,7 @@ from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.models.health import ConnectionInfoOfProcess
+from ai.backend.manager.repositories.manager_admin.health import ConnectionInfoOfProcess
 
 from .base import ManagerAdminAction
 

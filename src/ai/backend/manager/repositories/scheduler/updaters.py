@@ -45,5 +45,8 @@ class SessionStatusBatchUpdaterSpec(BatchUpdaterSpec[SessionRow]):
             values["starts_at"] = self.status_changed_at
         elif self.to_status == SessionStatus.TERMINATED:
             values["terminated_at"] = self.status_changed_at
+        elif self.to_status == SessionStatus.PENDING:
+            # Queued afresh: the previous run's start time must not survive.
+            values["starts_at"] = None
 
         return values

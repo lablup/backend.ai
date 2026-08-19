@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 
@@ -15,8 +16,8 @@ class UpdateAllowedResourceGroupsForProjectAction(ScalingGroupUserGroupAction):
     """Action to atomically add/remove allowed resource groups for a project."""
 
     project_id: UUID
-    add: list[str] = field(default_factory=list)
-    remove: list[str] = field(default_factory=list)
+    add: list[ResourceGroupID] = field(default_factory=list)
+    remove: list[ResourceGroupID] = field(default_factory=list)
 
     @override
     @classmethod

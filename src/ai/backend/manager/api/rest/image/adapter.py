@@ -19,12 +19,13 @@ from ai.backend.common.dto.manager.image.response import (
     ImageTagEntryDTO,
 )
 from ai.backend.common.dto.manager.image.types import ImageOrderField, OrderDirection
-from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.image.types import ImageData, ImageDataWithDetails
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.image.conditions import ImageConditions
 from ai.backend.manager.models.image.orders import ImageOrders
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 
 class ImageAdapter(BaseFilterAdapter):
@@ -55,7 +56,7 @@ class ImageAdapter(BaseFilterAdapter):
                 ImageResourceLimitDTO(key=rl.key, min=rl.min, max=self._convert_max(rl.max))
                 for rl in data.resource_limits
             ],
-            accelerators=data.accelerators,
+            accelerators=data.accelerators if data.accelerators else "*",
             config_digest=data.config_digest,
             is_local=data.is_local,
             created_at=data.created_at,

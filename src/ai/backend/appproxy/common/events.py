@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass
-from typing import Any, Self, override
-
-from pydantic import TypeAdapter
+from typing import override
 
 from ai.backend.common.events.types import AbstractAnycastEvent, AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -13,23 +9,9 @@ from .types import RouteInfo
 from .types import SerializableCircuit as Circuit
 
 
-@dataclass
 class AppProxyCircuitEvent(AbstractBroadcastEvent):
     target_worker_authority: str
     circuits: list[Circuit]
-
-    def serialize(self) -> tuple[Any, ...]:
-        return (
-            self.target_worker_authority,
-            TypeAdapter(list[Circuit]).dump_json(self.circuits).decode("utf-8"),
-        )
-
-    @classmethod
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(
-            target_worker_authority=value[0],
-            circuits=[Circuit(**r) for r in json.loads(value[1])],
-        )
 
     @classmethod
     @override
@@ -45,26 +27,10 @@ class AppProxyCircuitEvent(AbstractBroadcastEvent):
         return None
 
 
-@dataclass
 class AppProxyCircuitRouteUpdatedEvent(AbstractBroadcastEvent):
     target_worker_authority: str
     circuit: Circuit
     routes: list[RouteInfo]
-
-    def serialize(self) -> tuple[Any, ...]:
-        return (
-            self.target_worker_authority,
-            self.circuit.model_dump_json(),
-            TypeAdapter(list[RouteInfo]).dump_json(self.routes).decode("utf-8"),
-        )
-
-    @classmethod
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(
-            target_worker_authority=value[0],
-            circuit=Circuit(**json.loads(value[1])),
-            routes=[RouteInfo(**r) for r in json.loads(value[2])],
-        )
 
     @classmethod
     @override
@@ -85,20 +51,9 @@ class AppProxyCircuitRouteUpdatedEvent(AbstractBroadcastEvent):
         return None
 
 
-@dataclass
 class GenericWorkerEvent(AbstractAnycastEvent):
     worker_id: str
     reason: str
-
-    def serialize(self) -> tuple[Any, ...]:
-        return (
-            self.worker_id,
-            self.reason,
-        )
-
-    @classmethod
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(value[0], value[1])
 
     @classmethod
     @override
@@ -150,13 +105,6 @@ class WorkerTerminatedEvent(GenericWorkerEvent):
 
 
 class DoCheckWorkerLostEvent(AbstractAnycastEvent):
-    def serialize(self) -> tuple[Any, ...]:
-        return tuple()
-
-    @classmethod
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:  # noqa: ARG003
-        return cls()
-
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -177,13 +125,6 @@ class DoCheckWorkerLostEvent(AbstractAnycastEvent):
 
 
 class DoCheckUnusedPortEvent(AbstractAnycastEvent):
-    def serialize(self) -> tuple[Any, ...]:
-        return tuple()
-
-    @classmethod
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:  # noqa: ARG003
-        return cls()
-
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -210,13 +151,6 @@ class DoReconcileTraefikRoutesEvent(AbstractAnycastEvent):
     the etcd-based Traefik provider eventually converges on the DB-backed
     source of truth.
     """
-
-    def serialize(self) -> tuple[Any, ...]:
-        return tuple()
-
-    @classmethod
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:  # noqa: ARG003
-        return cls()
 
     @classmethod
     @override

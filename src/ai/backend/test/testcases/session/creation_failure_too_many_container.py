@@ -1,3 +1,5 @@
+from typing import override
+
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.output.fields import keypair_fields, keypair_resource_policy_fields
 from ai.backend.common.types import ClusterMode
@@ -11,6 +13,7 @@ from ai.backend.test.utils.exceptions import UnexpectedSuccess
 
 
 class SessionCreationFailureTooManyContainer(TestCode):
+    @override
     async def test(self) -> None:
         keypair = KeypairContext.current()
         client_session = ClientSessionContext.current()

@@ -6,10 +6,11 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Any
+from typing import Any, override
 
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound, ScalingGroupNotFound
 from ai.backend.manager.errors.user import UserNotFound
@@ -23,7 +24,7 @@ from ai.backend.manager.models.resource_usage_history import (
     UserUsageBucketRow,
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
 
 
@@ -38,6 +39,7 @@ class KernelUsageRecordData:
     project_id: uuid.UUID
     domain_name: str
     resource_group: str
+    resource_group_id: ResourceGroupID
     period_start: datetime
     period_end: datetime
     resource_usage: ResourceSlot
@@ -53,6 +55,7 @@ class KernelUsageRecordData:
             project_id=row.project_id,
             domain_name=row.domain_name,
             resource_group=row.resource_group,
+            resource_group_id=row.resource_group_id,
             period_start=row.period_start,
             period_end=row.period_end,
             resource_usage=row.resource_usage,
@@ -66,6 +69,7 @@ class DomainUsageBucketData:
     id: uuid.UUID
     domain_name: str
     resource_group: str
+    resource_group_id: ResourceGroupID
     period_start: date
     period_end: date
     decay_unit_days: int
@@ -81,6 +85,7 @@ class DomainUsageBucketData:
             id=row.id,
             domain_name=row.domain_name,
             resource_group=row.resource_group,
+            resource_group_id=row.resource_group_id,
             period_start=row.period_start,
             period_end=row.period_end,
             decay_unit_days=row.decay_unit_days,
@@ -99,6 +104,7 @@ class ProjectUsageBucketData:
     project_id: uuid.UUID
     domain_name: str
     resource_group: str
+    resource_group_id: ResourceGroupID
     period_start: date
     period_end: date
     decay_unit_days: int
@@ -115,6 +121,7 @@ class ProjectUsageBucketData:
             project_id=row.project_id,
             domain_name=row.domain_name,
             resource_group=row.resource_group,
+            resource_group_id=row.resource_group_id,
             period_start=row.period_start,
             period_end=row.period_end,
             decay_unit_days=row.decay_unit_days,
@@ -134,6 +141,7 @@ class UserUsageBucketData:
     project_id: uuid.UUID
     domain_name: str
     resource_group: str
+    resource_group_id: ResourceGroupID
     period_start: date
     period_end: date
     decay_unit_days: int
@@ -151,6 +159,7 @@ class UserUsageBucketData:
             project_id=row.project_id,
             domain_name=row.domain_name,
             resource_group=row.resource_group,
+            resource_group_id=row.resource_group_id,
             period_start=row.period_start,
             period_end=row.period_end,
             decay_unit_days=row.decay_unit_days,
@@ -201,16 +210,17 @@ class UserUsageBucketSearchResult:
     has_previous_page: bool
 
 
-# SearchScope classes for scoped usage bucket APIs
+# OperationScope classes for scoped usage bucket APIs
 
 
 @dataclass(frozen=True)
-class DomainUsageBucketSearchScope(SearchScope):
+class DomainUsageBucketOperationScope(OperationScope):
     """Scope for domain usage bucket queries."""
 
     resource_group: str
     domain_name: str
 
+    @override
     def to_condition(self) -> QueryCondition:
         resource_group = self.resource_group
         domain_name = self.domain_name
@@ -224,6 +234,7 @@ class DomainUsageBucketSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(
@@ -240,13 +251,14 @@ class DomainUsageBucketSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class ProjectUsageBucketSearchScope(SearchScope):
+class ProjectUsageBucketOperationScope(OperationScope):
     """Scope for project usage bucket queries."""
 
     resource_group: str
     domain_name: str
     project_id: uuid.UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         resource_group = self.resource_group
         domain_name = self.domain_name
@@ -262,6 +274,7 @@ class ProjectUsageBucketSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(
@@ -283,7 +296,7 @@ class ProjectUsageBucketSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class UserUsageBucketSearchScope(SearchScope):
+class UserUsageBucketOperationScope(OperationScope):
     """Scope for user usage bucket queries."""
 
     resource_group: str
@@ -291,6 +304,7 @@ class UserUsageBucketSearchScope(SearchScope):
     project_id: uuid.UUID
     user_uuid: uuid.UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         resource_group = self.resource_group
         domain_name = self.domain_name
@@ -308,6 +322,7 @@ class UserUsageBucketSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(

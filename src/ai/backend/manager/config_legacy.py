@@ -13,6 +13,7 @@ from pprint import pformat
 from typing import (
     Any,
     Final,
+    override,
 )
 
 import click
@@ -140,7 +141,6 @@ manager_local_config_iv = (
                 1:65535
             ],
             t.Key("aiomonitor-webui-port", default=39100): t.ToInt[1:65535],
-            t.Key("use-experimental-redis-event-dispatcher", default=False): t.ToBool,
             t.Key("status-update-interval", default=None): t.Null | t.ToFloat[0:],  # second
             t.Key("status-lifetime", default=None): t.Null | t.ToInt[0:],  # second
             t.Key("public-metrics-port", default=None): t.Null | t.ToInt[1:65535],
@@ -400,6 +400,7 @@ class AbstractConfig(UserDict[str, Any]):
 
 
 class LocalConfig(AbstractConfig):
+    @override
     async def reload(self) -> None:
         raise NotImplementedError
 

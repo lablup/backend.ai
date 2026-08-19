@@ -2,7 +2,7 @@
 # Author: Full name and email of the proposal author
 Author: HyeokJin Kim
 # Status: Draft | Accepted | Implemented | Rejected | Superseded
-Status: Draft
+Status: Implemented
 # Created: Date when this proposal was first created (YYYY-MM-DD)
 Created: 2026-01-30
 # Created-Version: Backend.AI version when this proposal was created (YY.Sprint.Patch)
@@ -10,7 +10,7 @@ Created-Version: 26.1.0
 # Target-Version: Expected version for implementation (fill when Accepted)
 Target-Version:
 # Implemented-Version: Actual version where this was implemented (fill when Implemented)
-Implemented-Version:
+Implemented-Version: 26.2.0
 ---
 
 # Scope-Based GraphQL API Naming Convention

@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import override
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 
@@ -36,10 +37,12 @@ class StorageDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
     """Main composer for all storage proxy dependencies."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "storage-proxy"
 
     @asynccontextmanager
+    @override
     async def compose(
         self,
         stack: DependencyStack,

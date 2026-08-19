@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
@@ -16,18 +16,11 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.artifact import ArtifactRow
     from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("ReservoirRegistryRow",)
-
-
-def _get_registry_artifact_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.artifact import ArtifactRow
-
-    return ReservoirRegistryRow.id == foreign(ArtifactRow.registry_id)
 
 
 def _get_registry_meta_join_condition() -> sa.ColumnElement[bool]:
@@ -36,7 +29,7 @@ def _get_registry_meta_join_condition() -> sa.ColumnElement[bool]:
     return ReservoirRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)
 
 
-class ReservoirRegistryRow(Base):  # type: ignore[misc]
+class ReservoirRegistryRow(Base):
     __tablename__ = "reservoir_registries"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -47,12 +40,6 @@ class ReservoirRegistryRow(Base):  # type: ignore[misc]
     secret_key: Mapped[str] = mapped_column("secret_key", sa.String, nullable=False)
     api_version: Mapped[str] = mapped_column("api_version", sa.String, nullable=False)
 
-    artifacts: Mapped[list[ArtifactRow]] = relationship(
-        "ArtifactRow",
-        back_populates="reservoir_registry",
-        primaryjoin=_get_registry_artifact_join_condition,
-        viewonly=True,
-    )
     meta: Mapped[ArtifactRegistryRow | None] = relationship(
         "ArtifactRegistryRow",
         back_populates="reservoir_registries",
@@ -61,9 +48,11 @@ class ReservoirRegistryRow(Base):  # type: ignore[misc]
         viewonly=True,
     )
 
+    @override
     def __str__(self) -> str:
         return f"ReservoirRegistryRow(id={self.id}, endpoint={self.endpoint}, api_version={self.api_version})"
 
+    @override
     def __repr__(self) -> str:
         return self.__str__()
 

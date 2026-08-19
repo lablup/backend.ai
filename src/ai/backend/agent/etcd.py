@@ -31,12 +31,10 @@ class AgentEtcdClientView(AbstractKVStore):
     @property
     def _agent_scope_prefix_map(self) -> Mapping[ConfigScopes, str]:
         """
-        This is kept as a @property method instead of a simple variable, because this way any
-        updates that are made to the config object (e.g. scaling group) is correctly applied as the
-        scope prefix mapping is recalculated every time.
+        Kept as a @property so that any updates to the config object are reflected every time
+        the scope prefix mapping is recalculated.
         """
         return {
-            ConfigScopes.SGROUP: f"sgroup/{self._config.agent.scaling_group}",
             ConfigScopes.NODE: f"nodes/agents/{self._config.agent.defaulted_id}",
         }
 

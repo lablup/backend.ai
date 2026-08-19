@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Sequence
+from typing import override
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
@@ -35,20 +36,24 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         self._deployment_controller = deployment_controller
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "check-replica-deployments"
 
     @classmethod
+    @override
     def category(cls) -> DeploymentHandlerCategory:
         return DeploymentHandlerCategory.SCALING
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """Lock for checking replicas."""
         return LockID.LOCKID_DEPLOYMENT_CHECK_REPLICA
 
     @classmethod
+    @override
     def target_statuses(cls) -> DeploymentTargetStatuses:
         """Target READY **and** DEPLOYING endpoints whose replica count
         may need adjusting.
@@ -69,11 +74,13 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         )
 
     @classmethod
+    @override
     def status_transitions(cls) -> DeploymentStatusTransitions:
         """No status transition: this handler only records the deployment's desired replica count.
         The group autoscale reconcile reads that count and scales the serving group."""
         return DeploymentStatusTransitions()
 
+    @override
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
@@ -96,6 +103,7 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         # Calculate desired replicas and adjust
         return await self._deployment_executor.calculate_desired_replicas(scalable)
 
+    @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         """No follow-up: the group autoscale reconcile picks up the recorded desired count."""
         return

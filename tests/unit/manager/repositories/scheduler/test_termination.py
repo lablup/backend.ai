@@ -13,6 +13,8 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -60,6 +62,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.scheduler.options import SessionConditions
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestKernelTermination:
@@ -105,15 +108,25 @@ class TestKernelTermination:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+        test_domain_id: DomainID,
+    ) -> AsyncGenerator[DomainFixtureData, None]:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 total_resource_slots=ResourceSlot({
                     "cpu": Decimal("1000"),
@@ -123,18 +136,20 @@ class TestKernelTermination:
             db_sess.add(domain)
             await db_sess.flush()
 
-        yield domain_name
+        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         """Create test scaling group and return scaling group name"""
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(
+                id=test_scaling_group_id,
                 name=sg_name,
                 driver="static",
                 scheduler="fifo",
@@ -223,7 +238,7 @@ class TestKernelTermination:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create test user and return user UUID"""
@@ -236,8 +251,9 @@ class TestKernelTermination:
                 username=f"test-user-{uuid.uuid4().hex[:8]}",
                 role=UserRole.USER,
                 status=UserStatus.ACTIVE,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=test_user_resource_policy_name,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -274,7 +290,7 @@ class TestKernelTermination:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create test group and return group ID"""
@@ -284,7 +300,7 @@ class TestKernelTermination:
             group = GroupRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 total_resource_slots=ResourceSlot({
                     "cpu": Decimal("500"),
                     "mem": Decimal("524288"),
@@ -302,6 +318,7 @@ class TestKernelTermination:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[AgentId, None]:
         """Create test agent and return agent ID"""
         agent_id = AgentId(f"test-agent-{uuid.uuid4().hex[:8]}")
@@ -312,6 +329,7 @@ class TestKernelTermination:
                 status=AgentStatus.ALIVE,
                 region="local",
                 scaling_group=test_scaling_group_name,
+                resource_group_id=test_scaling_group_id,
                 available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
                 occupied_slots=ResourceSlot(),
                 addr="127.0.0.1:6001",
@@ -327,7 +345,9 @@ class TestKernelTermination:
     async def test_session_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
     ) -> AsyncGenerator[SessionId, None]:
@@ -339,8 +359,10 @@ class TestKernelTermination:
                 id=session_id,
                 name=f"test-session-{uuid.uuid4().hex[:8]}",
                 session_type=SessionTypes.INTERACTIVE,
-                domain_name=test_domain_name,
+                domain_id=test_domain_id,
+                domain_name=test_domain.domain_name,
                 group_id=test_group_id,
+                resource_group_id=test_scaling_group_id,
                 scaling_group_name=test_scaling_group_name,
                 status=SessionStatus.TERMINATING,
                 status_info="test-termination",
@@ -364,7 +386,8 @@ class TestKernelTermination:
         test_session_id: SessionId,
         test_agent_id: AgentId,
         test_scaling_group_name: str,
-        test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
@@ -379,6 +402,7 @@ class TestKernelTermination:
                 agent=test_agent_id,
                 agent_addr="127.0.0.1:6001",
                 scaling_group=test_scaling_group_name,
+                resource_group_id=test_scaling_group_id,
                 cluster_idx=0,
                 cluster_role="main",
                 cluster_hostname=f"kernel-{uuid.uuid4().hex[:8]}",
@@ -390,7 +414,7 @@ class TestKernelTermination:
                 status_changed=datetime.now(tzutc()),
                 occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
                 requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_access_key,
@@ -415,7 +439,8 @@ class TestKernelTermination:
         test_session_id: SessionId,
         test_agent_id: AgentId,
         test_scaling_group_name: str,
-        test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
@@ -430,6 +455,7 @@ class TestKernelTermination:
                 agent=test_agent_id,
                 agent_addr="127.0.0.1:6001",
                 scaling_group=test_scaling_group_name,
+                resource_group_id=test_scaling_group_id,
                 cluster_idx=0,
                 cluster_role="main",
                 cluster_hostname=f"kernel-{uuid.uuid4().hex[:8]}",
@@ -441,7 +467,7 @@ class TestKernelTermination:
                 status_changed=datetime.now(tzutc()),
                 occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
                 requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_access_key,
@@ -466,7 +492,8 @@ class TestKernelTermination:
         test_session_id: SessionId,
         test_agent_id: AgentId,
         test_scaling_group_name: str,
-        test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
@@ -481,6 +508,7 @@ class TestKernelTermination:
                 agent=test_agent_id,
                 agent_addr="127.0.0.1:6001",
                 scaling_group=test_scaling_group_name,
+                resource_group_id=test_scaling_group_id,
                 cluster_idx=1,
                 cluster_role="sub",
                 cluster_hostname=f"kernel-{uuid.uuid4().hex[:8]}",
@@ -492,7 +520,7 @@ class TestKernelTermination:
                 status_changed=datetime.now(tzutc()),
                 occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
                 requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_access_key,
@@ -584,7 +612,8 @@ class TestKernelTermination:
         test_session_id: SessionId,
         test_agent_id: AgentId,
         test_scaling_group_name: str,
-        test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
@@ -599,6 +628,7 @@ class TestKernelTermination:
                 agent=test_agent_id,
                 agent_addr="127.0.0.1:6001",
                 scaling_group=test_scaling_group_name,
+                resource_group_id=test_scaling_group_id,
                 cluster_idx=0,
                 cluster_role="main",
                 cluster_hostname=f"kernel-{uuid.uuid4().hex[:8]}",
@@ -610,7 +640,7 @@ class TestKernelTermination:
                 status_changed=datetime.now(tzutc()),
                 occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
                 requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_access_key,

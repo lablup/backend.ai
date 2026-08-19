@@ -5,7 +5,6 @@ import time
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -22,10 +21,7 @@ from ai.backend.common.events.event_types.session.broadcast import SchedulingBro
 from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
-    BinarySize,
-    DeviceId,
     SessionId,
-    SlotName,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.types import SessionStatus
@@ -149,41 +145,6 @@ async def registry_ctx() -> AsyncGenerator[
         await registry.shutdown()
 
 
-async def test_convert_resource_spec_to_resource_slot(
-    registry_ctx: tuple[
-        AgentRegistry, MagicMock, MagicMock, MagicMock, ManagerConfigProvider, MagicMock, MagicMock
-    ],
-) -> None:
-    registry, _, _, _, _, _, _ = registry_ctx
-    allocations = {
-        "cuda": {
-            SlotName("cuda.shares"): {
-                DeviceId("a0"): "2.5",
-                DeviceId("a1"): "2.0",
-            },
-        },
-    }
-    converted_allocations = registry.convert_resource_spec_to_resource_slot(allocations)
-    assert converted_allocations["cuda.shares"] == Decimal("4.5")
-    allocations = {
-        "cpu": {
-            SlotName("cpu"): {
-                DeviceId("a0"): "3",
-                DeviceId("a1"): "1",
-            },
-        },
-        "ram": {
-            SlotName("ram"): {
-                DeviceId("b0"): "2.5g",
-                DeviceId("b1"): "512m",
-            },
-        },
-    }
-    converted_allocations = registry.convert_resource_spec_to_resource_slot(allocations)
-    assert converted_allocations["cpu"] == Decimal("4")
-    assert converted_allocations["ram"] == Decimal(BinarySize.from_str("1g")) * 3
-
-
 @dataclass
 class MockEndpointData:
     """Minimal stand-in for ``EndpointData`` exposing only ``model_definition``.
@@ -206,7 +167,7 @@ class TestResolveHealthCheck:
                         name="m",
                         model_path="/models/m",
                         service=ModelServiceConfig(
-                            start_command=["run"],
+                            start_command="run",
                             port=8000,
                             health_check=ModelHealthCheck(
                                 enable=True,
@@ -242,7 +203,7 @@ class TestResolveHealthCheck:
                     ModelConfig(
                         name="m",
                         model_path="/models/m",
-                        service=ModelServiceConfig(start_command=["run"], port=8000),
+                        service=ModelServiceConfig(start_command="run", port=8000),
                     )
                 ]
             )

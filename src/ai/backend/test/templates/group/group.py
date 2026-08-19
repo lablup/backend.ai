@@ -14,6 +14,7 @@ from ai.backend.test.templates.template import WrapperTestTemplate
 
 class GroupTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "create_group"
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, override
 
 from jinja2 import nodes
 from jinja2.ext import Extension
@@ -13,6 +13,7 @@ from .errors import InvalidTemplateValueError
 class TOMLField(Extension):
     tags = {"toml_field"}
 
+    @override
     def parse(self, parser: Parser) -> nodes.Node | list[nodes.Node]:
         tag_name = list(self.tags)[0]
         lineno = parser.stream.expect(f"name:{tag_name}").lineno
@@ -55,6 +56,7 @@ class TOMLField(Extension):
 class TOMLStringListField(TOMLField):
     tags = {"toml_strlist_field"}
 
+    @override
     def _transform(self, field_value: nodes.Expr, lineno: int | None = None) -> nodes.Expr:
         return nodes.Filter(field_value, "toml_scalar", [], [], None, None, lineno=lineno)
 

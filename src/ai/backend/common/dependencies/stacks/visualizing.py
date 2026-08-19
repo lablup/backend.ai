@@ -5,7 +5,7 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, TextIO
+from typing import Any, TextIO, override
 
 from ai.backend.common.dependencies.base import (
     DependencyComposer,
@@ -129,6 +129,7 @@ class VisualizingDependencyStack(DependencyStack):
         self._events.append(event)
         self._print_event(event)
 
+    @override
     async def enter_dependency(
         self,
         provider: DependencyProvider[SetupInputT, ResourceT],
@@ -147,6 +148,7 @@ class VisualizingDependencyStack(DependencyStack):
             self._record_event(stage_name, DependencyStatus.FAILED, error=e)
             raise
 
+    @override
     async def enter_composer(
         self,
         composer: DependencyComposer[SetupInputT, ResourcesT],

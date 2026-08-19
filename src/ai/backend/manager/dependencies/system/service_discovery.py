@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
@@ -49,10 +50,12 @@ class ServiceDiscoveryDependency(
     """Provides ServiceDiscovery and ServiceDiscoveryLoop."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "service-discovery"
 
     @asynccontextmanager
+    @override
     async def provide(
         self, setup_input: ServiceDiscoveryInput
     ) -> AsyncIterator[ServiceDiscoveryResources]:

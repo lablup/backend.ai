@@ -4,28 +4,27 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import override
 from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.data.model_card.types import ModelCardData
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 
 __all__ = (
     "AvailablePresetsSearchResult",
     "ModelCardSearchResult",
-    "ProjectModelCardSearchScope",
-    "VFolderModelCardSearchScope",
+    "ProjectModelCardOperationScope",
+    "VFolderModelCardOperationScope",
 )
 
 
@@ -50,7 +49,7 @@ class ModelCardSearchResult:
 
 
 @dataclass(frozen=True)
-class ProjectModelCardSearchScope(SearchScope):
+class ProjectModelCardOperationScope(OperationScope):
     """Scope for searching model cards within a MODEL_STORE project.
 
     Includes user_id for membership validation — only project members
@@ -60,6 +59,7 @@ class ProjectModelCardSearchScope(SearchScope):
     project_id: UUID
     user_id: UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         project_id = self.project_id
 
@@ -69,6 +69,7 @@ class ProjectModelCardSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         return [
             ExistenceCheck(
@@ -81,18 +82,13 @@ class ProjectModelCardSearchScope(SearchScope):
     @property
     def membership_check_query(self) -> sa.Select[tuple[bool]]:
         """Query to validate user is a member of this project."""
-        return sa.select(sa.literal(True)).where(
-            sa.and_(
-                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                AssociationScopesEntitiesRow.scope_id == str(self.project_id),
-                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                AssociationScopesEntitiesRow.entity_id == str(self.user_id),
-            )
+        return sa.select(
+            user_scope_membership_exists(PROJECT_SCOPE_TYPE, self.project_id, self.user_id)
         )
 
 
 @dataclass(frozen=True)
-class VFolderModelCardSearchScope(SearchScope):
+class VFolderModelCardOperationScope(OperationScope):
     """Scope for searching model cards backed by a specific VFolder.
 
     Access is delegated to the parent VFolder resolver — if the caller
@@ -101,6 +97,7 @@ class VFolderModelCardSearchScope(SearchScope):
 
     vfolder_id: VFolderUUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         vfolder_id = self.vfolder_id
 
@@ -110,5 +107,6 @@ class VFolderModelCardSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         return ()

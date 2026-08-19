@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, override
 
 from dateutil.tz import tzutc
 
@@ -37,17 +37,21 @@ class AgentLostCheckerTask(PeriodicTask):
         self._event_producer = event_producer
 
     @property
+    @override
     def name(self) -> str:
         return "agent_lost_checker"
 
     @property
+    @override
     def interval(self) -> float:
         return _CHECK_INTERVAL
 
     @property
+    @override
     def initial_delay(self) -> float:
         return 0.0
 
+    @override
     async def run(self) -> None:
         now = datetime.now(tzutc())
         timeout = timedelta(seconds=self._config_provider.config.manager.heartbeat_timeout)
@@ -57,6 +61,6 @@ class AgentLostCheckerTask(PeriodicTask):
             prev = datetime.fromtimestamp(prev_timestamp, tzutc())
             if now - prev > timeout:
                 await self._event_producer.anycast_event(
-                    AgentTerminatedEvent("agent-lost"),
+                    AgentTerminatedEvent(reason="agent-lost"),
                     source_override=AgentId(agent_id),
                 )

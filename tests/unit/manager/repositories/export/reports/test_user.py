@@ -12,7 +12,7 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.export import ExportFieldDef
 from ai.backend.manager.repositories.export.reports.user import (
     ASSOC_GROUP_USER_JOIN,
-    MAIN_KEYPAIR_JOIN,
+    DEFAULT_KEYPAIR_JOIN,
     PROJECT_JOIN,
     PROJECT_JOINS,
     USER_FIELDS,
@@ -120,9 +120,9 @@ class TestJoinDefinitions:
         """Project JOIN should use GroupRow table."""
         assert PROJECT_JOIN.table is GroupRow.__table__
 
-    def test_main_keypair_join_table(self) -> None:
-        """Main keypair JOIN should use KeyPairRow table."""
-        assert MAIN_KEYPAIR_JOIN.table is KeyPairRow.__table__
+    def test_default_keypair_join_table(self) -> None:
+        """Default keypair JOIN should use KeyPairRow table."""
+        assert DEFAULT_KEYPAIR_JOIN.table is KeyPairRow.__table__
 
 
 class TestFieldJoinAssignments:
@@ -147,10 +147,12 @@ class TestFieldJoinAssignments:
         assert USER_RESOURCE_POLICY_JOIN in field.joins
         assert len(field.joins) == 1
 
-    def test_main_access_key_has_no_join(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
-        """main_access_key is in UserRow, so no join needed."""
+    def test_main_access_key_has_join(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
+        """main_access_key comes from the marked keypair, so it needs the keypair join."""
         field = fields_by_key["main_access_key"]
-        assert field.joins is None
+        assert field.joins is not None
+        assert DEFAULT_KEYPAIR_JOIN in field.joins
+        assert len(field.joins) == 1
 
     def test_resource_policy_detail_fields_have_join(
         self, fields_by_key: dict[str, ExportFieldDef]
@@ -188,7 +190,7 @@ class TestFieldJoinAssignments:
     def test_main_keypair_detail_fields_have_join(
         self, fields_by_key: dict[str, ExportFieldDef]
     ) -> None:
-        """Main keypair detail fields should have MAIN_KEYPAIR_JOIN."""
+        """Main keypair detail fields should have DEFAULT_KEYPAIR_JOIN."""
         keypair_detail_keys = [
             "main_keypair_is_active",
             "main_keypair_created_at",
@@ -197,7 +199,7 @@ class TestFieldJoinAssignments:
         for key in keypair_detail_keys:
             field = fields_by_key[key]
             assert field.joins is not None
-            assert MAIN_KEYPAIR_JOIN in field.joins
+            assert DEFAULT_KEYPAIR_JOIN in field.joins
             assert len(field.joins) == 1
 
 

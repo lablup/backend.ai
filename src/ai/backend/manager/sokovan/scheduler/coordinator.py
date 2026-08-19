@@ -25,6 +25,7 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SchedulingBroadcastEvent,
 )
 from ai.backend.common.events.types import AbstractBroadcastEvent
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.leader.tasks import EventTaskSpec
 from ai.backend.common.types import AccessKey, AgentId, SessionId
 from ai.backend.logging import BraceStyleAdapter
@@ -36,17 +37,13 @@ from ai.backend.manager.data.session.types import (
     StatusTransitions,
     TransitionStatus,
 )
-from ai.backend.manager.data.sokovan import (
-    KernelCreationInfo,
-    PromotionSpec,
-    SessionWithKernels,
-)
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.models.kernel.conditions import KernelConditions
+from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.conditions import SessionConditions
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatchUpdaterSpec
@@ -60,6 +57,11 @@ from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory
+from ai.backend.manager.views.sokovan.lifecycle import (
+    LastPhase,
+    SessionWithKernels,
+)
+from ai.backend.manager.views.sokovan.result import PromotionSpec
 
 from .factory import CoordinatorHandlers
 from .handlers import SessionLifecycleHandler
@@ -101,11 +103,11 @@ class SchedulerTaskSpec:
 
     def create_if_needed_event(self) -> DoSokovanProcessIfNeededEvent:
         """Create event for checking if processing is needed."""
-        return DoSokovanProcessIfNeededEvent(self.schedule_type.value)
+        return DoSokovanProcessIfNeededEvent(schedule_type=self.schedule_type.value)
 
     def create_process_event(self) -> DoSokovanProcessScheduleEvent:
         """Create event for forced processing."""
-        return DoSokovanProcessScheduleEvent(self.schedule_type.value)
+        return DoSokovanProcessScheduleEvent(schedule_type=self.schedule_type.value)
 
     @property
     def short_task_name(self) -> str:
@@ -139,7 +141,8 @@ class FailureClassificationResult:
 
     Classification priority (first match wins):
     1. give_up: per-handler ``max_retry_count`` is set AND
-       ``phase_attempts`` reached it. ``None`` means "no retry limit"
+       the last phase record's ``attempts`` reached it. ``None`` means
+       "no retry limit"
        — give-up never fires.
     2. expired: per-handler ``timeout`` is set AND phase elapsed time
        exceeded it. ``None`` means "no timeout" — expired never fires.
@@ -236,17 +239,17 @@ class ScheduleCoordinator:
     ) -> bool:
         """Process a lifecycle schedule type using the DeploymentCoordinator pattern.
 
-        This method processes each scaling group independently:
-        1. Iterates over all schedulable scaling groups
-        2. For each scaling group:
-           - Creates a SessionRecorderContext for the scaling group
+        This method processes each resource group independently:
+        1. Iterates over all schedulable resource groups
+        2. For each resource group:
+           - Creates a SessionRecorderContext for the resource group
            - Queries sessions based on handler's target_statuses() and target_kernel_statuses()
            - Executes handler logic
            - Applies status transitions immediately
-           - Emits metrics per scaling group
-           - Runs post-processing per scaling group
+           - Emits metrics per resource group
+           - Runs post-processing per resource group
 
-        This per-scaling-group approach prevents accumulating too many sessions
+        This per-resource group approach prevents accumulating too many sessions
         in memory and ensures status updates are applied promptly.
 
         Args:
@@ -301,23 +304,23 @@ class ScheduleCoordinator:
                         self._lock_factory(handler.lock_id, lock_lifetime)
                     )
 
-                # Process each scaling group in parallel
-                scaling_groups = await self._repository.get_all_scaling_groups()
+                # Process each resource group in parallel
+                resource_group_ids = await self._repository.get_all_resource_groups()
 
                 results = await asyncio.gather(
                     *[
-                        self._process_scaling_group(handler, schedule_type, scaling_group)
-                        for scaling_group in scaling_groups
+                        self._process_resource_group(handler, schedule_type, resource_group_id)
+                        for resource_group_id in resource_group_ids
                     ],
                     return_exceptions=True,
                 )
 
                 # Log any exceptions that occurred during parallel processing
-                for scaling_group, result in zip(scaling_groups, results, strict=True):
+                for resource_group_id, result in zip(resource_group_ids, results, strict=True):
                     if isinstance(result, BaseException):
                         log.error(
-                            "Error processing scaling group {} for {}: {}",
-                            scaling_group,
+                            "Error processing resource group {} for {}: {}",
+                            resource_group_id,
                             schedule_type.value,
                             result,
                         )
@@ -348,22 +351,24 @@ class ScheduleCoordinator:
             with self._operation_metrics.measure_operation(spec.name):
                 # Promotions update session status based on kernel state and
                 # must run even when there are no schedulable or alive agents.
-                scaling_groups = await self._repository.get_all_scaling_groups()
+                resource_group_ids = await self._repository.get_all_resource_groups()
 
                 results = await asyncio.gather(
                     *[
-                        self._process_promotion_scaling_group(spec, schedule_type, scaling_group)
-                        for scaling_group in scaling_groups
+                        self._process_promotion_resource_group(
+                            spec, schedule_type, resource_group_id
+                        )
+                        for resource_group_id in resource_group_ids
                     ],
                     return_exceptions=True,
                 )
 
                 # Log any exceptions that occurred during parallel processing
-                for scaling_group, result in zip(scaling_groups, results, strict=True):
+                for resource_group_id, result in zip(resource_group_ids, results, strict=True):
                     if isinstance(result, BaseException):
                         log.error(
-                            "Error processing scaling group {} for {}: {}",
-                            scaling_group,
+                            "Error processing resource group {} for {}: {}",
+                            resource_group_id,
                             schedule_type.value,
                             result,
                         )
@@ -406,23 +411,25 @@ class ScheduleCoordinator:
                         self._lock_factory(handler.lock_id, lock_lifetime)
                     )
 
-                # Process each scaling group in parallel
-                scaling_groups = await self._repository.get_all_scaling_groups()
+                # Process each resource group in parallel
+                resource_group_ids = await self._repository.get_all_resource_groups()
 
                 results = await asyncio.gather(
                     *[
-                        self._process_kernel_scaling_group(handler, schedule_type, scaling_group)
-                        for scaling_group in scaling_groups
+                        self._process_kernel_resource_group(
+                            handler, schedule_type, resource_group_id
+                        )
+                        for resource_group_id in resource_group_ids
                     ],
                     return_exceptions=True,
                 )
 
                 # Log any exceptions that occurred during parallel processing
-                for scaling_group, result in zip(scaling_groups, results, strict=True):
+                for resource_group_id, result in zip(resource_group_ids, results, strict=True):
                     if isinstance(result, BaseException):
                         log.error(
-                            "Error processing scaling group {} for {}: {}",
-                            scaling_group,
+                            "Error processing resource group {} for {}: {}",
+                            resource_group_id,
                             schedule_type.value,
                             result,
                         )
@@ -464,29 +471,29 @@ class ScheduleCoordinator:
             async with AsyncExitStack() as stack:
                 stack.enter_context(self._operation_metrics.measure_operation(observer.name()))
 
-                # Process each scaling group in parallel
-                scaling_groups = await self._repository.get_all_scaling_groups()
+                # Process each resource group in parallel
+                resource_group_ids = await self._repository.get_all_resource_groups()
 
                 log.debug(
-                    "[Coordinator] Found {} scaling groups to observe: {}",
-                    len(scaling_groups),
-                    scaling_groups,
+                    "[Coordinator] Found {} resource groups to observe: {}",
+                    len(resource_group_ids),
+                    resource_group_ids,
                 )
 
                 results = await asyncio.gather(
                     *[
-                        self._process_observer_scaling_group(observer, scaling_group)
-                        for scaling_group in scaling_groups
+                        self._process_observer_resource_group(observer, resource_group_id)
+                        for resource_group_id in resource_group_ids
                     ],
                     return_exceptions=True,
                 )
 
                 # Log any exceptions that occurred during parallel processing
-                for scaling_group, result in zip(scaling_groups, results, strict=True):
+                for resource_group_id, result in zip(resource_group_ids, results, strict=True):
                     if isinstance(result, BaseException):
                         log.error(
-                            "Error observing scaling group {} for {}: {}",
-                            scaling_group,
+                            "Error observing resource group {} for {}: {}",
+                            resource_group_id,
                             schedule_type.value,
                             result,
                         )
@@ -511,7 +518,7 @@ class ScheduleCoordinator:
 
         Cleanup handlers read work items from Valkey and perform cleanup operations
         directly. Unlike other handler types, they do not query DB sessions by status,
-        do not iterate over scaling groups, and do not apply status transitions.
+        do not iterate over resource groups, and do not apply status transitions.
 
         The coordinator sets up RecorderContext so that downstream components
         (e.g., SessionTerminator) can use shared_phase/shared_step as usual.
@@ -537,12 +544,12 @@ class ScheduleCoordinator:
             )
             raise
 
-    async def _process_observer_scaling_group(
+    async def _process_observer_resource_group(
         self,
         observer: KernelObserver,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> None:
-        """Process a single scaling group for the given observer.
+        """Process a single resource group for the given observer.
 
         This method:
         1. Queries kernels using observer's query condition
@@ -552,14 +559,14 @@ class ScheduleCoordinator:
 
         Args:
             observer: The kernel observer to execute
-            scaling_group: The scaling group to process
+            resource_group_id: The id of the resource group to process
         """
         log.debug(
-            "[Coordinator] Processing observer {} for scaling_group={}",
+            "[Coordinator] Processing observer {} for resource_group={}",
             observer.name(),
-            scaling_group,
+            resource_group_id,
         )
-        condition = observer.get_query_condition(scaling_group)
+        condition = observer.get_query_condition(resource_group_id)
 
         # Process in batches with pagination for large result sets
         offset = 0
@@ -586,7 +593,7 @@ class ScheduleCoordinator:
                 break
 
             # Execute observer logic (no status transitions)
-            result = await observer.observe(scaling_group, kernel_result.items)
+            result = await observer.observe(resource_group_id, kernel_result.items)
             total_observed += result.observed_count
 
             # Check if there are more pages
@@ -608,13 +615,13 @@ class ScheduleCoordinator:
                 count=total_observed,
             )
 
-    async def _process_kernel_scaling_group(
+    async def _process_kernel_resource_group(
         self,
         handler: KernelLifecycleHandler,
         _schedule_type: ScheduleType,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> None:
-        """Process a single scaling group for the given kernel handler.
+        """Process a single resource group for the given kernel handler.
 
         This method:
         1. Queries sessions to get kernels for the handler
@@ -625,7 +632,7 @@ class ScheduleCoordinator:
         Args:
             handler: The kernel handler to execute
             schedule_type: Type of scheduling operation
-            scaling_group: The scaling group to process
+            resource_group_id: The id of the resource group to process
         """
         # Build querier with kernel conditions
         target_kernel_statuses = handler.target_kernel_statuses()
@@ -633,7 +640,7 @@ class ScheduleCoordinator:
         querier = BatchQuerier(
             pagination=NoPagination(),
             conditions=[
-                KernelConditions.by_scaling_group(scaling_group),
+                KernelConditions.by_resource_group_id(resource_group_id),
                 KernelConditions.by_statuses(target_kernel_statuses),
             ],
         )
@@ -644,12 +651,12 @@ class ScheduleCoordinator:
             return
 
         # Execute handler logic with kernels
-        result = await handler.execute(scaling_group, kernel_result.items)
+        result = await handler.execute(resource_group_id, kernel_result.items)
 
         # Apply kernel status transitions based on handler's status_transitions
         await self._handle_kernel_result(handler, result)
 
-        # Emit metrics per scaling group
+        # Emit metrics per resource group
         self._operation_metrics.observe_success(
             operation=handler.name(),
             count=result.success_count(),
@@ -663,8 +670,8 @@ class ScheduleCoordinator:
                 await self._run_kernel_post_processors(result, target_statuses)
             except Exception as e:
                 log.error(
-                    "Error during kernel post-processing for scaling group {}: {}",
-                    scaling_group,
+                    "Error during kernel post-processing for resource group {}: {}",
+                    resource_group_id,
                     e,
                 )
 
@@ -707,16 +714,16 @@ class ScheduleCoordinator:
                 len(result.successes),
             )
 
-    async def _process_scaling_group(
+    async def _process_resource_group(
         self,
         handler: SessionLifecycleHandler,
         schedule_type: ScheduleType,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> None:
-        """Process a single scaling group for the given handler.
+        """Process a single resource group for the given handler.
 
-        This method handles all processing for one scaling group:
-        - Creates a SessionRecorderContext scoped to this scaling group
+        This method handles all processing for one resource group:
+        - Creates a SessionRecorderContext scoped to this resource group
         - Queries and processes sessions
         - Applies status transitions
         - Emits metrics
@@ -725,11 +732,11 @@ class ScheduleCoordinator:
         Args:
             handler: The lifecycle handler to execute
             schedule_type: Type of scheduling operation
-            scaling_group: The scaling group to process
+            resource_group_id: The id of the resource group to process
         """
-        # Query sessions for this handler in this scaling group
+        # Query sessions for this handler in this resource group
         sessions = await self._repository.get_sessions_for_handler(
-            scaling_group,
+            resource_group_id,
             handler.target_statuses(),
             handler.target_kernel_statuses(),
         )
@@ -740,33 +747,25 @@ class ScheduleCoordinator:
         # Extract session IDs for recorder entity_ids
         session_ids = [s.session_info.identity.id for s in sessions]
 
-        # Populate phase_attempts and phase_started_at from scheduling history for failure classification
+        # Carry the last phase record onto the sessions for failure classification
         # Get last history records (regardless of phase), then compare phase at application level
         history_map = await self._repository.get_last_session_histories(session_ids)
         handler_name = handler.name()
-        for session in sessions:
-            history = history_map.get(session.session_info.identity.id)
-            # Only use history data if the last history is for the current phase
-            if history and history.phase == handler_name:
-                session.phase_attempts = history.attempts
-                session.phase_started_at = history.created_at
-            else:
-                session.phase_attempts = 0
-                session.phase_started_at = None
+        self._populate_phase_history(sessions, history_map, handler_name)
 
-        # Create recorder scoped to this scaling group
-        recorder_scope = f"{schedule_type.value}:{scaling_group}"
+        # Create recorder scoped to this resource group
+        recorder_scope = f"{schedule_type.value}:{resource_group_id}"
         with SessionRecorderContext.scope(recorder_scope, entity_ids=session_ids) as pool:
             # Execute handler logic
-            result = await handler.execute(scaling_group, sessions)
+            result = await handler.execute(resource_group_id, sessions)
 
             # Get recorded steps for history
             all_records = pool.build_all_records()
 
-            # Apply status transitions immediately for this scaling group (BEP-1030)
+            # Apply status transitions immediately for this resource group (BEP-1030)
             classified = await self._handle_result(handler, result, all_records, sessions)
 
-            # Emit metrics per scaling group
+            # Emit metrics per resource group
             self._operation_metrics.observe_success(
                 operation=handler.name(),
                 count=result.success_count(),
@@ -783,40 +782,64 @@ class ScheduleCoordinator:
                     await self._run_post_processors(result, target_statuses)
                 except Exception as e:
                     log.error(
-                        "Error during common post-processing for scaling group {}: {}",
-                        scaling_group,
+                        "Error during common post-processing for resource group {}: {}",
+                        resource_group_id,
                         e,
                     )
 
-            # Log recorded steps for this scaling group
+            # Log recorded steps for this resource group
             if all_records:
                 log.debug(
-                    "Recorded {} sessions with execution records for {} in scaling group {}",
+                    "Recorded {} sessions with execution records for {} in resource group {}",
                     len(all_records),
                     schedule_type.value,
-                    scaling_group,
+                    resource_group_id,
                 )
 
-    async def _process_promotion_scaling_group(
+    def _populate_phase_history(
+        self,
+        sessions: list[SessionWithKernels],
+        history_map: Mapping[SessionId, SessionSchedulingHistoryRow],
+        handler_name: str,
+    ) -> None:
+        """Carry this phase's last history record onto the sessions.
+
+        Only the last record counts, and only while it is still this phase's;
+        anything else leaves the session without one. Skips are carried like
+        any other record — ``LastPhase.result`` says what was counted, and the
+        give-up rule in :meth:`_classify_failures` is what excludes skips.
+        """
+        for session in sessions:
+            history = history_map.get(session.session_info.identity.id)
+            if history and history.phase == handler_name:
+                session.last_phase = LastPhase(
+                    attempts=history.attempts,
+                    started_at=history.created_at,
+                    result=SchedulingResult(history.result),
+                )
+            else:
+                session.last_phase = None
+
+    async def _process_promotion_resource_group(
         self,
         spec: PromotionSpec,
         schedule_type: ScheduleType,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> None:
-        """Process a single scaling group for the given promotion spec.
+        """Process a single resource group for the given promotion spec.
 
-        This method handles all processing for one scaling group using
+        This method handles all processing for one resource group using
         promotion spec semantics (ALL/ANY/NOT_ANY kernel matching).
 
         Args:
             spec: The promotion spec to process
             schedule_type: Type of scheduling operation
-            scaling_group: The scaling group to process
+            resource_group_id: The id of the resource group to process
         """
         querier = BatchQuerier(
             pagination=NoPagination(),
             conditions=[
-                SessionConditions.by_scaling_group(scaling_group),
+                SessionConditions.by_resource_group_id(resource_group_id),
                 SessionConditions.by_statuses(spec.target_statuses),
                 SessionConditions.by_kernel_match(
                     spec.target_kernel_statuses,
@@ -833,8 +856,8 @@ class ScheduleCoordinator:
 
         session_ids = [info.identity.id for info in session_infos]
 
-        # Create recorder scoped to this scaling group
-        recorder_scope = f"{schedule_type.value}:{scaling_group}"
+        # Create recorder scoped to this resource group
+        recorder_scope = f"{schedule_type.value}:{resource_group_id}"
         with SessionRecorderContext.scope(recorder_scope, entity_ids=session_ids) as pool:
             # Build transition info from matched sessions
             with SessionRecorderContext.shared_phase(
@@ -860,7 +883,7 @@ class ScheduleCoordinator:
             # Phase 2: Apply status transitions (includes hook execution)
             await self._handle_promotion_status_transitions(spec, result, pool)
 
-            # Emit metrics per scaling group
+            # Emit metrics per resource group
             self._operation_metrics.observe_success(
                 operation=spec.name,
                 count=result.success_count(),
@@ -873,19 +896,19 @@ class ScheduleCoordinator:
                     await self._run_post_processors(result, target_statuses)
                 except Exception as e:
                     log.error(
-                        "Error during common post-processing for scaling group {}: {}",
-                        scaling_group,
+                        "Error during common post-processing for resource group {}: {}",
+                        resource_group_id,
                         e,
                     )
 
-            # Log recorded steps for this scaling group
+            # Log recorded steps for this resource group
             all_records = pool.get_all_records()
             if all_records:
                 log.debug(
-                    "Recorded {} sessions with execution records for {} in scaling group {}",
+                    "Recorded {} sessions with execution records for {} in resource group {}",
                     len(all_records),
                     schedule_type.value,
-                    scaling_group,
+                    resource_group_id,
                 )
 
     async def _handle_promotion_status_transitions(
@@ -1115,7 +1138,7 @@ class ScheduleCoordinator:
             handler: The lifecycle handler that produced the result
             result: Execution result containing successes, failures, and skipped
             records: Mapping of session IDs to their execution records for sub_steps
-            sessions: Original sessions with phase_attempts for failure classification
+            sessions: Original sessions with last_phase for failure classification
 
         Returns:
             FailureClassificationResult if there were failures, None otherwise.
@@ -1225,13 +1248,15 @@ class ScheduleCoordinator:
         is ``None``; ``expired`` never fires when ``timeout`` is ``None``.
 
         Classification priority (first match wins):
-        1. give_up: max_retry_count set AND phase_attempts >= max_retry_count
+        1. give_up: max_retry_count set AND last_phase.attempts >= max_retry_count,
+           and those attempts are not skips (a session queued behind a blocked
+           one was never attempted, so it may not be given up on)
         2. expired: timeout set AND phase elapsed > timeout
         3. need_retry: default
 
         Args:
             failures: Failed session transition info
-            sessions: Original sessions with phase_attempts and phase_started_at populated
+            sessions: Original sessions with last_phase populated
             current_time: Current database time for timeout comparison
             handler_name: ``SessionLifecycleHandler.name()`` for resolving
                 per-handler policy from ``SessionHandlerOptions``
@@ -1252,14 +1277,21 @@ class ScheduleCoordinator:
                 continue
 
             policy = session.session_info.handler_options.resolve(handler_name)
+            last_phase = session.last_phase
 
-            # 1. Check max retries exceeded → give_up
-            if policy.is_retry_exhausted(session.phase_attempts):
+            # 1. Check max retries exceeded → give_up.
+            # A skip is recorded like any other result but is not an attempt:
+            # a session queued behind a blocked one may not be given up on for
+            # work it never got to do.
+            attempts = last_phase.attempts if last_phase is not None else 0
+            was_skipped = last_phase is not None and last_phase.result == SchedulingResult.SKIPPED
+            if not was_skipped and policy.is_retry_exhausted(attempts):
                 give_up_failures.append(failure)
                 continue
 
             # 2. Check timeout exceeded → expired
-            if policy.is_timed_out(session.phase_started_at, current_time):
+            started_at = last_phase.started_at if last_phase is not None else None
+            if policy.is_timed_out(started_at, current_time):
                 expired_failures.append(failure)
                 continue
 
@@ -1580,12 +1612,10 @@ class ScheduleCoordinator:
 
     async def handle_kernel_running(self, event: KernelStartedAnycastEvent) -> bool:
         """Handle kernel running event through the kernel state engine."""
-        # Convert event data to dataclass (always present, may be empty)
-        creation_info = KernelCreationInfo.from_dict(dict(event.creation_info))
         result = await self._kernel_state_engine.mark_kernel_running(
             event.kernel_id,
             event.reason,
-            creation_info,
+            event.creation_info,
         )
         if result:
             # Request CHECK_CREATING_PROGRESS to check if session should transition to RUNNING
@@ -1706,6 +1736,34 @@ class ScheduleCoordinator:
             ),
             SchedulerTaskSpec(
                 ScheduleType.DEPRIORITIZE,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            # Promote RESERVED sessions whose kernels are all admitted
+            SchedulerTaskSpec(
+                ScheduleType.CHECK_RESERVED_PROGRESS,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            # Advance RESERVED sessions once their victims' resources freed
+            SchedulerTaskSpec(
+                ScheduleType.RELEASE_RESERVED,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            # Branch preemption victims by the resource group's preemption mode
+            SchedulerTaskSpec(
+                ScheduleType.PREEMPTED,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            # Put sessions whose kernels are gone back in the queue
+            SchedulerTaskSpec(
+                ScheduleType.RESCHEDULING,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,

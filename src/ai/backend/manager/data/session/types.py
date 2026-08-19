@@ -25,14 +25,17 @@ from ai.backend.manager.data.user.types import UserData
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.kernel.types import KernelStatus
+    from ai.backend.manager.data.network.types import NetworkType
     from ai.backend.manager.data.session.options import SessionHandlerOptions
-    from ai.backend.manager.models.network import NetworkType
 
 
 class SessionStatus(CIStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
     DEPRIORITIZING = "DEPRIORITIZING"  # transient: lower priority and go back to PENDING
+    # holds a resource reservation (preemption plan) and waits for the
+    # victims' resources to free before becoming SCHEDULED
+    RESERVED = "RESERVED"
     # ---
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
@@ -45,6 +48,12 @@ class SessionStatus(CIStrEnum):
     RUNNING = "RUNNING"
     RESTARTING = "RESTARTING"
     RUNNING_DEGRADED = "RUNNING_DEGRADED"
+    # transient: confirmed preemption victim; branches by PreemptionMode to
+    # TERMINATING (terminate) or RESCHEDULING (reschedule)
+    PREEMPTED = "PREEMPTED"
+    # transient: kernels are being torn down to put the session back in the
+    # queue; becomes PENDING once they are all gone
+    RESCHEDULING = "RESCHEDULING"
     # ---
     TERMINATING = "TERMINATING"
     TERMINATED = "TERMINATED"
@@ -52,13 +61,14 @@ class SessionStatus(CIStrEnum):
     CANCELLED = "CANCELLED"
 
     @classmethod
-    def kernel_awaiting_statuses(cls) -> set[SessionStatus]:
-        return {
+    @lru_cache(maxsize=1)
+    def kernel_awaiting_statuses(cls) -> frozenset[SessionStatus]:
+        return frozenset((
             cls.PREPARING,
             cls.PULLING,
             cls.CREATING,
             cls.TERMINATING,
-        }
+        ))
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -70,8 +80,11 @@ class SessionStatus(CIStrEnum):
             not in (
                 cls.PENDING,
                 cls.DEPRIORITIZING,
+                cls.PREEMPTED,
+                cls.RESCHEDULING,
                 cls.TERMINATED,
                 cls.CANCELLED,
+                cls.ERROR,
             )
         )
 
@@ -105,6 +118,17 @@ class SessionStatus(CIStrEnum):
                 cls.ERROR,
             )
         )
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def preemption_victim_statuses(cls) -> frozenset[SessionStatus]:
+        """Return statuses eligible as preemption victim candidates (BEP-1055).
+
+        Still occupying resources and able to transition to termination —
+        strips TERMINATING, whose resources free without preemption, and
+        RESERVED, whose hold belongs to another preemption plan.
+        """
+        return (cls.resource_occupied_statuses() & cls.terminatable_statuses()) - {cls.RESERVED}
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -152,6 +176,7 @@ class SessionData:
     id: UUID
     session_type: SessionTypes
     priority: int
+    job_priority: int
     is_preemptible: bool
     cluster_mode: ClusterMode
     cluster_size: int

@@ -16,6 +16,24 @@ def my() -> None:
     """Self-service commands for the current user."""
 
 
+@my.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.my.app_config:app_config",
+    name="app-config",
+)
+def app_config() -> None:
+    """My app config commands."""
+
+
+@my.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.my.app_config_fragment:app_config_fragment",
+    name="app-config-fragment",
+)
+def app_config_fragment() -> None:
+    """My app config fragment commands."""
+
+
 @my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.keypair:keypair")
 def keypair() -> None:
     """My keypair commands."""

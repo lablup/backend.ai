@@ -22,6 +22,7 @@ from ai.backend.test.templates.template import WrapperTestTemplate
 
 class VFolderMountedInteractiveSessionTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "vfolder_mounted_interactive_session"
 
@@ -95,7 +96,7 @@ class VFolderMountedInteractiveSessionTemplate(WrapperTestTemplate):
         test_id = spec_meta.test_id
         client_session = ClientSessionContext.current()
         session_name = f"test_session_{test_id!s}"
-        session_id = None
+        session_id: UUID | None = None
         vfolder_meta = CreatedVFolderMetaContext.current()
         try:
             session_id = await self._verify_session_creation(
@@ -108,5 +109,5 @@ class VFolderMountedInteractiveSessionTemplate(WrapperTestTemplate):
             ):
                 yield
         finally:
-            if session_id:
+            if session_id is not None:
                 await self._verify_session_destruction(client_session, session_name)

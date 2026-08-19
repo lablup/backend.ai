@@ -11,7 +11,10 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+import sqlalchemy as sa
 
+from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -36,6 +39,7 @@ from ai.backend.manager.models.resource_usage_history import (
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
     PasswordInfo,
@@ -45,7 +49,6 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Creator, Upserter
-from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.resource_usage_history import (
     DomainUsageBucketConditions,
     DomainUsageBucketCreatorSpec,
@@ -60,6 +63,9 @@ from ai.backend.manager.repositories.resource_usage_history import (
     UserUsageBucketUpserterSpec,
 )
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
+
+RESOURCE_GROUP_ID = ResourceGroupID(uuid.UUID("00000000-0000-0000-0000-000000000001"))
 
 
 class TestResourceUsageHistoryRepository:
@@ -126,15 +132,30 @@ class TestResourceUsageHistoryRepository:
         return sg_name
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_resource_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+        test_scaling_group: str,
+    ) -> ResourceGroupID:
+        """Return the ID of the test scaling group."""
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == test_scaling_group)
+            )
+            return result.scalar_one()
+
+    @pytest.fixture
+    async def test_domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainFixtureData:
         """Create test domain and return domain name"""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain for usage history",
                 is_active=True,
@@ -145,13 +166,13 @@ class TestResourceUsageHistoryRepository:
             db_sess.add(domain)
             await db_sess.commit()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_project_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
     ) -> uuid.UUID:
         """Create test project (group) and return its ID"""
         project_id = uuid.uuid4()
@@ -170,7 +191,7 @@ class TestResourceUsageHistoryRepository:
             group = GroupRow(
                 id=project_id,
                 name=f"test-project-{project_id.hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 description="Test project for usage history",
                 resource_policy=policy_name,
             )
@@ -183,7 +204,7 @@ class TestResourceUsageHistoryRepository:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
     ) -> uuid.UUID:
         """Create test user and return user UUID"""
         user_uuid = uuid.uuid4()
@@ -215,9 +236,10 @@ class TestResourceUsageHistoryRepository:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=policy_name,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -238,7 +260,8 @@ class TestResourceUsageHistoryRepository:
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
         test_scaling_group: str,
-        test_domain_name: str,
+        test_resource_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
         test_project_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
     ) -> None:
@@ -253,11 +276,15 @@ class TestResourceUsageHistoryRepository:
                 session_id=session_id,
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_group=test_scaling_group,
+                resource_group_id=test_resource_group_id,
                 period_start=now - timedelta(minutes=5),
                 period_end=now,
-                resource_usage=ResourceSlot({"cpu": Decimal("300"), "mem": Decimal("1073741824")}),
+                resource_usage=ResourceSlot({
+                    "cpu": Decimal("300"),
+                    "mem": Decimal("1073741824"),
+                }),
             )
         )
 
@@ -267,13 +294,15 @@ class TestResourceUsageHistoryRepository:
         assert result.session_id == session_id
         assert result.user_uuid == test_user_uuid
         assert result.project_id == test_project_id
+        assert result.resource_group_id == test_resource_group_id
         assert result.resource_usage["cpu"] == Decimal("300")
 
     async def test_bulk_create_kernel_usage_records(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
         test_scaling_group: str,
-        test_domain_name: str,
+        test_resource_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
         test_project_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
     ) -> None:
@@ -293,8 +322,9 @@ class TestResourceUsageHistoryRepository:
                     session_id=session_id,
                     user_uuid=test_user_uuid,
                     project_id=test_project_id,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_group=test_scaling_group,
+                    resource_group_id=test_resource_group_id,
                     period_start=period_start,
                     period_end=period_end,
                     resource_usage=ResourceSlot({"cpu": Decimal("300")}),
@@ -309,13 +339,14 @@ class TestResourceUsageHistoryRepository:
         assert len(results) == 5
         for result in results:
             assert result.resource_group == test_scaling_group
-            assert result.domain_name == test_domain_name
+            assert result.domain_name == test_domain.domain_name
 
     async def test_search_kernel_usage_records(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
         test_scaling_group: str,
-        test_domain_name: str,
+        test_resource_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
         test_project_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
     ) -> None:
@@ -335,8 +366,9 @@ class TestResourceUsageHistoryRepository:
                     session_id=session_id,
                     user_uuid=test_user_uuid,
                     project_id=test_project_id,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_group=test_scaling_group,
+                    resource_group_id=test_resource_group_id,
                     period_start=period_start,
                     period_end=period_end,
                     resource_usage=ResourceSlot({"cpu": Decimal("300")}),
@@ -365,15 +397,17 @@ class TestResourceUsageHistoryRepository:
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
         test_scaling_group: str,
-        test_domain_name: str,
+        test_resource_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
     ) -> None:
         """Test creating domain usage bucket"""
         today = datetime.now(tz=UTC).date()
 
         creator = Creator(
             spec=DomainUsageBucketCreatorSpec(
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_group=test_scaling_group,
+                resource_group_id=test_resource_group_id,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -390,8 +424,9 @@ class TestResourceUsageHistoryRepository:
 
         result = await resource_usage_history_repository.create_domain_usage_bucket(creator)
 
-        assert result.domain_name == test_domain_name
+        assert result.domain_name == test_domain.domain_name
         assert result.resource_group == test_scaling_group
+        assert result.resource_group_id == test_resource_group_id
         assert result.period_start == today
         assert result.resource_usage["cpu"] == Decimal("86400")
 
@@ -399,15 +434,17 @@ class TestResourceUsageHistoryRepository:
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
         test_scaling_group: str,
-        test_domain_name: str,
+        test_resource_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
     ) -> None:
         """Test upsert domain usage bucket - insert case"""
         today = datetime.now(tz=UTC).date()
 
         upserter = Upserter(
             spec=DomainUsageBucketUpserterSpec(
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_group=test_scaling_group,
+                resource_group_id=test_resource_group_id,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -418,14 +455,16 @@ class TestResourceUsageHistoryRepository:
 
         result = await resource_usage_history_repository.upsert_domain_usage_bucket(upserter)
 
-        assert result.domain_name == test_domain_name
+        assert result.domain_name == test_domain.domain_name
         assert result.resource_usage["cpu"] == Decimal("3600")
 
     async def test_upsert_domain_usage_bucket_update(
         self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
         test_scaling_group: str,
-        test_domain_name: str,
+        test_resource_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
     ) -> None:
         """Test upsert domain usage bucket - update case"""
         today = datetime.now(tz=UTC).date()
@@ -433,8 +472,9 @@ class TestResourceUsageHistoryRepository:
         # First upsert (insert)
         upserter1 = Upserter(
             spec=DomainUsageBucketUpserterSpec(
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_group=test_scaling_group,
+                resource_group_id=test_resource_group_id,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -447,8 +487,9 @@ class TestResourceUsageHistoryRepository:
         # Second upsert (update)
         upserter2 = Upserter(
             spec=DomainUsageBucketUpserterSpec(
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_group=test_scaling_group,
+                resource_group_id=test_resource_group_id,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -459,12 +500,22 @@ class TestResourceUsageHistoryRepository:
         result = await resource_usage_history_repository.upsert_domain_usage_bucket(upserter2)
 
         assert result.resource_usage["cpu"] == Decimal("7200")
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            stored_resource_group_id = await db_sess.scalar(
+                sa.select(DomainUsageBucketRow.resource_group_id).where(
+                    DomainUsageBucketRow.domain_name == test_domain.domain_name,
+                    DomainUsageBucketRow.resource_group == test_scaling_group,
+                    DomainUsageBucketRow.period_start == today,
+                )
+            )
+        assert stored_resource_group_id == test_resource_group_id
 
     async def test_search_domain_usage_buckets(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
         test_scaling_group: str,
-        test_domain_name: str,
+        test_resource_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
     ) -> None:
         """Test searching domain usage buckets with BatchQuerier"""
         today = datetime.now(tz=UTC).date()
@@ -474,8 +525,9 @@ class TestResourceUsageHistoryRepository:
             bucket_date = today - timedelta(days=i)
             creator = Creator(
                 spec=DomainUsageBucketCreatorSpec(
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_group=test_scaling_group,
+                    resource_group_id=test_resource_group_id,
                     period_start=bucket_date,
                     period_end=bucket_date + timedelta(days=1),
                     decay_unit_days=1,
@@ -507,7 +559,8 @@ class TestResourceUsageHistoryRepository:
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
         test_scaling_group: str,
-        test_domain_name: str,
+        test_resource_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
         test_project_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
     ) -> None:
@@ -518,8 +571,9 @@ class TestResourceUsageHistoryRepository:
             spec=UserUsageBucketCreatorSpec(
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_group=test_scaling_group,
+                resource_group_id=test_resource_group_id,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -532,13 +586,15 @@ class TestResourceUsageHistoryRepository:
 
         assert result.user_uuid == test_user_uuid
         assert result.project_id == test_project_id
+        assert result.resource_group_id == test_resource_group_id
         assert result.resource_usage["cpu"] == Decimal("3600")
 
     async def test_upsert_user_usage_bucket(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
         test_scaling_group: str,
-        test_domain_name: str,
+        test_resource_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
         test_project_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
     ) -> None:
@@ -549,8 +605,9 @@ class TestResourceUsageHistoryRepository:
             spec=UserUsageBucketUpserterSpec(
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_group=test_scaling_group,
+                resource_group_id=test_resource_group_id,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -570,7 +627,8 @@ class TestResourceUsageHistoryRepository:
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
         test_scaling_group: str,
-        test_domain_name: str,
+        test_resource_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
         test_project_id: uuid.UUID,
     ) -> None:
         """Test creating project usage bucket"""
@@ -579,8 +637,9 @@ class TestResourceUsageHistoryRepository:
         creator = Creator(
             spec=ProjectUsageBucketCreatorSpec(
                 project_id=test_project_id,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_group=test_scaling_group,
+                resource_group_id=test_resource_group_id,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -592,6 +651,7 @@ class TestResourceUsageHistoryRepository:
         result = await resource_usage_history_repository.create_project_usage_bucket(creator)
 
         assert result.project_id == test_project_id
+        assert result.resource_group_id == test_resource_group_id
         assert result.resource_usage["cpu"] == Decimal("3600")
 
     # ==================== Aggregation Tests ====================
@@ -601,7 +661,8 @@ class TestResourceUsageHistoryRepository:
         resource_usage_history_repository: ResourceUsageHistoryRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group: str,
-        test_domain_name: str,
+        test_resource_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
         test_project_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
     ) -> None:
@@ -615,8 +676,9 @@ class TestResourceUsageHistoryRepository:
                 spec=UserUsageBucketCreatorSpec(
                     user_uuid=test_user_uuid,
                     project_id=test_project_id,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_group=test_scaling_group,
+                    resource_group_id=test_resource_group_id,
                     period_start=bucket_date,
                     period_end=bucket_date + timedelta(days=1),
                     decay_unit_days=1,
@@ -632,8 +694,7 @@ class TestResourceUsageHistoryRepository:
                         bucket_id=result.id,
                         bucket_type="user",
                         slot_name="cpu",
-                        amount=Decimal("3600"),
-                        duration_seconds=300,
+                        resource_usage=Decimal("3600"),
                         capacity=Decimal("0"),
                     )
                 )
@@ -642,7 +703,7 @@ class TestResourceUsageHistoryRepository:
         lookback_start = today - timedelta(days=7)
         lookback_end = today
         results = await resource_usage_history_repository.get_aggregated_usage_by_user(
-            resource_group=test_scaling_group,
+            resource_group_id=test_resource_group_id,
             lookback_start=lookback_start,
             lookback_end=lookback_end,
         )
@@ -654,7 +715,7 @@ class TestResourceUsageHistoryRepository:
     async def test_get_aggregated_usage_by_user_empty(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
-        test_scaling_group: str,
+        test_resource_group_id: ResourceGroupID,
     ) -> None:
         """Test getting aggregated usage with no data returns empty dict"""
         today = datetime.now(tz=UTC).date()
@@ -662,7 +723,7 @@ class TestResourceUsageHistoryRepository:
         lookback_end = today
 
         results = await resource_usage_history_repository.get_aggregated_usage_by_user(
-            resource_group=test_scaling_group,
+            resource_group_id=test_resource_group_id,
             lookback_start=lookback_start,
             lookback_end=lookback_end,
         )
@@ -674,7 +735,8 @@ class TestResourceUsageHistoryRepository:
         resource_usage_history_repository: ResourceUsageHistoryRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group: str,
-        test_domain_name: str,
+        test_resource_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
         test_project_id: uuid.UUID,
     ) -> None:
         """Test getting aggregated usage by project"""
@@ -686,8 +748,9 @@ class TestResourceUsageHistoryRepository:
             creator = Creator(
                 spec=ProjectUsageBucketCreatorSpec(
                     project_id=test_project_id,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_group=test_scaling_group,
+                    resource_group_id=test_resource_group_id,
                     period_start=bucket_date,
                     period_end=bucket_date + timedelta(days=1),
                     decay_unit_days=1,
@@ -703,8 +766,7 @@ class TestResourceUsageHistoryRepository:
                         bucket_id=result.id,
                         bucket_type="project",
                         slot_name="cpu",
-                        amount=Decimal("7200"),
-                        duration_seconds=300,
+                        resource_usage=Decimal("7200"),
                         capacity=Decimal("0"),
                     )
                 )
@@ -713,7 +775,7 @@ class TestResourceUsageHistoryRepository:
         lookback_start = today - timedelta(days=7)
         lookback_end = today
         results = await resource_usage_history_repository.get_aggregated_usage_by_project(
-            resource_group=test_scaling_group,
+            resource_group_id=test_resource_group_id,
             lookback_start=lookback_start,
             lookback_end=lookback_end,
         )
@@ -726,7 +788,8 @@ class TestResourceUsageHistoryRepository:
         resource_usage_history_repository: ResourceUsageHistoryRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group: str,
-        test_domain_name: str,
+        test_resource_group_id: ResourceGroupID,
+        test_domain: DomainFixtureData,
     ) -> None:
         """Test getting aggregated usage by domain"""
         today = datetime.now(tz=UTC).date()
@@ -736,8 +799,9 @@ class TestResourceUsageHistoryRepository:
             bucket_date = today - timedelta(days=i)
             creator = Creator(
                 spec=DomainUsageBucketCreatorSpec(
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_group=test_scaling_group,
+                    resource_group_id=test_resource_group_id,
                     period_start=bucket_date,
                     period_end=bucket_date + timedelta(days=1),
                     decay_unit_days=1,
@@ -753,8 +817,7 @@ class TestResourceUsageHistoryRepository:
                         bucket_id=result.id,
                         bucket_type="domain",
                         slot_name="cpu",
-                        amount=Decimal("86400"),
-                        duration_seconds=300,
+                        resource_usage=Decimal("86400"),
                         capacity=Decimal("0"),
                     )
                 )
@@ -763,10 +826,10 @@ class TestResourceUsageHistoryRepository:
         lookback_start = today - timedelta(days=7)
         lookback_end = today
         results = await resource_usage_history_repository.get_aggregated_usage_by_domain(
-            resource_group=test_scaling_group,
+            resource_group_id=test_resource_group_id,
             lookback_start=lookback_start,
             lookback_end=lookback_end,
         )
 
-        assert test_domain_name in results
-        assert results[test_domain_name]["cpu"] == Decimal("172800")  # 86400 * 2
+        assert test_domain.domain_name in results
+        assert results[test_domain.domain_name]["cpu"] == Decimal("172800")  # 86400 * 2

@@ -16,5 +16,5 @@ class AuditLogRepositories:
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
         return cls(
-            repository=AuditLogRepository(db=args.db),
+            repository=AuditLogRepository(ops_provider=args.ops_provider),
         )

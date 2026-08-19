@@ -3,10 +3,10 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any, override
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.artifact.types import VerificationStepResult
 from ai.backend.common.data.storage.registries.types import ModelData
@@ -21,32 +21,12 @@ from ai.backend.manager.models.base import (
     Base,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.artifact import ArtifactRow
-    from ai.backend.manager.models.association_artifacts_storages import (
-        AssociationArtifactsStorageRow,
-    )
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("ArtifactRevisionRow",)
 
 
-def _get_artifact_join_cond() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.artifact import ArtifactRow
-
-    return foreign(ArtifactRevisionRow.artifact_id) == ArtifactRow.id
-
-
-def _get_association_artifacts_storages_join_cond() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.association_artifacts_storages import (
-        AssociationArtifactsStorageRow,
-    )
-
-    return ArtifactRevisionRow.id == foreign(AssociationArtifactsStorageRow.artifact_revision_id)
-
-
-class ArtifactRevisionRow(Base):  # type: ignore[misc]
+class ArtifactRevisionRow(Base):
     __tablename__ = "artifact_revisions"
     __table_args__ = (
         # constraint
@@ -100,21 +80,7 @@ class ArtifactRevisionRow(Base):  # type: ignore[misc]
         "verification_result", sa.JSON(none_as_null=True), nullable=True, default=None
     )
 
-    artifact: Mapped[ArtifactRow] = relationship(
-        "ArtifactRow",
-        back_populates="revision_rows",
-        primaryjoin=_get_artifact_join_cond,
-        viewonly=True,
-    )
-
-    association_artifacts_storages_rows: Mapped[list[AssociationArtifactsStorageRow]] = (
-        relationship(
-            "AssociationArtifactsStorageRow",
-            back_populates="artifact_revision_row",
-            primaryjoin=_get_association_artifacts_storages_join_cond,
-        )
-    )
-
+    @override
     def __str__(self) -> str:
         readme_display = self.readme[:15] if self.readme else None
         created_at_str = self.created_at.isoformat() if self.created_at else None

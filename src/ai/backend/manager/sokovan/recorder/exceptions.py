@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -15,6 +17,7 @@ class RecorderError(BackendAIError):
     error_type = "https://api.backend.ai/probs/recorder-error"
     error_title = "Recorder operation failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
@@ -38,6 +41,7 @@ class NestedPhaseError(RecorderError):
             )
         )
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
@@ -61,6 +65,7 @@ class StepWithoutPhaseError(RecorderError):
             )
         )
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,

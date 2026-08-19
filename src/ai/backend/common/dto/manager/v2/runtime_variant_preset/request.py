@@ -47,7 +47,12 @@ class CreateRuntimeVariantPresetInput(BaseRequestModel):
     name: str = Field(min_length=1, max_length=256, description="Preset name.")
     description: str | None = Field(default=None, description="Description.")
     preset_target: PresetTarget = Field(description="Target: env or args.")
-    value_type: PresetValueType = Field(description="Value type: str, int, float, bool, flag.")
+    value_type: PresetValueType = Field(
+        description=(
+            "Value type: str, int, float, bool, flag. "
+            "'flag' is only valid with preset_target 'args'."
+        )
+    )
     default_value: str | None = Field(default=None, max_length=512, description="Default value.")
     key: str = Field(min_length=1, max_length=256, description="Env key or args flag.")
     required: bool = Field(
@@ -88,7 +93,13 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
     description: str | Sentinel | None = Field(default=SENTINEL)
     rank: int | None = Field(default=None, ge=0)
     preset_target: PresetTarget | None = Field(default=None)
-    value_type: PresetValueType | None = Field(default=None)
+    value_type: PresetValueType | None = Field(
+        default=None,
+        description=(
+            "New value type. 'flag' is only valid when the effective preset_target is 'args' "
+            "(the stored target applies when preset_target is omitted)."
+        ),
+    )
     default_value: str | Sentinel | None = Field(default=SENTINEL)
     key: str | None = Field(default=None, min_length=1, max_length=256)
     required: bool | None = Field(

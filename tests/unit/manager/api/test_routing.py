@@ -6,7 +6,7 @@ import asyncio
 import functools
 import json
 from collections.abc import Awaitable, Callable
-from typing import Self
+from typing import Self, override
 from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp_cors
@@ -283,6 +283,7 @@ class MockMiddlewareParam(MiddlewareParam):
     user_id: str
 
     @classmethod
+    @override
     async def from_request(cls, request: web.Request) -> Self:
         return cls(user_id="test-user-123")
 

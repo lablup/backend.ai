@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import logging
 import os
+import shlex
 import sys
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any, override
+from typing import Any, Self, override
 
 import humps
 import tomli
@@ -16,10 +18,15 @@ from pydantic import (
     model_validator,
 )
 
+from ai.backend.logging.utils import BraceStyleAdapter
+
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
 from .exception import BackendAIError, ConfigurationError, ModelDefinitionValidationError
+from .model_service_start_command_compat import resolve_model_service_start_command
 from .types import BackendAISchema, RedisHelperConfig, SchemaValidationFailureInfo
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
     "ConfigurationError",
@@ -38,6 +45,12 @@ __all__ = (
 
 
 class BaseConfigSchema(BackendAISchema):
+    """
+    Use for a component's config file schema (``configs/``). Unknown fields are
+    warned about and dropped; a schema that takes a wider mapping on purpose opts
+    out with ``ConfigDict(extra="ignore")``.
+    """
+
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -47,10 +60,30 @@ class BaseConfigSchema(BackendAISchema):
         from_attributes=True,
         alias_generator=snake_to_kebab_case,
         validate_default=True,
+        extra="allow",
     )
+
+    @model_validator(mode="after")
+    def _warn_unknown_fields(self) -> Self:
+        extra = self.__pydantic_extra__
+        if extra:
+            keys = sorted(extra)
+            log.warning(
+                "Ignoring unknown config field(s) in {}: {}",
+                type(self).__name__,
+                ", ".join(keys),
+            )
+            extra.clear()
+            self.__pydantic_fields_set__.difference_update(keys)
+        return self
 
 
 class BaseConfigModel(BackendAISchema):
+    """
+    Use for config-shaped payloads authored outside this repository - model service
+    definitions, logging and tester config. Unknown fields are kept, not reported.
+    """
+
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -145,23 +178,6 @@ agent_selector_config_iv = t.Dict({}) | agent_selector_globalconfig_iv
 DEFAULT_SHELL = "/bin/bash"
 
 
-def _wrap_str_start_command_into_argv(service: Any) -> Any:
-    if not isinstance(service, dict):
-        return service
-    # FIXME: temporary bridge — fold the single-string `command` into the str `start_command`
-    # so the ModelServiceConfigDraft validator wraps it.
-    command = service.get("command")
-    service = {k: v for k, v in service.items() if k != "command"}
-    # Override `start_command` with `command` if both are present as start_command is deprecated.
-    sc = command if command is not None else service.get("start_command")
-    if not isinstance(sc, str):
-        return service
-    shell = service.get("shell")
-    if shell:
-        return {**service, "start_command": [shell, "-c", sc]}
-    return {**service, "start_command": [sc]}
-
-
 class PreStartAction(BaseConfigModel):
     action: str = Field(
         description="The name of the pre-start action to execute.",
@@ -254,18 +270,21 @@ class ModelServiceConfig(BaseConfigModel):
         default_factory=list,
         description="List of pre-start actions to execute before starting the model service.",
     )
-    start_command: list[str] | None = Field(
+    start_command: str | None = Field(
         default=None,
         description=(
-            "Argv list to start the model service. ``{model_path}`` in any "
-            "token is replaced per-token with the resolved ``model_path`` "
-            "before launch. ``None`` falls back to the image's default CMD."
+            "Command string to start the model service. ``{model_path}`` is "
+            "replaced with the resolved ``model_path`` before launch. "
+            "``None`` falls back to the image's default CMD."
         ),
-        examples=[["python", "service.py"], ["vllm", "serve", "{model_path}"]],
+        examples=["python service.py", "vllm serve {model_path}"],
     )
-    shell: str = Field(
+    shell: str | None = Field(
         default=DEFAULT_SHELL,
-        description="Shell configured for the model service.",
+        description=(
+            "Shell used to run the command. If set, the kernel runs "
+            "`[shell, '-c', command]`; null or empty disables shell wrapping."
+        ),
         examples=[DEFAULT_SHELL],
     )
     port: int = Field(
@@ -280,8 +299,8 @@ class ModelServiceConfig(BaseConfigModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _wrap_str_start_command(cls, data: Any) -> Any:
-        return _wrap_str_start_command_into_argv(data)
+    def _resolve_start_command(cls, data: Any) -> Any:
+        return resolve_model_service_start_command(data)
 
 
 class ModelMetadata(BaseConfigModel):
@@ -517,8 +536,7 @@ class ModelDefinition(BaseConfigModel):
         return None
 
     def with_args_appended(self, args: list[str]) -> ModelDefinition:
-        """Return a copy with ``args`` appended to each model's
-        ``service.start_command`` as separate argv tokens.
+        """Return a copy with ``args`` appended to each model's command string.
 
         Models with ``service is None`` are passed through unchanged;
         a model whose ``start_command`` is ``None`` receives ``args``
@@ -532,9 +550,11 @@ class ModelDefinition(BaseConfigModel):
             if model.service is None:
                 new_models.append(model)
                 continue
-            existing = model.service.start_command or []
+            suffix = shlex.join(args)
+            existing = model.service.start_command
+            start_command = f"{existing} {suffix}" if existing else suffix
             new_service = model.service.model_copy(
-                update={"start_command": existing + args},
+                update={"start_command": start_command},
             )
             new_models.append(model.model_copy(update={"service": new_service}))
         return self.model_copy(update={"models": new_models})
@@ -567,15 +587,15 @@ class ModelHealthCheckDraft(BaseConfigModel):
 
 class ModelServiceConfigDraft(BaseConfigModel):
     pre_start_actions: list[PreStartAction] | None = None
-    start_command: list[str] | None = None
+    start_command: str | None = None
     shell: str | None = None
-    port: int | None = None
+    port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
 
     @model_validator(mode="before")
     @classmethod
-    def _wrap_str_start_command(cls, data: Any) -> Any:
-        return _wrap_str_start_command_into_argv(data)
+    def _resolve_start_command(cls, data: Any) -> Any:
+        return resolve_model_service_start_command(data)
 
     def to_resolved(self) -> ModelServiceConfig:
         # Drop unset (None) scalars so the strict type's ``Field(default=...)``
@@ -584,6 +604,8 @@ class ModelServiceConfigDraft(BaseConfigModel):
         # required fields (e.g. ``port``) surface as
         # ``BackendAISchemaValidationFailed``.
         payload = self.model_dump(exclude_none=True, exclude={"health_check"})
+        if "shell" in self.model_fields_set and self.shell is None:
+            payload["shell"] = None
         payload["health_check"] = self.health_check.to_resolved() if self.health_check else None
         return ModelServiceConfig.model_validate(payload)
 
@@ -601,9 +623,7 @@ class ModelConfigDraft(BaseConfigModel):
             # ``start_command`` are resolved here, at the same moment the
             # draft becomes a strict ``ModelConfig`` and ``model_path`` is
             # finalized. Placeholders therefore never propagate downstream.
-            service.start_command = [
-                token.replace("{model_path}", self.model_path) for token in service.start_command
-            ]
+            service.start_command = service.start_command.replace("{model_path}", self.model_path)
         payload = self.model_dump(exclude_none=True, exclude={"service"})
         payload["service"] = service
         return ModelConfig.model_validate(payload)
@@ -614,7 +634,9 @@ def _merge_health_check_draft(
     override: ModelHealthCheckDraft,
 ) -> ModelHealthCheckDraft:
     s = override.model_fields_set
+    # model_construct marks every kwarg as set; pass the real union so unset stays unset.
     return ModelHealthCheckDraft.model_construct(
+        _fields_set=base.model_fields_set | override.model_fields_set,
         enable=_pick_non_null_override(base.enable, override.enable, "enable" in s),
         interval=_pick_non_null_override(base.interval, override.interval, "interval" in s),
         path=_pick_non_null_override(base.path, override.path, "path" in s),
@@ -646,13 +668,15 @@ def _merge_service_config_draft(
             base.health_check, override.health_check, "health_check" in s
         )
     return ModelServiceConfigDraft.model_construct(
+        _fields_set=base.model_fields_set | override.model_fields_set,
         pre_start_actions=_pick_non_null_override(
             base.pre_start_actions, override.pre_start_actions, "pre_start_actions" in s
         ),
         start_command=_pick_non_null_override(
             base.start_command, override.start_command, "start_command" in s
         ),
-        shell=_pick_non_null_override(base.shell, override.shell, "shell" in s),
+        # shell requires explicit none to disable shell wrapping; otherwise the baseline's default is preserved.
+        shell=_pick(base.shell, override.shell, "shell" in s),
         port=_pick_non_null_override(base.port, override.port, "port" in s),
         health_check=health_check,
     )
@@ -674,6 +698,7 @@ def _merge_config_draft(
     else:
         metadata = _pick_non_null_override(base.metadata, override.metadata, "metadata" in s)
     return ModelConfigDraft.model_construct(
+        _fields_set=base.model_fields_set | override.model_fields_set,
         name=_pick_non_null_override(base.name, override.name, "name" in s),
         model_path=override.model_path if override.model_path is not None else base.model_path,
         service=service,
@@ -750,6 +775,83 @@ class ModelDefinitionDraft(BaseConfigModel):
             if health_check.get("enable") is None:
                 health_check["enable"] = True
         return cls.model_validate(data)
+
+
+class DefaultModelServiceConfig(BaseConfigModel):
+    """Baseline model service config; ``port`` stays required so the baseline
+    guarantees every revision resolves a service port."""
+
+    pre_start_actions: list[PreStartAction] | None = None
+    start_command: str | None = None
+    shell: str | None = None
+    port: int = Field(gt=1)
+    health_check: ModelHealthCheckDraft | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_start_command(cls, data: Any) -> Any:
+        return resolve_model_service_start_command(data)
+
+
+class DefaultModelConfig(BaseConfigModel):
+    """Baseline model config stored on a runtime variant. ``name`` and
+    ``service.port`` are required so the always-present baseline layer
+    guarantees them to every revision; ``model_path`` keeps its dynamic
+    mount-destination default in the reader.
+    """
+
+    name: str
+    model_path: str | None = None
+    service: DefaultModelServiceConfig
+    metadata: ModelMetadata | None = None
+
+
+class DefaultModelDefinition(BaseConfigModel):
+    """Stored shape of ``runtime_variants.default_model_definition``."""
+
+    models: list[DefaultModelConfig] | None = None
+
+    def to_draft(self) -> ModelDefinitionDraft:
+        # exclude_unset keeps unset fields from clobbering lower-priority merge layers.
+        return ModelDefinitionDraft.model_validate(self.model_dump(exclude_unset=True))
+
+
+class PresetModelServiceConfig(BaseConfigModel):
+    """Preset-stored model service config. ``port`` may be omitted to inherit
+    the runtime variant baseline's port at revision resolution."""
+
+    pre_start_actions: list[PreStartAction] | None = None
+    start_command: str | None = None
+    shell: str | None = None
+    port: int | None = Field(default=None, gt=1)
+    health_check: ModelHealthCheckDraft | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_start_command(cls, data: Any) -> Any:
+        return resolve_model_service_start_command(data)
+
+
+class PresetModelConfig(BaseConfigModel):
+    """Preset-stored model config. ``name``/``model_path`` may be omitted to
+    inherit merge-chain defaults. ``service`` is required for new preset
+    inputs but may be absent in rows stored via the legacy update API,
+    which accepted ``ModelDefinition`` with an optional ``service``."""
+
+    name: str | None = None
+    model_path: str | None = None
+    service: PresetModelServiceConfig | None = None
+    metadata: ModelMetadata | None = None
+
+
+class PresetModelDefinition(BaseConfigModel):
+    """Stored shape of ``deployment_revision_presets.model_definition``."""
+
+    models: list[PresetModelConfig]
+
+    def to_draft(self) -> ModelDefinitionDraft:
+        # exclude_unset keeps unset fields from clobbering lower-priority merge layers.
+        return ModelDefinitionDraft.model_validate(self.model_dump(exclude_unset=True))
 
 
 def find_config_file(daemon_name: str) -> Path:

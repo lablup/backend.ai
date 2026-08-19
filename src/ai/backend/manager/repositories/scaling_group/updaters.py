@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
@@ -12,11 +11,16 @@ from sqlalchemy import cast, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import array as pg_array
 
+from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.data.scaling_group.types import PreemptionConfig as DataPreemptionConfig
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.errors.resource import DefaultScalingGroupAlreadyExists
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
+from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
+
+DEFAULT_SCALING_GROUP_INDEX = "uq_scaling_groups_is_default"
 
 
 @dataclass
@@ -28,6 +32,7 @@ class ScalingGroupStatusUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
 
     is_active: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
     is_public: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
+    is_default: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
 
     @property
     @override
@@ -39,6 +44,7 @@ class ScalingGroupStatusUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
         to_update: dict[str, Any] = {}
         self.is_active.update_dict(to_update, "is_active")
         self.is_public.update_dict(to_update, "is_public")
+        self.is_default.update_dict(to_update, "is_default")
         return to_update
 
 
@@ -143,14 +149,17 @@ class ScalingGroupSchedulerConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
             to_update["scheduler_opts"] = scheduler_opts
         if (preemption := self.preemption_config.optional_value()) is not None:
             preemption_dict = {
+                "enabled": preemption.enabled,
                 "preemptible_priority": preemption.preemptible_priority,
                 "order": preemption.order.value,
                 "mode": preemption.mode.value,
+                "preemption_min_runtime": preemption.preemption_min_runtime.total_seconds(),
+                "victim_scope": preemption.victim_scope.value,
             }
             to_update["scheduler_opts"] = func.jsonb_set(
                 sa.literal_column("scheduler_opts"),
                 pg_array(["preemption"]),
-                cast(json.dumps(preemption_dict), JSONB),
+                cast(preemption_dict, JSONB),
             )
         return to_update
 
@@ -197,6 +206,19 @@ class ScalingGroupUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
     @override
     def row_class(self) -> type[ScalingGroupRow]:
         return ScalingGroupRow
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return (
+            IntegrityErrorCheck(
+                violation_type=UniqueConstraintViolationError,
+                constraint_name=DEFAULT_SCALING_GROUP_INDEX,
+                error=DefaultScalingGroupAlreadyExists(
+                    "Another resource group is already the default, clear it first"
+                ),
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:

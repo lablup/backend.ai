@@ -25,7 +25,6 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.rbac.scope_binder import (
@@ -39,6 +38,7 @@ from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupForKeypairsCreatorSpec,
 )
 from ai.backend.manager.repositories.scaling_group.purgers import (
+    ScalingGroupPurgerSpec,
     create_scaling_group_for_keypairs_purger,
 )
 from ai.backend.manager.repositories.scaling_group.repository import ScalingGroupRepository
@@ -111,7 +111,7 @@ async def _purge_sgroup(
     name: str,
 ) -> None:
     """Purge a scaling group via the processor."""
-    action = PurgeScalingGroupAction(purger=Purger(row_class=ScalingGroupRow, pk_value=name))
+    action = PurgeScalingGroupAction(purger=Purger(spec=ScalingGroupPurgerSpec(name=name)))
     await processors.purge_scaling_group.wait_for_complete(action)
 
 
@@ -278,7 +278,7 @@ class TestScalingGroupCRUD:
         name = f"crud-purge-{uuid.uuid4().hex[:8]}"
         await _create_sgroup(scaling_group_processors, name)
 
-        action = PurgeScalingGroupAction(purger=Purger(row_class=ScalingGroupRow, pk_value=name))
+        action = PurgeScalingGroupAction(purger=Purger(spec=ScalingGroupPurgerSpec(name=name)))
         result = await scaling_group_processors.purge_scaling_group.wait_for_complete(action)
         assert result.data.name == name
 
@@ -303,18 +303,18 @@ class TestScalingGroupDomainAssociation:
     ) -> None:
         """S-1: Associate a scaling group with a single domain; association exists in DB."""
         name = f"assoc-dom-{uuid.uuid4().hex[:8]}"
-        await _create_sgroup(scaling_group_processors, name)
+        sg = await _create_sgroup(scaling_group_processors, name)
         try:
             binder = RBACScopeBinder(
                 pairs=[
                     RBACScopeBindingPair(
                         spec=ScalingGroupForDomainCreatorSpec(
-                            scaling_group=name,
-                            domain=domain_fixture.domain_name,
+                            resource_group_id=sg.id,
+                            domain_id=domain_fixture.domain_id,
                         ),
-                        entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, name),
+                        entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, str(sg.id)),
                         scope_ref=RBACElementRef(
-                            RBACElementType.DOMAIN, domain_fixture.domain_name
+                            RBACElementType.DOMAIN, str(domain_fixture.domain_id)
                         ),
                     )
                 ]
@@ -324,8 +324,8 @@ class TestScalingGroupDomainAssociation:
             )
 
             exists = await scaling_group_repository.check_scaling_group_domain_association_exists(
-                scaling_group=name,
-                domain=domain_fixture.domain_name,
+                resource_group_id=sg.id,
+                domain_id=domain_fixture.domain_id,
             )
             assert exists is True
         finally:
@@ -344,19 +344,19 @@ class TestScalingGroupDomainAssociation:
     ) -> None:
         """S-3: Disassociate domain; check_exists returns False afterwards."""
         name = f"disassoc-dom-{uuid.uuid4().hex[:8]}"
-        await _create_sgroup(scaling_group_processors, name)
+        sg = await _create_sgroup(scaling_group_processors, name)
         try:
             # First associate
             binder = RBACScopeBinder(
                 pairs=[
                     RBACScopeBindingPair(
                         spec=ScalingGroupForDomainCreatorSpec(
-                            scaling_group=name,
-                            domain=domain_fixture.domain_name,
+                            resource_group_id=sg.id,
+                            domain_id=domain_fixture.domain_id,
                         ),
-                        entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, name),
+                        entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, str(sg.id)),
                         scope_ref=RBACElementRef(
-                            RBACElementType.DOMAIN, domain_fixture.domain_name
+                            RBACElementType.DOMAIN, str(domain_fixture.domain_id)
                         ),
                     )
                 ]
@@ -368,15 +368,15 @@ class TestScalingGroupDomainAssociation:
             # Verify association exists
             assert (
                 await scaling_group_repository.check_scaling_group_domain_association_exists(
-                    scaling_group=name,
-                    domain=domain_fixture.domain_name,
+                    resource_group_id=sg.id,
+                    domain_id=domain_fixture.domain_id,
                 )
             ) is True
 
             # Now disassociate
             unbinder = ResourceGroupDomainEntityUnbinder(
-                scaling_groups=[name],
-                domain=domain_fixture.domain_name,
+                resource_group_ids=[sg.id],
+                domain_id=domain_fixture.domain_id,
             )
             await (
                 scaling_group_processors.disassociate_scaling_group_with_domains.wait_for_complete(
@@ -386,8 +386,8 @@ class TestScalingGroupDomainAssociation:
 
             # Association should be gone
             exists = await scaling_group_repository.check_scaling_group_domain_association_exists(
-                scaling_group=name,
-                domain=domain_fixture.domain_name,
+                resource_group_id=sg.id,
+                domain_id=domain_fixture.domain_id,
             )
             assert exists is False
         finally:
@@ -406,13 +406,13 @@ class TestScalingGroupDomainAssociation:
     ) -> None:
         """S-5: check_scaling_group_domain_association_exists returns True/False correctly."""
         name = f"check-assoc-{uuid.uuid4().hex[:8]}"
-        await _create_sgroup(scaling_group_processors, name)
+        sg = await _create_sgroup(scaling_group_processors, name)
         try:
             # Before association: False
             assert (
                 await scaling_group_repository.check_scaling_group_domain_association_exists(
-                    scaling_group=name,
-                    domain=domain_fixture.domain_name,
+                    resource_group_id=sg.id,
+                    domain_id=domain_fixture.domain_id,
                 )
             ) is False
 
@@ -421,12 +421,12 @@ class TestScalingGroupDomainAssociation:
                 pairs=[
                     RBACScopeBindingPair(
                         spec=ScalingGroupForDomainCreatorSpec(
-                            scaling_group=name,
-                            domain=domain_fixture.domain_name,
+                            resource_group_id=sg.id,
+                            domain_id=domain_fixture.domain_id,
                         ),
-                        entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, name),
+                        entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, str(sg.id)),
                         scope_ref=RBACElementRef(
-                            RBACElementType.DOMAIN, domain_fixture.domain_name
+                            RBACElementType.DOMAIN, str(domain_fixture.domain_id)
                         ),
                     )
                 ]
@@ -436,8 +436,8 @@ class TestScalingGroupDomainAssociation:
             )
             assert (
                 await scaling_group_repository.check_scaling_group_domain_association_exists(
-                    scaling_group=name,
-                    domain=domain_fixture.domain_name,
+                    resource_group_id=sg.id,
+                    domain_id=domain_fixture.domain_id,
                 )
             ) is True
         finally:
@@ -460,13 +460,13 @@ class TestScalingGroupKeypairAssociation:
     ) -> None:
         """S-1: Associate a scaling group with a single keypair; association exists in DB."""
         name = f"kp-assoc-{uuid.uuid4().hex[:8]}"
-        await _create_sgroup(scaling_group_processors, name)
+        sg = await _create_sgroup(scaling_group_processors, name)
         access_key = AccessKey(admin_user_fixture.keypair.access_key)
         try:
             bulk_creator = BulkCreator(
                 specs=[
                     ScalingGroupForKeypairsCreatorSpec(
-                        scaling_group=name,
+                        resource_group_id=sg.id,
                         access_key=access_key,
                     )
                 ]
@@ -476,7 +476,7 @@ class TestScalingGroupKeypairAssociation:
             )
 
             exists = await scaling_group_repository.check_scaling_group_keypair_association_exists(
-                scaling_group_name=name,
+                resource_group_id=sg.id,
                 access_key=access_key,
             )
             assert exists is True
@@ -496,14 +496,14 @@ class TestScalingGroupKeypairAssociation:
     ) -> None:
         """S-3: Disassociate keypair; check_exists returns False afterwards."""
         name = f"kp-disassoc-{uuid.uuid4().hex[:8]}"
-        await _create_sgroup(scaling_group_processors, name)
+        sg = await _create_sgroup(scaling_group_processors, name)
         access_key = AccessKey(admin_user_fixture.keypair.access_key)
         try:
             # First associate
             bulk_creator = BulkCreator(
                 specs=[
                     ScalingGroupForKeypairsCreatorSpec(
-                        scaling_group=name,
+                        resource_group_id=sg.id,
                         access_key=access_key,
                     )
                 ]
@@ -515,14 +515,14 @@ class TestScalingGroupKeypairAssociation:
             # Verify association exists
             assert (
                 await scaling_group_repository.check_scaling_group_keypair_association_exists(
-                    scaling_group_name=name,
+                    resource_group_id=sg.id,
                     access_key=access_key,
                 )
             ) is True
 
             # Now disassociate
             purger = create_scaling_group_for_keypairs_purger(
-                scaling_group=name,
+                resource_group_id=sg.id,
                 access_key=access_key,
             )
             await (
@@ -533,7 +533,7 @@ class TestScalingGroupKeypairAssociation:
 
             # Association should be gone
             exists = await scaling_group_repository.check_scaling_group_keypair_association_exists(
-                scaling_group_name=name,
+                resource_group_id=sg.id,
                 access_key=access_key,
             )
             assert exists is False
@@ -554,18 +554,18 @@ class TestScalingGroupKeypairAssociation:
     ) -> None:
         """S-2: Associate a scaling group with multiple keypairs via BulkCreator."""
         name = f"kp-multi-{uuid.uuid4().hex[:8]}"
-        await _create_sgroup(scaling_group_processors, name)
+        sg = await _create_sgroup(scaling_group_processors, name)
         admin_key = AccessKey(admin_user_fixture.keypair.access_key)
         user_key = AccessKey(regular_user_fixture.keypair.access_key)
         try:
             bulk_creator = BulkCreator(
                 specs=[
                     ScalingGroupForKeypairsCreatorSpec(
-                        scaling_group=name,
+                        resource_group_id=sg.id,
                         access_key=admin_key,
                     ),
                     ScalingGroupForKeypairsCreatorSpec(
-                        scaling_group=name,
+                        resource_group_id=sg.id,
                         access_key=user_key,
                     ),
                 ]
@@ -576,13 +576,13 @@ class TestScalingGroupKeypairAssociation:
 
             assert (
                 await scaling_group_repository.check_scaling_group_keypair_association_exists(
-                    scaling_group_name=name,
+                    resource_group_id=sg.id,
                     access_key=admin_key,
                 )
             ) is True
             assert (
                 await scaling_group_repository.check_scaling_group_keypair_association_exists(
-                    scaling_group_name=name,
+                    resource_group_id=sg.id,
                     access_key=user_key,
                 )
             ) is True
@@ -602,13 +602,13 @@ class TestScalingGroupKeypairAssociation:
     ) -> None:
         """S-5: check_scaling_group_keypair_association_exists returns True/False correctly."""
         name = f"kp-check-{uuid.uuid4().hex[:8]}"
-        await _create_sgroup(scaling_group_processors, name)
+        sg = await _create_sgroup(scaling_group_processors, name)
         access_key = AccessKey(admin_user_fixture.keypair.access_key)
         try:
             # Before association: False
             assert (
                 await scaling_group_repository.check_scaling_group_keypair_association_exists(
-                    scaling_group_name=name,
+                    resource_group_id=sg.id,
                     access_key=access_key,
                 )
             ) is False
@@ -617,7 +617,7 @@ class TestScalingGroupKeypairAssociation:
             bulk_creator = BulkCreator(
                 specs=[
                     ScalingGroupForKeypairsCreatorSpec(
-                        scaling_group=name,
+                        resource_group_id=sg.id,
                         access_key=access_key,
                     )
                 ]
@@ -627,7 +627,7 @@ class TestScalingGroupKeypairAssociation:
             )
             assert (
                 await scaling_group_repository.check_scaling_group_keypair_association_exists(
-                    scaling_group_name=name,
+                    resource_group_id=sg.id,
                     access_key=access_key,
                 )
             ) is True

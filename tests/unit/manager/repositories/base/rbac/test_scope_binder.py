@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 from uuid import UUID
 
 import pytest
@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class ScopeBinderMappingRow(Base):  # type: ignore[misc]
+class ScopeBinderMappingRow(Base):
     """N:N mapping row for scope binder testing."""
 
     __tablename__ = "test_scope_binder_mapping"
@@ -66,6 +66,7 @@ class MappingCreatorSpec(CreatorSpec[ScopeBinderMappingRow]):
         self._entity_id = entity_id
         self._scope_id = scope_id
 
+    @override
     def build_row(self) -> ScopeBinderMappingRow:
         return ScopeBinderMappingRow(
             id=uuid.uuid4(),
@@ -106,7 +107,7 @@ BINDER_TABLES = [
 async def create_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
-    async with with_tables(database_connection, BINDER_TABLES):  # type: ignore[arg-type]
+    async with with_tables(database_connection, BINDER_TABLES):
         yield
 
 

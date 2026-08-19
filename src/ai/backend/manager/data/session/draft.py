@@ -37,11 +37,12 @@ from uuid import UUID
 import yarl
 from pydantic import ConfigDict, Field
 
-from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -52,6 +53,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
+from ai.backend.manager.data.network.types import NetworkType
 from ai.backend.manager.data.session.options import (
     AgentSelectionPolicy,
     FailurePolicy,
@@ -59,7 +61,6 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
     SessionHandlerOptions,
 )
-from ai.backend.manager.models.network import NetworkType
 
 
 class _DraftBaseModel(BackendAISchema):
@@ -74,12 +75,26 @@ class _DraftBaseModel(BackendAISchema):
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
 
-class KernelExecutionSpecDraft(_DraftBaseModel):
-    """Optional-heavy mirror of ``KernelExecutionSpec``."""
+class KernelResourceInput(_DraftBaseModel):
+    """Minimal per-kernel resource inputs for requested-slots resolution.
+
+    A standalone input consumed by the compute-schedule flow; ``image_id`` may be
+    ``None`` when a resource-group default supplies it downstream.
+    """
 
     image_id: ImageID | None = None
     resources: tuple[ResourceSlotEntry, ...] = ()
     resource_opts: ResourceOpts | None = None
+
+
+class KernelExecutionSpecDraft(_DraftBaseModel):
+    """Optional-heavy mirror of ``KernelExecutionSpec``.
+
+    ``resource_input`` groups the slot-resolution inputs (image + resource
+    slots) shared with the compute-schedule flow.
+    """
+
+    resource_input: KernelResourceInput = Field(default_factory=KernelResourceInput)
     environ: Mapping[str, str] = Field(default_factory=dict)
     mounts: tuple[MountInfoEntry, ...] = ()
     startup_command: str | None = None
@@ -145,6 +160,7 @@ class SessionOptionsDraft(_DraftBaseModel):
     """Optional-heavy mirror of ``SessionOptions``."""
 
     priority: int | None = None
+    job_priority: int | None = None
     is_preemptible: bool | None = None
     cluster_mode: ClusterMode | None = None
     cluster_size: int | None = None
@@ -179,9 +195,12 @@ class SessionNetworkDraft(_DraftBaseModel):
 class SessionScopeDraft(_DraftBaseModel):
     """Optional-heavy mirror of ``SessionScope``."""
 
+    domain_id: DomainID | None = None
     domain_name: DomainName | None = None
     project_id: ProjectID | None = None
+    resource_group_id: ResourceGroupID | None = None
     resource_group_name: ResourceGroupName | None = None
+    session_group_id: SessionGroupID | None = None
 
 
 class SessionClassificationDraft(_DraftBaseModel):
@@ -191,22 +210,38 @@ class SessionClassificationDraft(_DraftBaseModel):
     tag: str | None = None
 
 
-class SessionSpecDraft(_DraftBaseModel):
-    """Top-level draft mirroring ``SessionSpec``.
+class ResourceSpecDraft(_DraftBaseModel):
+    """Resource-determining portion of a session draft.
 
-    ``internal_data_extras`` carries request-envelope fields (sudo
-    toggle, model-definition overlay) that feed
-    :class:`KernelSpec.internal_data`. DB-sourced pieces like dotfiles
-    are merged in by the preparer chain against its context — they
-    never flow through the draft.
+    The input of the resource preparer rules (and the whole draft the
+    fitting check operates on): the options that shape resource amounts
+    and the kernel specs the expansion rule fills. The full
+    :class:`SessionResourceSpecDraft` nests this as its ``resource``
+    field; promotion flattens it back into the flat spec shape.
     """
 
+    options: SessionOptionsDraft = Field(default_factory=SessionOptionsDraft)
+    kernel_specs: tuple[KernelSpecDraft, ...] = ()
+
+
+class SessionResourceSpecDraft(_DraftBaseModel):
+    """Scope-free draft consumed by the preparer chain."""
+
     identity: SessionIdentityDraft = Field(default_factory=SessionIdentityDraft)
-    scope: SessionScopeDraft = Field(default_factory=SessionScopeDraft)
     classification: SessionClassificationDraft = Field(default_factory=SessionClassificationDraft)
     network: SessionNetworkDraft = Field(default_factory=SessionNetworkDraft)
     callback_url: yarl.URL | None = None
     dependencies: tuple[SessionID, ...] = ()
-    options: SessionOptionsDraft = Field(default_factory=SessionOptionsDraft)
-    kernel_specs: tuple[KernelSpecDraft, ...] = ()
+    resource: ResourceSpecDraft = Field(default_factory=ResourceSpecDraft)
     internal_data_extras: InternalDataExtras = Field(default_factory=InternalDataExtras)
+
+
+class SessionSpecDraft(_DraftBaseModel):
+    """Top-level draft mirroring ``SessionSpec``.
+
+    Composed of a scope-free :class:`SessionResourceSpecDraft` (consumed by
+    the preparer chain) plus a :class:`SessionScopeDraft`.
+    """
+
+    resource_spec: SessionResourceSpecDraft = Field(default_factory=SessionResourceSpecDraft)
+    scope: SessionScopeDraft = Field(default_factory=SessionScopeDraft)

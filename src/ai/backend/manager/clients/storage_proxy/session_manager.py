@@ -27,6 +27,7 @@ from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
     StorageProxyManagerFacingClient,
 )
 from ai.backend.manager.config.unified import VolumesConfig
+from ai.backend.manager.defs import is_noop_host
 from ai.backend.manager.errors.storage import (
     StorageProxyNotFound,
 )
@@ -160,7 +161,7 @@ class StorageSessionManager:
 
     @classmethod
     def is_noop_host(cls, vfolder_host: str) -> bool:
-        return cls._split_host(vfolder_host)[1] == NOOP_STORAGE_VOLUME_NAME
+        return is_noop_host(vfolder_host)
 
     async def get_all_volumes(self) -> Iterable[tuple[str, VolumeInfo]]:
         """

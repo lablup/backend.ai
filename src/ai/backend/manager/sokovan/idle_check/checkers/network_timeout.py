@@ -1,0 +1,143 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from typing import override
+
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.types import SessionId
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.idle_checker.types import IdleCheckSession
+from ai.backend.manager.sokovan.idle_check.checkers.base import (
+    CheckerAssignment,
+    IdleActivityDecision,
+    IdleChecker,
+    IdleCheckerContext,
+)
+
+log = BraceStyleAdapter(logging.getLogger(__name__))
+
+_ONGOING_ACTIVITY_SENTINEL = 0.0
+
+
+@dataclass(frozen=True)
+class _NetworkIdleState:
+    last_access: float | None
+    active_connections: int
+
+
+class NetworkTimeoutChecker(IdleChecker):
+    """Judge interactive sessions from their shared network-activity markers."""
+
+    _valkey_live: ValkeyLiveClient
+
+    def __init__(self, valkey_live: ValkeyLiveClient) -> None:
+        self._valkey_live = valkey_live
+
+    @override
+    async def judge(
+        self,
+        assignments: Sequence[CheckerAssignment],
+        *,
+        context: IdleCheckerContext,
+    ) -> Sequence[IdleActivityDecision]:
+        # Fetch session states in one batch to avoid repeated I/O per assignment.
+        sessions: list[IdleCheckSession] = []
+        for assignment in assignments:
+            sessions.extend(assignment.sessions)
+        states = await self._prepare_states(sessions)
+
+        # Judge each assignment in one pass, using the pre-fetched states.
+        decisions: list[IdleActivityDecision] = []
+        for assignment in assignments:
+            network_spec = assignment.definition.spec.network
+            if network_spec is None:
+                log.error(
+                    "Network timeout checker has mismatched spec type - check id: {}, spec type: {}",
+                    assignment.definition.checker_id,
+                    assignment.definition.spec.type,
+                )
+                continue
+            max_inactivity_seconds = network_spec.max_network_inactivity_seconds
+            for session in assignment.sessions:
+                decisions.append(
+                    self._decide_session_activity(
+                        checker_id=assignment.definition.checker_id,
+                        session_id=session.session_id,
+                        expire_at=session.expire_at,
+                        state=states[session.session_id],
+                        max_inactivity_seconds=max_inactivity_seconds,
+                        current_time=context.current_time,
+                    )
+                )
+        return decisions
+
+    def _decide_session_activity(
+        self,
+        *,
+        checker_id: IdleCheckerID,
+        session_id: SessionId,
+        expire_at: datetime | None,
+        state: _NetworkIdleState,
+        max_inactivity_seconds: int,
+        current_time: datetime,
+    ) -> IdleActivityDecision:
+        refreshed_expire_at = current_time + timedelta(seconds=max_inactivity_seconds)
+        if state.last_access == _ONGOING_ACTIVITY_SENTINEL or state.active_connections > 0:
+            return IdleActivityDecision(
+                checker_id=checker_id,
+                session_id=session_id,
+                expire_at=refreshed_expire_at,
+                is_active=True,
+                message=(
+                    "Network activity detected: "
+                    f"max_network_inactivity_seconds={max_inactivity_seconds}, "
+                    f"active_connections={state.active_connections}"
+                ),
+            )
+        effective_expire_at = expire_at if expire_at is not None else refreshed_expire_at
+        if state.last_access is None:
+            last_access_message = "last_access_at=None"
+        else:
+            last_access_at = datetime.fromtimestamp(state.last_access, tz=UTC)
+            last_access_message = (
+                f"last_access_at={last_access_at:%Y-%m-%d %H:%M:%S} UTC, "
+                f"inactive_seconds={(current_time - last_access_at).total_seconds():f}"
+            )
+        if current_time >= effective_expire_at:
+            message = "Maximum network inactivity exceeded"
+        else:
+            message = "No active network connection"
+        return IdleActivityDecision(
+            checker_id=checker_id,
+            session_id=session_id,
+            expire_at=effective_expire_at,
+            is_active=False,
+            message=(
+                f"{message}: "
+                f"max_network_inactivity_seconds={max_inactivity_seconds}, "
+                f"active_connections={state.active_connections}, "
+                f"{last_access_message}"
+            ),
+        )
+
+    async def _prepare_states(
+        self,
+        sessions: Sequence[IdleCheckSession],
+    ) -> dict[SessionId, _NetworkIdleState]:
+        session_ids = list(dict.fromkeys(session.session_id for session in sessions))
+        last_access_values, active_connection_counts = await asyncio.gather(
+            self._valkey_live.get_session_last_access_batch(session_ids),
+            self._valkey_live.count_active_connections_batch(session_ids),
+        )
+        states: dict[SessionId, _NetworkIdleState] = {}
+        for session_id in session_ids:
+            states[session_id] = _NetworkIdleState(
+                last_access=last_access_values[session_id],
+                active_connections=active_connection_counts[session_id],
+            )
+        return states

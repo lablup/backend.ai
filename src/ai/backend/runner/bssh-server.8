@@ -1,0 +1,315 @@
+.\" Manpage for bssh-server
+.\" Contact the maintainers to correct errors or typos.
+.TH BSSH-SERVER 8 "May 2026" "v2.2.3" "System Administration Commands"
+
+.SH NAME
+bssh-server \- Backend.AI SSH Server for container environments
+
+.SH SYNOPSIS
+.B bssh-server
+[\fIOPTIONS\fR] [\fICOMMAND\fR]
+
+.SH DESCRIPTION
+.B bssh-server
+is a lightweight SSH server designed for container environments. It provides SSH, SFTP, and SCP
+functionality with built-in audit logging, file transfer filtering, and comprehensive security
+controls.
+
+The server supports multiple authentication methods including public key and password authentication,
+with fine-grained access control through IP allowlists/blocklists and per-user session limits.
+
+.SH COMMANDS
+.TP
+.B run
+Start the SSH server (default command if none specified).
+
+.TP
+.B gen-config
+Generate a configuration file template. Use \fB-o\fR to write to a file instead of stdout.
+
+.TP
+.B hash-password
+Interactively hash a password using Argon2id algorithm for use in configuration files.
+
+.TP
+.B check-config
+Validate the configuration file and display all settings.
+
+.TP
+.B gen-host-key
+Generate SSH host key files in OpenSSH format.
+
+.TP
+.B version
+Display version and build information.
+
+.SH OPTIONS
+.SS Global Options
+These options can be used with any command:
+
+.TP
+.BR \-c ", " \-\-config " " \fIFILE\fR
+Path to configuration file. If not specified, searches default locations in order:
+.RS
+.IP 1. 3
+\fI./bssh-server.yaml\fR (current directory)
+.IP 2. 3
+\fI/etc/bssh/server.yaml\fR (system-wide)
+.IP 3. 3
+\fI$XDG_CONFIG_HOME/bssh/server.yaml\fR or \fI~/.config/bssh/server.yaml\fR (user-specific)
+.RE
+
+.TP
+.BR \-b ", " \-\-bind-address " " \fIADDR\fR
+Address to bind the server to. Overrides configuration file setting.
+Default: 0.0.0.0
+
+.TP
+.BR \-p ", " \-\-port " " \fIPORT\fR
+Port to listen on. Overrides configuration file setting.
+Default: 2222
+
+.TP
+.BR \-k ", " \-\-host-key " " \fIFILE\fR
+Path to host key file. Can be specified multiple times for multiple keys.
+Overrides configuration file setting.
+
+.TP
+.BR \-v ", " \-\-verbose
+Increase verbosity level. Can be specified up to three times (\fB-vvv\fR) for maximum verbosity.
+.RS
+.IP \fB-v\fR 6
+Info level logging
+.IP \fB-vv\fR 6
+Debug level logging
+.IP \fB-vvv\fR 6
+Trace level logging
+.RE
+
+.TP
+.BR \-D ", " \-\-foreground
+Run in foreground (do not daemonize). Useful for debugging and container deployments.
+
+.TP
+.BR \-\-pid-file " " \fIFILE\fR
+Write process ID to specified file. Used for init systems and process management.
+
+.SS gen-config Options
+.TP
+.BR \-o ", " \-\-output " " \fIFILE\fR
+Write configuration template to specified file instead of stdout.
+File is created with secure permissions (0600).
+
+.SS gen-host-key Options
+.TP
+.BR \-t ", " \-\-type " " \fITYPE\fR
+Key type to generate: \fBed25519\fR (recommended) or \fBrsa\fR.
+Default: ed25519
+
+.TP
+.BR \-o ", " \-\-output " " \fIFILE\fR
+Output file path for the generated key. Required.
+
+.TP
+.BR \-\-bits " " \fIBITS\fR
+Key size in bits for RSA keys. Minimum: 2048, Maximum: 16384.
+Default: 4096
+
+.SH CONFIGURATION
+The configuration file uses YAML format. Configuration values can be overridden by environment
+variables with the \fBBSSH_\fR prefix, and by CLI arguments.
+
+.SS Configuration Precedence (highest to lowest)
+.IP 1. 3
+CLI arguments
+.IP 2. 3
+Environment variables (\fBBSSH_*\fR)
+.IP 3. 3
+Configuration file
+.IP 4. 3
+Default values
+
+.SS Environment Variables
+.TP
+.B BSSH_PORT
+Server port (default: 2222)
+.TP
+.B BSSH_BIND_ADDRESS
+Bind address (default: 0.0.0.0)
+.TP
+.B BSSH_HOST_KEY
+Comma-separated list of host key paths
+.TP
+.B BSSH_MAX_CONNECTIONS
+Maximum concurrent connections (default: 100)
+.TP
+.B BSSH_KEEPALIVE_INTERVAL
+Keepalive interval in seconds (default: 60)
+.TP
+.B BSSH_AUTH_METHODS
+Comma-separated authentication methods (publickey,password)
+.TP
+.B BSSH_AUTHORIZED_KEYS_DIR
+Directory containing per-user authorized_keys files
+.TP
+.B BSSH_AUTHORIZED_KEYS_PATTERN
+Pattern for authorized_keys file paths ({user} placeholder)
+.TP
+.B BSSH_SHELL
+Default shell path (default: /bin/sh)
+.TP
+.B BSSH_COMMAND_TIMEOUT
+Command timeout in seconds (default: 3600)
+
+.SS Configuration Sections
+.TP
+.B server
+Network and connection settings (bind_address, port, host_keys, max_connections, timeout, keepalive_interval)
+.TP
+.B auth
+Authentication methods and settings (methods, publickey, password)
+.TP
+.B shell
+Shell execution settings (default, command_timeout, env)
+.TP
+.B sftp
+SFTP subsystem settings (\fBenabled\fR, \fBroot\fR). \fBroot\fR sets a chroot
+directory that confines SFTP transfers. When unset (default), absolute client
+paths are honored verbatim and relative paths resolve from the user's home
+directory, matching OpenSSH \fBsftp-server\fR behavior.
+.TP
+.B scp
+SCP protocol settings (\fBenabled\fR, \fBroot\fR). \fBroot\fR has the same
+semantics as \fBsftp.root\fR. When \fBscp.root\fR is unset, it falls back to
+\fBsftp.root\fR so a single setting governs both subsystems.
+.TP
+.B filter
+File transfer filtering (enabled, rules)
+.TP
+.B audit
+Audit logging settings (enabled, exporters)
+.TP
+.B security
+Security and access control (max_auth_attempts, ban_time, allowed_ips, blocked_ips, etc.)
+
+.SH EXAMPLES
+.SS Generate Configuration Template
+.nf
+# Output to stdout
+bssh-server gen-config
+
+# Write to file
+bssh-server gen-config -o /etc/bssh/server.yaml
+.fi
+
+.SS Generate Host Keys
+.nf
+# Generate Ed25519 key (recommended)
+bssh-server gen-host-key -t ed25519 -o /etc/bssh/ssh_host_ed25519_key
+
+# Generate RSA key
+bssh-server gen-host-key -t rsa -o /etc/bssh/ssh_host_rsa_key --bits 4096
+.fi
+
+.SS Hash Password for Configuration
+.nf
+bssh-server hash-password
+# Enter password interactively, copy the hash to config file
+.fi
+
+.SS Validate Configuration
+.nf
+bssh-server check-config -c /etc/bssh/server.yaml
+.fi
+
+.SS Start Server
+.nf
+# Start with default configuration
+bssh-server
+
+# Start with specific config file
+bssh-server -c /etc/bssh/server.yaml
+
+# Start in foreground with verbose logging
+bssh-server -c /etc/bssh/server.yaml -D -vvv
+
+# Start with CLI overrides
+bssh-server -c /etc/bssh/server.yaml -p 2222 -b 0.0.0.0
+.fi
+
+.SS Docker Deployment
+.nf
+docker run -d \\
+  -p 2222:22 \\
+  -v /path/to/config.yaml:/etc/bssh/server.yaml:ro \\
+  -v /path/to/host_key:/etc/bssh/ssh_host_ed25519_key:ro \\
+  bssh-server
+.fi
+
+.SH FILES
+.TP
+.I /etc/bssh/server.yaml
+Default system-wide configuration file.
+
+.TP
+.I /etc/bssh/ssh_host_*_key
+Default location for host key files.
+
+.TP
+.I ~/.config/bssh/server.yaml
+User-specific configuration file.
+
+.TP
+.I ./bssh-server.yaml
+Local configuration file (checked first).
+
+.SH SECURITY CONSIDERATIONS
+.IP \(bu 2
+Host key files should have permissions 0600 (owner read/write only)
+.IP \(bu 2
+Configuration files may contain password hashes; protect with permissions 0600
+.IP \(bu 2
+Use Ed25519 keys instead of RSA for better security and performance
+.IP \(bu 2
+Enable IP allowlists in production to restrict access to trusted networks
+.IP \(bu 2
+Configure rate limiting to prevent brute-force attacks
+.IP \(bu 2
+Enable audit logging for security monitoring and compliance
+.IP \(bu 2
+When \fBsftp.root\fR or \fBscp.root\fR is set, the chroot resolver
+canonicalizes the closest existing ancestor of the requested path and verifies
+it stays inside the configured root. This blocks attacks that route writes
+outside the chroot through intermediate-directory symlinks inside it.
+
+.SH EXIT STATUS
+.TP
+.B 0
+Successful operation.
+.TP
+.B 1
+Error occurred (configuration error, runtime error, etc.)
+
+.SH BUGS
+Report bugs at https://github.com/lablup/bssh/issues
+
+.SH AUTHORS
+Written by Jeongkyu Shin <inureyes@gmail.com> and the Lablup team.
+.br
+Developed and maintained by Lablup Inc. <https://lablup.com> as part of the Backend.AI project.
+
+.SH COPYRIGHT
+Copyright (C) 2025 Lablup Inc. and Jeongkyu Shin.
+.br
+License: Apache-2.0
+.br
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+.SH SEE ALSO
+.BR bssh (1),
+.BR bssh-keygen (1),
+.BR sshd (8),
+.BR ssh (1)
+
+Project homepage: https://github.com/lablup/bssh

@@ -4,6 +4,8 @@ Kernel and runner-related exceptions for the agent.
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -21,6 +23,7 @@ class KernelRunnerNotInitializedError(BackendAIError, web.HTTPInternalServerErro
     error_type = "https://api.backend.ai/probs/agent/kernel-runner-not-initialized"
     error_title = "Kernel runner is not initialized."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -35,6 +38,7 @@ class AsyncioContextError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/asyncio-context-error"
     error_title = "Asyncio context is invalid or unavailable."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -49,6 +53,7 @@ class SubprocessStreamError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/subprocess-stream-error"
     error_title = "Subprocess stream is not available."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -63,6 +68,7 @@ class OutputQueueNotInitializedError(BackendAIError, web.HTTPInternalServerError
     error_type = "https://api.backend.ai/probs/agent/output-queue-not-initialized"
     error_title = "Output queue is not initialized."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -77,6 +83,7 @@ class OutputQueueMismatchError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/output-queue-mismatch"
     error_title = "Output queue mismatch."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -91,6 +98,7 @@ class RunIdNotSetError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/run-id-not-set"
     error_title = "Run ID is not set."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,

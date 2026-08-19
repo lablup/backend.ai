@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from typing import override
 
 from graphql import ValidationRule
 from strawberry.extensions.base_extension import SchemaExtension
@@ -17,6 +18,7 @@ class GQLValidationExtension(SchemaExtension):
     which validation rules to add at request time.
     """
 
+    @override
     def on_validate(self) -> Iterator[None]:
         ctx: StrawberryGQLContext = self.execution_context.context
         config = ctx.config_provider.config

@@ -1,7 +1,7 @@
 import importlib.resources
 import logging
 import ssl
-from typing import Any
+from typing import Any, override
 
 import aiohttp_jinja2
 import jinja2
@@ -31,6 +31,7 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
             raise ServerMisconfiguredError("worker:proxy-worker.wildcard-domain")
         self.wildcard_config = self.root_context.local_config.proxy_worker.wildcard_domain
 
+    @override
     async def start(self) -> None:
         ssl_ctx = None
         proxy_worker_config = self.root_context.local_config.proxy_worker
@@ -75,6 +76,7 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
         self.site = site
         log.info("accepting proxy requests at {}", service_addr)
 
+    @override
     async def stop(self) -> None:
         if self.site:
             await self.site.stop()
@@ -102,6 +104,7 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
 
         return await self.exception_safe_handler_wrapper(request, _exception_safe_handler)
 
+    @override
     def get_circuit_key(self, circuit: Circuit) -> str:
         if not isinstance(circuit.frontend, SubdomainFrontendInfo):
             raise InvalidFrontendTypeError(

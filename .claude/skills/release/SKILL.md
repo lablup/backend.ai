@@ -33,13 +33,27 @@ Guides the Backend.AI release process: version bump, changelog generation, and R
    - **Pre-release**: version contains `rc`, `alpha`, `beta`, or `dev` (e.g., `26.2.0rc1`)
    - **Final release**: clean semver (e.g., `26.2.0`)
 
-4. **For final releases, check for prior RC sections**
-   - Scan `CHANGELOG.md` for sections matching `## {major}.{minor}.{patch}rc\d+`
+4. **Locate the changelog file**
+   - The changelog is split per version branch: `CHANGELOG/{major}.{minor}.md`
+     (`26.9.0rc1`, `26.9.0`, and `26.9.1` all live in `CHANGELOG/26.9.md`)
+   - The root `CHANGELOG.md` archives the releases made before the split — never write to it
+   - The file may not exist yet; the first release of the version branch creates it
+
+5. **For final releases, check for prior RC sections**
+   - Scan `CHANGELOG/{major}.{minor}.md` for sections matching `## {major}.{minor}.{patch}rc\d+`
    - List found RC sections to user
    - These will be consolidated in Phase 3
 
-5. **Confirm with user before proceeding**
-   - Show: target version, release type, WebUI version (if any), RC sections to consolidate (if any)
+6. **For a `{major}.{minor}.0rc1` target, settle the support level**
+   - That form is the rc that cuts a new release line; the release script recognises it
+     on its own, so nothing else has to be classified by hand
+   - Ask the user whether the line is LTS (the March and September sprints are, per the
+     versioning scheme) — a year of support is a commitment and is never inferred
+   - If it is, pass `--lts` to the release script below
+
+7. **Confirm with user before proceeding**
+   - Show: target version, release type, WebUI version (if any), RC sections to consolidate (if any),
+     and for a branch cut, whether the line is LTS
    - Wait for user approval
 
 ### Phase 2: Release Script Execution
@@ -48,6 +62,12 @@ Run `scripts/release.sh` which performs these steps:
 
 ```bash
 scripts/release.sh {target_version} [webui_version]
+```
+
+When the line being cut is LTS:
+
+```bash
+scripts/release.sh --lts {target_version} [webui_version]
 ```
 
 To override the next development version (year rollover or planned sprint skip):
@@ -61,7 +81,9 @@ NEXT_DEV_VERSION={next_version} scripts/release.sh {target_version} [webui_versi
 2. Downloads WebUI release (if `webui_version` provided)
 3. Updates `VERSION` file
 4. Freezes `NEXT_RELEASE_VERSION` placeholders to the actual version (stable releases only; skipped for `rc`/`a`/`b`/`dev`/`post`)
-5. Runs towncrier to generate changelog entries
+5. Runs `scripts/run-towncrier.py {target_version}`, which consumes the `changes/` fragments into `CHANGELOG/{major}.{minor}.md` (skipped entirely when there are no fragments)
+6. Runs `.github/scripts/update-maintained-versions.sh {target_version}`, which registers the line when the target is an `X.Y.0rc1` cut and retires the lines that are due — an LTS line once its recorded `retire_after` has passed, a regular line as soon as any newer line exists.
+   **Report its output to the user**: a retirement means that version stops receiving backports and drops out of the installer channel selection from that point on.
 6. Generates sample config files
 7. Generates API docs (OpenAPI, GraphQL schema)
 8. Runs quality checks: `pants tailor --check`, `pants check ::`
@@ -77,6 +99,7 @@ NEXT_DEV_VERSION={next_version} scripts/release.sh {target_version} [webui_versi
 **Error handling:**
 - If quality checks fail, report errors and stop
 - If towncrier fails, check `pyproject.toml` towncrier config and `changes/` directory
+- If no changelog block was produced, check whether `changes/` held any fragment — `run-towncrier.py` skips towncrier when there is none, by design
 - If config generation fails, check component CLI availability
 - On any failure, suggest user fix the issue and re-run the script manually
 
@@ -93,7 +116,7 @@ NEXT_DEV_VERSION={next_version} scripts/release.sh {target_version} [webui_versi
 This is the core value of the skill. When releasing a final version (e.g., `26.2.0`), all previous RC changelog sections (e.g., `26.2.0rc1`, `26.2.0rc2`) must be consolidated into the final version section.
 
 **Step 1: Collect RC entries**
-- Find all RC sections for the same major.minor.patch in `CHANGELOG.md`
+- Find all RC sections for the same major.minor.patch in `CHANGELOG/{major}.{minor}.md`
   - Pattern: `## {major}.{minor}.{patch}rc\d+ \(.*\)`
 - Extract all bullet items from each RC section, grouped by category (`### Features`, `### Improvements`, `### Fixes`, etc.)
 
@@ -103,8 +126,10 @@ This is the core value of the skill. When releasing a final version (e.g., `26.2
 - Group by category: Features, Improvements, Fixes, etc.
 
 **Step 3: Remove RC sections**
-- Delete the RC section blocks from `CHANGELOG.md`
-- Only the final version section should remain
+- Delete the RC section blocks from `CHANGELOG/{major}.{minor}.md`
+- Only the final version section should remain for this patch level; sections for
+  earlier patch releases of the same version branch (e.g. `## 26.9.0` when
+  releasing `26.9.1`) stay untouched below it
 
 **Step 4: Subsection grouping**
 - For each category (Features, Improvements, Fixes), group related items into `#### Subsection Title` blocks
@@ -172,7 +197,7 @@ Introduced StorageTarget abstraction for flexible storage configuration.
 
 **Step 6: Amend the release commit**
 ```bash
-git add CHANGELOG.md
+git add CHANGELOG/{major}.{minor}.md
 git commit --amend --no-edit
 ```
 
@@ -235,7 +260,7 @@ Agent: [Checks VERSION, runs release.sh, towncrier generates flat list, reports 
 ### Final release with RC consolidation
 ```
 User: /release 26.2.0
-Agent: [Checks VERSION, finds rc1/rc2 sections in CHANGELOG, runs release.sh,
+Agent: [Checks VERSION, finds rc1/rc2 sections in CHANGELOG/26.2.md, runs release.sh,
         consolidates RC entries + new entries, groups into subsections,
         presents for review, amends commit, reports summary]
 ```
@@ -249,6 +274,9 @@ Agent: [Runs release.sh with WebUI version, full workflow]
 ## Related
 
 - `scripts/release.sh` - The release automation script
+- `scripts/run-towncrier.py` - Runs towncrier against `CHANGELOG/{major}.{minor}.md`
+- `scripts/changelog_files.py` - Version to changelog path mapping
 - `pyproject.toml` - towncrier configuration (fragment types, template)
 - `changes/` - News fragment directory
+- `CHANGELOG/` - Per-version-branch changelogs; root `CHANGELOG.md` archives the pre-split releases
 - `/submit` - For regular PR submissions (not releases)

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Self
+from typing import TYPE_CHECKING, Annotated, Self
 from uuid import UUID
 
+import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
@@ -67,6 +69,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.runtime_variant.types import RuntimeVariantGQL
 
 
 @gql_enum(
@@ -94,6 +100,21 @@ class PresetValueTypeGQL(StrEnum):
     FLOAT = "float"
     BOOL = "bool"
     FLAG = "flag"
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="UI control type for a runtime variant preset.",
+    ),
+    name="RuntimeVariantPresetUIType",
+)
+class UITypeGQL(StrEnum):
+    SLIDER = "slider"
+    NUMBER_INPUT = "number_input"
+    SELECT = "select"
+    CHECKBOX = "checkbox"
+    TEXT_INPUT = "text_input"
 
 
 @gql_enum(
@@ -171,6 +192,76 @@ class UIOptionGQL(PydanticOutputMixin[UIOptionDTO]):
     text: TextOptionGQL | None = gql_field(description="Text input config.")
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Slider UI config input."),
+    name="RuntimeVariantPresetSliderOptionInput",
+)
+class SliderOptionInputGQL(PydanticInputMixin[SliderOptionDTO]):
+    min: float = gql_field(description="Minimum value.")
+    max: float = gql_field(description="Maximum value.")
+    step: float = gql_field(default=1, description="Increment step.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Number input UI config input.",
+    ),
+    name="RuntimeVariantPresetNumberOptionInput",
+)
+class NumberOptionInputGQL(PydanticInputMixin[NumberOptionDTO]):
+    min: float | None = gql_field(default=None, description="Minimum value.")
+    max: float | None = gql_field(default=None, description="Maximum value.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Choice item input."),
+    name="RuntimeVariantPresetChoiceItemInput",
+)
+class ChoiceItemInputGQL(PydanticInputMixin[ChoiceItemDTO]):
+    value: str = gql_field(description="Option value.")
+    label: str = gql_field(description="Display label.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Select UI config input.",
+    ),
+    name="RuntimeVariantPresetChoiceOptionInput",
+)
+class ChoiceOptionInputGQL(PydanticInputMixin[ChoiceOptionDTO]):
+    items: list[ChoiceItemInputGQL] = gql_field(description="List of choices.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Text input UI config input.",
+    ),
+    name="RuntimeVariantPresetTextOptionInput",
+)
+class TextOptionInputGQL(PydanticInputMixin[TextOptionDTO]):
+    placeholder: str | None = gql_field(default=None, description="Placeholder text.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="UI rendering options input.",
+    ),
+    name="RuntimeVariantPresetUIOptionInput",
+)
+class UIOptionInputGQL(PydanticInputMixin[UIOptionDTO]):
+    ui_type: UITypeGQL = gql_field(description="UI render type.")
+    slider: SliderOptionInputGQL | None = gql_field(default=None, description="Slider config.")
+    number: NumberOptionInputGQL | None = gql_field(
+        default=None, description="Number input config."
+    )
+    choices: ChoiceOptionInputGQL | None = gql_field(default=None, description="Select config.")
+    text: TextOptionInputGQL | None = gql_field(default=None, description="Text input config.")
+
+
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.4.2",
@@ -230,6 +321,24 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
         description="Timestamp of the last modification to this preset."
     )
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description="The runtime variant this preset belongs to. Fetch its name and other attributes in a single query alongside the preset list.",
+        )
+    )  # type: ignore[misc]
+    async def runtime_variant(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            RuntimeVariantGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.runtime_variant.types"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.runtime_variant_loader.load(self.runtime_variant_id)
+
 
 RuntimeVariantPresetEdge = Edge[RuntimeVariantPresetGQL]
 
@@ -258,21 +367,15 @@ class RuntimeVariantPresetFilterGQL(PydanticInputMixin[FilterDTO]):
         default=None, description="Variant ID filter."
     )
     AND: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Match all of the given sub-filters."),
         default=None,
     )
     OR: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Match any of the given sub-filters."),
         default=None,
     )
     NOT: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Negate the given sub-filters."),
         default=None,
     )
 
@@ -300,7 +403,10 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
         description="How the value is applied: 'env' for environment variable, 'args' for command-line argument."
     )
     value_type: PresetValueTypeGQL = gql_field(
-        description="Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag')."
+        description=(
+            "Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag'). "
+            "'flag' is only valid when preset_target is 'args'."
+        )
     )
     default_value: str | None = gql_field(
         default=None, description="The default value shown to users when creating a deployment."
@@ -315,6 +421,24 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
         ),
         default=False,
     )
+    category: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UI category group for organizing parameters.",
+        )
+    )
+    display_name: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Human-readable display label for the UI.",
+        )
+    )
+    ui_option: UIOptionInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UI rendering options.",
+        )
+    )
 
 
 @gql_pydantic_input(
@@ -327,12 +451,36 @@ class UpdateRuntimeVariantPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
     description: str | None = gql_field(default=None, description="New description.")
     rank: int | None = gql_field(default=None, description="New rank.")
     preset_target: PresetTargetGQL | None = gql_field(default=None, description="New target.")
-    value_type: PresetValueTypeGQL | None = gql_field(default=None, description="New value type.")
+    value_type: PresetValueTypeGQL | None = gql_field(
+        default=None,
+        description=(
+            "New value type. 'flag' is only valid when the effective preset_target is 'args' "
+            "(the stored target applies when preset_target is omitted)."
+        ),
+    )
     default_value: str | None = gql_field(default=None, description="New default value.")
     key: str | None = gql_field(default=None, description="New key.")
     required: bool | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.4.4", description="New required flag."),
         default=None,
+    )
+    category: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="New UI category group.",
+        )
+    )
+    display_name: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="New human-readable display label.",
+        )
+    )
+    ui_option: UIOptionInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="New UI rendering options.",
+        )
     )
 
 

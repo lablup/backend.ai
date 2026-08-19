@@ -2,10 +2,10 @@
 
 Introduce the persistence foundation for the first-class idle checker
 (BEP-1054). ``idle_checkers`` holds a reusable, scope-free checker spec
-(``checker_type`` + JSONB ``spec``); ``idle_checker_bindings`` is the
-scope <-> checker association carrying its own ``enabled`` flag. Scope is a
-polymorphic ``(scope_type, scope_id)`` string pair validated on the write
-path rather than by a DB foreign key.
+(``checker_type`` + target session types + JSONB ``spec``);
+``idle_checker_bindings`` is the scope <-> checker association carrying its
+own ``enabled`` flag. Scope is a polymorphic ``(scope_type, scope_id)`` string
+pair validated on the write path rather than by a DB foreign key.
 
 Revision ID: d3f8a1c45e9b
 Revises: a8e06485829f
@@ -34,6 +34,11 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=128), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("checker_type", sa.String(length=64), nullable=False),
+        sa.Column(
+            "target_session_types",
+            postgresql.ARRAY(sa.String(length=64)),
+            nullable=False,
+        ),
         sa.Column("spec", postgresql.JSONB(), nullable=False),
         sa.Column(
             "created_at",

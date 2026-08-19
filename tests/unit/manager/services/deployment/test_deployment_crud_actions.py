@@ -57,7 +57,8 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
     SearchAccessTokensAction,
@@ -84,6 +85,7 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 
 class DeploymentCRUDBaseFixtures:
@@ -120,6 +122,7 @@ class DeploymentCRUDBaseFixtures:
             deployment_service,
             [],
             ActionValidators(
+                virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
                 rbac=RBACValidators(
                     scope=MagicMock(spec=ScopeActionRBACValidator),
                     single_entity=MagicMock(spec=SingleEntityActionRBACValidator),

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
@@ -16,18 +16,11 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.artifact import ArtifactRow
     from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("HuggingFaceRegistryRow",)
-
-
-def _get_registry_artifact_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.artifact import ArtifactRow
-
-    return HuggingFaceRegistryRow.id == foreign(ArtifactRow.registry_id)
 
 
 def _get_registry_meta_join_condition() -> sa.ColumnElement[bool]:
@@ -36,7 +29,7 @@ def _get_registry_meta_join_condition() -> sa.ColumnElement[bool]:
     return HuggingFaceRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)
 
 
-class HuggingFaceRegistryRow(Base):  # type: ignore[misc]
+class HuggingFaceRegistryRow(Base):
     __tablename__ = "huggingface_registries"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -45,12 +38,6 @@ class HuggingFaceRegistryRow(Base):  # type: ignore[misc]
     url: Mapped[str] = mapped_column("url", sa.String, nullable=False)
     token: Mapped[str | None] = mapped_column("token", sa.String, nullable=True, default=None)
 
-    artifacts: Mapped[list[ArtifactRow]] = relationship(
-        "ArtifactRow",
-        back_populates="huggingface_registry",
-        primaryjoin=_get_registry_artifact_join_condition,
-        viewonly=True,
-    )
     meta: Mapped[ArtifactRegistryRow | None] = relationship(
         "ArtifactRegistryRow",
         back_populates="huggingface_registries",
@@ -59,9 +46,11 @@ class HuggingFaceRegistryRow(Base):  # type: ignore[misc]
         viewonly=True,
     )
 
+    @override
     def __str__(self) -> str:
         return f"HuggingFaceRegistryRow(id={self.id}, url={self.url}, token={self.token})"
 
+    @override
     def __repr__(self) -> str:
         return self.__str__()
 

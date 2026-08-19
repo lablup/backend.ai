@@ -143,11 +143,12 @@ def redis_container() -> Iterator[tuple[str, HostPortPairModel]]:
 
 @pytest.fixture(scope="session", autouse=False)
 def postgres_container() -> Iterator[tuple[str, HostPortPairModel]]:
-    # Spawn a single-node PostgreSQL container for a testing session.
+    # Spawn a single-node PostgreSQL container for a testing session. The image tracks the
+    # version halfstack runs, so a test exercises the same server the product requires.
     random_id = secrets.token_hex(8)
     container = (
         PostgresContainer(
-            "postgres:13.6-alpine", username="postgres", password="develove", dbname="testing"
+            "postgres:16.3-alpine", username="postgres", password="develove", dbname="testing"
         )
         .with_name(f"test--postgres-slot-{get_parallel_slot()}-{random_id}")
         .with_exposed_ports(5432)

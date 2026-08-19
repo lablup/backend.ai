@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, override
 
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidatorRule,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    SessionSpecContext,
 )
 
 _RESERVED_PORTS: frozenset[int] = frozenset({2000, 2001, 2200, 7681})
@@ -18,15 +20,17 @@ _RESERVED_PORTS: frozenset[int] = frozenset({2000, 2001, 2200, 7681})
 class ServicePortRule(SessionSpecValidatorRule):
     """Per-kernel preopen_ports must not collide with reserved or service ports."""
 
+    @override
     def name(self) -> str:
         return "service_port"
 
+    @override
     def validate(
         self,
         spec: SessionSpec,
-        context: SessionSpecValidationContext,
+        context: SessionSpecContext,
     ) -> None:
-        for idx, kernel in enumerate(spec.kernel_specs):
+        for idx, kernel in enumerate(spec.resource_spec.kernel_specs):
             preopen = set(kernel.preopen_ports)
             if not preopen:
                 continue
@@ -38,7 +42,9 @@ class ServicePortRule(SessionSpecValidatorRule):
                         f"collide with reserved ports ({sorted(_RESERVED_PORTS)})."
                     ),
                 )
-            image_info = context.image_infos.get(kernel.execution_spec.image_id)
+            image_info = context.global_info.image_infos.get(
+                kernel.execution_spec.resource_input.image_id
+            )
             if image_info is None:
                 continue
             image_service_ports = self._image_service_ports(image_info.labels)

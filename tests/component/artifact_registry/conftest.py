@@ -20,6 +20,7 @@ from ai.backend.manager.api.rest.artifact_registry.registry import (
 )
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -32,7 +33,6 @@ from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRo
 from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
 from ai.backend.manager.models.huggingface_registry.row import HuggingFaceRegistryRow
 from ai.backend.manager.models.reservoir_registry.row import ReservoirRegistryRow
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
@@ -48,6 +48,7 @@ from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 
 @dataclass
@@ -89,6 +90,7 @@ def artifact_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
             rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
         ),
     )
@@ -128,6 +130,7 @@ def artifact_revision_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
             rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
         ),
     )

@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from io import StringIO
-from typing import Any
+from typing import Any, override
 
 import pytest
 
@@ -32,6 +32,7 @@ class SimpleDependencyProvider(NonMonitorableDependencyProvider[Any, str]):
         self._raise_on_enter = raise_on_enter
 
     @property
+    @override
     def stage_name(self) -> str:
         """
         Get the stage name.
@@ -39,6 +40,7 @@ class SimpleDependencyProvider(NonMonitorableDependencyProvider[Any, str]):
         return self._stage_name
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: Any) -> AsyncIterator[str]:
         """
         Provide a resource.
@@ -95,10 +97,12 @@ class TestVisualizingDependencyStack:
 
         class TestComposer(DependencyComposer[str, ComposerResources]):
             @property
+            @override
             def stage_name(self) -> str:
                 return "test-composer"
 
             @asynccontextmanager
+            @override
             async def compose(
                 self, stack: DependencyStack, setup_input: str
             ) -> AsyncIterator[ComposerResources]:
@@ -141,10 +145,12 @@ class TestVisualizingDependencyStack:
 
         class InnerComposer(DependencyComposer[str, str]):
             @property
+            @override
             def stage_name(self) -> str:
                 return "inner-composer"
 
             @asynccontextmanager
+            @override
             async def compose(self, stack: DependencyStack, setup_input: str) -> AsyncIterator[str]:
                 provider = SimpleDependencyProvider("inner-dep", cleanup_tracker)
                 resource = await stack.enter_dependency(provider, setup_input)
@@ -152,10 +158,12 @@ class TestVisualizingDependencyStack:
 
         class OuterComposer(DependencyComposer[str, str]):
             @property
+            @override
             def stage_name(self) -> str:
                 return "outer-composer"
 
             @asynccontextmanager
+            @override
             async def compose(self, stack: DependencyStack, setup_input: str) -> AsyncIterator[str]:
                 inner_composer = InnerComposer()
                 resource = await stack.enter_composer(inner_composer, setup_input)
@@ -258,10 +266,12 @@ class TestVisualizingDependencyStack:
 
         class FailingComposer(DependencyComposer[str, str]):
             @property
+            @override
             def stage_name(self) -> str:
                 return "failing-composer"
 
             @asynccontextmanager
+            @override
             async def compose(self, stack: DependencyStack, setup_input: str) -> AsyncIterator[str]:
                 provider1 = SimpleDependencyProvider("dep1", cleanup_tracker)
                 await stack.enter_dependency(provider1, setup_input)

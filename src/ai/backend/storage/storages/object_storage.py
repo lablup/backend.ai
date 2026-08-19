@@ -96,7 +96,7 @@ class ObjectStorage(AbstractStorage):
             s3_client = self._get_s3_client()
             object_meta = await s3_client.get_object_meta(filepath)
             ctype = (
-                (object_meta.content_type if object_meta else None)
+                object_meta.content_type
                 or mimetypes.guess_type(filepath)[0]
                 or "application/octet-stream"
             )

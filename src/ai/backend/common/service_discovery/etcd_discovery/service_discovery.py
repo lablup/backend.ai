@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, cast, override
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.service_discovery.service_discovery import (
@@ -28,20 +28,24 @@ class ETCDServiceDiscovery(ServiceDiscovery):
         self._etcd = args.etcd
         self._prefix = args.prefix
 
+    @override
     async def register(self, service_meta: ServiceMetadata) -> None:
         prefix = self._service_prefix(service_meta.service_group, service_meta.id)
         await self._etcd.put_prefix(prefix, service_meta.to_dict(), scope=ConfigScopes.GLOBAL)
 
+    @override
     async def unregister(self, service_group: str, service_id: uuid.UUID) -> None:
         await self._etcd.delete_prefix(
             self._service_prefix(service_group, service_id), scope=ConfigScopes.GLOBAL
         )
 
+    @override
     async def heartbeat(self, service_meta: ServiceMetadata) -> None:
         service_meta.health_status.update_heartbeat()
         prefix = self._service_prefix(service_meta.service_group, service_meta.id)
         await self._etcd.put_prefix(prefix, service_meta.to_dict(), scope=ConfigScopes.GLOBAL)
 
+    @override
     async def discover(self) -> Sequence[ServiceMetadata]:
         raw_service_groups = await self._etcd.get_prefix(self._prefix, scope=ConfigScopes.GLOBAL)
         services = []
@@ -53,6 +57,7 @@ class ETCDServiceDiscovery(ServiceDiscovery):
                 services.append(ServiceMetadata.from_dict(service_config))
         return services
 
+    @override
     async def get_service_group(self, service_group: str) -> Sequence[ServiceMetadata]:
         service_group_prefix = self._service_group_prefix(service_group)
         raw_service_configs = await self._etcd.get_prefix(
@@ -66,6 +71,7 @@ class ETCDServiceDiscovery(ServiceDiscovery):
             services.append(ServiceMetadata.from_dict(service_config))
         return services
 
+    @override
     async def get_service(self, service_group: str, service_id: uuid.UUID) -> ServiceMetadata:
         service_prefix = self._service_prefix(service_group, service_id)
         raw_service_config = await self._etcd.get_prefix(service_prefix, scope=ConfigScopes.GLOBAL)
@@ -74,6 +80,7 @@ class ETCDServiceDiscovery(ServiceDiscovery):
         service_config = cast(dict[str, Any], raw_service_config)
         return ServiceMetadata.from_dict(service_config)
 
+    @override
     async def sync_model_service_routes(
         self,
         routes: Sequence[ModelServiceMetadata],

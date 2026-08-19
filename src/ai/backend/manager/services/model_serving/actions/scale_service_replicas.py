@@ -41,6 +41,7 @@ class ScaleServiceReplicasAction(ModelServiceAction):
         return None
 
     @classmethod
+    @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 

@@ -12,6 +12,8 @@ from datetime import datetime
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -39,16 +41,25 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.session.repository import SessionRepository
-from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
+from ai.backend.manager.repositories.session.types import ProjectSessionOperationScope
 from ai.backend.testutils.db import with_tables
 
 
 class TestSessionSearchInProject:
     """Tests for SessionRepository.search_in_project()"""
+
+    @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -88,6 +99,8 @@ class TestSessionSearchInProject:
     async def test_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create two projects with sessions: project_a has 2 sessions, project_b has 1."""
         domain_name = "test-domain"
@@ -102,6 +115,7 @@ class TestSessionSearchInProject:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=test_domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -113,6 +127,7 @@ class TestSessionSearchInProject:
             )
             db_sess.add(
                 ScalingGroupRow(
+                    id=test_scaling_group_id,
                     name="default",
                     is_active=True,
                     is_public=True,
@@ -169,7 +184,7 @@ class TestSessionSearchInProject:
                     resource_policy="default",
                     allowed_client_ip=None,
                     totp_key=None,
-                    main_access_key=None,
+                    domain_id=test_domain_id,
                 )
             )
             await db_sess.flush()
@@ -221,6 +236,7 @@ class TestSessionSearchInProject:
                         session_type=SessionTypes.INTERACTIVE,
                         cluster_mode=ClusterMode.SINGLE_NODE,
                         cluster_size=1,
+                        domain_id=test_domain_id,
                         domain_name=domain_name,
                         group_id=group_id,
                         user_uuid=user_id,
@@ -242,6 +258,7 @@ class TestSessionSearchInProject:
                         environ=None,
                         bootstrap_script=None,
                         use_host_network=False,
+                        resource_group_id=test_scaling_group_id,
                         scaling_group_name="default",
                     )
                 )
@@ -261,6 +278,8 @@ class TestSessionSearchInProject:
                         cluster_idx=0,
                         local_rank=0,
                         cluster_hostname="main",
+                        scaling_group="default",
+                        resource_group_id=test_scaling_group_id,
                         image="cr.backend.ai/stable/python:latest",
                         architecture="x86_64",
                         registry="cr.backend.ai",
@@ -309,7 +328,7 @@ class TestSessionSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project returns only sessions belonging to the specified project."""
-        scope = ProjectSessionSearchScope(project_id=test_data["project_a_id"])
+        scope = ProjectSessionOperationScope(project_id=test_data["project_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -329,7 +348,7 @@ class TestSessionSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project for project_b returns only its session, not project_a's."""
-        scope = ProjectSessionSearchScope(project_id=test_data["project_b_id"])
+        scope = ProjectSessionOperationScope(project_id=test_data["project_b_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -348,7 +367,7 @@ class TestSessionSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project returns correct pagination fields."""
-        scope = ProjectSessionSearchScope(project_id=test_data["project_a_id"])
+        scope = ProjectSessionOperationScope(project_id=test_data["project_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],

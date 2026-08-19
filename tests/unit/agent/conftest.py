@@ -93,7 +93,7 @@ def local_config(
         "agent": {
             "region": f"rg-{test_id}",
             "id": f"i-{test_id}",
-            "scaling-group": f"sg-{test_id}",
+            "initial-resource-group-name": f"sg-{test_id}",
             "ipc-base-path": ipc_base_path,
             "var-base-path": var_base_path,
             "mount-path": mount_path,

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -17,6 +19,7 @@ class AppProxyConnectionError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/appproxy-connection-error"
     error_title = "Failed to connect to AppProxy."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.APPPROXY,
@@ -31,6 +34,7 @@ class AppProxyResponseError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/appproxy-response-error"
     error_title = "Invalid response from AppProxy."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.APPPROXY,

@@ -26,6 +26,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class LocalRegistry(BaseContainerRegistry):
     @actxmgr
+    @override
     async def prepare_client_session(self) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientSession]]:
         connector = get_docker_connector()
         async with aiohttp.ClientSession(connector=connector.connector) as sess:

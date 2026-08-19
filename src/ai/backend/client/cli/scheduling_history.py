@@ -152,7 +152,7 @@ def _render_flat_view(
             status_str = f" ({h.from_status or '?'} → {h.to_status or '?'})"
 
         # Format timestamp (convert UTC to local time)
-        created = _format_local_time(str(h.created_at) if h.created_at else None)
+        created = _format_local_time(str(h.created_at))
 
         print(
             f"{main_prefix} {result_indicator} {entity_label} | {phase_str}{status_str} @ {created}"
@@ -241,7 +241,7 @@ def _render_grouped_view(
                 status_str = f" ({h.from_status or '?'} → {h.to_status or '?'})"
 
             # Format timestamp (convert UTC to local time)
-            created = _format_local_time(str(h.created_at) if h.created_at else None)
+            created = _format_local_time(str(h.created_at))
 
             print(f"{history_prefix} {result_indicator} {phase_str}{status_str} @ {created}")
 

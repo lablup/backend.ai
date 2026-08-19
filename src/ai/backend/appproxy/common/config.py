@@ -3,7 +3,7 @@ import pwd
 import types
 import typing
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, override
 
 from pydantic import (
     BaseModel,
@@ -88,9 +88,11 @@ class HostPortPair(BaseSchema):
                 return True
         return False
 
+    @override
     def __repr__(self) -> str:
         return f"{self.host}:{self.port}"
 
+    @override
     def __str__(self) -> str:
         return self.__repr__()
 

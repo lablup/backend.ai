@@ -18,7 +18,6 @@ class MockManagerConfig:
     """Simple mock for manager config."""
 
     id: str
-    use_experimental_redis_event_dispatcher: bool
 
 
 @dataclass
@@ -37,7 +36,7 @@ class MockConfig:
     debug: MockDebugConfig
 
 
-def _make_mock_config(*, use_experimental: bool = False) -> MockConfig:
+def _make_mock_config() -> MockConfig:
     mock_redis = MagicMock()
     mock_profile_target = MagicMock()
     mock_stream_target = MagicMock()
@@ -47,7 +46,6 @@ def _make_mock_config(*, use_experimental: bool = False) -> MockConfig:
     return MockConfig(
         manager=MockManagerConfig(
             id="test-manager-id",
-            use_experimental_redis_event_dispatcher=use_experimental,
         ),
         redis=mock_redis,
         debug=MockDebugConfig(log_events=False),
@@ -59,12 +57,12 @@ class TestMessageQueueDependency:
 
     @patch("ai.backend.manager.dependencies.messaging.message_queue.RedisQueue")
     async def test_provide_redis_queue(self, mock_redis_queue_class: MagicMock) -> None:
-        """Dependency should create RedisQueue when experimental flag is off."""
+        """Dependency should create RedisQueue."""
         mock_queue = MagicMock()
         mock_queue.close = AsyncMock()
         mock_redis_queue_class.create = AsyncMock(return_value=mock_queue)
 
-        config = _make_mock_config(use_experimental=False)
+        config = _make_mock_config()
         dependency = MessageQueueDependency()
         queue_input = MessageQueueInput(config=config)  # type: ignore[arg-type]
 
@@ -83,24 +81,6 @@ class TestMessageQueueDependency:
         # Queue should be closed after context exit
         mock_queue.close.assert_called_once()
 
-    @patch("ai.backend.manager.dependencies.messaging.message_queue.HiRedisQueue")
-    async def test_provide_hiredis_queue(self, mock_hiredis_class: MagicMock) -> None:
-        """Dependency should create HiRedisQueue when experimental flag is on."""
-        mock_queue = MagicMock()
-        mock_queue.close = AsyncMock()
-        mock_hiredis_class.return_value = mock_queue
-
-        config = _make_mock_config(use_experimental=True)
-        dependency = MessageQueueDependency()
-        queue_input = MessageQueueInput(config=config)  # type: ignore[arg-type]
-
-        async with dependency.provide(queue_input) as queue:
-            assert queue is mock_queue
-            mock_hiredis_class.assert_called_once()
-
-        # Queue should be closed after context exit
-        mock_queue.close.assert_called_once()
-
     @patch("ai.backend.manager.dependencies.messaging.message_queue.RedisQueue")
     async def test_cleanup_on_exception(self, mock_redis_queue_class: MagicMock) -> None:
         """Dependency should close queue even on exception."""
@@ -108,7 +88,7 @@ class TestMessageQueueDependency:
         mock_queue.close = AsyncMock()
         mock_redis_queue_class.create = AsyncMock(return_value=mock_queue)
 
-        config = _make_mock_config(use_experimental=False)
+        config = _make_mock_config()
         dependency = MessageQueueDependency()
         queue_input = MessageQueueInput(config=config)  # type: ignore[arg-type]
 

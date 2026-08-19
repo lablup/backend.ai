@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
 from unittest.mock import patch
 
 import pytest
@@ -217,7 +216,7 @@ class TestContainerSSHProvisioner:
     def spec_no_keypair(self, tmp_path: Path, agent_config: AgentConfig) -> ContainerSSHSpec:
         return ContainerSSHSpec(
             work_dir=tmp_path,
-            ssh_keypair=cast(ContainerSSHKeyPair, None),
+            ssh_keypair=None,
             mounts=[],
             uid_override=None,
             gid_override=None,
@@ -283,7 +282,7 @@ class TestContainerSSHProvisioner:
         spec_default: ContainerSSHSpec,
     ) -> None:
         with patch(f"{_UTILS_OS}.geteuid", return_value=1000):
-            ssh_dir = provisioner._populate_ssh_config(spec_default)
+            ssh_dir = provisioner._populate_ssh_config(spec_default, ssh_keypair)
 
         assert ssh_dir == tmp_path / ".ssh"
         assert ssh_dir.is_dir()
@@ -304,6 +303,7 @@ class TestContainerSSHProvisioner:
     async def test_populate_ssh_config_skips_existing_id_rsa(
         self,
         tmp_path: Path,
+        ssh_keypair: ContainerSSHKeyPair,
         provisioner: ContainerSSHProvisioner,
         spec_default: ContainerSSHSpec,
     ) -> None:
@@ -313,12 +313,13 @@ class TestContainerSSHProvisioner:
         (ssh_dir / "id_rsa").write_bytes(existing_content)
 
         with patch(f"{_UTILS_OS}.geteuid", return_value=1000):
-            provisioner._populate_ssh_config(spec_default)
+            provisioner._populate_ssh_config(spec_default, ssh_keypair)
 
         assert (ssh_dir / "id_rsa").read_bytes() == existing_content
 
     async def test_populate_ssh_config_ownership(
         self,
+        ssh_keypair: ContainerSSHKeyPair,
         provisioner: ContainerSSHProvisioner,
         spec_with_ownership: ContainerSSHSpec,
     ) -> None:
@@ -326,7 +327,7 @@ class TestContainerSSHProvisioner:
             patch(f"{_UTILS_OS}.geteuid", return_value=0),
             patch(f"{_UTILS_OS}.chown") as mock_chown,
         ):
-            provisioner._populate_ssh_config(spec_with_ownership)
+            provisioner._populate_ssh_config(spec_with_ownership, ssh_keypair)
 
         assert mock_chown.call_count == 4
         for call in mock_chown.call_args_list:

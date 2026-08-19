@@ -29,11 +29,14 @@ from sqlalchemy.orm import (
     selectinload,
 )
 from sqlalchemy.orm.strategy_options import _AbstractLoad
+from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.group.types import GroupData, ProjectType
+from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.association_container_registries_groups import (
@@ -48,6 +51,7 @@ from ai.backend.manager.models.base import (
     StructuredJSONColumn,
     VFolderHostPermissionColumn,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -60,7 +64,6 @@ from ai.backend.manager.models.rbac import (
     required_permission,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import ProjectPermission
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -69,29 +72,11 @@ from ai.backend.manager.models.types import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.kernel import KernelRow
-    from ai.backend.manager.models.network import NetworkRow
     from ai.backend.manager.models.rbac import ContainerRegistryScope
     from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
     from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
-    from ai.backend.manager.models.session import SessionRow
-    from ai.backend.manager.models.user import UserRow
-    from ai.backend.manager.models.vfolder import VFolderRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-def _get_networks_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.network import NetworkRow
-
-    return GroupRow.id == foreign(NetworkRow.project)
-
-
-def _get_vfolder_rows_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.vfolder import VFolderRow
-
-    return GroupRow.id == foreign(VFolderRow.group)
 
 
 def _get_association_container_registries_groups_join_condition() -> sa.ColumnElement[bool]:
@@ -121,7 +106,7 @@ container_registry_iv = t.Dict({}) | t.Dict({
 })
 
 
-class AssocGroupUserRow(Base):  # type: ignore[misc]
+class AssocGroupUserRow(Base):
     """DEPRECATED -- scheduled for sunset.
 
     Project membership is moving to ``association_scopes_entities`` (ASE) with
@@ -151,16 +136,13 @@ class AssocGroupUserRow(Base):  # type: ignore[misc]
         nullable=False,
     )
 
-    user: Mapped[UserRow] = relationship("UserRow", back_populates="groups")
-    group: Mapped[GroupRow] = relationship("GroupRow", back_populates="users")
-
 
 # DEPRECATED: scheduled for sunset; project membership lives in
 # `association_scopes_entities`. Do not use in new code.
 association_groups_users = AssocGroupUserRow.__table__
 
 
-class GroupRow(Base):  # type: ignore[misc]
+class GroupRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "groups"
     __table_args__ = (
         sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
@@ -174,15 +156,6 @@ class GroupRow(Base):  # type: ignore[misc]
     )
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool | None] = mapped_column("is_active", sa.Boolean, default=True)
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
-    modified_at: Mapped[datetime | None] = mapped_column(
-        "modified_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.current_timestamp(),
-    )
     #: Field for synchronization with external services.
     integration_id: Mapped[str | None] = mapped_column("integration_id", sa.String(length=512))
     domain_name: Mapped[str] = mapped_column(
@@ -226,35 +199,25 @@ class GroupRow(Base):  # type: ignore[misc]
     )
 
     # Relationships (defined with deferred join conditions to avoid circular imports)
-    sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="group")
-    domain: Mapped[DomainRow] = relationship("DomainRow", back_populates="groups")
     sgroup_for_groups_rows: Mapped[list[ScalingGroupForProjectRow]] = relationship(
-        "ScalingGroupForProjectRow", back_populates="project_row"
+        "ScalingGroupForProjectRow"
     )
-    users: Mapped[list[AssocGroupUserRow]] = relationship(
-        "AssocGroupUserRow", back_populates="group"
-    )
-    resource_policy_row: Mapped[ProjectResourcePolicyRow] = relationship(
-        "ProjectResourcePolicyRow", back_populates="projects"
-    )
-    kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="group_row")
-    networks: Mapped[list[NetworkRow]] = relationship(
-        "NetworkRow",
-        back_populates="project_row",
-        primaryjoin=_get_networks_join_condition,
-    )
-    vfolder_rows: Mapped[list[VFolderRow]] = relationship(
-        "VFolderRow",
-        back_populates="group_row",
-        primaryjoin=_get_vfolder_rows_join_condition,
-    )
+    users: Mapped[list[AssocGroupUserRow]] = relationship("AssocGroupUserRow")
+    resource_policy_row: Mapped[ProjectResourcePolicyRow] = relationship("ProjectResourcePolicyRow")
     association_container_registries_groups_rows: Mapped[
         list[AssociationContainerRegistriesGroupsRow]
     ] = relationship(
         "AssociationContainerRegistriesGroupsRow",
-        back_populates="group_row",
         primaryjoin=_get_association_container_registries_groups_join_condition,
     )
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+        return cls.id
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.name
 
     def to_data(self) -> GroupData:
         return GroupData(
@@ -263,7 +226,7 @@ class GroupRow(Base):  # type: ignore[misc]
             description=self.description,
             is_active=self.is_active,
             created_at=self.created_at,
-            modified_at=self.modified_at,
+            modified_at=self.updated_at,
             integration_name=self.integration_id,  # DB column is integration_id
             domain_name=self.domain_name,
             total_resource_slots=self.total_resource_slots,
@@ -335,7 +298,7 @@ class GroupRow(Base):  # type: ignore[misc]
         project_id: uuid.UUID,
         *,
         db: ExtendedAsyncSAEngine,
-    ) -> Self:
+    ) -> GroupRow:
         """
         Query a project by its ID with related resource policies.
         Args:
@@ -391,6 +354,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
     _permissions: frozenset[ProjectPermission] = field(default_factory=frozenset)
 
     @property
+    @override
     def permissions(self) -> Container[ProjectPermission]:
         return self._permissions
 
@@ -432,7 +396,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
             description=row.description,
             is_active=row.is_active,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            modified_at=row.updated_at,
             domain_name=row.domain_name,
             type=row.type,
             _integration_name=row.integration_id,  # DB column is integration_id
@@ -446,7 +410,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
 
 
 def _build_group_query(
-    cond: sa.sql.expression.BinaryExpression[Any], domain_name: str
+    cond: sa.sql.expression.ColumnElement[bool], domain_name: str
 ) -> sa.sql.Select[Any]:
     return (
         sa.select(groups.c.id)
@@ -485,7 +449,7 @@ async def resolve_groups(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[uuid.UUID],
-) -> Iterable[uuid.UUID]: ...
+) -> Sequence[uuid.UUID]: ...
 
 
 @overload
@@ -493,14 +457,14 @@ async def resolve_groups(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[str],
-) -> Iterable[uuid.UUID]: ...
+) -> Sequence[uuid.UUID]: ...
 
 
 async def resolve_groups(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[uuid.UUID] | Iterable[str],
-) -> Iterable[uuid.UUID]:
+) -> Sequence[uuid.UUID]:
     listed_val = [*values]
     match listed_val:
         case [uuid.UUID(), *_]:
@@ -605,12 +569,14 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
             )
         return cond
 
+    @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
         return sa.select(GroupRow).where(cond)
 
+    @override
     async def calculate_final_permission(self, rbac_obj: GroupRow) -> frozenset[ProjectPermission]:
         project_row = rbac_obj
         project_id = project_row.id

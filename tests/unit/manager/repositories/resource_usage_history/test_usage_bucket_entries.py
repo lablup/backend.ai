@@ -1,7 +1,8 @@
 """Tests for UsageBucketEntryRow and normalized bucket entry operations.
 
-Phase 3 (BA-4308): Verifies that usage bucket entries are correctly created,
-upserted, and aggregated via the normalized usage_bucket_entries table.
+Verifies that usage bucket entries are correctly created, upserted, and
+aggregated via the normalized usage_bucket_entries table.  An entry stores
+occupied_slots integrated over time, which the read paths sum.
 """
 
 from __future__ import annotations
@@ -14,9 +15,10 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.fair_share import (
-    BucketDelta,
     DomainUsageBucketKey,
     UsageBucketAggregationResult,
     UserUsageBucketKey,
@@ -49,6 +51,9 @@ from ai.backend.manager.repositories.resource_usage_history.db_source.db_source 
     ResourceUsageHistoryDBSource,
 )
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
+
+RESOURCE_GROUP_ID = ResourceGroupID(uuid.UUID("00000000-0000-0000-0000-000000000001"))
 
 
 class TestUsageBucketEntries:
@@ -89,13 +94,15 @@ class TestUsageBucketEntries:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -105,7 +112,7 @@ class TestUsageBucketEntries:
             )
             db_sess.add(domain)
             await db_sess.commit()
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def db_source(
@@ -118,28 +125,29 @@ class TestUsageBucketEntries:
         self,
         db_source: ResourceUsageHistoryDBSource,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
     ) -> None:
         """Verify that incrementing domain buckets also writes normalized entries."""
-        raw_slots = ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096000")})
-        duration = 300  # 5-minute slice
+        resource_usage = ResourceSlot({"cpu": Decimal("600"), "mem": Decimal("1228800000")})
         period = date(2024, 1, 15)
+        resource_group_id = ResourceGroupID(uuid.uuid4())
 
         result = UsageBucketAggregationResult(
             user_usage_deltas={},
             project_usage_deltas={},
             domain_usage_deltas={
                 DomainUsageBucketKey(
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_group="default",
+                    resource_group_id=resource_group_id,
                     period_date=period,
-                ): BucketDelta(slots=raw_slots, duration_seconds=duration),
+                ): resource_usage,
             },
         )
 
         await db_source.increment_usage_buckets(result)
 
-        # Verify entries were created with separated amount/duration
+        # Verify entries were created with resource-seconds
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             entry_rows = (
                 (
@@ -157,52 +165,46 @@ class TestUsageBucketEntries:
             slot_map = {e.slot_name: e for e in entry_rows}
             assert "cpu" in slot_map
             assert "mem" in slot_map
-            assert slot_map["cpu"].amount == Decimal("2")
-            assert slot_map["mem"].amount == Decimal("4096000")
-            assert slot_map["cpu"].duration_seconds == 300
-            assert slot_map["mem"].duration_seconds == 300
+            assert slot_map["cpu"].resource_usage == Decimal("600")
+            assert slot_map["mem"].resource_usage == Decimal("1228800000")
 
     async def test_increment_accumulates_entries(
         self,
         db_source: ResourceUsageHistoryDBSource,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
     ) -> None:
         """Verify that multiple increments accumulate amount and duration."""
         period = date(2024, 1, 15)
+        resource_group_id = ResourceGroupID(uuid.uuid4())
         key = DomainUsageBucketKey(
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             resource_group="default",
+            resource_group_id=resource_group_id,
             period_date=period,
         )
 
-        # First increment: 2 CPUs for 300 seconds
+        # First increment: 2 CPUs for 300 seconds -> 600 CPU-seconds
         result1 = UsageBucketAggregationResult(
             user_usage_deltas={},
             project_usage_deltas={},
             domain_usage_deltas={
-                key: BucketDelta(
-                    slots=ResourceSlot({"cpu": Decimal("2")}),
-                    duration_seconds=300,
-                ),
+                key: ResourceSlot({"cpu": Decimal("600")}),
             },
         )
         await db_source.increment_usage_buckets(result1)
 
-        # Second increment: 3 CPUs for 300 seconds
+        # Second increment: 3 CPUs for 300 seconds -> 900 CPU-seconds
         result2 = UsageBucketAggregationResult(
             user_usage_deltas={},
             project_usage_deltas={},
             domain_usage_deltas={
-                key: BucketDelta(
-                    slots=ResourceSlot({"cpu": Decimal("3")}),
-                    duration_seconds=300,
-                ),
+                key: ResourceSlot({"cpu": Decimal("900")}),
             },
         )
         await db_source.increment_usage_buckets(result2)
 
-        # Verify accumulated: amount = 2 + 3 = 5, duration = 300 + 300 = 600
+        # Verify accumulated: 600 + 900 = 1500 CPU-seconds
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             entry_rows = (
                 (
@@ -218,31 +220,40 @@ class TestUsageBucketEntries:
 
             assert len(entry_rows) == 1
             assert entry_rows[0].slot_name == "cpu"
-            assert entry_rows[0].amount == Decimal("5")
-            assert entry_rows[0].duration_seconds == 600
+            assert entry_rows[0].resource_usage == Decimal("1500")
+
+            stored_resource_group_id = await db_sess.scalar(
+                sa.select(DomainUsageBucketRow.resource_group_id).where(
+                    DomainUsageBucketRow.domain_name == test_domain.domain_name,
+                    DomainUsageBucketRow.resource_group == "default",
+                    DomainUsageBucketRow.period_start == period,
+                )
+            )
+            assert stored_resource_group_id == resource_group_id
 
     async def test_increment_user_buckets_creates_entries(
         self,
         db_source: ResourceUsageHistoryDBSource,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
     ) -> None:
         """Verify that incrementing user buckets also writes normalized entries."""
         user_uuid = uuid.uuid4()
         project_id = uuid.uuid4()
-        raw_slots = ResourceSlot({"cpu": Decimal("3"), "cuda.device": Decimal("2")})
-        duration = 300  # 5-minute slice
+        resource_usage = ResourceSlot({"cpu": Decimal("900"), "cuda.device": Decimal("600")})
         period = date(2024, 1, 15)
+        resource_group_id = ResourceGroupID(uuid.uuid4())
 
         result = UsageBucketAggregationResult(
             user_usage_deltas={
                 UserUsageBucketKey(
                     user_uuid=user_uuid,
                     project_id=project_id,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_group="default",
+                    resource_group_id=resource_group_id,
                     period_date=period,
-                ): BucketDelta(slots=raw_slots, duration_seconds=duration),
+                ): resource_usage,
             },
             project_usage_deltas={},
             domain_usage_deltas={},
@@ -250,7 +261,7 @@ class TestUsageBucketEntries:
 
         await db_source.increment_usage_buckets(result)
 
-        # Verify entries were created with separated amount/duration
+        # Verify entries were created with resource-seconds
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             entry_rows = (
                 (
@@ -266,52 +277,48 @@ class TestUsageBucketEntries:
 
             assert len(entry_rows) == 2
             slot_map = {e.slot_name: e for e in entry_rows}
-            assert slot_map["cpu"].amount == Decimal("3")
-            assert slot_map["cuda.device"].amount == Decimal("2")
-            assert slot_map["cpu"].duration_seconds == 300
+            assert slot_map["cpu"].resource_usage == Decimal("900")
+            assert slot_map["cuda.device"].resource_usage == Decimal("600")
 
     async def test_aggregated_usage_reads_from_entries(
         self,
         db_source: ResourceUsageHistoryDBSource,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
     ) -> None:
         """Verify that aggregation queries read from normalized entries."""
         period1 = date(2024, 1, 15)
         period2 = date(2024, 1, 16)
+        resource_group_id = ResourceGroupID(uuid.uuid4())
 
-        # Insert two domain buckets with entries (raw amount, not resource-seconds)
+        # Insert two domain buckets with entries (resource-seconds)
         result = UsageBucketAggregationResult(
             user_usage_deltas={},
             project_usage_deltas={},
             domain_usage_deltas={
                 DomainUsageBucketKey(
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_group="default",
+                    resource_group_id=resource_group_id,
                     period_date=period1,
-                ): BucketDelta(
-                    slots=ResourceSlot({"cpu": Decimal("2")}),
-                    duration_seconds=300,
-                ),
+                ): ResourceSlot({"cpu": Decimal("600")}),
                 DomainUsageBucketKey(
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_group="default",
+                    resource_group_id=resource_group_id,
                     period_date=period2,
-                ): BucketDelta(
-                    slots=ResourceSlot({"cpu": Decimal("3")}),
-                    duration_seconds=300,
-                ),
+                ): ResourceSlot({"cpu": Decimal("900")}),
             },
         )
         await db_source.increment_usage_buckets(result)
 
-        # Query aggregated usage — SUM(amount) across buckets
+        # Query aggregated usage — SUM(resource_usage) across buckets
         aggregated = await db_source.get_aggregated_usage_by_domain(
-            resource_group="default",
+            resource_group_id=resource_group_id,
             lookback_start=date(2024, 1, 14),
             lookback_end=date(2024, 1, 17),
         )
 
-        assert test_domain_name in aggregated
-        # 2 + 3 = 5 (raw amounts summed across buckets)
-        assert aggregated[test_domain_name]["cpu"] == Decimal("5")
+        assert test_domain.domain_name in aggregated
+        # 600 + 900 = 1500 CPU-seconds summed across buckets
+        assert aggregated[test_domain.domain_name]["cpu"] == Decimal("1500")

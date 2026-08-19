@@ -50,15 +50,27 @@ class GroupRollingHandler(
                     else:
                         surge = view.rollout.resolve_max_surge(goal)
                         unavailable = view.rollout.resolve_max_unavailable(goal)
-                        # Grow target by surge above what is up; keep the availability floor on
-                        # current. An initial deploy has no current revision to keep serving, so
-                        # there is no floor to maintain and current stays at zero.
-                        next_target = min(goal, target_desired + surge)
+                        # Keep the availability floor on current, but never above its
+                        # live count: the current side is drain-only during a rollout
+                        # (dead replicas are not refilled), so desired above live would
+                        # hold budget for replicas that can never come back. An initial
+                        # deploy has no current revision to keep serving, so there is
+                        # no floor to maintain and current stays at zero.
                         next_current = (
                             0
                             if view.current_revision_id is None
-                            else max(0, (goal - unavailable) - target_desired)
+                            else min(
+                                view.current_live_replica_count,
+                                max(0, (goal - unavailable) - target_desired),
+                            )
                         )
+                        # The surge budget bounds the total (current + target) at
+                        # goal + surge, measured against the post-drain current side.
+                        # With a healthy current side this reduces to the classic
+                        # step (previous target + surge); replicas the current side
+                        # lost hand their slot to the target immediately instead of
+                        # throttling it to one surge increment per step.
+                        next_target = min(goal, max(target_desired, (goal + surge) - next_current))
                         outcome = HandlerOutcome.FAILURE
                         message = "rolling out target revision toward desired"
             decisions.append(

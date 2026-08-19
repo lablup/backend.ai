@@ -10,6 +10,7 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import FairShareData
 from ai.backend.manager.models.fair_share.row import (
@@ -18,6 +19,8 @@ from ai.backend.manager.models.fair_share.row import (
     UserFairShareRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+RESOURCE_GROUP_ID = ResourceGroupID(uuid.UUID("00000000-0000-0000-0000-000000000001"))
 
 
 class TestDomainFairShareRowToData:
@@ -31,6 +34,7 @@ class TestDomainFairShareRowToData:
         row = DomainFairShareRow(
             id=uuid.uuid4(),
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="test-domain",
             weight=None,  # Uses default_weight
             fair_share_factor=Decimal("1.0"),
@@ -80,6 +84,7 @@ class TestDomainFairShareRowToData:
         row = DomainFairShareRow(
             id=uuid.uuid4(),
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="test-domain",
             weight=Decimal("2.0"),  # Explicit weight
             fair_share_factor=Decimal("1.0"),
@@ -128,6 +133,7 @@ class TestProjectFairShareRowToData:
         row = ProjectFairShareRow(
             id=uuid.uuid4(),
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=uuid.uuid4(),
             domain_name="test-domain",
             weight=Decimal("1.5"),
@@ -173,6 +179,7 @@ class TestUserFairShareRowToData:
         row = UserFairShareRow(
             id=uuid.uuid4(),
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             user_uuid=uuid.uuid4(),
             project_id=uuid.uuid4(),
             domain_name="test-domain",
@@ -219,6 +226,7 @@ class TestResourceWeightMergingEdgeCases:
         row = DomainFairShareRow(
             id=uuid.uuid4(),
             resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="test-domain",
             weight=Decimal("1.0"),
             fair_share_factor=Decimal("1.0"),

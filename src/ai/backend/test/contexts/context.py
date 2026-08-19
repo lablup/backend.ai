@@ -3,7 +3,7 @@ from abc import abstractmethod
 from collections.abc import Iterator, Mapping, MutableMapping
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import TypeVar, final
+from typing import TypeVar, final, override
 
 T = TypeVar("T")
 
@@ -64,6 +64,7 @@ class BaseTestContext[T]:
     _ctxvar: ContextVar[T | None] | None = None
     _used: MutableMapping[ContextName, "BaseTestContext[T]"] = {}
 
+    @override
     def __init_subclass__(cls) -> None:
         if cls._ctxvar is not None:
             raise RuntimeError(f"{cls.__name__} is already initialized")

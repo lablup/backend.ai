@@ -16,6 +16,8 @@ from decimal import Decimal
 
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -24,12 +26,13 @@ from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import (
     create_pending_session_with_kernels,
     fetch_agent_resources,
-    make_allocation_batch,
     make_creation_info,
+    make_session_allocations,
     seed_agent_resources,
 )
 
@@ -40,7 +43,9 @@ class TestAllocateSessionsReservation:
     async def test_a1_single_kernel_reserves_and_schedules(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -57,18 +62,18 @@ class TestAllocateSessionsReservation:
         )
         session_id, kernel_ids = await create_pending_session_with_kernels(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
             agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
         )
-        batch = make_allocation_batch(
+        batch = make_session_allocations(
             session_id=session_id,
-            scaling_group_name=test_scaling_group_name,
-            access_key=test_access_key,
-            kernel_assignments=[(kernel_ids[0], test_agent_id, Decimal("2"), Decimal("4096"))],
+            kernel_assignments=[(kernel_ids[0], test_agent_id)],
         )
 
         db_source = ScheduleDBSource(db_with_cleanup)
@@ -97,7 +102,9 @@ class TestAllocateSessionsReservation:
     async def test_a2_multi_kernel_reserves_sum(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -114,7 +121,9 @@ class TestAllocateSessionsReservation:
         )
         session_id, kernel_ids = await create_pending_session_with_kernels(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -124,13 +133,11 @@ class TestAllocateSessionsReservation:
                 (test_agent_id, Decimal("3"), Decimal("2048")),
             ],
         )
-        batch = make_allocation_batch(
+        batch = make_session_allocations(
             session_id=session_id,
-            scaling_group_name=test_scaling_group_name,
-            access_key=test_access_key,
             kernel_assignments=[
-                (kernel_ids[0], test_agent_id, Decimal("2"), Decimal("4096")),
-                (kernel_ids[1], test_agent_id, Decimal("3"), Decimal("2048")),
+                (kernel_ids[0], test_agent_id),
+                (kernel_ids[1], test_agent_id),
             ],
         )
 
@@ -152,7 +159,9 @@ class TestAllocateSessionsReservation:
     async def test_a3_idempotent_double_allocate(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -169,18 +178,18 @@ class TestAllocateSessionsReservation:
         )
         session_id, kernel_ids = await create_pending_session_with_kernels(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
             agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
         )
-        batch = make_allocation_batch(
+        batch = make_session_allocations(
             session_id=session_id,
-            scaling_group_name=test_scaling_group_name,
-            access_key=test_access_key,
-            kernel_assignments=[(kernel_ids[0], test_agent_id, Decimal("2"), Decimal("4096"))],
+            kernel_assignments=[(kernel_ids[0], test_agent_id)],
         )
 
         db_source = ScheduleDBSource(db_with_cleanup)
@@ -196,7 +205,9 @@ class TestAllocateSessionsReservation:
     async def test_a4_capacity_gate_rolls_back(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -215,18 +226,18 @@ class TestAllocateSessionsReservation:
         )
         session_id, kernel_ids = await create_pending_session_with_kernels(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
             agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
         )
-        batch = make_allocation_batch(
+        batch = make_session_allocations(
             session_id=session_id,
-            scaling_group_name=test_scaling_group_name,
-            access_key=test_access_key,
-            kernel_assignments=[(kernel_ids[0], test_agent_id, Decimal("2"), Decimal("4096"))],
+            kernel_assignments=[(kernel_ids[0], test_agent_id)],
         )
 
         db_source = ScheduleDBSource(db_with_cleanup)
@@ -247,7 +258,9 @@ class TestAllocateSessionsReservation:
     async def test_a5_batch_atomicity_second_session_exceeds(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -265,7 +278,9 @@ class TestAllocateSessionsReservation:
         )
         session_a, kernels_a = await create_pending_session_with_kernels(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -274,7 +289,9 @@ class TestAllocateSessionsReservation:
         )
         session_b, kernels_b = await create_pending_session_with_kernels(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -282,20 +299,16 @@ class TestAllocateSessionsReservation:
             agent_assignments=[(test_agent_id, Decimal("3"), Decimal("4096"))],
         )
 
-        batch_a = make_allocation_batch(
+        batch_a = make_session_allocations(
             session_id=session_a,
-            scaling_group_name=test_scaling_group_name,
-            access_key=test_access_key,
-            kernel_assignments=[(kernels_a[0], test_agent_id, Decimal("3"), Decimal("4096"))],
+            kernel_assignments=[(kernels_a[0], test_agent_id)],
         )
-        batch_b = make_allocation_batch(
+        batch_b = make_session_allocations(
             session_id=session_b,
-            scaling_group_name=test_scaling_group_name,
-            access_key=test_access_key,
-            kernel_assignments=[(kernels_b[0], test_agent_id, Decimal("3"), Decimal("4096"))],
+            kernel_assignments=[(kernels_b[0], test_agent_id)],
         )
         # Combine both session allocations into one batch.
-        batch_a.allocations.extend(batch_b.allocations)
+        batch_a.extend(batch_b)
 
         db_source = ScheduleDBSource(db_with_cleanup)
         result = await db_source.allocate_sessions(batch_a)
@@ -320,7 +333,9 @@ class TestReservedOnlyRelease:
         self,
         db: ExtendedAsyncSAEngine,
         *,
+        domain_id: DomainID,
         domain_name: str,
+        resource_group_id: ResourceGroupID,
         scaling_group_name: str,
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
@@ -332,18 +347,18 @@ class TestReservedOnlyRelease:
         """Create a PENDING session and allocate it (-> SCHEDULED, reserved up)."""
         session_id, kernel_ids = await create_pending_session_with_kernels(
             db,
+            domain_id=domain_id,
             domain_name=domain_name,
+            resource_group_id=resource_group_id,
             scaling_group_name=scaling_group_name,
             group_id=group_id,
             user_uuid=user_uuid,
             access_key=access_key,
             agent_assignments=[(agent_id, cpu, mem)],
         )
-        batch = make_allocation_batch(
+        batch = make_session_allocations(
             session_id=session_id,
-            scaling_group_name=scaling_group_name,
-            access_key=access_key,
-            kernel_assignments=[(kernel_ids[0], agent_id, cpu, mem)],
+            kernel_assignments=[(kernel_ids[0], agent_id)],
         )
         result = await ScheduleDBSource(db).allocate_sessions(batch)
         assert result == [session_id]
@@ -352,7 +367,9 @@ class TestReservedOnlyRelease:
     async def test_c2_cancel_releases_reserved(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -370,7 +387,9 @@ class TestReservedOnlyRelease:
         db_source = ScheduleDBSource(db_with_cleanup)
         _, kernel_id = await self._allocate_one(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -410,7 +429,9 @@ class TestReservedOnlyRelease:
     async def test_c3_bulk_terminate_releases_reserved(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -428,7 +449,9 @@ class TestReservedOnlyRelease:
         db_source = ScheduleDBSource(db_with_cleanup)
         _, kernel_id = await self._allocate_one(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -451,7 +474,9 @@ class TestReservedOnlyRelease:
     async def test_full_lifecycle_reserved_to_used_to_zero(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -469,7 +494,9 @@ class TestReservedOnlyRelease:
         db_source = ScheduleDBSource(db_with_cleanup)
         _, kernel_id = await self._allocate_one(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,

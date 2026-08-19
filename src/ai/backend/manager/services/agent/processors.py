@@ -1,9 +1,6 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
@@ -49,6 +46,10 @@ from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
     SyncAgentRegistryActionResult,
 )
+from ai.backend.manager.services.agent.actions.update_resource_group import (
+    UpdateAgentResourceGroupAction,
+    UpdateAgentResourceGroupActionResult,
+)
 from ai.backend.manager.services.agent.actions.watcher_agent_restart import (
     WatcherAgentRestartAction,
     WatcherAgentRestartActionResult,
@@ -64,7 +65,7 @@ from ai.backend.manager.services.agent.actions.watcher_agent_stop import (
 from ai.backend.manager.services.agent.service import AgentService
 
 
-class AgentProcessors(AbstractProcessorPackage):
+class AgentProcessors:
     sync_agent_registry: ActionProcessor[SyncAgentRegistryAction, SyncAgentRegistryActionResult]
     get_watcher_status: ActionProcessor[GetWatcherStatusAction, GetWatcherStatusActionResult]
     watcher_agent_start: ActionProcessor[WatcherAgentStartAction, WatcherAgentStartActionResult]
@@ -86,6 +87,9 @@ class AgentProcessors(AbstractProcessorPackage):
     search_agents: ActionProcessor[SearchAgentsAction, SearchAgentsActionResult]
     load_container_counts: ActionProcessor[
         LoadContainerCountsAction, LoadContainerCountsActionResult
+    ]
+    update_resource_group: ActionProcessor[
+        UpdateAgentResourceGroupAction, UpdateAgentResourceGroupActionResult
     ]
 
     def __init__(
@@ -118,20 +122,4 @@ class AgentProcessors(AbstractProcessorPackage):
         )
         self.search_agents = ActionProcessor(service.search_agents, action_monitors)
         self.load_container_counts = ActionProcessor(service.load_container_counts, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            SyncAgentRegistryAction.spec(),
-            GetWatcherStatusAction.spec(),
-            WatcherAgentStartAction.spec(),
-            WatcherAgentRestartAction.spec(),
-            WatcherAgentStopAction.spec(),
-            RecalculateUsageAction.spec(),
-            GetTotalResourcesAction.spec(),
-            HandleHeartbeatAction.spec(),
-            RemoveAgentFromImagesAction.spec(),
-            RemoveAgentFromImagesByCanonicalsAction.spec(),
-            SearchAgentsAction.spec(),
-            LoadContainerCountsAction.spec(),
-        ]
+        self.update_resource_group = ActionProcessor(service.update_resource_group, action_monitors)

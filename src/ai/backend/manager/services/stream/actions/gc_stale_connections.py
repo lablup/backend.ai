@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.types import KernelId
+from ai.backend.common.types import SessionId
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.stream.actions.base import StreamAction
@@ -11,7 +11,7 @@ from ai.backend.manager.services.stream.actions.base import StreamAction
 
 @dataclass(frozen=True)
 class GCStaleConnectionsAction(StreamAction):
-    active_session_ids: list[KernelId]
+    active_session_ids: list[SessionId]
 
     @override
     def entity_id(self) -> str | None:
@@ -25,7 +25,7 @@ class GCStaleConnectionsAction(StreamAction):
 
 @dataclass(frozen=True)
 class GCStaleConnectionsActionResult(BaseActionResult):
-    removed_sessions: list[str]
+    inactive_session_ids: list[SessionId]
 
     @override
     def entity_id(self) -> str | None:

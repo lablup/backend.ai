@@ -4,7 +4,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_STREAM_LOCK, RedisRole
@@ -91,10 +91,12 @@ class DistributedLockFactoryDependency(
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "distributed-lock-factory"
 
     @asynccontextmanager
+    @override
     async def provide(
         self, setup_input: DistributedLockInput
     ) -> AsyncIterator[DistributedLockFactory]:

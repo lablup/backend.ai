@@ -110,7 +110,7 @@ class VolumeService:
             log.warning("Vfolder deletion task cancelled. (vfolder_id:{})", vfolder_id)
         else:
             log.info("VFolder deletion task succeeded. (vfolder_id:{})", vfolder_id)
-            await self._event_producer.anycast_event(VFolderDeletionSuccessEvent(vfolder_id))
+            await self._event_producer.anycast_event(VFolderDeletionSuccessEvent(vfid=vfolder_id))
 
     async def get_volume(self, volume_id: VolumeID) -> VolumeMeta:
         await log_manager_api_entry_new(log, "get_volume", volume_id)

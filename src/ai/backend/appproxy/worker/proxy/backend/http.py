@@ -146,11 +146,12 @@ class HTTPBackend(BaseBackend):
         else:
             remote_host = None
             remote_port = None
-        backend_rqst_hdrs = {}
-        # copy frontend request headers without hop-by-hop headers
+        backend_rqst_hdrs: CIMultiDict[str] = CIMultiDict()
+        # copy frontend request headers without hop-by-hop headers,
+        # preserving repeated headers (multidict add(), not dict assignment)
         for key, value in frontend_request.headers.items():
             if key not in HOP_ONLY_HEADERS:
-                backend_rqst_hdrs[key] = value
+                backend_rqst_hdrs.add(key, value)
         # overwrite proxy-related headers
         backend_rqst_hdrs["x-forwarded-proto"] = protocol
         if self.circuit.app == "rstudio":
@@ -191,10 +192,14 @@ class HTTPBackend(BaseBackend):
         )
         try:
             async with self.request_http(route, backend_request) as backend_response:
-                frontend_resp_hdrs = {}
+                # Use a multidict and add() so that repeated response headers
+                # (e.g. multiple Set-Cookie entries) are all preserved; a plain
+                # dict would keep only the last occurrence, breaking cookie-based
+                # auth flows such as RStudio Server's sign-in.
+                frontend_resp_hdrs: CIMultiDict[str] = CIMultiDict()
                 for key, value in backend_response.headers.items():
                     if key not in HOP_ONLY_HEADERS:
-                        frontend_resp_hdrs[key] = value
+                        frontend_resp_hdrs.add(key, value)
                 frontend_resp_hdrs["Access-Control-Allow-Origin"] = "*"
                 frontend_response = web.StreamResponse(
                     status=backend_response.status,

@@ -5,7 +5,7 @@ import pwd
 from collections.abc import Mapping, Sequence
 from datetime import tzinfo
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, Final, TypeVar
+from typing import Annotated, Any, ClassVar, Final, TypeVar, override
 
 import jwt
 from dateutil import tz
@@ -300,9 +300,11 @@ class HostPortPair(BackendAISchema):
     def to_legacy(self) -> LegacyHostPortPair:
         return LegacyHostPortPair(host=self.host, port=self.port)
 
+    @override
     def __str__(self) -> str:
         return self.address
 
+    @override
     def __repr__(self) -> str:
         return self.address
 

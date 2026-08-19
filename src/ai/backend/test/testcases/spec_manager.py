@@ -2,7 +2,7 @@ import enum
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import product
-from typing import Any
+from typing import Any, override
 
 from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.template import (
@@ -47,9 +47,11 @@ class TestSpec:
     template: TestTemplate
     parametrizes: Mapping[ContextName, Sequence[Any]] | None = None
 
+    @override
     def __hash__(self) -> int:
         return hash(self.name)
 
+    @override
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, TestSpec):
             return NotImplemented

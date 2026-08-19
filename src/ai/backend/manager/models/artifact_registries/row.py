@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
@@ -36,7 +36,7 @@ def _get_reservoir_registry_join_condition() -> sa.ColumnElement[bool]:
     return ReservoirRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)
 
 
-class ArtifactRegistryRow(Base):  # type: ignore[misc]
+class ArtifactRegistryRow(Base):
     """
     Common information of all artifact_registry records.
     """
@@ -65,6 +65,7 @@ class ArtifactRegistryRow(Base):  # type: ignore[misc]
         viewonly=True,
     )
 
+    @override
     def __str__(self) -> str:
         return f"ArtifactRegistryRow(id={self.id}, registry_id={self.registry_id}, type={self.type}, name={self.name})"
 

@@ -8,10 +8,13 @@ from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, QueryParam
 from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
+from ai.backend.common.dto.manager.v2.scheduler.request import ComputeScheduleInput
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     EnqueueSessionInput,
+    ExcludeSessionIdleChecksInput,
     GetSessionLogsQuery,
+    IncludeSessionIdleChecksInput,
     ShutdownSessionServiceInput,
     StartSessionServiceInput,
     TerminateSessionsInput,
@@ -57,6 +60,14 @@ class V2SessionHandler:
             group_id=body.parsed.project_id,
         )
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
+
+    async def compute_schedule(
+        self,
+        body: BodyParam[ComputeScheduleInput],
+    ) -> APIResponse:
+        """Compute whether a would-be session fits a resource group, without provisioning."""
+        result = await self._adapter.compute_schedule(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_search_sessions(
         self,
@@ -138,6 +149,22 @@ class V2SessionHandler:
     ) -> APIResponse:
         """Terminate one or more sessions."""
         result = await self._adapter.terminate(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def exclude_idle_checks(
+        self,
+        body: BodyParam[ExcludeSessionIdleChecksInput],
+    ) -> APIResponse:
+        """Exclude checker-session pairs from idle checks."""
+        result = await self._adapter.exclude_idle_checks(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def include_idle_checks(
+        self,
+        body: BodyParam[IncludeSessionIdleChecksInput],
+    ) -> APIResponse:
+        """Include checker-session pairs into idle checks."""
+        result = await self._adapter.include_idle_checks(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def start_service(

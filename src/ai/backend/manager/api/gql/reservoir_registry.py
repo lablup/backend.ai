@@ -1,5 +1,5 @@
 from collections.abc import Iterable, Sequence
-from typing import Self, cast
+from typing import Self, cast, override
 from uuid import UUID
 
 import strawberry
@@ -62,6 +62,7 @@ class ReservoirRegistry(PydanticNodeMixin[ReservoirRegistryNode]):
     api_version: str
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,

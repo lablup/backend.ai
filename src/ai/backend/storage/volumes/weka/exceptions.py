@@ -4,6 +4,8 @@ Weka-specific exceptions.
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -21,6 +23,7 @@ class WekaError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/weka/generic"
     error_title = "Weka Error"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -35,6 +38,7 @@ class WekaInitError(WekaError):
     error_type = "https://api.backend.ai/probs/storage/weka/init-error"
     error_title = "Weka Initialization Error"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -49,6 +53,7 @@ class WekaAPIError(WekaError):
     error_type = "https://api.backend.ai/probs/storage/weka/api-error"
     error_title = "Weka API Error"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -63,6 +68,7 @@ class WekaInvalidBodyError(WekaAPIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/weka/invalid-body"
     error_title = "Weka Invalid Body"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -77,6 +83,7 @@ class WekaUnauthorizedError(WekaAPIError):
     error_type = "https://api.backend.ai/probs/storage/weka/unauthorized"
     error_title = "Weka Unauthorized"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -91,6 +98,7 @@ class WekaNotFoundError(WekaAPIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/weka/not-found"
     error_title = "Weka Not Found"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -112,6 +120,7 @@ class WekaNoMetricError(WekaError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/weka/no-metric"
     error_title = "Weka No Metric"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,

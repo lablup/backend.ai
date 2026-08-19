@@ -50,6 +50,9 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.model_card.repository import ModelCardRepository
@@ -65,6 +68,7 @@ from ai.backend.manager.services.permission_contoller.processors import (
 )
 from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
 from ai.backend.manager.services.processors import Processors
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
@@ -77,6 +81,7 @@ def _build_validators(
 ) -> ActionValidators:
     permission_repo = PermissionControllerRepository(database_engine)
     return ActionValidators(
+        virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
         rbac=RBACValidators(
             scope=ScopeActionRBACValidator(permission_repo, config_provider),
             single_entity=SingleEntityActionRBACValidator(permission_repo, config_provider),
@@ -200,10 +205,40 @@ async def model_store_project_fixture(
                 type=ProjectType.MODEL_STORE,
             )
         )
+        virtual_scope_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=project_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=project_id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=project_id,
+                permission_cap=None,
+            )
+        )
     yield project_id
     async with db_engine.begin() as conn:
         await conn.execute(
             ModelCardRow.__table__.delete().where(ModelCardRow.__table__.c.project == project_id)
+        )
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == project_id,
+            )
         )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id))
 
@@ -228,10 +263,40 @@ async def second_project_fixture(
                 type=ProjectType.MODEL_STORE,
             )
         )
+        virtual_scope_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=project_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=project_id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=project_id,
+                permission_cap=None,
+            )
+        )
     yield project_id
     async with db_engine.begin() as conn:
         await conn.execute(
             ModelCardRow.__table__.delete().where(ModelCardRow.__table__.c.project == project_id)
+        )
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == project_id,
+            )
         )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id))
 

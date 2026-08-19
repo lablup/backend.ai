@@ -3,7 +3,7 @@ import logging
 from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Final, Literal, cast
+from typing import Any, Final, Literal, cast, override
 
 import aiofiles
 import aiofiles.os
@@ -99,6 +99,7 @@ class VASTQuotaModel(BaseQuotaModel):
                 f"VAST API unknown error during quota modification: {e}"
             ) from e
 
+    @override
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -166,6 +167,7 @@ class VASTQuotaModel(BaseQuotaModel):
             quota = await _set_quota(options)
             await self._set_vast_quota_id(quota_scope_id, quota.id)
 
+    @override
     async def update_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -176,6 +178,7 @@ class VASTQuotaModel(BaseQuotaModel):
             raise QuotaScopeNotFoundError
         await self._modify_quota_scope(vast_quota_id, config)
 
+    @override
     async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
         if (vast_quota_id := await self._get_vast_quota_id(quota_scope_id)) is None:
             return None
@@ -194,6 +197,7 @@ class VASTQuotaModel(BaseQuotaModel):
             limit_bytes=quota.hard_limit,
         )
 
+    @override
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
         vast_quota_id = await self._get_vast_quota_id(quota_scope_id)
         if vast_quota_id is None:
@@ -204,6 +208,7 @@ class VASTQuotaModel(BaseQuotaModel):
             raise QuotaScopeNotFoundError from e
         await self._rm_vast_quota_id(quota_scope_id)
 
+    @override
     async def delete_quota_scope(self, quota_scope_id: QuotaScopeID) -> None:
         await self.unset_quota(quota_scope_id)
         qspath = self.mangle_qspath(quota_scope_id)
@@ -248,15 +253,19 @@ class VASTVolume(BaseVolume):
             cluster_info_cache_ttl=self.config["vast_cluster_info_cache_ttl"],
         )
 
+    @override
     async def shutdown(self) -> None:
         pass
 
+    @override
     async def create_quota_model(self) -> VASTQuotaModel:
         return VASTQuotaModel(self.mount_path, self.api_client)
 
+    @override
     async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_METRIC, CAP_QUOTA, CAP_FAST_FS_SIZE, CAP_FAST_SIZE])
 
+    @override
     async def get_hwinfo(self) -> HardwareMetadata:
         cluster_id: int = self.config["vast_cluster_id"]
         try:
@@ -287,6 +296,7 @@ class VASTVolume(BaseVolume):
             },
         }
 
+    @override
     async def get_performance_metric(self) -> FSPerfMetric:
         cluster_id: int = self.config["vast_cluster_id"]
         try:
@@ -311,6 +321,7 @@ class VASTVolume(BaseVolume):
             io_bytes_write=clsuter_info.wr_bw,
         )
 
+    @override
     async def get_fs_usage(self) -> CapacityUsage:
         cluster_id: int = self.config["vast_cluster_id"]
         try:

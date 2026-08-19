@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Collection
 from uuid import UUID
 
@@ -110,14 +111,40 @@ class RuntimeVariantPresetConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Reads the cursor row's ``created_at`` and compares against that, because that is what
+        the page is ordered by — comparing ids would draw the page boundary on a column the
+        result is not sorted by.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RuntimeVariantPresetRow.id < sa.text(f"'{cursor_id}'::uuid")
+            subquery = (
+                sa.select(RuntimeVariantPresetRow.created_at)
+                .where(RuntimeVariantPresetRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return RuntimeVariantPresetRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Reads the cursor row's ``created_at`` and compares against that, because that is what
+        the page is ordered by — comparing ids would draw the page boundary on a column the
+        result is not sorted by.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RuntimeVariantPresetRow.id > sa.text(f"'{cursor_id}'::uuid")
+            subquery = (
+                sa.select(RuntimeVariantPresetRow.created_at)
+                .where(RuntimeVariantPresetRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return RuntimeVariantPresetRow.created_at > subquery
 
         return inner

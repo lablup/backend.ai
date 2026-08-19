@@ -1,6 +1,5 @@
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -16,10 +15,6 @@ from .base import (
     BaseMixin,
     StructuredJSONObjectColumn,
 )
-
-if TYPE_CHECKING:
-    pass
-
 
 __all__ = [
     "Endpoint",

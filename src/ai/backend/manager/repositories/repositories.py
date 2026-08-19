@@ -2,11 +2,11 @@ from dataclasses import dataclass
 from typing import Self
 
 from ai.backend.manager.repositories.agent.repositories import AgentRepositories
-from ai.backend.manager.repositories.app_config_allow_list.repositories import (
-    AppConfigAllowListRepositories,
-)
 from ai.backend.manager.repositories.app_config_definition.repositories import (
     AppConfigDefinitionRepositories,
+)
+from ai.backend.manager.repositories.app_config_fragment.repositories import (
+    AppConfigFragmentRepositories,
 )
 from ai.backend.manager.repositories.artifact.repositories import ArtifactRepositories
 from ai.backend.manager.repositories.artifact_registry.repositories import (
@@ -32,6 +32,7 @@ from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.huggingface_registry.repositories import (
     HuggingFaceRegistryRepositories,
 )
+from ai.backend.manager.repositories.idle_checker.repositories import IdleCheckerRepositories
 from ai.backend.manager.repositories.image.repositories import ImageRepositories
 from ai.backend.manager.repositories.keypair_resource_policy.repositories import (
     KeypairResourcePolicyRepositories,
@@ -42,6 +43,8 @@ from ai.backend.manager.repositories.model_card.repositories import ModelCardRep
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.notification.repositories import NotificationRepositories
 from ai.backend.manager.repositories.object_storage.repositories import ObjectStorageRepositories
+from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.repositories import (
     PermissionControllerRepositories,
 )
@@ -62,6 +65,10 @@ from ai.backend.manager.repositories.resource_preset.repositories import Resourc
 from ai.backend.manager.repositories.resource_slot.repositories import ResourceSlotRepositories
 from ai.backend.manager.repositories.resource_usage_history.repositories import (
     ResourceUsageHistoryRepositories,
+)
+from ai.backend.manager.repositories.retention.repositories import RetentionRepositories
+from ai.backend.manager.repositories.retention_policy.repositories import (
+    RetentionPolicyRepositories,
 )
 from ai.backend.manager.repositories.role_preset.repositories import RolePresetRepositories
 from ai.backend.manager.repositories.runtime_variant.repositories import RuntimeVariantRepositories
@@ -91,8 +98,10 @@ from ai.backend.manager.repositories.vfs_storage.repositories import VFSStorageR
 @dataclass
 class Repositories:
     agent: AgentRepositories
-    app_config_allow_list: AppConfigAllowListRepositories
+    ops_provider: DBOpsProvider
+    v2_ops_provider: V2DBOpsProvider
     app_config_definition: AppConfigDefinitionRepositories
+    app_config_fragment: AppConfigFragmentRepositories
     auth: AuthRepositories
     container_registry: ContainerRegistryRepositories
     deployment: DeploymentRepositories
@@ -103,6 +112,7 @@ class Repositories:
     export: ExportRepositories
     fair_share: FairShareRepositories
     group: GroupRepositories
+    idle_checker: IdleCheckerRepositories
     image: ImageRepositories
     keypair_resource_policy: KeypairResourcePolicyRepositories
     manager_admin: ManagerAdminRepositories
@@ -117,6 +127,7 @@ class Repositories:
     reservoir_registry: ReservoirRegistryRepositories
     resource_preset: ResourcePresetRepositories
     resource_slot: ResourceSlotRepositories
+    retention_policy: RetentionPolicyRepositories
     role_preset: RolePresetRepositories
     runtime_variant: RuntimeVariantRepositories
     runtime_variant_preset: RuntimeVariantPresetRepositories
@@ -140,12 +151,13 @@ class Repositories:
     events: EventsRepositories
     storage_namespace: StorageNamespaceRepositories
     audit_log: AuditLogRepositories
+    retention: RetentionRepositories
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
         agent_repositories = AgentRepositories.create(args)
-        app_config_allow_list_repositories = AppConfigAllowListRepositories.create(args)
         app_config_definition_repositories = AppConfigDefinitionRepositories.create(args)
+        app_config_fragment_repositories = AppConfigFragmentRepositories.create(args)
         auth_repositories = AuthRepositories.create(args)
         container_registry_repositories = ContainerRegistryRepositories.create(args)
         deployment_repositories = DeploymentRepositories.create(args)
@@ -156,6 +168,7 @@ class Repositories:
         export_repositories = ExportRepositories.create(args)
         fair_share_repositories = FairShareRepositories.create(args)
         group_repositories = GroupRepositories.create(args)
+        idle_checker_repositories = IdleCheckerRepositories.create(args)
         image_repositories = ImageRepositories.create(args)
         keypair_resource_policy_repositories = KeypairResourcePolicyRepositories.create(args)
         manager_admin_repositories = ManagerAdminRepositories.create(args)
@@ -172,6 +185,7 @@ class Repositories:
         reservoir_registry_repositories = ReservoirRegistryRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
         resource_slot_repositories = ResourceSlotRepositories.create(args)
+        retention_policy_repositories = RetentionPolicyRepositories.create(args)
         role_preset_repositories = RolePresetRepositories.create(args)
         runtime_variant_repositories = RuntimeVariantRepositories.create(args)
         runtime_variant_preset_repositories = RuntimeVariantPresetRepositories.create(args)
@@ -195,11 +209,14 @@ class Repositories:
         events_repositories = EventsRepositories.create(args)
         storage_namespace_repositories = StorageNamespaceRepositories.create(args)
         audit_log_repositories = AuditLogRepositories.create(args)
+        retention_repositories = RetentionRepositories.create(args)
 
         return cls(
             agent=agent_repositories,
-            app_config_allow_list=app_config_allow_list_repositories,
+            ops_provider=args.ops_provider,
+            v2_ops_provider=args.v2_ops_provider,
             app_config_definition=app_config_definition_repositories,
+            app_config_fragment=app_config_fragment_repositories,
             auth=auth_repositories,
             container_registry=container_registry_repositories,
             deployment=deployment_repositories,
@@ -210,6 +227,7 @@ class Repositories:
             export=export_repositories,
             fair_share=fair_share_repositories,
             group=group_repositories,
+            idle_checker=idle_checker_repositories,
             image=image_repositories,
             keypair_resource_policy=keypair_resource_policy_repositories,
             manager_admin=manager_admin_repositories,
@@ -224,6 +242,7 @@ class Repositories:
             reservoir_registry=reservoir_registry_repositories,
             resource_preset=resource_preset_repositories,
             resource_slot=resource_slot_repositories,
+            retention_policy=retention_policy_repositories,
             role_preset=role_preset_repositories,
             runtime_variant=runtime_variant_repositories,
             runtime_variant_preset=runtime_variant_preset_repositories,
@@ -247,4 +266,5 @@ class Repositories:
             events=events_repositories,
             storage_namespace=storage_namespace_repositories,
             audit_log=audit_log_repositories,
+            retention=retention_repositories,
         )

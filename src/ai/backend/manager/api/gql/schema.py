@@ -1,4 +1,5 @@
 import re
+from typing import override
 
 import strawberry
 from graphql.pyutils.undefined import Undefined as GraphQLUndefined
@@ -6,6 +7,8 @@ from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
 from ai.backend.common.api_handlers import Sentinel as BackendSentinel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_field
 from ai.backend.manager.api.gql.extensions import (
     GQLExceptionHandlerExtension,
     GQLLoggingExtension,
@@ -14,20 +17,34 @@ from ai.backend.manager.api.gql.extensions import (
 )
 
 from .agent import (
+    admin_update_agent_resource_group,
     agent_stats,
     agents_v2,
+)
+from .app_config import (
+    my_app_configs,
+    public_app_configs,
 )
 from .app_config_allow_list import (
     admin_app_config_allow_list,
     admin_app_config_allow_lists,
     admin_create_app_config_allow_list,
     admin_purge_app_config_allow_list,
+    admin_update_app_config_allow_list,
 )
 from .app_config_definition import (
     admin_app_config_definition,
     admin_app_config_definitions,
     admin_create_app_config_definition,
     admin_purge_app_config_definition,
+)
+from .app_config_fragment import (
+    admin_app_config_fragments,
+    app_config_fragment,
+    my_app_config_fragments_by_names,
+    my_upsert_app_config_fragments,
+    scoped_app_config_fragments_by_names,
+    scoped_upsert_app_config_fragments,
 )
 from .artifact import (
     approve_artifact_revision,
@@ -148,6 +165,19 @@ from .huggingface_registry import (
     huggingface_registries,
     huggingface_registry,
     update_huggingface_registry,
+)
+from .idle_checker import (
+    admin_create_idle_checker,
+    admin_idle_checkers,
+    admin_purge_idle_checker,
+    admin_update_idle_checker,
+)
+from .idle_checker_assignment import (
+    admin_create_idle_checker_assignment,
+    admin_idle_checker_assignments,
+    purge_idle_checker_assignment,
+    scoped_idle_checker_assignments,
+    update_idle_checker_assignment,
 )
 from .image import (
     admin_image_aliases,
@@ -373,7 +403,13 @@ from .resource_preset import (
     admin_resource_presets_v2,
     admin_update_resource_preset_v2,
 )
-from .resource_slot.resolver import resource_slot_type, resource_slot_types
+from .resource_slot.resolver import (
+    admin_create_resource_slot_type,
+    admin_purge_resource_slot_type,
+    admin_update_resource_slot_type,
+    resource_slot_type,
+    resource_slot_types,
+)
 from .resource_usage import (
     admin_domain_usage_buckets,
     admin_project_usage_buckets,
@@ -381,6 +417,14 @@ from .resource_usage import (
     domain_usage_buckets,
     project_usage_buckets,
     user_usage_buckets,
+)
+from .retention_policy import (
+    admin_create_retention_policy,
+    admin_delete_retention_policy,
+    admin_purge_retention_policy,
+    admin_retention_policies,
+    admin_retention_policy,
+    admin_update_retention_policy,
 )
 from .role_preset import (
     admin_bulk_add_role_preset_permissions,
@@ -409,17 +453,22 @@ from .runtime_variant_preset import (
     runtime_variant_presets,
 )
 from .scheduler import (
+    compute_schedule,
     scheduling_events_by_session,
 )
 from .scheduling_handler import scheduling_handlers
 from .scheduling_history import (
     admin_deployment_histories,
+    admin_kernel_scheduling_histories,
+    admin_replica_group_histories,
     admin_route_histories,
     admin_session_scheduling_histories,
     deployment_histories,
     deployment_scoped_scheduling_histories,
     route_histories,
     route_scoped_scheduling_histories,
+    scoped_kernel_scheduling_histories,
+    scoped_replica_group_histories,
     session_scheduling_histories,
     session_scoped_scheduling_histories,
 )
@@ -427,6 +476,8 @@ from .service_catalog import admin_service_catalogs
 from .session.resolver import (
     admin_sessions_v2,
     enqueue_session,
+    exclude_session_idle_checks,
+    include_session_idle_checks,
     project_sessions_v2,
     session_v2,
     terminate_sessions_v2,
@@ -498,6 +549,14 @@ class Query:
     agents_v2 = agents_v2
     admin_app_config_allow_list = admin_app_config_allow_list
     admin_app_config_allow_lists = admin_app_config_allow_lists
+    app_config_fragment = app_config_fragment
+    admin_app_config_fragments = admin_app_config_fragments
+    admin_idle_checkers = admin_idle_checkers
+    admin_idle_checker_assignments = admin_idle_checker_assignments
+    scoped_idle_checker_assignments = scoped_idle_checker_assignments
+    scoped_app_config_fragments_by_names = scoped_app_config_fragments_by_names
+    my_app_config_fragments_by_names = my_app_config_fragments_by_names
+    my_app_configs = my_app_configs
     artifact = artifact
     artifacts = artifacts
     artifact_revision = artifact_revision
@@ -524,14 +583,17 @@ class Query:
     admin_resource_groups = admin_resource_groups
     admin_resource_group_v2 = admin_resource_group_v2
     scheduling_handlers = scheduling_handlers
+    compute_schedule = compute_schedule
     admin_allowed_resource_groups_for_domain_v2 = admin_allowed_resource_groups_for_domain_v2
     admin_allowed_resource_groups_for_project_v2 = admin_allowed_resource_groups_for_project_v2
     admin_allowed_domains_for_resource_group_v2 = admin_allowed_domains_for_resource_group_v2
     admin_allowed_projects_for_resource_group_v2 = admin_allowed_projects_for_resource_group_v2
     admin_service_catalogs = admin_service_catalogs
     admin_session_scheduling_histories = admin_session_scheduling_histories
+    admin_kernel_scheduling_histories = admin_kernel_scheduling_histories
     admin_deployments = admin_deployments
     admin_deployment_histories = admin_deployment_histories
+    admin_replica_group_histories = admin_replica_group_histories
     admin_route_histories = admin_route_histories
     admin_notification_channel = admin_notification_channel
     admin_notification_channels = admin_notification_channels
@@ -614,8 +676,10 @@ class Query:
     image_scoped_aliases = image_scoped_aliases
     # Entity Scoped APIs (added in 26.2.0)
     session_scoped_scheduling_histories = session_scoped_scheduling_histories
+    scoped_kernel_scheduling_histories = scoped_kernel_scheduling_histories
     deployment_scoped_scheduling_histories = deployment_scoped_scheduling_histories
     route_scoped_scheduling_histories = route_scoped_scheduling_histories
+    scoped_replica_group_histories = scoped_replica_group_histories
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
     domain_fair_share = domain_fair_share
@@ -677,6 +741,9 @@ class Query:
     # Runtime Variant APIs
     runtime_variants = runtime_variants
     runtime_variant = runtime_variant
+    # Retention Policy APIs
+    admin_retention_policies = admin_retention_policies
+    admin_retention_policy = admin_retention_policy
     # Runtime Variant Preset APIs
     runtime_variant_presets = runtime_variant_presets
     runtime_variant_preset = runtime_variant_preset
@@ -705,8 +772,21 @@ class Query:
 
 @strawberry.type
 class Mutation:
+    admin_update_agent_resource_group = admin_update_agent_resource_group
+    admin_create_idle_checker = admin_create_idle_checker
+    admin_update_idle_checker = admin_update_idle_checker
+    admin_purge_idle_checker = admin_purge_idle_checker
+    admin_create_idle_checker_assignment = admin_create_idle_checker_assignment
+    update_idle_checker_assignment = update_idle_checker_assignment
+    purge_idle_checker_assignment = purge_idle_checker_assignment
+    admin_create_resource_slot_type = admin_create_resource_slot_type
+    admin_update_resource_slot_type = admin_update_resource_slot_type
+    admin_purge_resource_slot_type = admin_purge_resource_slot_type
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
     admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
+    admin_update_app_config_allow_list = admin_update_app_config_allow_list
+    scoped_upsert_app_config_fragments = scoped_upsert_app_config_fragments
+    my_upsert_app_config_fragments = my_upsert_app_config_fragments
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
@@ -908,6 +988,11 @@ class Mutation:
     admin_update_runtime_variant = admin_update_runtime_variant
     admin_delete_runtime_variant = admin_delete_runtime_variant
     admin_delete_runtime_variants = admin_delete_runtime_variants
+    # Retention Policy mutations
+    admin_create_retention_policy = admin_create_retention_policy
+    admin_update_retention_policy = admin_update_retention_policy
+    admin_delete_retention_policy = admin_delete_retention_policy
+    admin_purge_retention_policy = admin_purge_retention_policy
     # Runtime Variant Preset mutations
     admin_create_runtime_variant_preset = admin_create_runtime_variant_preset
     admin_update_runtime_variant_preset = admin_update_runtime_variant_preset
@@ -942,6 +1027,8 @@ class Mutation:
     # Session V2 mutations
     enqueue_session = enqueue_session
     terminate_sessions_v2 = terminate_sessions_v2
+    exclude_session_idle_checks = exclude_session_idle_checks
+    include_session_idle_checks = include_session_idle_checks
 
 
 @strawberry.type
@@ -955,6 +1042,7 @@ class Subscription:
 
 
 class CustomizedSchema(Schema):
+    @override
     def as_str(self) -> str:
         # Strawberry picks up pydantic field defaults (including SENTINEL) as GraphQL
         # schema field default_values.  SENTINEL is not a valid GraphQL scalar value, so
@@ -1012,35 +1100,32 @@ schema = CustomizedSchema(
 )
 
 
-async def _public_ping() -> str:
+@gql_root_field(BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Returns 'pong'"))  # type: ignore[misc]
+async def ping() -> str:
     return "pong"
 
 
-@strawberry.type
+@strawberry.type(name="Query")
 class PublicQueries:
-    """Query root served at the unauthenticated public endpoint (POST /admin/gql/strawberry/public).
+    """Query root of the ``public`` subgraph, served without authentication at
+    ``POST /admin/gql/strawberry/public``.
 
     Contains ONLY fields that are safe to expose without authentication; private fields are
-    physically absent, so they cannot be queried (no runtime gate needed). Real public fields
-    should be registered both here and on ``Query`` so authenticated clients can reach them via the
-    main endpoint too.
-
-    ``public_ping`` is a temporary placeholder so this type is non-empty (GraphQL requires >=1
-    field). It is intentionally registered only here (not on ``Query``) and will be replaced by
-    real public fields (e.g. ``publicAppConfigs``).
+    physically absent, so they cannot be queried (no runtime gate needed). A public field belongs
+    here and nowhere else: declaring it on ``Query`` as well would let the router resolve it
+    against the authenticated subgraph, which answers 401 to an anonymous caller.
     """
 
-    public_ping: str = strawberry.field(
-        resolver=_public_ping,
-        description="Placeholder public field; returns 'pong'.",
-    )
+    ping = ping
+    public_app_configs = public_app_configs
 
 
-# Plain (non-federation) schema: the public endpoint is hit directly, not through the Apollo
-# Router supergraph, so it needs no federation machinery.
-public_schema = strawberry.Schema(
+# A subgraph of the same supergraph as `schema`, kept separate only so that its routing URL
+# carries no auth middleware: anonymous queries compose against this subgraph alone.
+public_schema = Schema(
     query=PublicQueries,
     config=StrawberryConfig(auto_camel_case=True),
+    federation_version="2.7",
     extensions=[
         GQLLoggingExtension,
         GQLMetricExtension,

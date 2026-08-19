@@ -8,10 +8,7 @@ from .row import (
     RESOURCE_USAGE_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KernelRow,
-    by_kernel_ids,
-    get_user_email,
     kernels,
-    recalc_concurrency_used,
 )
 
 __all__ = (
@@ -23,8 +20,5 @@ __all__ = (
     "USER_RESOURCE_OCCUPYING_KERNEL_STATUSES",
     "KernelRow",
     "KernelStatus",
-    "by_kernel_ids",
-    "get_user_email",
     "kernels",
-    "recalc_concurrency_used",
 )

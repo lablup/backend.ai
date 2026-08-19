@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Any
+from typing import Any, override
 
 from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.types import AgentId
@@ -14,9 +14,11 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AbstractEventDispatcherPlugin(AbstractPlugin, metaclass=ABCMeta):
+    @override
     async def init(self, context: Any | None = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 

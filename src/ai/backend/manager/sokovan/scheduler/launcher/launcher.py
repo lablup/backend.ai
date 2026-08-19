@@ -31,13 +31,6 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.sokovan import (
-    ImageConfigData,
-    KernelBindingData,
-    NetworkSetup,
-    SessionDataForPull,
-    SessionDataForStart,
-)
 from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
@@ -49,6 +42,13 @@ from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
 )
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.views.sokovan.config import NetworkSetup
+from ai.backend.manager.views.sokovan.image import ImageConfigData
+from ai.backend.manager.views.sokovan.lifecycle import (
+    KernelBindingData,
+    SessionDataForPull,
+    SessionDataForStart,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

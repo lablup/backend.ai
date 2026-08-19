@@ -10,6 +10,7 @@ import enum
 import json
 import logging
 import re
+import shlex
 from collections.abc import (
     Collection,
     Iterator,
@@ -41,7 +42,7 @@ class Action(TypedDict):
 @attrs.define(auto_attribs=True, slots=True)
 class ServiceDefinition:
     command: str | list[str]
-    shell: str = "bash"
+    shell: str | None = "bash"
     noop: bool = False
     url_template: str = ""
     prestart_actions: list[Action] = attrs.Factory(list)
@@ -118,7 +119,10 @@ class ServiceParser:
         start_command = service.command
         if isinstance(start_command, str):
             shell = service.shell
-            start_command = [shell, "-c", start_command]
+            if shell:
+                start_command = [shell, "-c", start_command]
+            else:
+                start_command = shlex.split(start_command)
         cmdargs = [*start_command]
         env = {}
 

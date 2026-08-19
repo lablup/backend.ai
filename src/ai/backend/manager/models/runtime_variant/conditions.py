@@ -81,14 +81,38 @@ class RuntimeVariantConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Reads the cursor row's ``created_at`` and compares against that, because that is what
+        the page is ordered by.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RuntimeVariantRow.id < sa.text(f"'{cursor_id}'::uuid")
+            subquery = (
+                sa.select(RuntimeVariantRow.created_at)
+                .where(RuntimeVariantRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return RuntimeVariantRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Reads the cursor row's ``created_at`` and compares against that, because that is what
+        the page is ordered by.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RuntimeVariantRow.id > sa.text(f"'{cursor_id}'::uuid")
+            subquery = (
+                sa.select(RuntimeVariantRow.created_at)
+                .where(RuntimeVariantRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return RuntimeVariantRow.created_at > subquery
 
         return inner

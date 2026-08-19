@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 import pytest
 import sqlalchemy as sa
@@ -12,18 +12,20 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.repositories.base import (
     BulkUpserter,
     BulkUpserterResult,
+    BulkUpserterResultWithFailures,
     Upserter,
     UpserterResult,
     UpserterSpec,
     execute_bulk_upserter,
     execute_upserter,
 )
+from ai.backend.manager.repositories.ops import DBOpsProvider
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
-class UpserterTestRow(Base):  # type: ignore[misc]
+class UpserterTestRow(Base):
     """ORM model for upserter testing with PK as business key."""
 
     __tablename__ = "test_upserter_orm"
@@ -41,12 +43,15 @@ class SimpleUpserterSpec(UpserterSpec[UpserterTestRow]):
         self._value = value
 
     @property
+    @override
     def row_class(self) -> type[UpserterTestRow]:
         return UpserterTestRow
 
+    @override
     def build_insert_values(self) -> dict[str, Any]:
         return {"name": self._name, "value": self._value}
 
+    @override
     def build_update_values(self) -> dict[str, Any]:
         # On conflict (PK), only update value
         return {"value": self._value}
@@ -246,3 +251,31 @@ class TestBulkUpserter:
 
             assert isinstance(result, BulkUpserterResult)
             assert result.upserted_count == 0
+
+    async def test_bulk_upsert_partial_isolates_failing_rows(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        upserter_row_class: type[UpserterTestRow],
+    ) -> None:
+        """One row's failure rolls back only its own savepoint; the rest persist."""
+        bulk: BulkUpserter[UpserterTestRow] = BulkUpserter(
+            specs=[
+                SimpleUpserterSpec(name="ok-1", value="v1"),
+                # Exceeds VARCHAR(100), so this row alone fails.
+                SimpleUpserterSpec(name="too-long", value="x" * 200),
+                SimpleUpserterSpec(name="ok-2", value="v2"),
+            ]
+        )
+
+        async with DBOpsProvider(database_connection).write_ops() as w:
+            result = await w.bulk_upsert_partial(bulk, index_elements=["name"])
+
+        assert isinstance(result, BulkUpserterResultWithFailures)
+        assert [row.name for row in result.successes] == ["ok-1", "ok-2"]
+        assert len(result.errors) == 1
+        assert result.errors[0].index == 1
+
+        async with database_connection.begin_session() as db_sess:
+            table = upserter_row_class.__table__
+            names_result = await db_sess.execute(sa.select(table.c.name).order_by(table.c.name))
+            assert list(names_result.scalars().all()) == ["ok-1", "ok-2"]

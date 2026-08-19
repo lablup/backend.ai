@@ -1,3 +1,5 @@
+from typing import override
+
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.output.fields import image_fields
 from ai.backend.common.types import ClusterMode
@@ -9,6 +11,7 @@ from ai.backend.test.utils.exceptions import UnexpectedSuccess
 
 
 class SessionCreationFailureLowResources(TestCode):
+    @override
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         image_dep = ImageContext.current()

@@ -102,7 +102,7 @@ class VFSDirectoryDownloadServerStreamReader(StreamReader):
                     yield chunk
         finally:
             # Clean up temp file
-            if self._temp_file and self._temp_file.exists():
+            if self._temp_file is not None and self._temp_file.exists():
                 await aiofiles.os.remove(self._temp_file)
                 log.debug("Cleaned up temp file: {}", self._temp_file)
 
@@ -173,6 +173,7 @@ class VFSStorage(AbstractStorage):
             log.warning("Failed to clean temporary storage {}: {}", self._base_path, e)
 
     @property
+    @override
     def name(self) -> str:
         return self._name
 

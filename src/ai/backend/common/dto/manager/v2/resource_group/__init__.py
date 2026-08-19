@@ -40,7 +40,6 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     OrderDirection,
     PreemptionModeDTO,
-    PreemptionOrderDTO,
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
     SchedulerTypeDTO,
@@ -50,7 +49,6 @@ __all__ = (
     # Types
     "OrderDirection",
     "PreemptionModeDTO",
-    "PreemptionOrderDTO",
     "ResourceGroupOrderDirection",
     "ResourceGroupOrderField",
     "SchedulerTypeDTO",

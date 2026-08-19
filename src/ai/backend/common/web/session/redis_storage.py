@@ -51,6 +51,7 @@ class RedisStorage(AbstractStorage):
     async def get_redis_time(self) -> int:
         return await self._valkey_client.get_server_time_second()
 
+    @override
     async def load_session(self, request: web.Request) -> Session:
         # If X-BackendAI-SessionID exists in request, login will use the value as SessionID,
         # instead of Cookie value.

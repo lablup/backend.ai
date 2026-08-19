@@ -10,7 +10,7 @@ from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.manager.data.deployment.types import TargetGroupSpec
+from ai.backend.common.schema.deployment import TargetGroupSpec
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scheduling_history.creators import (

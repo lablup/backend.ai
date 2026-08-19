@@ -26,7 +26,7 @@ class AgentConfig:
 @dataclass
 class ContainerSSHSpec:
     work_dir: Path
-    ssh_keypair: ContainerSSHKeyPair
+    ssh_keypair: ContainerSSHKeyPair | None
     mounts: list[Mount]
 
     # Override UID/GID settings
@@ -60,7 +60,8 @@ class ContainerSSHProvisioner(Provisioner[ContainerSSHSpec, ContainerSSHResult])
 
     @override
     async def setup(self, spec: ContainerSSHSpec) -> ContainerSSHResult:
-        if not spec.ssh_keypair:
+        ssh_keypair = spec.ssh_keypair
+        if ssh_keypair is None:
             return ContainerSSHResult(ssh_dir=None)
 
         # Check if /home/work/.ssh is already mounted
@@ -72,12 +73,14 @@ class ContainerSSHProvisioner(Provisioner[ContainerSSHSpec, ContainerSSHResult])
 
         loop = asyncio.get_running_loop()
 
-        ssh_dir = await loop.run_in_executor(None, self._populate_ssh_config, spec)
+        ssh_dir = await loop.run_in_executor(None, self._populate_ssh_config, spec, ssh_keypair)
         return ContainerSSHResult(ssh_dir=ssh_dir)
 
-    def _populate_ssh_config(self, spec: ContainerSSHSpec) -> Path:
-        pubkey = spec.ssh_keypair.public_key.encode("ascii")
-        privkey = spec.ssh_keypair.private_key.encode("ascii")
+    def _populate_ssh_config(
+        self, spec: ContainerSSHSpec, ssh_keypair: ContainerSSHKeyPair
+    ) -> Path:
+        pubkey = ssh_keypair.public_key.encode("ascii")
+        privkey = ssh_keypair.private_key.encode("ascii")
         ssh_dir = spec.work_dir / ".ssh"
 
         # Create SSH directory

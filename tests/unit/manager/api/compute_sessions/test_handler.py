@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.compute_session import (
     SearchComputeSessionsRequest,
 )
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     ClusterMode,
     KernelId,
@@ -46,7 +47,7 @@ from ai.backend.manager.data.kernel.types import (
     UserPermission,
 )
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
-from ai.backend.manager.repositories.base import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 
@@ -65,6 +66,7 @@ def create_session_data(
         id=session_id or uuid4(),
         session_type=SessionTypes.INTERACTIVE,
         priority=0,
+        job_priority=0,
         is_preemptible=True,
         cluster_mode=ClusterMode.SINGLE_NODE,
         cluster_size=1,
@@ -159,6 +161,7 @@ def create_kernel_info(
         ),
         resource=ResourceInfo(
             scaling_group="default",
+            resource_group_id=ResourceGroupID(uuid4()),
             agent=agent,
             agent_addr=None,
             container_id=None,

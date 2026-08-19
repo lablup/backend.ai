@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Self
+from typing import Self, override
 from uuid import UUID
 
 import strawberry
@@ -215,6 +215,7 @@ class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
     created_at: datetime
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,
@@ -239,6 +240,7 @@ class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
     created_at: datetime
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,

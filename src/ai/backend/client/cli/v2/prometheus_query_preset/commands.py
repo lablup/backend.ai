@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast, override
 from uuid import UUID
 
 import click
@@ -42,6 +42,7 @@ class PrometheusTimestampParamType(click.ParamType):
     def __init__(self) -> None:
         self._datetime_parser = click.DateTime(formats=_DATETIME_FORMATS)
 
+    @override
     def convert(
         self,
         value: object,

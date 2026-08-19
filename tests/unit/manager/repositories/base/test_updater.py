@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator, Callable, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 from uuid import UUID
 
 import pytest
@@ -19,6 +19,7 @@ from ai.backend.manager.errors.repository import (
     UniqueConstraintViolationError,
 )
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base import (
     BatchUpdater,
     BatchUpdaterResult,
@@ -32,13 +33,12 @@ from ai.backend.manager.repositories.base import (
     execute_bulk_updater_partial,
     execute_updater,
 )
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
-class UpdaterTestRowInt(Base):  # type: ignore[misc]
+class UpdaterTestRowInt(Base):
     """ORM model for updater testing with integer PK."""
 
     __tablename__ = "test_updater_int_pk"
@@ -50,7 +50,7 @@ class UpdaterTestRowInt(Base):  # type: ignore[misc]
     value: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
 
 
-class UpdaterTestRowUUID(Base):  # type: ignore[misc]
+class UpdaterTestRowUUID(Base):
     """ORM model for updater testing with UUID PK."""
 
     __tablename__ = "test_updater_uuid_pk"
@@ -61,7 +61,7 @@ class UpdaterTestRowUUID(Base):  # type: ignore[misc]
     status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="pending")
 
 
-class UpdaterTestRowStr(Base):  # type: ignore[misc]
+class UpdaterTestRowStr(Base):
     """ORM model for updater testing with string PK."""
 
     __tablename__ = "test_updater_str_pk"
@@ -83,9 +83,11 @@ class IntPKStatusUpdaterSpec(UpdaterSpec[UpdaterTestRowInt]):
         self._new_value = new_value
 
     @property
+    @override
     def row_class(self) -> type[UpdaterTestRowInt]:
         return UpdaterTestRowInt
 
+    @override
     def build_values(self) -> dict[str, Any]:
         values: dict[str, Any] = {"status": self._new_status}
         if self._new_value is not None:
@@ -97,9 +99,11 @@ class IntPKNoValuesUpdaterSpec(UpdaterSpec[UpdaterTestRowInt]):
     """Updater spec that produces no column changes (empty build_values)."""
 
     @property
+    @override
     def row_class(self) -> type[UpdaterTestRowInt]:
         return UpdaterTestRowInt
 
+    @override
     def build_values(self) -> dict[str, Any]:
         return {}
 
@@ -111,9 +115,11 @@ class UUIDPKStatusUpdaterSpec(UpdaterSpec[UpdaterTestRowUUID]):
         self._new_status = new_status
 
     @property
+    @override
     def row_class(self) -> type[UpdaterTestRowUUID]:
         return UpdaterTestRowUUID
 
+    @override
     def build_values(self) -> dict[str, Any]:
         return {"status": self._new_status}
 
@@ -125,9 +131,11 @@ class StrPKStatusUpdaterSpec(UpdaterSpec[UpdaterTestRowStr]):
         self._new_status = new_status
 
     @property
+    @override
     def row_class(self) -> type[UpdaterTestRowStr]:
         return UpdaterTestRowStr
 
+    @override
     def build_values(self) -> dict[str, Any]:
         return {"status": self._new_status}
 
@@ -142,9 +150,11 @@ class IntPKBatchUpdaterSpec(BatchUpdaterSpec[UpdaterTestRowInt]):
         self._new_status = new_status
 
     @property
+    @override
     def row_class(self) -> type[UpdaterTestRowInt]:
         return UpdaterTestRowInt
 
+    @override
     def build_values(self) -> dict[str, Any]:
         return {"status": self._new_status}
 
@@ -681,7 +691,7 @@ class TestBatchUpdater:
 # --- Integrity error handling tests ---
 
 
-class UpdaterTestRowWithUnique(Base):  # type: ignore[misc]
+class UpdaterTestRowWithUnique(Base):
     """ORM model for updater integrity error testing with a unique constraint on name."""
 
     __tablename__ = "test_updater_unique"
@@ -714,13 +724,16 @@ class UniqueNameUpdaterSpec(UpdaterSpec[UpdaterTestRowWithUnique]):
         self._checks = checks
 
     @property
+    @override
     def row_class(self) -> type[UpdaterTestRowWithUnique]:
         return UpdaterTestRowWithUnique
 
+    @override
     def build_values(self) -> dict[str, Any]:
         return {"name": self._new_name}
 
     @property
+    @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return self._checks
 
@@ -737,13 +750,16 @@ class UniqueNameBatchUpdaterSpec(BatchUpdaterSpec[UpdaterTestRowWithUnique]):
         self._checks = checks
 
     @property
+    @override
     def row_class(self) -> type[UpdaterTestRowWithUnique]:
         return UpdaterTestRowWithUnique
 
+    @override
     def build_values(self) -> dict[str, Any]:
         return {"name": self._new_name}
 
     @property
+    @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return self._checks
 
@@ -919,7 +935,7 @@ class TestBatchUpdaterIntegrityError:
 # =============================================================================
 
 
-class BulkUpdaterPartialTestRow(Base):  # type: ignore[misc]
+class BulkUpdaterPartialTestRow(Base):
     """ORM model for bulk updater partial testing.
 
     ``name`` carries a UNIQUE constraint so an update colliding with another row's
@@ -941,9 +957,11 @@ class _FieldUpdaterSpec(UpdaterSpec[BulkUpdaterPartialTestRow]):
         self._values = values
 
     @property
+    @override
     def row_class(self) -> type[BulkUpdaterPartialTestRow]:
         return BulkUpdaterPartialTestRow
 
+    @override
     def build_values(self) -> dict[str, Any]:
         return dict(self._values)
 

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_card.types import ResourceRequirementEntry
@@ -102,7 +103,9 @@ class TestModelCardCreatorResourceRequirements:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> DomainRow:
         async with db_with_cleanup.begin_session() as db_sess:
+            domain_id = DomainID(uuid.uuid4())
             domain = DomainRow(
+                id=domain_id,
                 name=f"test-domain-{uuid.uuid4().hex[:8]}",
                 description="Test domain",
                 is_active=True,
@@ -165,6 +168,7 @@ class TestModelCardCreatorResourceRequirements:
                     rounds=100_000,
                     salt_size=32,
                 ),
+                domain_id=DomainID(test_domain.id),
                 need_password_change=False,
                 full_name="Test User",
                 domain_name=test_domain.name,

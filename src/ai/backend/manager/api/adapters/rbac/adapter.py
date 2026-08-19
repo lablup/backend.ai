@@ -86,6 +86,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     EntityOrderBy as EntityOrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    MappedScopeNestedFilter as MappedScopeNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionFilter as PermissionFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -215,11 +218,10 @@ from ai.backend.manager.models.role_invitation.conditions import (
     RoleInvitationOrders,
 )
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkCreator,
-    NoPagination,
-    OffsetPagination,
     Purger,
     combine_conditions_or,
     negate_conditions,
@@ -231,15 +233,19 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     RoleCreatorSpec,
     UserRoleCreatorSpec,
 )
-from ai.backend.manager.repositories.permission_controller.types import ScopedRoleSearchScope
+from ai.backend.manager.repositories.permission_controller.purgers import (
+    PermissionPurgerSpec,
+    RolePurgerSpec,
+)
+from ai.backend.manager.repositories.permission_controller.types import ScopedRoleOperationScope
 from ai.backend.manager.repositories.permission_controller.updaters import (
     PermissionUpdaterSpec,
     RoleUpdaterSpec,
 )
 from ai.backend.manager.repositories.role_invitation.types import (
-    InviteeSearchScope,
-    InviterSearchScope,
-    RoleInvitationSearchScope,
+    InviteeOperationScope,
+    InviterOperationScope,
+    RoleInvitationOperationScope,
 )
 from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
 from ai.backend.manager.services.permission_contoller.actions.bulk_add_role_permissions import (
@@ -388,7 +394,7 @@ class RBACAdapter(BaseAdapter):
     def _validate_scope_id(self, scope_type: RBACElementType, scope_id: str) -> None:
         """Raise InvalidScope if scope_id is not a valid UUID for scope types that require one."""
         match scope_type:
-            case RBACElementType.USER | RBACElementType.PROJECT:
+            case RBACElementType.USER | RBACElementType.PROJECT | RBACElementType.DOMAIN:
                 try:
                     uuid.UUID(scope_id)
                 except ValueError:
@@ -750,7 +756,7 @@ class RBACAdapter(BaseAdapter):
 
     async def search_roles_in_scope(
         self,
-        scope: ScopedRoleSearchScope,
+        scope: ScopedRoleOperationScope,
         input: SearchRolesInput,
     ) -> SearchResult[RoleNode]:
         """Search roles registered in a given scope."""
@@ -913,7 +919,7 @@ class RBACAdapter(BaseAdapter):
 
     async def purge(self, role_id: UUID) -> PurgeRolePayload:
         """Hard-delete a role from the database."""
-        purger: Purger[RoleRow] = Purger(row_class=RoleRow, pk_value=role_id)
+        purger: Purger[RoleRow] = Purger(spec=RolePurgerSpec(role_id=role_id))
         action_result = await self._processors.permission_controller.purge_role.wait_for_complete(
             PurgeRoleAction(purger=purger)
         )
@@ -923,7 +929,9 @@ class RBACAdapter(BaseAdapter):
 
     async def delete_permission(self, permission_id: UUID) -> DeletePermissionPayloadDTO:
         """Hard-delete a scoped permission."""
-        purger: Purger[PermissionRow] = Purger(row_class=PermissionRow, pk_value=permission_id)
+        purger: Purger[PermissionRow] = Purger(
+            spec=PermissionPurgerSpec(permission_id=permission_id)
+        )
         await self._processors.permission_controller.delete_permission.wait_for_complete(
             DeletePermissionAction(purger=purger)
         )
@@ -1085,7 +1093,7 @@ class RBACAdapter(BaseAdapter):
     ) -> BulkRemoveRolePermissionsPayload:
         """Bulk-delete permission rows by primary key."""
         purgers: list[Purger[PermissionRow]] = [
-            Purger(row_class=PermissionRow, pk_value=pid) for pid in input.permission_ids
+            Purger(spec=PermissionPurgerSpec(permission_id=pid)) for pid in input.permission_ids
         ]
         action_result = await self._processors.permission_controller.bulk_remove_role_permissions.wait_for_complete(
             BulkRemoveRolePermissionsAction(purgers=purgers)
@@ -1404,6 +1412,8 @@ class RBACAdapter(BaseAdapter):
                 )
         if f.assigned_user is not None:
             conditions.extend(self._convert_user_nested_filter(f.assigned_user))
+        if f.mapped_scope is not None:
+            conditions.extend(self._convert_mapped_scope_nested_filter(f.mapped_scope))
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_role_filter_gql(sub))
@@ -1447,6 +1457,61 @@ class RBACAdapter(BaseAdapter):
             not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
                 not_conditions.extend(self._convert_user_nested_filter(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+        return conditions
+
+    def _convert_mapped_scope_nested_filter(
+        self, f: MappedScopeNestedFilterDTO
+    ) -> list[QueryCondition]:
+        raw_conditions: list[QueryCondition] = []
+        if f.scope_type is not None:
+            st = f.scope_type
+            if st.equals is not None:
+                raw_conditions.append(
+                    EntityScopeConditions.by_scope_type_equals(RBACElementType(st.equals))
+                )
+            if st.in_ is not None and st.in_:
+                raw_conditions.append(
+                    EntityScopeConditions.by_scope_type_in([RBACElementType(s) for s in st.in_])
+                )
+            if st.not_equals is not None:
+                raw_conditions.append(
+                    EntityScopeConditions.by_scope_type_not_equals(RBACElementType(st.not_equals))
+                )
+            if st.not_in is not None and st.not_in:
+                raw_conditions.append(
+                    EntityScopeConditions.by_scope_type_not_in([
+                        RBACElementType(s) for s in st.not_in
+                    ])
+                )
+        if f.scope_id is not None:
+            condition = self.convert_string_filter(
+                f.scope_id,
+                contains_factory=EntityScopeConditions.by_scope_id_contains,
+                equals_factory=EntityScopeConditions.by_scope_id_equals,
+                starts_with_factory=EntityScopeConditions.by_scope_id_starts_with,
+                ends_with_factory=EntityScopeConditions.by_scope_id_ends_with,
+                in_factory=EntityScopeConditions.by_scope_id_in,
+            )
+            if condition is not None:
+                raw_conditions.append(condition)
+        conditions: list[QueryCondition] = []
+        if raw_conditions:
+            conditions.append(RoleConditions.by_mapped_scope(raw_conditions))
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_mapped_scope_nested_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(self._convert_mapped_scope_nested_filter(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(self._convert_mapped_scope_nested_filter(sub))
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions
@@ -1684,6 +1749,27 @@ class RBACAdapter(BaseAdapter):
                 starts_with_factory=EntityScopeConditions.by_entity_id_starts_with,
                 ends_with_factory=EntityScopeConditions.by_entity_id_ends_with,
                 in_factory=EntityScopeConditions.by_entity_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.scope_type is not None:
+            conditions.extend(
+                self._convert_rbac_element_type_filter(
+                    f.scope_type,
+                    equals_factory=EntityScopeConditions.by_scope_type_equals,
+                    not_equals_factory=EntityScopeConditions.by_scope_type_not_equals,
+                    in_factory=EntityScopeConditions.by_scope_type_in,
+                    not_in_factory=EntityScopeConditions.by_scope_type_not_in,
+                )
+            )
+        if f.scope_id is not None:
+            condition = self.convert_string_filter(
+                f.scope_id,
+                contains_factory=EntityScopeConditions.by_scope_id_contains,
+                equals_factory=EntityScopeConditions.by_scope_id_equals,
+                starts_with_factory=EntityScopeConditions.by_scope_id_starts_with,
+                ends_with_factory=EntityScopeConditions.by_scope_id_ends_with,
+                in_factory=EntityScopeConditions.by_scope_id_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -2031,7 +2117,7 @@ class RBACAdapter(BaseAdapter):
             SearchMyRoleInvitationsAction(
                 user_id=me.user_id,
                 querier=querier,
-                scope=InviteeSearchScope(invitee_user_id=me.user_id),
+                scope=InviteeOperationScope(invitee_user_id=me.user_id),
             )
         )
         raw = action_result.result
@@ -2068,7 +2154,7 @@ class RBACAdapter(BaseAdapter):
             SearchMySentRoleInvitationsAction(
                 user_id=me.user_id,
                 querier=querier,
-                scope=InviterSearchScope(inviter_user_id=me.user_id),
+                scope=InviterOperationScope(inviter_user_id=me.user_id),
             )
         )
         raw = action_result.result
@@ -2103,7 +2189,7 @@ class RBACAdapter(BaseAdapter):
             SearchRoleInvitationsByRoleAction(
                 role_id=role_id,
                 querier=querier,
-                scope=RoleInvitationSearchScope(role_id=role_id),
+                scope=RoleInvitationOperationScope(role_id=role_id),
             )
         )
         raw = action_result.result

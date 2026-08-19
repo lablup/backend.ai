@@ -75,6 +75,11 @@ class ContainerSandboxType(enum.StrEnum):
     JAIL = "jail"
 
 
+class ContainerLogDriver(enum.StrEnum):
+    LOCAL = "local"
+    JSON_FILE = "json-file"
+
+
 class ScratchType(enum.StrEnum):
     HOSTDIR = "hostdir"
     HOSTFILE = "hostfile"
@@ -1094,25 +1099,6 @@ class CommonAgentConfig(BaseConfigSchema):
             example=ConfigExample(local="", prod="/var/log/backend.ai/abuse"),
         ),
     ]
-    use_experimental_redis_event_dispatcher: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices(
-                "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
-            ),
-            serialization_alias="use-experimental-redis-event-dispatcher",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Enables the experimental Redis-based event dispatcher for agent-manager communication. "
-                "Provides improved event delivery reliability and scalability. "
-                "Requires Redis to be configured. Still in experimental phase."
-            ),
-            added_version="25.12.0",
-            example=ConfigExample(local="false", prod="false"),
-        ),
-    ]
     docker_mode: Annotated[
         str | None,
         Field(
@@ -1206,20 +1192,21 @@ class OverridableAgentConfig(BaseConfigSchema):
             example=ConfigExample(local="6007", prod="6007"),
         ),
     ]
-    scaling_group: Annotated[
-        str,
+    initial_resource_group_name: Annotated[
+        str | None,
         Field(
-            default="default",
-            validation_alias=AliasChoices("scaling-group", "scaling_group"),
-            serialization_alias="scaling-group",
+            default=None,
+            validation_alias=AliasChoices(
+                "initial-resource-group-name", "initial_resource_group_name"
+            ),
+            serialization_alias="initial-resource-group-name",
         ),
         BackendAIConfigMeta(
             description=(
-                "Name of the scaling group this agent belongs to. "
-                "Scaling groups organize agents into logical clusters for resource allocation. "
-                "Users can target specific scaling groups when creating sessions."
+                "Name of the resource group used as the seed only at the agent's first "
+                "registration. When unset, the default resource group is used."
             ),
-            added_version="25.12.0",
+            added_version="26.8.0",
             example=ConfigExample(local="default", prod="gpu-cluster"),
         ),
     ]
@@ -1317,6 +1304,18 @@ class OverridableAgentConfig(BaseConfigSchema):
     model_config = ConfigDict(
         extra="allow",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_removed_scaling_group_key(cls, data: Any) -> Any:
+        if isinstance(data, Mapping):
+            for removed_key in ("scaling-group", "scaling_group"):
+                if removed_key in data:
+                    raise ValueError(
+                        f"The '{removed_key}' agent config key is deprecated. "
+                        "Use 'initial-resource-group-name' instead."
+                    )
+        return data
 
     @property
     def defaulted_id(self) -> str:
@@ -1922,6 +1921,23 @@ class ResourceConfig(BaseConfigSchema):
 
 
 class ContainerLogsConfig(BaseConfigSchema):
+    driver: Annotated[
+        ContainerLogDriver,
+        Field(
+            default=ContainerLogDriver.LOCAL,
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Log driver used for kernel containers. "
+                "'local' is Docker-only and stores logs in an efficient binary format. "
+                "'json-file' is accepted by both Docker and Podman, but Podman keeps a "
+                "single size-capped log per container, so only 'max-length' takes effect "
+                "there while file count and compression have no equivalent."
+            ),
+            added_version="26.4.10",
+            example=ConfigExample(local="local", prod="local"),
+        ),
+    ]
     max_length: Annotated[
         BinarySizeField,
         Field(
@@ -2077,6 +2093,8 @@ class DockerExtraConfig(BaseConfigSchema):
     """
     For checking additional Docker configurations
     """
+
+    model_config = ConfigDict(extra="ignore")
 
     swarm_enabled: Annotated[
         bool,

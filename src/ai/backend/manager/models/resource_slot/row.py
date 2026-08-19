@@ -15,11 +15,17 @@ from decimal import Decimal
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from ai.backend.common.identifier.resource_slot import ResourceSlotTypeUUID
+from ai.backend.manager.data.resource_slot.types import (
+    NumberFormatData,
+    ResourceSlotTypeData,
+)
 from ai.backend.manager.models.base import (
     GUID,
     Base,
     PydanticColumn,
 )
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin, LifecycleTimestampsMixin
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 
 __all__ = (
@@ -32,7 +38,7 @@ __all__ = (
 )
 
 
-class ResourceSlotTypeRow(Base):  # type: ignore[misc]
+class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):
     """Registry of known resource slot types with display metadata.
 
     Primary key is slot_name (e.g., 'cpu', 'mem', 'cuda.device').
@@ -40,6 +46,13 @@ class ResourceSlotTypeRow(Base):  # type: ignore[misc]
 
     __tablename__ = "resource_slot_types"
 
+    uuid: Mapped[ResourceSlotTypeUUID] = mapped_column(
+        "uuid",
+        GUID(ResourceSlotTypeUUID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     slot_type: Mapped[str] = mapped_column("slot_type", sa.String(length=16), nullable=False)
     required: Mapped[bool] = mapped_column(
@@ -94,22 +107,27 @@ class ResourceSlotTypeRow(Base):  # type: ignore[misc]
     rank: Mapped[int] = mapped_column(
         "rank", sa.Integer, nullable=False, server_default=sa.text("0")
     )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
-    )
+
+    def to_data(self) -> ResourceSlotTypeData:
+        return ResourceSlotTypeData(
+            uuid=self.uuid,
+            slot_name=self.slot_name,
+            slot_type=self.slot_type,
+            required=self.required,
+            enabled=self.enabled,
+            display_name=self.display_name,
+            description=self.description,
+            display_unit=self.display_unit,
+            display_icon=self.display_icon,
+            number_format=NumberFormatData(
+                binary=self.number_format.binary,
+                round_length=self.number_format.round_length,
+            ),
+            rank=self.rank,
+        )
 
 
-class AgentResourceRow(Base):  # type: ignore[misc]
+class AgentResourceRow(LifecycleTimestampsMixin, Base):
     """Per-agent, per-slot resource capacity and usage.
 
     Composite primary key: (agent_id, slot_name).
@@ -125,21 +143,14 @@ class AgentResourceRow(Base):  # type: ignore[misc]
     reserved: Mapped[Decimal] = mapped_column(
         "reserved", sa.Numeric(precision=24, scale=6), nullable=False, server_default=sa.text("0")
     )
+    prereserved: Mapped[Decimal] = mapped_column(
+        "prereserved",
+        sa.Numeric(precision=24, scale=6),
+        nullable=False,
+        server_default=sa.text("0"),
+    )
     used: Mapped[Decimal] = mapped_column(
         "used", sa.Numeric(precision=24, scale=6), nullable=False, server_default=sa.text("0")
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
     )
 
     slot_type_row: Mapped[ResourceSlotTypeRow] = relationship(
@@ -170,7 +181,7 @@ class AgentResourceRow(Base):  # type: ignore[misc]
     )
 
 
-class ResourceAllocationRow(Base):  # type: ignore[misc]
+class ResourceAllocationRow(CreatedAtMixin, Base):
     """Per-kernel, per-slot resource allocation.
 
     Composite primary key: (kernel_id, slot_name).
@@ -183,14 +194,30 @@ class ResourceAllocationRow(Base):  # type: ignore[misc]
     requested: Mapped[Decimal] = mapped_column(
         "requested", sa.Numeric(precision=24, scale=6), nullable=False
     )
+    prereserved: Mapped[Decimal] = mapped_column(
+        "prereserved",
+        sa.Numeric(precision=24, scale=6),
+        nullable=False,
+        server_default=sa.text("0"),
+    )
+    reserved: Mapped[Decimal] = mapped_column(
+        "reserved",
+        sa.Numeric(precision=24, scale=6),
+        nullable=False,
+        server_default=sa.text("0"),
+    )
     used: Mapped[Decimal | None] = mapped_column(
         "used", sa.Numeric(precision=24, scale=6), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
+    prereserved_at: Mapped[datetime | None] = mapped_column(
+        "prereserved_at",
         sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
+        nullable=True,
+    )
+    reserved_at: Mapped[datetime | None] = mapped_column(
+        "reserved_at",
+        sa.DateTime(timezone=True),
+        nullable=True,
     )
     used_at: Mapped[datetime | None] = mapped_column(
         "used_at",
@@ -226,7 +253,7 @@ class ResourceAllocationRow(Base):  # type: ignore[misc]
     )
 
 
-class ModelCardResourceRequirementRow(Base):  # type: ignore[misc]
+class ModelCardResourceRequirementRow(Base):
     """Per-model-card, per-slot minimum resource requirement.
 
     Composite primary key: (model_card_id, slot_name).
@@ -256,7 +283,7 @@ class ModelCardResourceRequirementRow(Base):  # type: ignore[misc]
     )
 
 
-class PresetResourceSlotRow(Base):  # type: ignore[misc]
+class PresetResourceSlotRow(Base):
     """Per-preset, per-slot resource allocation.
 
     Composite primary key: (preset_id, slot_name).
@@ -286,7 +313,7 @@ class PresetResourceSlotRow(Base):  # type: ignore[misc]
     )
 
 
-class DeploymentRevisionResourceSlotRow(Base):  # type: ignore[misc]
+class DeploymentRevisionResourceSlotRow(Base):
     """Per-revision, per-slot resource allocation.
 
     Composite primary key: (revision_id, slot_name).

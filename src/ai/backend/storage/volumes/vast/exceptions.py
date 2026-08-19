@@ -1,3 +1,6 @@
+from typing import override
+
+
 class VASTError(Exception):
     pass
 
@@ -10,6 +13,7 @@ class VASTAPIError(VASTError):
 
         self.message = message or ""
 
+    @override
     def __str__(self) -> str:
         return type(self).__name__
 

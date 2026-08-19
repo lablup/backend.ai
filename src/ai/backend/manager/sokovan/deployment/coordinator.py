@@ -40,7 +40,8 @@ from ai.backend.manager.data.session.types import SchedulingResult, SubStepResul
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
@@ -196,11 +197,15 @@ class DeploymentTaskSpec:
 
     def create_if_needed_event(self) -> DoDeploymentLifecycleIfNeededEvent:
         """Create event for checking if processing is needed."""
-        return DoDeploymentLifecycleIfNeededEvent(self.lifecycle_type.value, sub_step=self.sub_step)
+        return DoDeploymentLifecycleIfNeededEvent(
+            lifecycle_type=self.lifecycle_type.value, sub_step=self.sub_step
+        )
 
     def create_process_event(self) -> DoDeploymentLifecycleEvent:
         """Create event for forced processing."""
-        return DoDeploymentLifecycleEvent(self.lifecycle_type.value, sub_step=self.sub_step)
+        return DoDeploymentLifecycleEvent(
+            lifecycle_type=self.lifecycle_type.value, sub_step=self.sub_step
+        )
 
     @property
     def _suffix(self) -> str:

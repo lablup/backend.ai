@@ -3,7 +3,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import aiofiles.os
 
@@ -25,6 +25,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class CephDirQuotaModel(BaseQuotaModel):
+    @override
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -36,6 +37,7 @@ class CephDirQuotaModel(BaseQuotaModel):
         if options is not None:
             await self.update_quota_scope(quota_scope_id, options)
 
+    @override
     async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
         qspath = self.mangle_qspath(quota_scope_id)
         if not qspath.exists():
@@ -74,6 +76,7 @@ class CephDirQuotaModel(BaseQuotaModel):
         )
         return QuotaUsage(used_bytes=used_bytes, limit_bytes=limit_bytes)
 
+    @override
     async def update_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -93,6 +96,7 @@ class CephDirQuotaModel(BaseQuotaModel):
             ),
         )
 
+    @override
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         if not qspath.exists():
@@ -108,6 +112,7 @@ class CephDirQuotaModel(BaseQuotaModel):
 
 
 class CephFSOpModel(BaseFSOpModel):
+    @override
     async def scan_tree_usage(self, path: Path) -> TreeUsage:
         loop = asyncio.get_running_loop()
         raw_reports = await loop.run_in_executor(
@@ -121,6 +126,7 @@ class CephFSOpModel(BaseFSOpModel):
         used_bytes = int(raw_reports[1].strip().decode())
         return TreeUsage(file_count=file_count, used_bytes=used_bytes)
 
+    @override
     async def scan_tree_size(self, path: Path) -> BinarySize:
         loop = asyncio.get_running_loop()
         raw_report = await loop.run_in_executor(
@@ -136,6 +142,7 @@ class CephFSVolume(BaseVolume):
     registry: dict[str, int]
     project_id_pool: list[int]
 
+    @override
     async def init(self) -> None:
         try:
             await run([b"ceph", b"--version"])
@@ -143,18 +150,22 @@ class CephFSVolume(BaseVolume):
             raise CephNotInstalledError("Ceph is not installed.") from e
         await super().init()
 
+    @override
     async def create_quota_model(self) -> AbstractQuotaModel:
         return CephDirQuotaModel(self.mount_path)
 
+    @override
     async def create_fsop_model(self) -> AbstractFSOpModel:
         return CephFSOpModel(
             self.mount_path,
             self.local_config["storage-proxy"]["scandir-limit"],
         )
 
+    @override
     async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_FAST_SIZE])
 
+    @override
     async def get_fs_usage(self) -> CapacityUsage:
         (total, used, _) = await asyncio.get_running_loop().run_in_executor(
             None,

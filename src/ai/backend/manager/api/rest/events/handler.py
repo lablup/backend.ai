@@ -209,6 +209,20 @@ class EventsHandler:
             self.event_hub.register_event_propagator(
                 propagator, [(EventDomain.BGTASK, str(task_id))]
             )
+
+            async def close_on_disconnect() -> None:
+                # resp.wait() returns once the SSE connection is closed by the
+                # client. Closing the propagator then unblocks receive() below,
+                # so the handler exits and the finally: cleanup runs. Without
+                # this, receive() blocks forever when a client disconnects
+                # before the terminal (close) event arrives, leaking the task,
+                # the registered propagator, and its per-alias metric series.
+                try:
+                    await resp.wait()
+                finally:
+                    await propagator.close()
+
+            disconnect_task = asyncio.create_task(close_on_disconnect())
             try:
                 cache_id = EventCacheDomain.BGTASK.cache_id(str(task_id))
                 async for event in propagator.receive(cache_id):
@@ -230,9 +244,19 @@ class EventsHandler:
                             user_event.event_name(),
                         )
                         break
-                await resp.send(dump_json_str({}), event="server_close")
+                # Skip the trailing send if the client already disconnected
+                # (receive() then ended via close_on_disconnect()).
+                if not disconnect_task.done():
+                    await resp.send(dump_json_str({}), event="server_close")
             finally:
                 self.event_hub.unregister_event_propagator(propagator.id())
+                await propagator.close()
+                if not disconnect_task.done():
+                    disconnect_task.cancel()
+                    try:
+                        await disconnect_task
+                    except asyncio.CancelledError:
+                        pass
         return resp
 
 

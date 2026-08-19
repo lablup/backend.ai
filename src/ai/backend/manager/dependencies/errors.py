@@ -4,6 +4,8 @@ Exceptions related to dependency management.
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -19,6 +21,7 @@ class InvalidManagerKeypairError(BackendAIError):
     error_type = "https://api.backend.ai/probs/dependency/invalid-manager-keypair"
     error_title = "Invalid manager keypair configuration."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -33,6 +36,7 @@ class DependencyInitializationError(BackendAIError):
     error_type = "https://api.backend.ai/probs/dependency/initialization-failure"
     error_title = "Dependency initialization failure."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,

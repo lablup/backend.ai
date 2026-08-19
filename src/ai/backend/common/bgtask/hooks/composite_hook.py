@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
+from typing import override
 
 from .base import AbstractTaskHook, TaskContext
 
@@ -13,6 +14,7 @@ class CompositeTaskHook(AbstractTaskHook):
         self._hooks = hooks
 
     @asynccontextmanager
+    @override
     async def apply(self, context: TaskContext) -> AsyncIterator[TaskContext]:
         async with AsyncExitStack() as stack:
             # Apply all hooks in sequence

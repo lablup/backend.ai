@@ -9,35 +9,36 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, override
 from unittest.mock import AsyncMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.manager.errors.repository import EmptySearchScopeError
+from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
     CreatorSpec,
     DependentCreatorSpec,
-    ExistsQuerier,
-    NoPagination,
     Purger,
     Querier,
     Updater,
     UpdaterSpec,
 )
+from ai.backend.manager.repositories.base.purger import PurgerSpec
 from ai.backend.manager.repositories.ops import DBOpsProvider, ReadOps
 from ai.backend.testutils.db import with_tables
 
 
-class OpsTestParentRow(Base):  # type: ignore[misc]
+class OpsTestParentRow(Base):
     __tablename__ = "test_ops_parent"
     __table_args__ = {"extend_existing": True}
 
@@ -46,7 +47,7 @@ class OpsTestParentRow(Base):  # type: ignore[misc]
     domain_name: Mapped[str] = mapped_column(sa.String(64), nullable=False)
 
 
-class OpsTestChildRow(Base):  # type: ignore[misc]
+class OpsTestChildRow(Base):
     __tablename__ = "test_ops_child"
     __table_args__ = {"extend_existing": True}
 
@@ -62,6 +63,7 @@ class ParentCreatorSpec(CreatorSpec[OpsTestParentRow]):
     name: str
     domain_name: str
 
+    @override
     def build_row(self) -> OpsTestParentRow:
         return OpsTestParentRow(name=self.name, domain_name=self.domain_name)
 
@@ -71,11 +73,30 @@ class ParentUpdaterSpec(UpdaterSpec[OpsTestParentRow]):
     new_name: str
 
     @property
+    @override
     def row_class(self) -> type[OpsTestParentRow]:
         return OpsTestParentRow
 
+    @override
     def build_values(self) -> dict[str, Any]:
         return {"name": self.new_name}
+
+
+@dataclass
+class ParentPurgerSpec(PurgerSpec[OpsTestParentRow]):
+    parent_id: int
+
+    @override
+    def row_class(self) -> type[OpsTestParentRow]:
+        return OpsTestParentRow
+
+    @override
+    def pk_value(self) -> int:
+        return self.parent_id
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
 
 @dataclass(frozen=True)
@@ -87,18 +108,21 @@ class ChildDependency:
 class ChildDependentCreatorSpec(DependentCreatorSpec[ChildDependency, OpsTestChildRow]):
     label: str
 
+    @override
     def build_row(self, dependency: ChildDependency) -> OpsTestChildRow:
         return OpsTestChildRow(parent_id=dependency.parent_id, label=self.label)
 
 
 @dataclass(frozen=True)
-class ParentDomainScope(SearchScope):
+class ParentDomainScope(OperationScope):
     domain_name: str
 
+    @override
     def to_condition(self) -> QueryCondition:
         return lambda: OpsTestParentRow.domain_name == self.domain_name
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return ()
 
@@ -120,7 +144,7 @@ class TestScopeConstraint:
     async def test_with_scopes_rejects_empty_scopes(self) -> None:
         ops = ReadOps(AsyncMock())  # session is never touched before the guard raises
         querier = BatchQuerier(pagination=NoPagination())
-        with pytest.raises(EmptySearchScopeError):
+        with pytest.raises(EmptyOperationScopeError):
             await ops.batch_query_with_scopes(sa.select(OpsTestParentRow), querier, [])
 
 
@@ -153,7 +177,7 @@ class TestWriteRoundTrip:
         async with provider.write_ops() as w:
             created = await w.create(Creator(spec=ParentCreatorSpec(name="p1", domain_name="d1")))
             parent_id = created.row.id
-            await w.purge(Purger(row_class=OpsTestParentRow, pk_value=parent_id))
+            await w.purge(Purger(spec=ParentPurgerSpec(parent_id=parent_id)))
 
         async with provider.read_ops() as r:
             fetched = await r.query(Querier(row_class=OpsTestParentRow, pk_value=parent_id))
@@ -191,69 +215,6 @@ class TestDependentCreate:
 
         assert child.parent_id == parent.id
         assert child.label == "solo"
-
-
-@pytest.fixture
-async def seeded_parent(
-    database_connection: ExtendedAsyncSAEngine,
-    ops_tables: None,
-) -> None:
-    """Seed a single ("p1", "d1") parent row directly, independent of the create op."""
-    async with database_connection.begin() as conn:
-        await conn.execute(sa.insert(OpsTestParentRow).values(name="p1", domain_name="d1"))
-
-
-class TestExists:
-    async def test_matching_condition_is_true_absent_is_false(
-        self, provider: DBOpsProvider, seeded_parent: None
-    ) -> None:
-        async with provider.read_ops() as r:
-            assert await r.exists(
-                ExistsQuerier(
-                    row_class=OpsTestParentRow,
-                    conditions=[lambda: OpsTestParentRow.name == "p1"],
-                )
-            )
-            assert not await r.exists(
-                ExistsQuerier(
-                    row_class=OpsTestParentRow,
-                    conditions=[lambda: OpsTestParentRow.name == "absent"],
-                )
-            )
-
-    async def test_conditions_are_anded(self, provider: DBOpsProvider, seeded_parent: None) -> None:
-        async with provider.read_ops() as r:
-            assert await r.exists(
-                ExistsQuerier(
-                    row_class=OpsTestParentRow,
-                    conditions=[
-                        lambda: OpsTestParentRow.name == "p1",
-                        lambda: OpsTestParentRow.domain_name == "d1",
-                    ],
-                )
-            )
-            # name matches but domain_name does not — the AND must fail.
-            assert not await r.exists(
-                ExistsQuerier(
-                    row_class=OpsTestParentRow,
-                    conditions=[
-                        lambda: OpsTestParentRow.name == "p1",
-                        lambda: OpsTestParentRow.domain_name == "d2",
-                    ],
-                )
-            )
-
-    async def test_empty_conditions_false_on_empty_table(
-        self, provider: DBOpsProvider, ops_tables: None
-    ) -> None:
-        async with provider.read_ops() as r:
-            assert not await r.exists(ExistsQuerier(row_class=OpsTestParentRow))
-
-    async def test_empty_conditions_true_when_any_row(
-        self, provider: DBOpsProvider, seeded_parent: None
-    ) -> None:
-        async with provider.read_ops() as r:
-            assert await r.exists(ExistsQuerier(row_class=OpsTestParentRow))
 
 
 class TestScopeFiltering:

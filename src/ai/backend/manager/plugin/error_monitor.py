@@ -25,6 +25,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ErrorMonitor(AbstractErrorReporterPlugin):
     _error_log_repository: ErrorLogRepository
 
+    @override
     async def init(self, context: Any | None = None) -> None:
         if context is None:
             log.warning(
@@ -36,12 +37,15 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
         self.enabled = True
         self._error_log_repository = context["error_log_repository"]
 
+    @override
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         pass
 
+    @override
     async def capture_message(self, message: str) -> None:
         pass
 
+    @override
     async def capture_exception(
         self,
         exc_instance: Exception | None = None,
@@ -95,6 +99,7 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
 class ErrorEventDispatcher(AbstractEventDispatcherPlugin):
     _error_log_repository: ErrorLogRepository
 
+    @override
     async def init(self, context: Any | None = None) -> None:
         if context is None:
             log.warning(

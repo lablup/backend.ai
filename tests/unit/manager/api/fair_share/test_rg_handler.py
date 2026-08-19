@@ -14,6 +14,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
@@ -32,11 +33,14 @@ from ai.backend.manager.services.fair_share.actions import (
     GetUserFairShareAction,
 )
 
+RESOURCE_GROUP_ID = ResourceGroupID(UUID("880e8400-e29b-41d4-a716-446655440003"))
+
 
 def create_domain_fair_share_data() -> DomainFairShareData:
     """Create domain fair share data for testing."""
     return DomainFairShareData(
         resource_group="default",
+        resource_group_id=RESOURCE_GROUP_ID,
         domain_name="test-domain",
         data=FairShareData(
             spec=FairShareSpec(
@@ -67,6 +71,7 @@ def create_project_fair_share_data() -> ProjectFairShareData:
     """Create project fair share data for testing."""
     return ProjectFairShareData(
         resource_group="default",
+        resource_group_id=RESOURCE_GROUP_ID,
         project_id=UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
         domain_name="test-domain",
         data=FairShareData(
@@ -98,6 +103,7 @@ def create_user_fair_share_data() -> UserFairShareData:
     """Create user fair share data for testing."""
     return UserFairShareData(
         resource_group="default",
+        resource_group_id=RESOURCE_GROUP_ID,
         user_uuid=UUID("11111111-2222-3333-4444-555555555555"),
         project_id=UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
         domain_name="test-domain",
@@ -150,7 +156,7 @@ class TestRGGetDomainFairShare:
 
         await processors.fair_share.get_domain_fair_share.wait_for_complete(
             GetDomainFairShareAction(
-                resource_group="default",
+                resource_group_id=RESOURCE_GROUP_ID,
                 domain_name="test-domain",
             )
         )
@@ -160,7 +166,7 @@ class TestRGGetDomainFairShare:
         call_args = processors.fair_share.get_domain_fair_share.wait_for_complete.call_args
         action = call_args[0][0]
         assert isinstance(action, GetDomainFairShareAction)
-        assert action.resource_group == "default"
+        assert action.resource_group_id == RESOURCE_GROUP_ID
         assert action.domain_name == "test-domain"
 
     async def test_returns_data_when_found(
@@ -171,7 +177,7 @@ class TestRGGetDomainFairShare:
         processors = mock_processors_with_domain_exists
         action_result = await processors.fair_share.get_domain_fair_share.wait_for_complete(
             GetDomainFairShareAction(
-                resource_group="default",
+                resource_group_id=RESOURCE_GROUP_ID,
                 domain_name="test-domain",
             )
         )
@@ -199,7 +205,7 @@ class TestRGGetDomainFairShare:
         with pytest.raises(DomainNotFound):
             await processors.fair_share.get_domain_fair_share.wait_for_complete(
                 GetDomainFairShareAction(
-                    resource_group="default",
+                    resource_group_id=RESOURCE_GROUP_ID,
                     domain_name="nonexistent-domain",
                 )
             )
@@ -229,7 +235,7 @@ class TestRGGetProjectFairShare:
 
         await processors.fair_share.get_project_fair_share.wait_for_complete(
             GetProjectFairShareAction(
-                resource_group="default",
+                resource_group_id=RESOURCE_GROUP_ID,
                 project_id=project_id,
             )
         )
@@ -237,7 +243,7 @@ class TestRGGetProjectFairShare:
         call_args = processors.fair_share.get_project_fair_share.wait_for_complete.call_args
         action = call_args[0][0]
         assert isinstance(action, GetProjectFairShareAction)
-        assert action.resource_group == "default"
+        assert action.resource_group_id == RESOURCE_GROUP_ID
         assert action.project_id == project_id
 
     async def test_returns_data_when_found(
@@ -248,7 +254,7 @@ class TestRGGetProjectFairShare:
         processors = mock_processors_with_project_exists
         action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
             GetProjectFairShareAction(
-                resource_group="default",
+                resource_group_id=RESOURCE_GROUP_ID,
                 project_id=UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
             )
         )
@@ -275,7 +281,7 @@ class TestRGGetProjectFairShare:
         with pytest.raises(ProjectNotFound):
             await processors.fair_share.get_project_fair_share.wait_for_complete(
                 GetProjectFairShareAction(
-                    resource_group="default",
+                    resource_group_id=RESOURCE_GROUP_ID,
                     project_id=UUID("11111111-2222-3333-4444-555555555555"),
                 )
             )
@@ -306,7 +312,7 @@ class TestRGGetUserFairShare:
 
         await processors.fair_share.get_user_fair_share.wait_for_complete(
             GetUserFairShareAction(
-                resource_group="default",
+                resource_group_id=RESOURCE_GROUP_ID,
                 project_id=project_id,
                 user_uuid=user_uuid,
             )
@@ -315,7 +321,7 @@ class TestRGGetUserFairShare:
         call_args = processors.fair_share.get_user_fair_share.wait_for_complete.call_args
         action = call_args[0][0]
         assert isinstance(action, GetUserFairShareAction)
-        assert action.resource_group == "default"
+        assert action.resource_group_id == RESOURCE_GROUP_ID
         assert action.project_id == project_id
         assert action.user_uuid == user_uuid
 
@@ -327,7 +333,7 @@ class TestRGGetUserFairShare:
         processors = mock_processors_with_user_exists
         action_result = await processors.fair_share.get_user_fair_share.wait_for_complete(
             GetUserFairShareAction(
-                resource_group="default",
+                resource_group_id=RESOURCE_GROUP_ID,
                 project_id=UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
                 user_uuid=UUID("11111111-2222-3333-4444-555555555555"),
             )
@@ -355,7 +361,7 @@ class TestRGGetUserFairShare:
         with pytest.raises(UserNotFound):
             await processors.fair_share.get_user_fair_share.wait_for_complete(
                 GetUserFairShareAction(
-                    resource_group="default",
+                    resource_group_id=RESOURCE_GROUP_ID,
                     project_id=UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
                     user_uuid=UUID("11111111-2222-3333-4444-555555555555"),
                 )

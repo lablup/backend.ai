@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import override
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.storage.config.loaders import load_local_config
@@ -23,10 +24,12 @@ class ConfigProvider(
     """Provider for storage proxy configuration."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "config"
 
     @asynccontextmanager
+    @override
     async def provide(
         self, setup_input: ConfigProviderInput
     ) -> AsyncIterator[StorageProxyUnifiedConfig]:

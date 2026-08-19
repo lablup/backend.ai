@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import ResourceSlotHandler
@@ -24,7 +24,7 @@ def register_resource_slot_routes(
         "/search",
         handler.search_resource_slot_types,
         middlewares=[
-            superadmin_required,
+            auth_required,
             route_deps.all_status_mw,
         ],
     )
@@ -33,7 +33,7 @@ def register_resource_slot_routes(
         "/{slot_name}",
         handler.get_resource_slot_type,
         middlewares=[
-            superadmin_required,
+            auth_required,
             route_deps.all_status_mw,
         ],
     )

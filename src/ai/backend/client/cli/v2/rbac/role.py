@@ -49,6 +49,24 @@ def role() -> None:
     default=None,
     help="Filter by role status.",
 )
+@click.option(
+    "--scope-type",
+    type=click.Choice(["domain", "project", "user"], case_sensitive=False),
+    default=None,
+    help="Filter by the type of scope the role is mapped to.",
+)
+@click.option(
+    "--scope-id",
+    type=str,
+    default=None,
+    help="Filter by the id of the scope the role is mapped to (exact match).",
+)
+@click.option(
+    "--assigned-user-id",
+    type=str,
+    default=None,
+    help="Filter roles assigned to this user id.",
+)
 def search(
     limit: int | None,
     offset: int | None,
@@ -56,27 +74,57 @@ def search(
     name_contains: str | None,
     source: str | None,
     status: str | None,
+    scope_type: str | None,
+    scope_id: str | None,
+    assigned_user_id: str | None,
 ) -> None:
     """Search roles."""
-    from ai.backend.common.dto.manager.query import StringFilter
+    from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
     from ai.backend.common.dto.manager.v2.rbac.request import (
+        MappedScopeNestedFilter,
         RoleFilter,
         RoleOrderBy,
         SearchRolesInput,
+        UserNestedFilter,
     )
     from ai.backend.common.dto.manager.v2.rbac.types import (
+        RBACElementTypeDTO,
+        RBACElementTypeFilter,
         RoleOrderField,
         RoleSourceFilter,
         RoleStatusFilter,
     )
 
+    # Build mapped-scope nested filter only if any scope option is provided
+    mapped_scope_dto: MappedScopeNestedFilter | None = None
+    if scope_type is not None or scope_id is not None:
+        mapped_scope_dto = MappedScopeNestedFilter(
+            scope_type=RBACElementTypeFilter(equals=RBACElementTypeDTO(scope_type))
+            if scope_type is not None
+            else None,
+            scope_id=StringFilter(equals=scope_id) if scope_id is not None else None,
+        )
+
+    # Build assigned-user nested filter only if the option is provided
+    assigned_user_dto: UserNestedFilter | None = None
+    if assigned_user_id is not None:
+        assigned_user_dto = UserNestedFilter(user_id=UUIDFilter(equals=UUID(assigned_user_id)))
+
     # Build filter only if any filter option is provided
     filter_dto: RoleFilter | None = None
-    if any([name_contains is not None, source is not None, status is not None]):
+    if any([
+        name_contains is not None,
+        source is not None,
+        status is not None,
+        mapped_scope_dto is not None,
+        assigned_user_dto is not None,
+    ]):
         filter_dto = RoleFilter(
             name=StringFilter(contains=name_contains) if name_contains is not None else None,
             source=RoleSourceFilter(equals=source) if source is not None else None,
             status=RoleStatusFilter(equals=status) if status is not None else None,
+            mapped_scope=mapped_scope_dto,
+            assigned_user=assigned_user_dto,
         )
 
     # Build order only if --order-by is provided

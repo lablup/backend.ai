@@ -13,7 +13,6 @@ from ai.backend.common.dto.manager.rbac.request import (
 )
 from ai.backend.common.dto.manager.rbac.response import ScopeDTO
 from ai.backend.common.dto.manager.rbac.types import OrderDirection, ScopeOrderField
-from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.permission.types import ScopeData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.rbac_models.conditions import (
@@ -26,7 +25,9 @@ from ai.backend.manager.models.rbac_models.orders import (
     ProjectScopeOrders,
     UserScopeOrders,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 __all__ = ("ScopeAdapter",)
 

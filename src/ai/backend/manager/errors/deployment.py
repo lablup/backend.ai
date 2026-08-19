@@ -1,3 +1,5 @@
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -7,12 +9,14 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.errors.common import ObjectNotFound
 
 
 class DefinitionFileNotFound(ObjectNotFound):
     object_name = "definition-file"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -21,9 +25,32 @@ class DefinitionFileNotFound(ObjectNotFound):
         )
 
 
+class DeploymentDefinitionFileReadError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/deployment-definition-file-read-error"
+    error_title = "Failed to read deployment definition file."
+
+    def __init__(
+        self,
+        *,
+        vfolder_id: VFolderUUID,
+        filename: str,
+        cause: Exception,
+    ) -> None:
+        super().__init__(f"File '{filename}' in vfolder {vfolder_id}: {cause}")
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_DATA_FORMAT,
+        )
+
+
 class EndpointNotFound(ObjectNotFound):
     object_name = "endpoint"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -35,6 +62,7 @@ class EndpointNotFound(ObjectNotFound):
 class DeploymentRevisionNotFound(ObjectNotFound):
     object_name = "deployment-revision"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -46,6 +74,7 @@ class DeploymentRevisionNotFound(ObjectNotFound):
 class UserNotFoundInDeployment(ObjectNotFound):
     object_name = "user in deployment"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -57,6 +86,7 @@ class UserNotFoundInDeployment(ObjectNotFound):
 class NoActiveKeypairForDeployment(ObjectNotFound):
     object_name = "active keypair for deployment user"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_DEPLOYMENT,
@@ -69,6 +99,7 @@ class DeploymentHasNoTargetRevision(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/deployment-has-no-target-revision"
     error_title = "Deployment has no target revision."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -92,6 +123,7 @@ class RevisionMissingModelVFolder(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/revision-missing-model-vfolder"
     error_title = "Deployment revision has no model vfolder."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -114,6 +146,7 @@ class RevisionNotDeployable(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/revision-not-deployable"
     error_title = "Deployment revision references deleted resources."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -126,6 +159,7 @@ class InvalidDeploymentStrategy(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-deployment-strategy"
     error_title = "Unknown or invalid deployment strategy."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -138,6 +172,7 @@ class RouteSessionNotFound(BackendAIError):
     error_type = "https://api.backend.ai/probs/route-session-not-found"
     error_title = "No session associated with route."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -154,6 +189,7 @@ class RouteSessionTerminated(BackendAIError):
         super().__init__(f"Session status: {session_status}")
         self.session_status = session_status
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -166,6 +202,7 @@ class RouteUnhealthy(BackendAIError):
     error_type = "https://api.backend.ai/probs/route-unhealthy"
     error_title = "Route health check failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -178,6 +215,7 @@ class IncompleteRevisionData(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/incomplete-revision-data"
     error_title = "Revision data is missing required fields."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,

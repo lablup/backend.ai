@@ -19,6 +19,7 @@ from typing import (
     NamedTuple,
     Self,
     cast,
+    override,
 )
 
 import aiohttp
@@ -384,9 +385,11 @@ class PlatformTagSet(Mapping[str, str]):
                 value = ""
             self._data[key] = value
 
+    @override
     def __repr__(self) -> str:
         return self.__str__()
 
+    @override
     def __str__(self) -> str:
         return f"PlatformTagSet({self._data!s})"
 
@@ -396,15 +399,19 @@ class PlatformTagSet(Mapping[str, str]):
         _v = self._data.get(key, None)
         return _v == version
 
+    @override
     def __getitem__(self, key: str) -> str:
         return self._data[key]
 
+    @override
     def __iter__(self) -> Iterator[str]:
         return iter(self._data)
 
+    @override
     def __len__(self) -> int:
         return len(self._data)
 
+    @override
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, (set, frozenset)):
             return set(self._data.keys()) == other
@@ -429,6 +436,7 @@ class ParsedImageStr(NamedTuple):
         tags = self.tag.split("-")
         return (tags[0], PlatformTagSet(tags[1:], self.project_and_image_name))
 
+    @override
     def __str__(self) -> str:
         return self.canonical
 
@@ -665,12 +673,15 @@ class ImageRef:
         join = functools.partial(join_non_empty, sep="/")
         return f"{join(self.project, self.name)}:{self.tag}"
 
+    @override
     def __str__(self) -> str:
         return self.canonical
 
+    @override
     def __repr__(self) -> str:
         return f'<ImageRef: "{self.canonical}" ({self.architecture})>'
 
+    @override
     def __hash__(self) -> int:
         return hash((self.project, self.name, self.tag, self.registry, self.architecture))
 

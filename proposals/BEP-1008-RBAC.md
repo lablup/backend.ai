@@ -1,6 +1,7 @@
 ---
 Author: HyeokJin Kim (hyeokjin@lablup.com)
-Status: Draft
+Status: Superseded
+Superseded-By: BEP-1062
 Created: 2025-06-23
 Created-Version:
 Target-Version:

@@ -1,5 +1,6 @@
 import json
 import sys
+from typing import Any, cast
 
 import click
 
@@ -32,12 +33,11 @@ def get(key: str, prefix: bool) -> None:
 
     with Session() as session:
         try:
-            data = session.EtcdConfig.get(key, prefix)
+            data = cast(dict[str, Any] | None, session.EtcdConfig.get(key, prefix))
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
-        data = json.dumps(data, indent=2) if data else "null"
-        print_pretty(data)
+        print_pretty(json.dumps(data, indent=2) if data else "null")
 
 
 @etcd.command()

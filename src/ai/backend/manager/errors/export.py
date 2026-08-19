@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -22,6 +24,7 @@ class ExportReportNotFound(BackendAIError, web.HTTPNotFound):
     def __init__(self, report_key: str) -> None:
         super().__init__(extra_msg=f"Unknown report: {report_key}")
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -39,6 +42,7 @@ class InvalidExportFieldKeys(BackendAIError, web.HTTPBadRequest):
     def __init__(self, invalid_keys: list[str]) -> None:
         super().__init__(extra_msg=f"Invalid field keys: {invalid_keys}")
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -56,6 +60,7 @@ class TooManyConcurrentExports(BackendAIError, web.HTTPServiceUnavailable):
     def __init__(self) -> None:
         super().__init__(extra_msg="Too many concurrent export requests. Please try again later.")
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,

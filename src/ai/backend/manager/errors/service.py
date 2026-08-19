@@ -4,6 +4,8 @@ Service endpoint and model service-related exceptions.
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -23,6 +25,7 @@ class NoUpdatesToApply(BackendAIError):
     def __init__(self, message: str = "No updates to apply") -> None:
         super().__init__(message)
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ENDPOINT,
@@ -34,6 +37,7 @@ class NoUpdatesToApply(BackendAIError):
 class EndpointNotFound(ObjectNotFound):
     object_name = "endpoint"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ENDPOINT,
@@ -45,6 +49,7 @@ class EndpointNotFound(ObjectNotFound):
 class ModelDefinitionNotFound(ObjectNotFound):
     object_name = "model_definition"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -58,6 +63,7 @@ class ScalingImpossible(BackendAIError, web.HTTPBadRequest):
         "Scaling operation cannot be performed due to insufficient resources or constraints."
     )
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ENDPOINT,
@@ -69,6 +75,7 @@ class ScalingImpossible(BackendAIError, web.HTTPBadRequest):
 class AutoScalingRuleNotFound(ObjectNotFound):
     object_name = "auto_scaling_rule"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ENDPOINT,
@@ -80,6 +87,7 @@ class AutoScalingRuleNotFound(ObjectNotFound):
 class AutoScalingPolicyNotFound(ObjectNotFound):
     object_name = "auto_scaling_policy"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ENDPOINT,
@@ -91,6 +99,7 @@ class AutoScalingPolicyNotFound(ObjectNotFound):
 class DeploymentPolicyNotFound(ObjectNotFound):
     object_name = "deployment_policy"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ENDPOINT,
@@ -102,6 +111,7 @@ class DeploymentPolicyNotFound(ObjectNotFound):
 class RoutingNotFound(ObjectNotFound):
     object_name = "routing"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ROUTE,
@@ -113,6 +123,7 @@ class RoutingNotFound(ObjectNotFound):
 class EndpointTokenNotFound(ObjectNotFound):
     object_name = "endpoint_token"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ENDPOINT,
@@ -124,6 +135,7 @@ class EndpointTokenNotFound(ObjectNotFound):
 class ModelServiceNotFound(ObjectNotFound):
     object_name = "model service"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -135,6 +147,7 @@ class ModelServiceNotFound(ObjectNotFound):
 class RouteNotFound(ObjectNotFound):
     object_name = "route"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ROUTE,
@@ -146,6 +159,7 @@ class RouteNotFound(ObjectNotFound):
 class ModelServiceDependencyNotCleared(BackendAIError, web.HTTPBadRequest):
     error_title = "Cannot delete model VFolders bound to alive model services."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
@@ -158,6 +172,7 @@ class AppServiceStartFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/app-service-start-failed"
     error_title = "Failed to start the application service."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
@@ -171,6 +186,7 @@ class EndpointAccessForbiddenError(GenericForbidden):
 
     error_title = "Access to this endpoint is forbidden."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ENDPOINT,
@@ -182,6 +198,7 @@ class EndpointAccessForbiddenError(GenericForbidden):
 class EndpointAutoScalingRuleNotFound(ObjectNotFound):
     object_name = "endpoint auto scaling rule"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ENDPOINT_AUTO_SCALING,

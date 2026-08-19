@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Final
+from typing import Final, override
 
 from ai.backend.common.cron.base import PeriodicTask
 from ai.backend.common.leader.base import LeadershipChecker, LeaderTask
@@ -64,6 +64,7 @@ class LeaderCron(LeaderTask):
             log.exception("Unexpected error in task {}", task.name)
             raise
 
+    @override
     async def start(self, leadership_checker: LeadershipChecker) -> None:
         """
         Start the leader cron.
@@ -84,6 +85,7 @@ class LeaderCron(LeaderTask):
 
         log.info("Leader cron started with {} tasks", len(self._tasks))
 
+    @override
     async def stop(self) -> None:
         """
         Stop the leader cron.

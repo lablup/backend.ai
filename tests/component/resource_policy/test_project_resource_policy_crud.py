@@ -36,6 +36,7 @@ class TestProjectResourcePolicyCreate:
         assert isinstance(result, CreateProjectResourcePolicyPayload)
         policy = result.project_resource_policy
         assert policy.name == name
+        assert policy.created_at is not None
         assert policy.max_vfolder_count == 20
         assert policy.max_network_count == 10
 
@@ -63,6 +64,7 @@ class TestProjectResourcePolicyGet:
 
         result = await admin_v2_registry.resource_policy.admin_get_project_resource_policy(name)
         assert result.name == name
+        assert result.created_at is not None
         assert result.max_vfolder_count == created.project_resource_policy.max_vfolder_count
 
 

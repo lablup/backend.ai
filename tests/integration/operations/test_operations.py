@@ -54,7 +54,7 @@ class TestAnnouncementLifecycle:
         self,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        """get (empty) → update (enable) → get (verify) → update (disable) → get (verify)."""
+        """get (empty) → enable → get → disable (message retained) → get → clear → get."""
         # 1. Get default (should be disabled)
         result = await admin_registry.operations.get_announcement()
         assert isinstance(result, GetAnnouncementResponse)
@@ -71,12 +71,20 @@ class TestAnnouncementLifecycle:
         assert result.enabled is True
         assert result.message == "Maintenance at 10 PM"
 
-        # 4. Disable announcement
+        # 4. Disable announcement (only hidden; the message is retained)
         await admin_registry.operations.update_announcement(
             UpdateAnnouncementRequest(enabled=False)
         )
 
-        # 5. Verify disabled
+        # 5. Verify disabled but message retained
+        result = await admin_registry.operations.get_announcement()
+        assert result.enabled is False
+        assert result.message == "Maintenance at 10 PM"
+
+        # 6. Clear the stored message explicitly and verify
+        await admin_registry.operations.update_announcement(
+            UpdateAnnouncementRequest(enabled=False, message="")
+        )
         result = await admin_registry.operations.get_announcement()
         assert result.enabled is False
         assert result.message == ""

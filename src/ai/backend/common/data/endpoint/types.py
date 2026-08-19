@@ -1,6 +1,6 @@
 from enum import Enum, StrEnum
 from functools import lru_cache
-from typing import Any, Self
+from typing import Any, Self, override
 
 
 class EndpointStatus(StrEnum):
@@ -61,6 +61,7 @@ class EndpointLifecycle(Enum):
         return {cls.DESTROYING, cls.DESTROYED}
 
     @classmethod
+    @override
     def _missing_(cls, value: Any) -> Self | None:
         # Accept v2 :class:`ModelDeploymentStatus` aliases on the wire so
         # historical / future callers that hand us the new naming still

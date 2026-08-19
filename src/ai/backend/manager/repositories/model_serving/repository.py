@@ -27,6 +27,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionTypes,
 )
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.deployment.types import RouteHealthStatus
 from ai.backend.manager.data.image.types import ImageData
@@ -57,7 +58,6 @@ from ai.backend.manager.models.endpoint import (
     EndpointLifecycle,
     EndpointRow,
     EndpointTokenRow,
-    ModelServiceHelper,
 )
 from ai.backend.manager.models.group import resolve_group_name_or_id
 from ai.backend.manager.models.image import ImageAlias, ImageIdentifier, ImageRow
@@ -67,7 +67,6 @@ from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import VFolderRow, VFolderUsageMode
@@ -87,6 +86,7 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     execute_rbac_entity_creator,
 )
 from ai.backend.manager.repositories.deployment.creators import DeploymentPolicyCreatorSpec
+from ai.backend.manager.repositories.model_serving.mount import check_extra_mounts
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.types import MountOptionModel, UserScope
 from ai.backend.manager.utils import query_userinfo
@@ -563,7 +563,7 @@ class ModelServingRepository:
     @model_serving_repository_resilience.apply()
     async def get_user_with_keypair(self, user_id: uuid.UUID) -> Any | None:
         """
-        Get user with their main access key.
+        Get the user row joined with one of their keypairs.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             query = (
@@ -641,9 +641,6 @@ class ModelServingRepository:
         async with self._db.begin_readonly_session_read_committed() as session:
             try:
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-                if not rule:
-                    return None
-
                 return rule.to_data()
             except ObjectNotFound:
                 return None
@@ -711,9 +708,6 @@ class ModelServingRepository:
             try:
                 # Validate lifecycle stage before update
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-                if not rule:
-                    return None
-
                 if rule.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
                     return None
 
@@ -738,12 +732,9 @@ class ModelServingRepository:
         async with self._db.begin_session() as session:
             try:
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-                if not rule:
-                    return False
-
                 await session.delete(rule)
                 return True
-            except NoResultFound:
+            except ObjectNotFound:
                 return False
 
     @model_serving_repository_resilience.apply()
@@ -856,7 +847,12 @@ class ModelServingRepository:
                 session_owner = endpoint_row.session_owner_row
                 if session_owner is None:
                     raise InvalidAPIParameters("Session owner not found for endpoint")
-                if session_owner.main_access_key is None:
+                default_access_key = await db_session.scalar(
+                    sa.select(KeyPairRow.access_key).where(
+                        (KeyPairRow.user == session_owner.uuid) & KeyPairRow.is_default
+                    )
+                )
+                if default_access_key is None:
                     raise InvalidAPIParameters("Session owner has no access key")
                 if session_owner.role is None:
                     raise InvalidAPIParameters("Session owner has no role")
@@ -868,7 +864,7 @@ class ModelServingRepository:
                 await self._check_inference_scaling_group(
                     conn,
                     endpoint_row.resource_group,
-                    AccessKey(session_owner.main_access_key),
+                    AccessKey(default_access_key),
                     endpoint_row.domain,
                     ProjectID(endpoint_row.project),
                 )
@@ -1055,9 +1051,9 @@ class ModelServingRepository:
 
             model_id = folder_row["id"]
 
-            vfolder_mounts = await ModelServiceHelper.check_extra_mounts(
+            vfolder_mounts = await check_extra_mounts(
                 conn,
-                legacy_etcd_loader,
+                allowed_vfolder_types,
                 storage_manager,
                 model_id,
                 model_mount_destination,

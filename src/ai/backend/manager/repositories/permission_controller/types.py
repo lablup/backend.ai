@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, override
 
 import sqlalchemy as sa
 
@@ -16,7 +16,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import BatchQuerierResult
 
@@ -30,11 +30,12 @@ class AssignedUserBatchQuerierResult(BatchQuerierResult[UserRow]):
 
 
 @dataclass(frozen=True)
-class PermissionSearchScope(SearchScope):
+class PermissionOperationScope(OperationScope):
     """Scope for searching scoped permissions by role."""
 
     role_id: uuid.UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         role_id = self.role_id
 
@@ -44,6 +45,7 @@ class PermissionSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(
@@ -55,12 +57,13 @@ class PermissionSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class ScopedRoleSearchScope(SearchScope):
+class ScopedRoleOperationScope(OperationScope):
     """Scope for searching roles registered in a given scope (project, domain, etc.)."""
 
     element_type: RBACElementType
     scope_id: str
 
+    @override
     def to_condition(self) -> QueryCondition:
         element_type = self.element_type
         scope_id = self.scope_id
@@ -76,16 +79,18 @@ class ScopedRoleSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return []
 
 
 @dataclass(frozen=True)
-class ObjectPermissionSearchScope(SearchScope):
+class ObjectPermissionOperationScope(OperationScope):
     """Scope for searching object permissions by role."""
 
     role_id: uuid.UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         role_id = self.role_id
 
@@ -95,6 +100,7 @@ class ObjectPermissionSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(

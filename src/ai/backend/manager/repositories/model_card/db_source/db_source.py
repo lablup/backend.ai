@@ -67,7 +67,7 @@ from ai.backend.manager.repositories.base.upserter import BulkUpserter, execute_
 from ai.backend.manager.repositories.model_card.types import (
     AvailablePresetsSearchResult,
     ModelCardSearchResult,
-    ProjectModelCardSearchScope,
+    ProjectModelCardOperationScope,
 )
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
@@ -193,7 +193,7 @@ class ModelCardDBSource:
             for purger in purgers:
                 # ModelCardRow uses a UUID primary key; the Purger generic type permits
                 # UUID/str/int so narrow it once for the failure record.
-                card_id = cast(UUID, purger.pk_value)
+                card_id = cast(UUID, purger.spec.pk_value())
                 try:
                     async with session.begin_nested():
                         deleted_id = await self._delete_card_in_session(session, purger, options)
@@ -285,7 +285,7 @@ class ModelCardDBSource:
     async def search_in_project(
         self,
         querier: BatchQuerier,
-        scope: ProjectModelCardSearchScope,
+        scope: ProjectModelCardOperationScope,
     ) -> ModelCardSearchResult:
         async with self._db.begin_readonly_session() as db_sess:
             is_member = (await db_sess.execute(scope.membership_check_query)).scalar()

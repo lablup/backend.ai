@@ -15,6 +15,7 @@ import pytest
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairData
@@ -88,13 +89,14 @@ class TestCreateUser:
             created_at=datetime.now(tz=UTC),
             modified_at=datetime.now(tz=UTC),
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
             role=UserRole.USER,
             resource_policy="default",
             allowed_client_ip=None,
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key="TESTKEY1234567890",
+            default_access_key="TESTKEY1234567890",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
@@ -108,6 +110,7 @@ class TestCreateUser:
             secret_key=SecretKey("test-secret-key"),
             is_active=True,
             is_admin=False,
+            is_default=True,
             created_at=datetime.now(tz=UTC),
             modified_at=datetime.now(tz=UTC),
             resource_policy_name="default",
@@ -160,6 +163,7 @@ class TestCreateUser:
                 )
             ),
             group_ids=None,
+            _domain_id=DomainID(uuid.uuid4()),
         )
 
         result = await service.create_user(action)
@@ -195,6 +199,7 @@ class TestCreateUser:
                 )
             ),
             group_ids=group_ids,
+            _domain_id=DomainID(uuid.uuid4()),
         )
 
         result = await service.create_user(action)
@@ -225,6 +230,7 @@ class TestCreateUser:
                     domain_name="default",
                 )
             ),
+            _domain_id=DomainID(uuid.uuid4()),
         )
 
         with pytest.raises(InvalidAPIParameters):
@@ -268,13 +274,14 @@ class TestModifyUser:
             created_at=datetime.now(tz=UTC),
             modified_at=datetime.now(tz=UTC),
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
             role=UserRole.USER,
             resource_policy="default",
             allowed_client_ip=None,
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key="TESTKEY1234567890",
+            default_access_key="TESTKEY1234567890",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
@@ -431,13 +438,14 @@ class TestPurgeUser:
             created_at=datetime.now(tz=UTC),
             modified_at=datetime.now(tz=UTC),
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
             role=UserRole.USER,
             resource_policy="default",
             allowed_client_ip=None,
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key="TESTKEY1234567890",
+            default_access_key="TESTKEY1234567890",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
@@ -448,7 +456,6 @@ class TestPurgeUser:
         return UserInfoContext(
             uuid=uuid.uuid4(),
             email="admin@example.com",
-            main_access_key=AccessKey("ADMINKEY123456789"),
         )
 
     async def test_purge_user_succeeds_without_active_vfolders(
@@ -564,7 +571,6 @@ class TestPurgeUser:
         mock_user_repository.delegate_endpoint_ownership.assert_called_once_with(
             user_uuid=purge_user_uuid,
             target_user_uuid=admin_user_info_ctx.uuid,
-            target_main_access_key=admin_user_info_ctx.main_access_key,
         )
         # When delegating, delete_endpoints should be called with delete_destroyed_only=True
         mock_user_repository.delete_endpoints.assert_called_once_with(
@@ -656,7 +662,7 @@ class TestBulkPurgeUsers:
         admin_user = MagicMock()
         admin_user.uuid = uuid.uuid4()
         admin_user.email = "admin@example.com"
-        admin_user.main_access_key = "ADMINKEY123456789"
+        admin_user.default_access_key = "ADMINKEY123456789"
         mock_user_repository.get_user_by_uuid = AsyncMock(return_value=admin_user)
         return admin_user
 

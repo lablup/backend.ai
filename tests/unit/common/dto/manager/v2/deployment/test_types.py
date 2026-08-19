@@ -17,7 +17,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentBasicInfo,
     DeploymentOrderField,
     DeploymentPolicyInfo,
-    IntOrPercent,
     NetworkConfigInfo,
     OrderDirection,
     ReplicaStateInfo,
@@ -40,6 +39,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     RouteTrafficStatus as ExportedRouteTrafficStatus,
 )
+from ai.backend.common.schema.deployment import IntOrPercent
 
 
 class TestOrderDirection:

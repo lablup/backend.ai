@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.scaling_group import ListScalingGroupsResponse
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupOpts,
     scaling_groups,
@@ -38,9 +39,11 @@ async def private_sgroup_for_visibility(
 ) -> AsyncIterator[str]:
     """Insert a private (is_public=False) scaling group with domain association; yield name."""
     name = f"private-vis-{secrets.token_hex(8)}"
+    sgroup_id = uuid.uuid4()
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(scaling_groups).values(
+                id=sgroup_id,
                 name=name,
                 description=f"Private visibility test sgroup {name}",
                 is_active=True,
@@ -53,14 +56,14 @@ async def private_sgroup_for_visibility(
         )
         await conn.execute(
             sa.insert(sgroups_for_domains).values(
-                scaling_group=name,
-                domain=domain_fixture.domain_name,
+                resource_group_id=sgroup_id,
+                domain_id=domain_fixture.domain_id,
             )
         )
     yield name
     async with db_engine.begin() as conn:
         await conn.execute(
-            sgroups_for_domains.delete().where(sgroups_for_domains.c.scaling_group == name)
+            sgroups_for_domains.delete().where(sgroups_for_domains.c.resource_group_id == sgroup_id)
         )
         await conn.execute(scaling_groups.delete().where(scaling_groups.c.name == name))
 
@@ -78,7 +81,7 @@ class TestScalingGroupCRUD:
         self,
         admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
     ) -> None:
         """Public scaling group is visible to both admin and regular user."""
@@ -86,13 +89,13 @@ class TestScalingGroupCRUD:
             group=str(group_fixture),
         )
         assert isinstance(admin_result, ListScalingGroupsResponse)
-        assert any(sg.name == scaling_group_fixture for sg in admin_result.scaling_groups)
+        assert any(sg.name == scaling_group_name for sg in admin_result.scaling_groups)
 
         user_result = await user_registry.scaling_group.list_scaling_groups(
             group=str(group_fixture),
         )
         assert isinstance(user_result, ListScalingGroupsResponse)
-        assert any(sg.name == scaling_group_fixture for sg in user_result.scaling_groups)
+        assert any(sg.name == scaling_group_name for sg in user_result.scaling_groups)
 
     async def test_s_visibility_private_sgroup_hidden_from_user(
         self,
@@ -140,7 +143,7 @@ class TestScalingGroupPermissions:
     async def test_regular_user_can_list_scaling_groups(
         self,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
     ) -> None:
         """F-AUTH-LIST: Regular user can list public scaling groups (auth_required, not superadmin).
@@ -155,4 +158,4 @@ class TestScalingGroupPermissions:
         assert isinstance(result, ListScalingGroupsResponse)
         names = [sg.name for sg in result.scaling_groups]
         # The fixture sgroup is public — regular user should see it
-        assert scaling_group_fixture in names
+        assert scaling_group_name in names

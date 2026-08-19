@@ -26,6 +26,7 @@ from ai.backend.test.templates.template import (
 
 class BatchSessionTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "batch_session"
 

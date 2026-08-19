@@ -20,5 +20,6 @@ class TomlConfigLoader(AbstractConfigLoader):
         return raw_cfg
 
     @property
+    @override
     def source_name(self) -> str:
         return f"toml:{self._config_path}"

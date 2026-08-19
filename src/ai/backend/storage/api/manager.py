@@ -475,10 +475,6 @@ async def create_vfolder(request: web.Request) -> web.Response:
             except QuotaScopeNotFoundError:
                 if not ctx.local_config.storage_proxy.auto_quota_scope_creation:
                     raise
-                if not params["vfid"].quota_scope_id:
-                    raise InvalidAPIParameters(
-                        "quota_scope_id is required for auto quota scope creation"
-                    ) from None
                 if initial_max_size_for_quota_scope := (params["options"] or {}).get(
                     "initial_max_size_for_quota_scope"
                 ):
@@ -1431,11 +1427,11 @@ async def handle_volume_mount(
         err_msg = resp.body
         await context.event_producer.broadcast_event(
             VolumeMounted(
-                str(context.node_id),
-                VolumeMountableNodeType.STORAGE_PROXY,
-                str(mount_path),
-                event.quota_scope_id,
-                err_msg,
+                node_id=str(context.node_id),
+                node_type=VolumeMountableNodeType.STORAGE_PROXY,
+                mount_path=str(mount_path),
+                quota_scope_id=event.quota_scope_id,
+                err_msg=err_msg,
             )
         )
         return
@@ -1447,11 +1443,11 @@ async def handle_volume_mount(
         err_msg = resp.body
     await context.event_producer.broadcast_event(
         VolumeMounted(
-            str(context.node_id),
-            VolumeMountableNodeType.STORAGE_PROXY,
-            str(mount_path),
-            event.quota_scope_id,
-            err_msg,
+            node_id=str(context.node_id),
+            node_type=VolumeMountableNodeType.STORAGE_PROXY,
+            mount_path=str(mount_path),
+            quota_scope_id=event.quota_scope_id,
+            err_msg=err_msg,
         )
     )
 
@@ -1482,10 +1478,10 @@ async def handle_volume_umount(
         log.warning(resp.body)
     await context.event_producer.broadcast_event(
         VolumeUnmounted(
-            str(context.node_id),
-            VolumeMountableNodeType.STORAGE_PROXY,
-            str(mount_path),
-            event.quota_scope_id,
-            err_msg,
+            node_id=str(context.node_id),
+            node_type=VolumeMountableNodeType.STORAGE_PROXY,
+            mount_path=str(mount_path),
+            quota_scope_id=event.quota_scope_id,
+            err_msg=err_msg,
         )
     )

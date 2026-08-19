@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import override
 
 from ai.backend.appproxy.common.etcd import TraefikEtcd
 from ai.backend.appproxy.coordinator.config import ServerConfig
@@ -17,10 +18,12 @@ class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
     """Provider for Traefik etcd connection (optional)."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "etcd"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: ServerConfig) -> AsyncIterator[TraefikEtcd | None]:
         """Create and provide Traefik etcd connection if enabled."""
         if setup_input.proxy_coordinator.enable_traefik:
@@ -52,6 +55,7 @@ class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
         else:
             yield None
 
+    @override
     def gen_liveness_checker(self, resource: TraefikEtcd | None) -> ServiceHealthChecker | None:
         """Liveness — stuck etcd connection observed; restart is the recovery path."""
         if resource is None:

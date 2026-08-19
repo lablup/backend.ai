@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import (
+    Collection,
     Iterable,
     Sequence,
 )
@@ -12,14 +13,13 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Self,
-    cast,
 )
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 import yarl
 from sqlalchemy.exc import NoResultFound
-from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
     Mapped,
     contains_eager,
@@ -39,14 +39,8 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
     ResourceSlot,
-    VFolderID,
-    VFolderMount,
-    VFolderMountOptions,
-    VFolderMountRequest,
-    VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingAction,
     AutoScalingCondition,
@@ -77,7 +71,6 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointTokenData,
     ScalingState,
 )
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.base import (
     GUID,
@@ -87,15 +80,9 @@ from ai.backend.manager.models.base import (
     StrEnumType,
 )
 from ai.backend.manager.models.routing import RouteStatus
-from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
-from ai.backend.manager.types import MountOptionModel, UserScope
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.creator import DeploymentCreator
-    from ai.backend.manager.models.deployment_auto_scaling_policy import (
-        DeploymentAutoScalingPolicyRow,
-    )
     from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
     from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
     from ai.backend.manager.models.replica_group import ReplicaGroupRow
@@ -107,7 +94,6 @@ __all__ = (
     "EndpointLifecycle",
     "EndpointRow",
     "EndpointTokenRow",
-    "ModelServiceHelper",
 )
 
 
@@ -118,12 +104,6 @@ def _get_endpoint_tokens_join_condition() -> Any:
     from ai.backend.manager.models.endpoint import EndpointTokenRow
 
     return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
-
-
-def _get_endpoint_revisions_join_condition() -> Any:
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-
-    return EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)
 
 
 def _get_primary_replica_group_join_condition() -> sa.ColumnElement[bool]:
@@ -151,14 +131,6 @@ def _get_deploying_revision_join_condition() -> sa.ColumnElement[bool]:
     return foreign(EndpointRow.deploying_revision_id) == DeploymentRevisionRow.id
 
 
-def _get_endpoint_auto_scaling_policy_join_condition() -> Any:
-    from ai.backend.manager.models.deployment_auto_scaling_policy import (
-        DeploymentAutoScalingPolicyRow,
-    )
-
-    return EndpointRow.id == foreign(DeploymentAutoScalingPolicyRow.endpoint)
-
-
 def _get_deployment_policy_join_condition() -> Any:
     from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 
@@ -181,7 +153,7 @@ def _get_endpoint_token_endpoint_row_join_condition() -> Any:
     return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
 
 
-class EndpointRow(Base):  # type: ignore[misc]
+class EndpointRow(Base):
     __tablename__ = "endpoints"
 
     __table_args__ = (
@@ -302,28 +274,17 @@ class EndpointRow(Base):  # type: ignore[misc]
         back_populates="endpoint_row",
         primaryjoin=_get_endpoint_tokens_join_condition,
     )
-    endpoint_auto_scaling_rules: Mapped[list[EndpointAutoScalingRuleRow]] = relationship(
-        "EndpointAutoScalingRuleRow", back_populates="endpoint_row"
-    )
     created_user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
-        back_populates="created_endpoints",
         foreign_keys=[created_user],
         primaryjoin=_get_created_user_row_join_condition,
     )
     session_owner_row: Mapped[UserRow | None] = relationship(
         "UserRow",
-        back_populates="owned_endpoints",
         foreign_keys=[session_owner],
         primaryjoin=_get_session_owner_row_join_condition,
     )
 
-    revisions: Mapped[list[DeploymentRevisionRow]] = relationship(
-        "DeploymentRevisionRow",
-        back_populates="endpoint_row",
-        primaryjoin=_get_endpoint_revisions_join_condition,
-        order_by="DeploymentRevisionRow.revision_number.desc()",
-    )
     primary_replica_group_row: Mapped[ReplicaGroupRow | None] = relationship(
         "ReplicaGroupRow",
         primaryjoin=_get_primary_replica_group_join_condition,
@@ -356,16 +317,8 @@ class EndpointRow(Base):  # type: ignore[misc]
         uselist=False,
     )
 
-    auto_scaling_policy: Mapped[DeploymentAutoScalingPolicyRow | None] = relationship(
-        "DeploymentAutoScalingPolicyRow",
-        back_populates="endpoint_row",
-        primaryjoin=_get_endpoint_auto_scaling_policy_join_condition,
-        uselist=False,
-    )
-
     deployment_policy: Mapped[DeploymentPolicyRow | None] = relationship(
         "DeploymentPolicyRow",
-        back_populates="endpoint_row",
         primaryjoin=_get_deployment_policy_join_condition,
         uselist=False,
     )
@@ -383,7 +336,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         load_created_user: bool = False,
         load_session_owner: bool = False,
         load_revisions: bool = False,
-    ) -> Self:
+    ) -> EndpointRow:
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
@@ -436,7 +389,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         load_session_owner: bool = False,
         load_revisions: bool = False,
         status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
-    ) -> list[Self]:
+    ) -> list[EndpointRow]:
         from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
         query = (
@@ -488,7 +441,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         load_session_owner: bool = False,
         load_revisions: bool = False,
         status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
-    ) -> Sequence[Self]:
+    ) -> Sequence[EndpointRow]:
         from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
         query = (
@@ -542,7 +495,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         load_session_owner: bool = False,
         load_revisions: bool = False,
         status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
-    ) -> Sequence[Self]:
+    ) -> Sequence[EndpointRow]:
         from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
         from ai.backend.manager.models.replica_group import ReplicaGroupRow
 
@@ -641,7 +594,9 @@ class EndpointRow(Base):  # type: ignore[misc]
         target_user_uuid: UUID,
         target_access_key: AccessKey,
     ) -> None:
+        from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
         from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+        from ai.backend.manager.models.session_group.row import SessionGroupRow
 
         endpoint_rows = await EndpointRow.list_endpoint(
             db_session,
@@ -664,6 +619,19 @@ class EndpointRow(Base):  # type: ignore[misc]
         )
         for session_row in session_rows:
             session_row.delegate_ownership(target_user_uuid, target_access_key)
+        # The placement groups of the delegated replica groups follow their
+        # members: a group's members all belong to its owner (BEP-1064).
+        await db_session.execute(
+            sa.update(SessionGroupRow)
+            .where(
+                SessionGroupRow.id.in_(
+                    sa.select(ReplicaGroupRow.session_group_id).where(
+                        ReplicaGroupRow.deployment_id.in_([row.id for row in endpoint_rows])
+                    )
+                )
+            )
+            .values(owner_user_id=target_user_uuid)
+        )
 
     @property
     def current_revision_id(self) -> DeploymentRevisionID | None:
@@ -720,8 +688,9 @@ class EndpointRow(Base):  # type: ignore[misc]
     def to_data(self) -> EndpointData:
         """Convert to EndpointData.
 
-        Requires revisions and revisions.image_row to be eagerly loaded
-        via selectinload for revision field population.
+        Requires ``current_revision_row`` / ``deploying_revision_row`` and
+        their ``image_row`` to be eagerly loaded via selectinload for
+        revision field population.
         ``_find_active_revision`` prefers ``current_revision`` and falls
         back to ``deploying_revision`` so the projection reflects the
         spec currently being deployed during the initial DEPLOYING
@@ -910,7 +879,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         )
 
 
-class EndpointTokenRow(Base):  # type: ignore[misc]
+class EndpointTokenRow(Base):
     __tablename__ = "endpoint_tokens"
 
     id: Mapped[UUID] = mapped_column(
@@ -973,14 +942,14 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         project: UUID | None = None,
         user_uuid: UUID | None = None,
         load_endpoint: bool = False,
-    ) -> Sequence[Self]:
+    ) -> Sequence[EndpointTokenRow]:
         query = (
             sa.select(EndpointTokenRow)
             .filter(EndpointTokenRow.endpoint == endpoint_id)
             .order_by(sa.desc(EndpointTokenRow.created_at))
         )
         if load_endpoint:
-            query = query.options(selectinload(EndpointTokenRow.tokens))
+            query = query.options(selectinload(EndpointTokenRow.endpoint_row))
         if project:
             query = query.filter(EndpointTokenRow.project == project)
         if domain:
@@ -1000,10 +969,10 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         project: UUID | None = None,
         user_uuid: UUID | None = None,
         load_endpoint: bool = False,
-    ) -> Self:
+    ) -> EndpointTokenRow:
         query = sa.select(EndpointTokenRow).filter(EndpointTokenRow.token == token)
         if load_endpoint:
-            query = query.options(selectinload(EndpointTokenRow.tokens))
+            query = query.options(selectinload(EndpointTokenRow.endpoint_row))
         if project:
             query = query.filter(EndpointTokenRow.project == project)
         if domain:
@@ -1031,7 +1000,7 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         )
 
 
-class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
+class EndpointAutoScalingRuleRow(Base):
     __tablename__ = "endpoint_auto_scaling_rules"
 
     id: Mapped[UUID] = mapped_column(
@@ -1081,18 +1050,16 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
         nullable=False,
     )
 
-    endpoint_row: Mapped[EndpointRow] = relationship(
-        "EndpointRow", back_populates="endpoint_auto_scaling_rules", lazy="joined"
-    )
+    endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", lazy="joined")
 
     @classmethod
     async def list(
         cls,
         session: AsyncSession,
-        endpoint_status_filter: Iterable[EndpointLifecycle] = frozenset([
+        endpoint_status_filter: Collection[EndpointLifecycle] = frozenset([
             EndpointLifecycle.CREATED
         ]),
-    ) -> Sequence[Self]:
+    ) -> Sequence[EndpointAutoScalingRuleRow]:
         query = sa.select(EndpointAutoScalingRuleRow)
         if endpoint_status_filter:
             query = (
@@ -1233,76 +1200,3 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
         """
         for column_name, value in modifier.fields_to_update().items():
             setattr(self, column_name, value)
-
-
-class ModelServiceHelper:
-    @staticmethod
-    async def check_extra_mounts(
-        conn: AsyncConnection,
-        legacy_etcd_loader: LegacyEtcdLoader,
-        storage_manager: StorageSessionManager,
-        model_id: UUID,
-        model_mount_destination: str,
-        extra_mounts: dict[UUID, MountOptionModel],
-        user_scope: UserScope,
-        resource_policy: dict[str, Any],
-    ) -> Sequence[VFolderMount]:
-        """
-        check if user is allowed to access every folders eagering to mount (other than model VFolder)
-        on general session creation lifecycle this check will be completed by `enqueue_session()` function,
-        which is not covered by the validation procedure (`create_session(dry_run=True)` call at the bottom part of `create()` API)
-        so we have to manually cover this part here.
-        """
-        if model_id in extra_mounts:
-            raise InvalidAPIParameters(
-                "Same VFolder appears on both model specification and VFolder mount"
-            )
-
-        mount_requests = [
-            VFolderMountRequest(
-                ref=folder_id,
-                dst_path=options.mount_destination,
-                options=VFolderMountOptions(
-                    permission=options.permission,
-                    subpath=options.subpath,
-                ),
-            )
-            for folder_id, options in extra_mounts.items()
-        ]
-        allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
-        vfolder_mounts = await prepare_vfolder_mounts(
-            conn,
-            storage_manager,
-            allowed_vfolder_types,
-            user_scope,
-            resource_policy,
-            mount_requests,
-        )
-
-        for vfolder in vfolder_mounts:
-            if str(vfolder.kernel_path) == model_mount_destination:
-                raise InvalidAPIParameters(
-                    "extra_mounts.mount_destination conflicts with model_mount_destination config. Make sure not to shadow value defined at model_mount_destination as a mount destination of extra VFolders."
-                )
-            if vfolder.usage_mode == VFolderUsageMode.MODEL:
-                raise InvalidAPIParameters(
-                    "MODEL type VFolders cannot be added as a part of extra_mounts folder"
-                )
-
-        return vfolder_mounts
-
-    @staticmethod
-    async def _listdir(
-        storage_manager: StorageSessionManager,
-        proxy_name: str,
-        volume_name: str,
-        vfid: VFolderID,
-        relpath: str,
-    ) -> dict[str, Any]:
-        manager_facing_client = storage_manager.get_manager_facing_client(proxy_name)
-        result = await manager_facing_client.list_files(
-            volume_name,
-            str(vfid),
-            relpath,
-        )
-        return cast(dict[str, Any], result)

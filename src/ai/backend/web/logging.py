@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from types import TracebackType
-from typing import Any
+from typing import Any, override
 
 
 class BraceMessage:
@@ -13,6 +13,7 @@ class BraceMessage:
         self.fmt = fmt
         self.args = args
 
+    @override
     def __str__(self) -> str:
         return self.fmt.format(*self.args)
 
@@ -21,6 +22,7 @@ class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
     def __init__(self, logger: logging.Logger, extra: Mapping[str, Any] | None = None) -> None:
         super().__init__(logger, extra)
 
+    @override
     def log(
         self,
         level: int,

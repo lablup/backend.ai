@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import io
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 from rich.console import Console, ConsoleRenderable
 from rich.text import Text
@@ -26,6 +26,7 @@ from textual.widgets import (
 
 
 class DirectoryPathValidator(Validator):
+    @override
     def validate(self, value: str) -> ValidationResult:
         if Path(value).is_dir():
             return self.success()
@@ -38,6 +39,7 @@ class ProgressItem(Static):
         super().__init__(*args, **kwargs)
         self._label = label
 
+    @override
     def compose(self) -> ComposeResult:
         yield Label(Text.from_markup(self._label), classes="progress-name")
         yield ProgressBar(classes="progress-download")
@@ -73,6 +75,7 @@ class SetupLog(Log):
             width=200,
         )
 
+    @override
     def on_mount(self) -> None:
         if self.app.is_headless:
             self._stdout_console = Console(force_terminal=True)
@@ -102,6 +105,7 @@ class SetupLog(Log):
             return f"{content}\n"
         return self._render_io.getvalue()
 
+    @override
     def write(
         self,
         data: object,
@@ -197,6 +201,7 @@ class InputDialog(Static):
         self._focus_save = None
         self._validator = validator
 
+    @override
     def compose(self) -> ComposeResult:
         yield Label(self._label)
         yield Input(

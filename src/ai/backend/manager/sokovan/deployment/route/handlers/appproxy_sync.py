@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Sequence
+from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -45,20 +46,24 @@ class AppProxySyncRouteHandler(RouteHandler):
         self._event_producer = event_producer
 
     @classmethod
+    @override
     def name(cls) -> str:
         return "appproxy-sync"
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         # Sync is idempotent (set + event); the long cycle keeps state
         # convergent without an explicit distributed lock.
         return None
 
     @classmethod
+    @override
     def category(cls) -> RouteHandlerCategory:
         return RouteHandlerCategory.SYNC
 
     @classmethod
+    @override
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.RUNNING],
@@ -66,6 +71,7 @@ class AppProxySyncRouteHandler(RouteHandler):
         )
 
     @classmethod
+    @override
     def status_transitions(cls) -> RouteStatusTransitions:
         # Pure side-effect handler; never mutates lifecycle/health columns.
         return RouteStatusTransitions(
@@ -74,9 +80,11 @@ class AppProxySyncRouteHandler(RouteHandler):
             stale=None,
         )
 
+    @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         return await self._route_executor.sync_appproxy(routes)
 
+    @override
     async def post_process(self, result: RouteExecutionResult) -> None:
         synced = len(result.successes)
         failed = len(result.errors)

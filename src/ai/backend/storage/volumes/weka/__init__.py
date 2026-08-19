@@ -5,7 +5,7 @@ import logging
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import aiofiles.os
 
@@ -50,6 +50,7 @@ class WekaQuotaModel(BaseQuotaModel):
             lambda: path.stat().st_ino,
         )
 
+    @override
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -63,6 +64,7 @@ class WekaQuotaModel(BaseQuotaModel):
         if options is not None:
             await self.update_quota_scope(quota_scope_id, options)
 
+    @override
     async def update_quota_scope(self, quota_scope_id: QuotaScopeID, config: QuotaConfig) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         inode_id = await self._get_inode_id(qspath)
@@ -73,6 +75,7 @@ class WekaQuotaModel(BaseQuotaModel):
             qs_relpath, inode_id, soft_limit=config.limit_bytes, hard_limit=config.limit_bytes
         )
 
+    @override
     async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
         qspath = self.mangle_qspath(quota_scope_id)
         if not qspath.exists():
@@ -95,6 +98,7 @@ class WekaQuotaModel(BaseQuotaModel):
             limit_bytes=limit_bytes,
         )
 
+    @override
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         inode_id = await self._get_inode_id(qspath)
@@ -103,6 +107,7 @@ class WekaQuotaModel(BaseQuotaModel):
         except WekaNotFoundError:
             pass
 
+    @override
     async def delete_quota_scope(self, quota_scope_id: QuotaScopeID) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         inode_id = await self._get_inode_id(qspath)
@@ -149,6 +154,7 @@ class WekaVolume(BaseVolume):
             ssl=ssl_verify,
         )
 
+    @override
     async def init(self) -> None:
         for fs in await self.api_client.list_fs():
             if fs.name == self.config["weka_fs_name"]:
@@ -158,12 +164,15 @@ class WekaVolume(BaseVolume):
             raise WekaInitError(f"FileSystem {self.config['weka_fs_name']} not found")
         await super().init()
 
+    @override
     async def create_quota_model(self) -> AbstractQuotaModel:
         return WekaQuotaModel(self.mount_path, self._fs_uid, self.api_client)
 
+    @override
     async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_METRIC, CAP_FAST_FS_SIZE])
 
+    @override
     async def get_hwinfo(self) -> HardwareMetadata:
         if self._fs_uid is None:
             raise VolumeNotInitializedError("Weka filesystem UID is not initialized")
@@ -188,6 +197,7 @@ class WekaVolume(BaseVolume):
                 "metadata": {},
             }
 
+    @override
     async def get_fs_usage(self) -> CapacityUsage:
         if self._fs_uid is None:
             raise VolumeNotInitializedError("Weka filesystem UID is not initialized")
@@ -197,6 +207,7 @@ class WekaVolume(BaseVolume):
             used_bytes=fs.used_total,
         )
 
+    @override
     async def get_performance_metric(self) -> FSPerfMetric:
         start_time = datetime.now(UTC).replace(second=0, microsecond=0) - timedelta(
             minutes=1,

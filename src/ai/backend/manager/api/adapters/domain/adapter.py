@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.domain.response import (
     PurgeDomainPayload,
 )
 from ai.backend.common.dto.manager.v2.domain.types import DomainOrderField, OrderDirection
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
@@ -33,16 +34,16 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.orders import DomainOrders
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
     combine_conditions_or,
     negate_conditions,
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
-from ai.backend.manager.repositories.domain.types import DomainSearchScope
+from ai.backend.manager.repositories.domain.types import DomainOperationScope
 from ai.backend.manager.repositories.domain.updaters import DomainNodeUpdaterSpec
 from ai.backend.manager.services.domain.actions.create_domain_node import CreateDomainNodeAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
@@ -81,6 +82,23 @@ class DomainAdapter(BaseAdapter):
         )
         domain_map = {data.name: self._domain_data_to_node(data) for data in action_result.items}
         return [domain_map.get(name) for name in names]
+
+    async def batch_load_by_ids(self, ids: Sequence[DomainID]) -> list[DomainNode | None]:
+        """Batch load domains by UUID for DataLoader use.
+
+        Returns DomainNode DTOs in the same order as the input ids list.
+        """
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[DomainConditions.by_ids(ids)],
+        )
+        action_result = await self._processors.domain.search_domains.wait_for_complete(
+            SearchDomainsAction(querier=querier)
+        )
+        domain_map = {data.id: self._domain_data_to_node(data) for data in action_result.items}
+        return [domain_map.get(domain_id) for domain_id in ids]
 
     async def get(self, domain_name: str) -> DomainNode:
         """Retrieve a single domain by name."""
@@ -121,7 +139,7 @@ class DomainAdapter(BaseAdapter):
 
     async def search_rg_domains(
         self,
-        scope: DomainSearchScope,
+        scope: DomainOperationScope,
         input: AdminSearchDomainsInput,
     ) -> AdminSearchDomainsPayload:
         """Search domains within a resource group scope."""
@@ -247,6 +265,14 @@ class DomainAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter.id is not None:
+            condition = filter.id.build_query_condition(
+                equals_factory=DomainConditions.by_id_equals,
+                in_factory=DomainConditions.by_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
         if filter.description is not None:
             condition = self._convert_description_filter(filter.description)
             if condition is not None:
@@ -266,9 +292,9 @@ class DomainAdapter(BaseAdapter):
 
         if filter.modified_at is not None:
             condition = filter.modified_at.build_query_condition(
-                before_factory=DomainConditions.by_modified_at_before,
-                after_factory=DomainConditions.by_modified_at_after,
-                equals_factory=DomainConditions.by_modified_at_equals,
+                before_factory=DomainConditions.by_updated_at_before,
+                after_factory=DomainConditions.by_updated_at_after,
+                equals_factory=DomainConditions.by_updated_at_equals,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -359,7 +385,7 @@ class DomainAdapter(BaseAdapter):
     def _domain_data_to_node(data: DomainData) -> DomainNode:
         """Convert data layer type to Pydantic DTO."""
         return DomainNode(
-            id=data.name,
+            id=data.id,
             basic_info=DomainBasicInfo(
                 name=data.name,
                 description=data.description,
@@ -370,8 +396,9 @@ class DomainAdapter(BaseAdapter):
             ),
             lifecycle=DomainLifecycleInfo(
                 is_active=data.is_active,
+                is_default=data.is_default,
                 created_at=data.created_at,
-                modified_at=data.modified_at,
+                modified_at=data.updated_at,
             ),
         )
 
@@ -385,7 +412,7 @@ def _resolve_order(field: DomainOrderField, direction: OrderDirection) -> QueryO
         case DomainOrderField.CREATED_AT:
             return DomainOrders.created_at(ascending)
         case DomainOrderField.MODIFIED_AT:
-            return DomainOrders.modified_at(ascending)
+            return DomainOrders.updated_at(ascending)
         case DomainOrderField.IS_ACTIVE:
             return DomainOrders.is_active(ascending)
         case DomainOrderField.PROJECT_NAME:

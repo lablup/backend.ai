@@ -5,6 +5,7 @@ import os
 import threading
 import time
 from pathlib import Path
+from typing import override
 
 import pytest
 import trafaret as t
@@ -43,6 +44,7 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.common.testing"))
 class NotPicklableClass:
     """A class that cannot be pickled."""
 
+    @override
     def __reduce__(self) -> tuple[type, tuple[()]]:
         raise TypeError("this is not picklable")
 
@@ -54,6 +56,7 @@ class NotUnpicklableClass:
         if x == 1:
             raise TypeError("this is not unpicklable")
 
+    @override
     def __reduce__(self) -> tuple[type[NotUnpicklableClass], tuple[int, ...]]:
         return type(self), (1,)
 

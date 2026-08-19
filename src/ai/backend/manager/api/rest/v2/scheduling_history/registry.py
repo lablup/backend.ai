@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import V2SchedulingHistoryHandler
@@ -34,6 +34,20 @@ def register_v2_scheduling_history_routes(
         middlewares=[superadmin_required],
     )
 
+    # Kernel history
+    registry.add(
+        "POST",
+        "/kernels/admin/search",
+        handler.admin_search_kernel_history,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/kernels/scoped/search",
+        handler.scoped_search_kernel_history,
+        middlewares=[auth_required],
+    )
+
     # Deployment history
     registry.add(
         "POST",
@@ -46,6 +60,20 @@ def register_v2_scheduling_history_routes(
         "/deployments/{deployment_id}/search",
         handler.admin_deployment_scoped_search,
         middlewares=[superadmin_required],
+    )
+
+    # Replica group history
+    registry.add(
+        "POST",
+        "/replica-groups/admin/search",
+        handler.admin_search_replica_group_history,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/replica-groups/scoped/search",
+        handler.scoped_search_replica_group_history,
+        middlewares=[auth_required],
     )
 
     # Route history

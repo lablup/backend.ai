@@ -4,13 +4,12 @@ import enum
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, NamedTuple
+from typing import Any, NamedTuple
 from uuid import UUID
 
-from ai.backend.common.types import CIStrEnum, ImageCanonical, ImageID
+from ai.backend.common.types import CIStrEnum, ImageCanonical, ImageID, SlotName
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.image import Resources
+type Resources = dict[SlotName, dict[str, Any]]
 
 
 class ImageStatus(enum.StrEnum):

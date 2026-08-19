@@ -1,0 +1,35 @@
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+
+from ai.backend.common.exception import ErrorCode
+from ai.backend.common.identifier.action import ActionID
+from ai.backend.common.identifier.entity import EntityID
+from ai.backend.manager.actions.types import OperationStatus
+
+__all__ = (
+    "SingleEntityActionResultMeta",
+    "SingleEntityActionProcessResult",
+)
+
+
+@dataclass
+class SingleEntityActionResultMeta:
+    """Outcome metadata for a single-entity action run.
+
+    Self-contained for the pure-ABC single-entity line; ``entity_id`` is always
+    present because :class:`BaseSingleEntityAction` operates on an identified entity.
+    """
+
+    action_id: ActionID
+    entity_id: EntityID
+    status: OperationStatus
+    description: str
+    started_at: datetime
+    ended_at: datetime
+    duration: timedelta
+    error_code: ErrorCode | None
+
+
+@dataclass
+class SingleEntityActionProcessResult:
+    meta: SingleEntityActionResultMeta

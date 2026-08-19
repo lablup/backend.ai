@@ -1,13 +1,15 @@
-from typing import Any, cast
+from typing import Any, cast, override
 
 from ai.backend.common.etcd import AsyncEtcd
 
 
 class TraefikEtcd(AsyncEtcd):
+    @override
     def _mangle_key(self, k: str) -> str:
         k = k.removeprefix("/")
         return f"{self.ns}/{k}"
 
+    @override
     def _demangle_key(self, k: bytes | str) -> str:
         if isinstance(k, bytes):
             k = k.decode(self.encoding)

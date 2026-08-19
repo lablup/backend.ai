@@ -1,5 +1,7 @@
 """Permission and RBAC-related error definitions."""
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -19,6 +21,7 @@ __all__ = (
     "RoleNotAssigned",
     "RoleNotFound",
     "UserSystemRoleNotProvisioned",
+    "VirtualScopeNotFound",
 )
 
 
@@ -26,6 +29,7 @@ class RoleNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/role-not-found"
     error_title = "The role does not exist."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ROLE,
@@ -45,6 +49,7 @@ class UserSystemRoleNotProvisioned(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/user-system-role-not-provisioned"
     error_title = "The user's SYSTEM role is not provisioned."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ROLE,
@@ -57,6 +62,7 @@ class RoleAlreadyAssigned(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/role-already-assigned"
     error_title = "The role is already assigned to the user."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ROLE,
@@ -69,6 +75,7 @@ class RoleNotAssigned(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/role-not-assigned"
     error_title = "The role is not assigned to the user."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ROLE,
@@ -81,6 +88,7 @@ class NotEnoughPermission(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/not-enough-permission"
     error_title = "Insufficient permission to perform this operation."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ROLE,
@@ -93,6 +101,7 @@ class PermissionNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/permission-not-found"
     error_title = "The permission does not exist."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.PERMISSION,
@@ -105,6 +114,7 @@ class ObjectPermissionNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/object-permission-not-found"
     error_title = "The object permission does not exist."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.PERMISSION,
@@ -113,10 +123,31 @@ class ObjectPermissionNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
+class VirtualScopeNotFound(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a scope's virtual scope is expected to exist but does not.
+
+    A virtual scope is always created alongside any owner scope, so a missing one is
+    a server-side data-integrity condition (an invariant violation), not a client
+    error — hence 500.
+    """
+
+    error_type = "https://api.backend.ai/probs/virtual-scope-not-found"
+    error_title = "The virtual scope for the given scope does not exist."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class ReplaceRolePermissionRoleIdMismatch(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/replace-role-permission-role-id-mismatch"
     error_title = "Permission entry role_id does not match the request role_id."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.PERMISSION,

@@ -32,14 +32,17 @@ from ai.backend.manager.api.rest.user.handler import UserHandler
 from ai.backend.manager.api.rest.user.registry import register_user_routes
 from ai.backend.manager.api.rest.v2.user.handler import V2UserHandler
 from ai.backend.manager.api.rest.v2.user.registry import register_v2_user_routes
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
@@ -81,14 +84,27 @@ def user_processors(
 
 
 @pytest.fixture()
+def domain_processors(
+    database_engine: ExtendedAsyncSAEngine,
+) -> DomainProcessors:
+    service = DomainService(repository=DomainRepository(database_engine))
+    return DomainProcessors(
+        service=service, action_monitors=[], validators=_create_mock_validators()
+    )
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     user_processors: UserProcessors,
+    domain_processors: DomainProcessors,
     config_provider: ManagerConfigProvider,
 ) -> list[RouteRegistry]:
     """Load only the modules required for user-domain tests."""
     user_registry = register_user_routes(
-        UserHandler(user=user_processors, config_provider=config_provider),
+        UserHandler(
+            user=user_processors, domain=domain_processors, config_provider=config_provider
+        ),
         route_deps,
     )
     admin_registry = register_admin_routes(

@@ -1,4 +1,4 @@
-from typing import Any, Self, override
+from typing import override
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -6,18 +6,6 @@ from ai.backend.common.events.user_event.user_event import UserEvent
 
 class DoScanReservoirRegistryEvent(AbstractAnycastEvent):
     """Event to trigger reservoir registry scanning."""
-
-    def __init__(self) -> None:
-        pass
-
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return ()
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls()
 
     @classmethod
     @override

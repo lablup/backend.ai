@@ -80,7 +80,7 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
         if vfolder_func.id is None:
             raise RuntimeError("Model VFolder id is None.")
 
-        endpoint_id = None
+        endpoint_id: UUID | None = None
         try:
             response = await client_session.Service.create(
                 **self._build_service_params(),
@@ -124,13 +124,14 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             ):
                 yield
         finally:
-            if endpoint_id:
+            if endpoint_id is not None:
                 response = await client_session.Service(endpoint_id).delete()
                 assert response["success"], f"Model Service deletion failed!, response: {response}"
 
 
 class EndpointTemplate(_BaseEndpointTemplate):
     @property
+    @override
     def name(self) -> str:
         return "endpoint_template"
 
@@ -141,6 +142,7 @@ class EndpointTemplate(_BaseEndpointTemplate):
 
 class PublicEndpointTemplate(_BaseEndpointTemplate):
     @property
+    @override
     def name(self) -> str:
         return "public_endpoint_template"
 
@@ -151,6 +153,7 @@ class PublicEndpointTemplate(_BaseEndpointTemplate):
 
 class CustomGroupEndpointTemplate(_BaseEndpointTemplate):
     @property
+    @override
     def name(self) -> str:
         return "custom_group_endpoint_template"
 

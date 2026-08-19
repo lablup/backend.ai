@@ -1,3 +1,5 @@
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -18,6 +20,7 @@ class ConfigurationError(HammerspaceError):
     error_title = "Hammerspace configuration is invalid."
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -31,6 +34,7 @@ class AuthenticationError(HammerspaceError, web.HTTPUnauthorized):
     error_title = "Hammerspace API authentication failed."
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -44,6 +48,7 @@ class ObjectiveNotFound(HammerspaceError, web.HTTPNotFound):
     error_title = "Hammerspace has no such objective."
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -57,6 +62,7 @@ class ShareNotFound(HammerspaceError, web.HTTPNotFound):
     error_title = "Hammerspace has no such share."
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -70,6 +76,7 @@ class VolumeNotFound(HammerspaceError, web.HTTPNotFound):
     error_title = "Hammerspace has no such volume."
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,

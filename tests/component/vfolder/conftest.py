@@ -74,6 +74,7 @@ from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
 from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 _VFOLDER_SERVER_SUBAPP_MODULES = (_auth_api,)
@@ -131,7 +132,8 @@ def vfolder_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
         ),
     )
 
@@ -154,7 +156,8 @@ def vfolder_file_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
         ),
     )
 
@@ -175,7 +178,8 @@ def vfolder_invite_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
         ),
     )
 
@@ -196,7 +200,8 @@ def vfolder_sharing_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
         ),
     )
 

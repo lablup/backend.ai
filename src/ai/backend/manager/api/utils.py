@@ -30,6 +30,7 @@ from typing import (
     TypeAlias,
     TypeVar,
     cast,
+    override,
 )
 
 import trafaret as t
@@ -291,6 +292,7 @@ class _Infinity(numbers.Number):
     def __int__(self) -> int:
         return 0xFFFF_FFFF_FFFF_FFFF  # a practical 64-bit maximum
 
+    @override
     def __hash__(self) -> int:
         return hash(self)
 

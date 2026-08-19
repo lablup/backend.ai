@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from aiohttp import web
 
@@ -41,6 +41,7 @@ class StoragePluginContext(BasePluginContext[AbstractStoragePlugin]):
     plugin_group = "backendai_storage_v10"
 
     @classmethod
+    @override
     def discover_plugins(
         cls,
         plugin_group: str,
@@ -55,6 +56,7 @@ class StorageArtifactVerifierPluginContext(BasePluginContext[AbstractArtifactVer
     plugin_group = "backendai_storage_artifact_verifier_v1"
 
     @classmethod
+    @override
     def discover_plugins(
         cls,
         plugin_group: str,

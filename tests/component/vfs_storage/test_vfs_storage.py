@@ -23,11 +23,11 @@ from ai.backend.common.dto.manager.storage.response import (
     GetVFSStorageResponse,
     ListVFSStorageResponse,
 )
-from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
-    OffsetPagination,
     Updater,
 )
 from ai.backend.manager.repositories.vfs_storage.creators import VFSStorageCreatorSpec

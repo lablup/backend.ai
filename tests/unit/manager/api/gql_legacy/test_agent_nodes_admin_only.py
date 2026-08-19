@@ -13,8 +13,8 @@ import graphene
 import pytest
 
 from ai.backend.manager.api.gql_legacy.agent import AgentNode
+from ai.backend.manager.data.permission.permission_defs import AgentPermission
 from ai.backend.manager.models.rbac import SystemScope
-from ai.backend.manager.models.rbac.permission_defs import AgentPermission
 from ai.backend.manager.models.user import UserRole
 
 

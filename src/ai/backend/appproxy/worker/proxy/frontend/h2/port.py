@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from asyncio import subprocess
-from typing import Any
+from typing import Any, override
 
 from yarl import URL
 
@@ -32,6 +32,7 @@ class PortFrontend(H2Frontend[int]):
         self.processes = []
         self.api_ports = {}
 
+    @override
     async def start(self) -> None:
         worker_config = self.root_context.local_config.proxy_worker
         port_proxy_config = worker_config.port_proxy
@@ -73,6 +74,7 @@ class PortFrontend(H2Frontend[int]):
             self.api_ports[listen_port] = api_port
             log.info("started nghttpx server at {}:{}", port_proxy_config.bind_host, listen_port)
 
+    @override
     async def stop(self) -> None:
         for task in self.proc_monitor_tasks:
             task.cancel()
@@ -87,19 +89,23 @@ class PortFrontend(H2Frontend[int]):
         finally:
             self.api_ports = {}
 
+    @override
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> H2Backend:
         api_port = self.api_ports[self.get_circuit_key(circuit)]
         backend = H2Backend(URL(f"http://localhost:{api_port}"), self.root_context, circuit)
         return await self.update_backend(backend, routes)
 
+    @override
     async def update_backend(self, backend: H2Backend, routes: list[RouteInfo]) -> H2Backend:
         backend_configs = [BackendConfig(r.current_kernel_host, r.kernel_port) for r in routes]
         await backend.update_config(backend_configs)
         return backend
 
+    @override
     async def terminate_backend(self, backend: H2Backend) -> None:
         await backend.update_config([])
 
+    @override
     def get_circuit_key(self, circuit: Circuit) -> int:
         if not isinstance(circuit.frontend, PortFrontendInfo):
             raise InvalidFrontendTypeError(

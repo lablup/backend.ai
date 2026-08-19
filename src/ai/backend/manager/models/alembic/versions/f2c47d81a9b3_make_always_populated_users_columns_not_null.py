@@ -1,0 +1,58 @@
+"""make the always-populated users columns NOT NULL
+
+``totp_activated`` is already NOT NULL in migrated databases; the column is
+here for the ones built from the model metadata.
+
+Revision ID: f2c47d81a9b3
+Revises: dfab9fd24208
+Create Date: 2026-08-12 11:20:00.000000
+
+"""
+
+import sqlalchemy as sa
+from alembic import op
+from sqlalchemy.engine import Connection
+
+# revision identifiers, used by Alembic.
+revision = "f2c47d81a9b3"
+down_revision = "dfab9fd24208"
+# Part of: NEXT_RELEASE_VERSION
+branch_labels = None
+depends_on = None
+
+
+def _backfill(bind: Connection) -> None:
+    """Each of the three falls back to the value creation gives it. need_password_change
+    never had a default; totp_activated only lacks one in a database built from the model
+    metadata, which carried the stale annotation."""
+    bind.execute(
+        sa.text("UPDATE users SET need_password_change = false WHERE need_password_change IS NULL")
+    )
+    bind.execute(sa.text("UPDATE users SET totp_activated = false WHERE totp_activated IS NULL"))
+    bind.execute(sa.text("UPDATE users SET role = 'user' WHERE role IS NULL"))
+
+
+def upgrade() -> None:
+    _backfill(op.get_bind())
+
+    op.alter_column("users", "role", existing_type=sa.String(length=64), nullable=False)
+    op.alter_column(
+        "users",
+        "need_password_change",
+        existing_type=sa.Boolean(),
+        nullable=False,
+        server_default=sa.false(),
+    )
+    op.alter_column("users", "totp_activated", existing_type=sa.Boolean(), nullable=False)
+
+
+def downgrade() -> None:
+    op.alter_column("users", "role", existing_type=sa.String(length=64), nullable=True)
+    op.alter_column(
+        "users",
+        "need_password_change",
+        existing_type=sa.Boolean(),
+        nullable=True,
+        server_default=None,
+    )
+    op.alter_column("users", "totp_activated", existing_type=sa.Boolean(), nullable=True)

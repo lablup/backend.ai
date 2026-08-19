@@ -21,9 +21,8 @@ class KeyPairResourcePolicyUpdaterSpec(UpdaterSpec["KeyPairResourcePolicyRow"]):
     max_concurrent_sessions: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_containers_per_session: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_pending_session_count: TriState[int] = field(default_factory=TriState.nop)
-    max_pending_session_resource_slots: TriState[dict[str, Any]] = field(
-        default_factory=TriState.nop
-    )
+    max_pending_session_resource_slots: TriState[ResourceSlot] = field(default_factory=TriState.nop)
+    max_priority: TriState[int] = field(default_factory=TriState.nop)
     max_quota_scope_size: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_vfolder_count: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_vfolder_size: OptionalState[int] = field(default_factory=OptionalState.nop)
@@ -48,6 +47,7 @@ class KeyPairResourcePolicyUpdaterSpec(UpdaterSpec["KeyPairResourcePolicyRow"]):
         self.max_pending_session_resource_slots.update_dict(
             to_update, "max_pending_session_resource_slots"
         )
+        self.max_priority.update_dict(to_update, "max_priority")
         self.max_quota_scope_size.update_dict(to_update, "max_quota_scope_size")
         self.max_vfolder_count.update_dict(to_update, "max_vfolder_count")
         self.max_vfolder_size.update_dict(to_update, "max_vfolder_size")

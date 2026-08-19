@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.bulk import BulkActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.audit_log.actions.create import (
     CreateAuditLogAction,
@@ -22,7 +19,7 @@ from ai.backend.manager.services.audit_log.actions.search import (
 from ai.backend.manager.services.audit_log.service import AuditLogService
 
 
-class AuditLogProcessors(AbstractProcessorPackage):
+class AuditLogProcessors:
     create: ActionProcessor[CreateAuditLogAction, CreateAuditLogActionResult]
     search: ActionProcessor[SearchAuditLogsAction, SearchAuditLogsActionResult]
     scoped_search: BulkActionProcessor[
@@ -42,11 +39,3 @@ class AuditLogProcessors(AbstractProcessorPackage):
             monitors=action_monitors,
             validators=[validators.rbac.bulk],
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateAuditLogAction.spec(),
-            SearchAuditLogsAction.spec(),
-            ScopedSearchAuditLogsAction.spec(),
-        ]

@@ -3,7 +3,7 @@ import functools
 import logging
 import socket
 import time
-from typing import Any
+from typing import Any, override
 
 from aiohttp import web
 
@@ -37,6 +37,7 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
         self.servers = []
         self.server_tasks = []
 
+    @override
     async def start(self) -> None:
         proxy_worker_config = self.root_context.local_config.proxy_worker
         port_proxy_config = proxy_worker_config.port_proxy
@@ -72,6 +73,7 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             log.exception("TCPFrontend._listen_task(c: {}): exception:", circuit_key)
             raise
 
+    @override
     async def stop(self) -> None:
         for task in self.server_tasks:
             task.cancel()
@@ -104,16 +106,20 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             return False
         return True
 
+    @override
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> TCPBackend:
         return TCPBackend(routes, self.root_context, circuit)
 
+    @override
     async def update_backend(self, backend: TCPBackend, routes: list[RouteInfo]) -> TCPBackend:
         await backend.update_routes(routes)
         return backend
 
+    @override
     async def terminate_backend(self, backend: TCPBackend) -> None:
         await backend.close()
 
+    @override
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
         now = time.time()
         return [
@@ -153,6 +159,7 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             end = time.monotonic()
             metrics.proxy.observe_downstream_tcp_end(duration=int(end - start))
 
+    @override
     def get_circuit_key(self, circuit: Circuit) -> int:
         if not isinstance(circuit.frontend, PortFrontendInfo):
             raise InvalidFrontendTypeError(

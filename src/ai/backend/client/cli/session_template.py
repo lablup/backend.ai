@@ -1,5 +1,7 @@
 import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import cast
 
 import click
 from tabulate import tabulate
@@ -133,7 +135,9 @@ def list(list_all: bool) -> None:
     ]
     with Session() as session:
         try:
-            resp = session.SessionTemplate.list_templates(list_all)
+            resp = cast(
+                Sequence[Mapping[str, str]], session.SessionTemplate.list_templates(list_all)
+            )
             if not resp:
                 print("There is no task templates created yet.")
                 return

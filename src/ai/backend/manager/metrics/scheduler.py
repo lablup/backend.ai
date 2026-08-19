@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Self
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.metrics.safe import (
     SafeCounter as Counter,
 )
@@ -107,12 +108,12 @@ class SchedulerPhaseMetricObserver:
         self._phase_count = Counter(
             name="backendai_scheduler_phase_count",
             documentation="Total number of scheduler/scheduling controller phase executions",
-            labelnames=["component", "scaling_group", "phase", "status"],
+            labelnames=["component", "resource_group_id", "phase", "status"],
         )
         self._phase_duration_sec = Histogram(
             name="backendai_scheduler_phase_duration_sec",
             documentation="Duration of scheduler/scheduling controller phase executions in seconds",
-            labelnames=["component", "scaling_group", "phase", "status"],
+            labelnames=["component", "resource_group_id", "phase", "status"],
             buckets=[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.5, 5.0, 10.0],
         )
 
@@ -127,7 +128,7 @@ class SchedulerPhaseMetricObserver:
         self,
         *,
         component: str,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID | None,
         phase: str,
         status: str,
         duration: float,
@@ -137,26 +138,29 @@ class SchedulerPhaseMetricObserver:
 
         Args:
             component: The component name ('scheduler' or 'scheduling_controller')
-            scaling_group: The scaling group name
+            resource_group_id: The resource group ID
             phase: The phase name (e.g., 'validation', 'sequencing_fifo', 'allocation', 'fetch_data')
             status: The phase status ('success' or 'failure')
             duration: The phase duration in seconds
         """
+        rg_label = str(resource_group_id) if resource_group_id is not None else ""
         self._phase_count.labels(
-            component=component, scaling_group=scaling_group, phase=phase, status=status
+            component=component, resource_group_id=rg_label, phase=phase, status=status
         ).inc()
         self._phase_duration_sec.labels(
-            component=component, scaling_group=scaling_group, phase=phase, status=status
+            component=component, resource_group_id=rg_label, phase=phase, status=status
         ).observe(duration)
 
     @contextmanager
-    def measure_phase(self, component: str, scaling_group: str, phase: str) -> Iterator[None]:
+    def measure_phase(
+        self, component: str, resource_group_id: ResourceGroupID | None, phase: str
+    ) -> Iterator[None]:
         """
         Context manager to measure a phase execution.
 
         Args:
             component: The component name ('scheduler' or 'scheduling_controller')
-            scaling_group: The scaling group name
+            resource_group_id: The resource group ID
             phase: The phase name
         """
         start = time.perf_counter()
@@ -170,7 +174,7 @@ class SchedulerPhaseMetricObserver:
             duration = time.perf_counter() - start
             self._observe_phase(
                 component=component,
-                scaling_group=scaling_group,
+                resource_group_id=resource_group_id,
                 phase=phase,
                 status=status,
                 duration=duration,

@@ -15,6 +15,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
@@ -530,6 +531,7 @@ class TestCalculateFactors:
                 domain={
                     domain_name: DomainFairShareData(
                         resource_group="default",
+                        resource_group_id=ResourceGroupID(uuid4()),
                         domain_name=domain_name,
                         data=FairShareData(
                             spec=make_fair_share_spec(weight=Decimal("1.0")),
@@ -542,6 +544,7 @@ class TestCalculateFactors:
                 project={
                     project_id: ProjectFairShareData(
                         resource_group="default",
+                        resource_group_id=ResourceGroupID(uuid4()),
                         project_id=project_id,
                         domain_name=domain_name,
                         data=FairShareData(
@@ -555,6 +558,7 @@ class TestCalculateFactors:
                 user={
                     user_key: UserFairShareData(
                         resource_group="default",
+                        resource_group_id=ResourceGroupID(uuid4()),
                         user_uuid=user_uuid,
                         project_id=project_id,
                         domain_name=domain_name,
@@ -667,6 +671,7 @@ class TestCalculateFactors:
                 domain={
                     domain_name: DomainFairShareData(
                         resource_group="default",
+                        resource_group_id=ResourceGroupID(uuid4()),
                         domain_name=domain_name,
                         data=FairShareData(
                             spec=make_fair_share_spec(weight=Decimal("0.5")),
@@ -697,6 +702,7 @@ class TestCalculateFactors:
                 domain={
                     domain_name: DomainFairShareData(
                         resource_group="default",
+                        resource_group_id=ResourceGroupID(uuid4()),
                         domain_name=domain_name,
                         data=FairShareData(
                             spec=make_fair_share_spec(weight=Decimal("2.0")),
@@ -930,6 +936,7 @@ class TestIntegrationScenarios:
                 domain={
                     domain_a: DomainFairShareData(
                         resource_group="default",
+                        resource_group_id=ResourceGroupID(uuid4()),
                         domain_name=domain_a,
                         data=FairShareData(
                             spec=make_fair_share_spec(),
@@ -940,6 +947,7 @@ class TestIntegrationScenarios:
                     ),
                     domain_b: DomainFairShareData(
                         resource_group="default",
+                        resource_group_id=ResourceGroupID(uuid4()),
                         domain_name=domain_b,
                         data=FairShareData(
                             spec=make_fair_share_spec(),
@@ -952,6 +960,7 @@ class TestIntegrationScenarios:
                 project={
                     project_a: ProjectFairShareData(
                         resource_group="default",
+                        resource_group_id=ResourceGroupID(uuid4()),
                         project_id=project_a,
                         domain_name=domain_a,
                         data=FairShareData(
@@ -963,6 +972,7 @@ class TestIntegrationScenarios:
                     ),
                     project_b: ProjectFairShareData(
                         resource_group="default",
+                        resource_group_id=ResourceGroupID(uuid4()),
                         project_id=project_b,
                         domain_name=domain_b,
                         data=FairShareData(
@@ -976,6 +986,7 @@ class TestIntegrationScenarios:
                 user={
                     user_a: UserFairShareData(
                         resource_group="default",
+                        resource_group_id=ResourceGroupID(uuid4()),
                         user_uuid=user_a.user_uuid,
                         project_id=project_a,
                         domain_name=domain_a,
@@ -989,6 +1000,7 @@ class TestIntegrationScenarios:
                     ),
                     user_b: UserFairShareData(
                         resource_group="default",
+                        resource_group_id=ResourceGroupID(uuid4()),
                         user_uuid=user_b.user_uuid,
                         project_id=project_b,
                         domain_name=domain_b,
@@ -1064,6 +1076,7 @@ class TestDomainNameResolution:
                 project={
                     project_id: ProjectFairShareData(
                         resource_group="default",
+                        resource_group_id=ResourceGroupID(uuid4()),
                         project_id=project_id,
                         domain_name=domain_name,
                         data=FairShareData(
@@ -1189,6 +1202,7 @@ class TestDomainNameResolution:
                 project={
                     project_id: ProjectFairShareData(
                         resource_group="default",
+                        resource_group_id=ResourceGroupID(uuid4()),
                         project_id=project_id,
                         domain_name="",
                         data=FairShareData(

@@ -8,12 +8,12 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from contextlib import asynccontextmanager as actxmgr
 from typing import (
-    TYPE_CHECKING,
     Any,
     Concatenate,
     ParamSpec,
     TypeVar,
     overload,
+    override,
 )
 
 import sqlalchemy as sa
@@ -37,15 +37,11 @@ from yarl import URL
 
 from ai.backend.appproxy.common.errors import DatabaseError
 from ai.backend.appproxy.coordinator.config import DBConfig
+from ai.backend.appproxy.coordinator.defs import LockID
 from ai.backend.appproxy.coordinator.errors import TransactionResultError
 from ai.backend.common.json import ExtendedJSONEncoder
-from ai.backend.logging import BraceStyleAdapter
-
-if TYPE_CHECKING:
-    pass
-
-from ai.backend.appproxy.coordinator.defs import LockID
 from ai.backend.common.types import Sentinel
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 column_constraints = ["nullable", "index", "unique", "primary_key"]
@@ -131,6 +127,7 @@ class ExtendedAsyncSAEngine(SAEngine):
                 self._readonly_txn_count -= 1
 
     @actxmgr
+    @override
     async def begin(self, bind: SAConnection | None = None) -> AsyncIterator[SAConnection]:
         if bind is None:
             async with self.connect() as _bind, self._begin(_bind) as conn:
@@ -355,6 +352,8 @@ async def connect_database(
         str(db_url),
         connect_args=pgsql_connect_opts,
         pool_size=db_config.pool_size,
+        pool_recycle=db_config.pool_recycle,
+        pool_pre_ping=db_config.pool_pre_ping,
         max_overflow=db_config.max_overflow,
         json_serializer=functools.partial(json.dumps, cls=ExtendedJSONEncoder),
         isolation_level=isolation_level,

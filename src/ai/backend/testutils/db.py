@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Callable, Sequence
 from contextlib import asynccontextmanager
-from typing import Any, Protocol, cast
+from typing import Any, ClassVar, Protocol, cast, override
 
 from sqlalchemy import Table, text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -13,7 +13,7 @@ from sqlalchemy.sql.schema import ForeignKeyConstraint
 class HasTable(Protocol):
     """Protocol for SQLAlchemy ORM model classes with __table__ attribute."""
 
-    __table__: Table
+    __table__: ClassVar[Table]
 
 
 # Type alias for items that can be passed to with_tables
@@ -37,6 +37,7 @@ def _make_subset_schema_generator(table_names: frozenset[str]) -> type[SchemaGen
     """
 
     class _SubsetSchemaGenerator(SchemaGenerator):
+        @override
         def visit_foreign_key_constraint(self, constraint: ForeignKeyConstraint) -> None:
             elements = constraint.elements
             if elements:

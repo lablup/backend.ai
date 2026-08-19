@@ -8,6 +8,7 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.types import MountInfoEntry, MountPermission
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
@@ -24,7 +25,6 @@ from ai.backend.manager.data.deployment.types import (
     RevisionDraft,
 )
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
-from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
 
 @dataclass

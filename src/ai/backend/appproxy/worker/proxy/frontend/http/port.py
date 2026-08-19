@@ -1,7 +1,7 @@
 import importlib.resources
 import logging
 import ssl
-from typing import Any
+from typing import Any, override
 
 import aiohttp_jinja2
 import jinja2
@@ -26,6 +26,7 @@ class PortFrontend(BaseHTTPFrontend[int]):
 
         self.sites = []
 
+    @override
     async def start(self) -> None:
         ssl_ctx = None
         proxy_worker_config = self.root_context.local_config.proxy_worker
@@ -86,6 +87,7 @@ class PortFrontend(BaseHTTPFrontend[int]):
             port_end,
         )
 
+    @override
     async def stop(self) -> None:
         for site in self.sites:
             await site.stop()
@@ -105,6 +107,7 @@ class PortFrontend(BaseHTTPFrontend[int]):
         request["backend"] = backend
         return await handler(request)
 
+    @override
     def get_circuit_key(self, circuit: Circuit) -> int:
         if not isinstance(circuit.frontend, PortFrontendInfo):
             raise InvalidFrontendTypeError(

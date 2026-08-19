@@ -4,7 +4,7 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from decimal import Decimal
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, override
 from unittest.mock import AsyncMock, MagicMock
 
 import sqlalchemy as sa
@@ -94,6 +94,7 @@ class _Shape(ABCColumnPayload):
     """Test-only polymorphic payload base; `load` dispatches by the `kind` tag."""
 
     @classmethod
+    @override
     def load(cls, raw: dict[str, Any]) -> _Shape:
         kind = raw["kind"]
         if kind == "circle":
@@ -107,6 +108,7 @@ class _Shape(ABCColumnPayload):
 class _Circle(_Shape):
     radius: float
 
+    @override
     def serialize(self) -> dict[str, Any]:
         return {"kind": "circle", "radius": self.radius}
 
@@ -115,6 +117,7 @@ class _Circle(_Shape):
 class _Square(_Shape):
     side: float
 
+    @override
     def serialize(self) -> dict[str, Any]:
         return {"kind": "square", "side": self.side}
 

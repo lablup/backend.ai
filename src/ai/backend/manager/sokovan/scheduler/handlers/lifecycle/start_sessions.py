@@ -4,22 +4,24 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
-from ai.backend.manager.data.sokovan import SessionWithKernels
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.session.conditions import SessionConditions
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     SessionExecutionResult,
     SessionTransitionInfo,
 )
+from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
@@ -46,21 +48,25 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
         self._repository = repository
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "start-sessions"
 
     @classmethod
+    @override
     def target_statuses(cls) -> list[SessionStatus]:
         """Sessions in PREPARED state."""
         return [SessionStatus.PREPARED]
 
     @classmethod
+    @override
     def target_kernel_statuses(cls) -> list[KernelStatus] | None:
         """Include sessions where kernels are in PREPARED status."""
         return [KernelStatus.PREPARED]
 
     @classmethod
+    @override
     def status_transitions(cls) -> StatusTransitions:
         """Define state transitions for start sessions handler (BEP-1030).
 
@@ -90,13 +96,15 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
         )
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """Lock for operations targeting PREPARED sessions transitioning to CREATING."""
         return LockID.LOCKID_SOKOVAN_TARGET_CREATING
 
+    @override
     async def execute(
         self,
-        _scaling_group: str,
+        _resource_group_id: ResourceGroupID,
         sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Start kernels on agents for PREPARED sessions.

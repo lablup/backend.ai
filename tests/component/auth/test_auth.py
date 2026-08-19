@@ -46,7 +46,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.domain import DomainRow, domains
 from ai.backend.manager.models.group import GroupRow, association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
@@ -54,6 +54,9 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import AuthUserFixtureData
@@ -140,6 +143,30 @@ async def signup_default_project(
                 resource_policy=resource_policy_fixture,
             )
         )
+        virtual_scope_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=data.project_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=data.project_id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=data.project_id,
+                permission_cap=None,
+            )
+        )
     yield data
     async with db_engine.begin() as conn:
         await conn.execute(
@@ -150,6 +177,12 @@ async def signup_default_project(
         for email in data.cleanup_emails:
             await conn.execute(keypairs.delete().where(keypairs.c.user_id == email))
             await conn.execute(users.delete().where(users.c.email == email))
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == data.project_id,
+            )
+        )
         await conn.execute(
             GroupRow.__table__.delete().where(GroupRow.__table__.c.id == data.project_id),
         )
@@ -197,6 +230,9 @@ async def expired_password_user(
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
                 password_changed_at=expired_at,
+                domain_id=sa.select(DomainRow.id)
+                .where(DomainRow.name == domain_fixture.domain_name)
+                .scalar_subquery(),
             )
         )
         await conn.execute(
@@ -281,6 +317,30 @@ async def cross_domain_fixture(
                 resource_policy=resource_policy_fixture,
             )
         )
+        virtual_scope_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=group_id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
+                permission_cap=None,
+            )
+        )
         await conn.execute(
             sa.insert(users).values(
                 uuid=str(admin_data.user_uuid),
@@ -300,6 +360,9 @@ async def cross_domain_fixture(
                 domain_name=domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.ADMIN,
+                domain_id=sa.select(DomainRow.id)
+                .where(DomainRow.name == domain_name)
+                .scalar_subquery(),
             )
         )
         await conn.execute(
@@ -340,6 +403,9 @@ async def cross_domain_fixture(
                 domain_name=domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
+                domain_id=sa.select(DomainRow.id)
+                .where(DomainRow.name == domain_name)
+                .scalar_subquery(),
             )
         )
         await conn.execute(
@@ -389,6 +455,12 @@ async def cross_domain_fixture(
         await conn.execute(
             users.delete().where(
                 users.c.uuid.in_([str(admin_data.user_uuid), str(user_data.user_uuid)])
+            )
+        )
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == group_id,
             )
         )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))

@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import final
+from typing import final, override
 
 import sqlalchemy as sa
 
@@ -31,7 +31,9 @@ class Transition[TStatusRow: Base, THistoryRow: ReconcileHistoryMixin]:
     category); the new history creator carries this transition's sub_steps.
     """
 
-    new_history: Creator[THistoryRow]
+    # THistoryRow rows always inherit Base alongside the mixin, but Python typing
+    # cannot express the intersection bound Creator requires.
+    new_history: Creator[THistoryRow]  # type: ignore[type-var]
     match_conditions: Sequence[QueryCondition]
     status_updater: Updater[TStatusRow] | None = None
 
@@ -70,6 +72,7 @@ class SokovanOpsProvider(RBACOpsProvider):
     """Hands out :class:`SokovanWriteOps` for the read-write surface."""
 
     @asynccontextmanager
+    @override
     async def write_ops(self) -> AsyncIterator[SokovanWriteOps]:
         async with self._db.begin_session_read_committed() as sess:
             yield SokovanWriteOps(sess)

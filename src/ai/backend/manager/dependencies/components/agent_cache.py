@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from zmq.auth.certs import load_certificate
 
@@ -29,10 +30,12 @@ class AgentCacheDependency(NonMonitorableDependencyProvider[AgentCacheInput, Age
     """Provides AgentRPCCache lifecycle management."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "agent-cache"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: AgentCacheInput) -> AsyncIterator[AgentRPCCache]:
         """Initialize and provide agent RPC cache.
 

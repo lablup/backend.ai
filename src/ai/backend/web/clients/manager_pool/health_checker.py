@@ -18,6 +18,7 @@ Two checkers are split off because they serve different roles:
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import override
 
 from ai.backend.common.health_checker.abc import ServiceHealthChecker
 from ai.backend.common.health_checker.types import (
@@ -48,13 +49,16 @@ class ManagerPoolGateHealthChecker(ServiceHealthChecker):
         self._timeout = timeout
 
     @property
+    @override
     def target_service_group(self) -> ServiceGroup:
         return MANAGER
 
     @property
+    @override
     def timeout(self) -> float:
         return self._timeout
 
+    @override
     async def check_service(self) -> ServiceHealth:
         has_healthy = self._pool.has_any_healthy()
         return ServiceHealth(
@@ -79,13 +83,16 @@ class ManagerEndpointsHealthChecker(ServiceHealthChecker):
         self._timeout = timeout
 
     @property
+    @override
     def target_service_group(self) -> ServiceGroup:
         return MANAGER_ENDPOINTS
 
     @property
+    @override
     def timeout(self) -> float:
         return self._timeout
 
+    @override
     async def check_service(self) -> ServiceHealth:
         now = datetime.now(UTC)
         results: dict[ComponentId, ComponentHealthStatus] = {}

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import override
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -16,10 +17,12 @@ class NetworkPluginDependency(PluginDependency[NetworkPluginContext]):
     """Provides NetworkPluginContext lifecycle management."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "network-plugin"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: PluginsInput) -> AsyncIterator[NetworkPluginContext]:
         """Initialize and provide a NetworkPluginContext.
 

@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import cast
+from typing import cast, override
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
@@ -52,9 +52,11 @@ class FakeTargetStatuses(BaseReconcilerTargetStatuses):
 class FakeInfo(BaseReconcilerInfo):
     ids: list[UUID] = field(default_factory=list)
 
+    @override
     def entity_ids(self) -> Sequence[UUID]:
         return self.ids
 
+    @override
     def now(self) -> datetime:
         return datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -64,12 +66,15 @@ class FakeResult(BaseReconcilerResult):
     processed: int = 0
     failed: int = 0
 
+    @override
     def processed_count(self) -> int:
         return self.processed
 
+    @override
     def failed_count(self) -> int:
         return self.failed
 
+    @override
     def decisions(self) -> Sequence[ReconcilerDecision]:
         return []
 
@@ -84,6 +89,7 @@ class FakeSource(ReconcilerSource[FakeInfo, FakeCategory, FakeTargetStatuses]):
         self._call_log = call_log
         self._info = info
 
+    @override
     async def fetch_reconcile_info(
         self, category: FakeCategory, target_statuses: FakeTargetStatuses
     ) -> FakeInfo:
@@ -96,10 +102,12 @@ class FakeHandler(ReconcilerHandler[FakeInfo, FakeResult]):
         self._call_log = call_log
         self._result = result
 
+    @override
     async def execute(self, reconcile_info: FakeInfo) -> FakeResult:
         self._call_log.events.append("execute")
         return self._result
 
+    @override
     async def post_process(self, result: FakeResult) -> None:
         self._call_log.events.append("post_process")
 
@@ -110,6 +118,7 @@ class FakeApplier(
     def __init__(self, call_log: CallLog) -> None:
         self._call_log = call_log
 
+    @override
     async def apply(
         self,
         apply_input: ReconcilerApplyInput[
@@ -123,6 +132,7 @@ class FakeFlag(ReconcilerFlag):
     def __init__(self, needed: bool) -> None:
         self._needed = needed
 
+    @override
     async def check_mark_needed(self, reconcile_type: str) -> bool:
         return self._needed
 

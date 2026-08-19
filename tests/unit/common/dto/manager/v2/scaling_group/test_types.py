@@ -5,10 +5,10 @@ from __future__ import annotations
 from ai.backend.common.dto.manager.v2.scaling_group.types import (
     OrderDirection,
     PreemptionMode,
-    PreemptionOrder,
     ScalingGroupOrderField,
     SchedulerType,
 )
+from ai.backend.common.types import PreemptionOrder
 
 
 class TestOrderDirection:
@@ -87,4 +87,4 @@ class TestPreemptionOrder:
 
     def test_all_values_present(self) -> None:
         values = {e.value for e in PreemptionOrder}
-        assert values == {"oldest", "newest"}
+        assert values == {"oldest", "newest", "fewest-sessions", "smallest-resources"}

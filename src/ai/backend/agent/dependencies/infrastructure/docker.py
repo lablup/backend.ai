@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import override
 
 from aiodocker import Docker
 
@@ -19,10 +20,12 @@ class DockerDependency(DependencyProvider[AgentUnifiedConfig, Docker]):
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "docker"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: AgentUnifiedConfig) -> AsyncIterator[Docker]:
         """Initialize and provide a Docker client.
 
@@ -38,6 +41,7 @@ class DockerDependency(DependencyProvider[AgentUnifiedConfig, Docker]):
         finally:
             await docker.close()
 
+    @override
     def gen_liveness_checker(
         self,
         resource: Docker,

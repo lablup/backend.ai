@@ -1,5 +1,6 @@
 import json
 import pickle
+from typing import override
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.common.json import dump_json_str
@@ -9,6 +10,7 @@ from ai.backend.manager.errors.kernel import BackendAgentError
 
 class TestError(BackendAIError):
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode.default()
 

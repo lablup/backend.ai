@@ -25,6 +25,7 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
@@ -52,6 +53,7 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
@@ -63,6 +65,9 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
@@ -79,10 +84,11 @@ from ai.backend.manager.services.permission_contoller.service import PermissionC
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
-    from tests.component.conftest import ServerInfo, UserFixtureData
+    from tests.component.conftest import ServerInfo, UserFixtureData, VirtualScopeSeeder
 
 
 def _build_validators(
@@ -91,6 +97,7 @@ def _build_validators(
 ) -> ActionValidators:
     permission_repo = PermissionControllerRepository(database_engine)
     return ActionValidators(
+        virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
         rbac=RBACValidators(
             scope=ScopeActionRBACValidator(permission_repo, config_provider),
             single_entity=SingleEntityActionRBACValidator(permission_repo, config_provider),
@@ -333,8 +340,38 @@ async def target_project_fixture(
                 resource_policy=resource_policy_fixture,
             )
         )
+        virtual_scope_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=project_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=project_id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=project_id,
+                permission_cap=None,
+            )
+        )
     yield project_id
     async with db_engine.begin() as conn:
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == project_id,
+            )
+        )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id))
 
 
@@ -357,8 +394,38 @@ async def other_project_fixture(
                 resource_policy=resource_policy_fixture,
             )
         )
+        virtual_scope_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=project_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=project_id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=project_id,
+                permission_cap=None,
+            )
+        )
     yield project_id
     async with db_engine.begin() as conn:
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == project_id,
+            )
+        )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id))
 
 
@@ -471,6 +538,7 @@ async def assigned_users(
     group_fixture: uuid.UUID,
     domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
+    virtual_scope_seeder: VirtualScopeSeeder,
 ) -> AsyncIterator[list[uuid.UUID]]:
     """Insert test users and assign them to the target project via ASE.
 
@@ -508,6 +576,9 @@ async def assigned_users(
                     domain_name=domain_fixture.domain_name,
                     resource_policy=resource_policy_fixture,
                     role=UserRole.USER,
+                    domain_id=sa.select(DomainRow.id)
+                    .where(DomainRow.name == domain_fixture.domain_name)
+                    .scalar_subquery(),
                 )
             )
             await conn.execute(
@@ -532,6 +603,8 @@ async def assigned_users(
                     relation_type=RelationType.AUTO,
                 )
             )
+            await virtual_scope_seeder.insert_user_scope(conn, UserID(uid))
+            await virtual_scope_seeder.enroll_user_in_project(conn, group_fixture, UserID(uid))
             user_ids.append(uid)
             emails.append(email)
             access_keys.append(ak)
@@ -546,6 +619,18 @@ async def assigned_users(
                     AssociationScopesEntitiesRow.scope_id == str(group_fixture),
                     AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                     AssociationScopesEntitiesRow.entity_id == str(uid),
+                )
+            )
+            await conn.execute(
+                EntityMembershipRow.__table__.delete().where(
+                    EntityMembershipRow.__table__.c.entity_type == EntityType.USER,
+                    EntityMembershipRow.__table__.c.entity_id == str(uid),
+                )
+            )
+            await conn.execute(
+                VirtualScopeRow.__table__.delete().where(
+                    VirtualScopeRow.__table__.c.scope_type == ScopeType.USER,
+                    VirtualScopeRow.__table__.c.scope_id == str(uid),
                 )
             )
         for ak in reversed(access_keys):

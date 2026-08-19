@@ -7,32 +7,32 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import override
 from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 
 __all__ = (
-    "DomainUserSearchScope",
-    "ProjectUserSearchScope",
-    "RoleUserSearchScope",
+    "DomainUserOperationScope",
+    "ProjectUserOperationScope",
+    "RoleUserOperationScope",
 )
 
 
 @dataclass(frozen=True)
-class DomainUserSearchScope(SearchScope):
+class DomainUserOperationScope(OperationScope):
     """Required scope for searching users within a domain.
 
     Used for domain_users query (domain admin+).
@@ -41,6 +41,7 @@ class DomainUserSearchScope(SearchScope):
     domain_name: str
     """Required. The domain to search within."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for UserRow."""
         domain_name = self.domain_name
@@ -51,6 +52,7 @@ class DomainUserSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
         """Return existence checks for scope validation."""
         return [
@@ -63,30 +65,29 @@ class DomainUserSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class ProjectUserSearchScope(SearchScope):
+class ProjectUserOperationScope(OperationScope):
     """Required scope for searching users within a project.
 
     Used for project_users query (project member+).
-    Requires JOIN with association_scopes_entities (PROJECT scope, USER entity).
+    Membership is read from the project's virtual scope.
     """
 
     project_id: UUID
     """Required. The project (group) to search within."""
 
+    @override
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for AssociationScopesEntitiesRow.
-
-        The JOIN added in db_source already filters by scope_type=PROJECT and
-        entity_type=USER, so this only narrows the scope_id to the requested project.
-        """
-        project_id_str = str(self.project_id)
+        """Membership predicate: the user is enrolled in the project's virtual
+        scope."""
+        project_id = self.project_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AssociationScopesEntitiesRow.scope_id == project_id_str
+            return user_scope_membership_exists(PROJECT_SCOPE_TYPE, project_id, UserRow.uuid)
 
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         """Return existence checks for scope validation."""
         return [
@@ -99,7 +100,7 @@ class ProjectUserSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class RoleUserSearchScope(SearchScope):
+class RoleUserOperationScope(OperationScope):
     """Required scope for searching users assigned to a role.
 
     Requires JOIN with user_roles table.
@@ -108,6 +109,7 @@ class RoleUserSearchScope(SearchScope):
     role_id: UUID
     """Required. The role to search within."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for UserRoleRow."""
         role_id = self.role_id
@@ -118,6 +120,7 @@ class RoleUserSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         """Return existence checks for scope validation."""
         return [

@@ -7,10 +7,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from ai.backend.common.clients.agent.client import AgentClient
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation
 from ai.backend.common.health_checker import AGENT, ComponentId
 from ai.backend.common.types import AgentId
-from ai.backend.manager.clients.agent.client import AgentClient
 from ai.backend.manager.health.rpc import AgentRpcHealthChecker, RpcHealthCheckError
 
 

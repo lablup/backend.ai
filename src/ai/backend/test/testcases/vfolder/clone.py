@@ -1,3 +1,5 @@
+from typing import override
+
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.vfolder import CreatedVFolderMetaContext
@@ -7,6 +9,7 @@ from ai.backend.test.templates.vfolder.utils import retrieve_all_files
 
 
 class VFolderCloneSuccess(TestCode):
+    @override
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         vfolder_meta = CreatedVFolderMetaContext.current()

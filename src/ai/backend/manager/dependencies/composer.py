@@ -4,11 +4,15 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import override
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.plugin.error_monitor import ErrorEventDispatcher
 from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
+    create_agent_selector,
+)
 
 from .agents import AgentsComposer, AgentsInput, AgentsResources
 from .bootstrap import BootstrapComposer, BootstrapInput, BootstrapResources
@@ -101,10 +105,12 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "manager-dependencies"
 
     @asynccontextmanager
+    @override
     async def compose(
         self,
         stack: DependencyStack,
@@ -230,6 +236,10 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 prometheus_client=prometheus_client,
             ),
         )
+        resource_priority = (
+            bootstrap.config_provider.config.manager.agent_selection_resource_priority
+        )
+        agent_selector = create_agent_selector(resource_priority)
 
         # Stage 8: Agents (controllers, client pools, agent registry)
         agents = await stack.enter_composer(
@@ -249,6 +259,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 deployment_repository=domain.repositories.deployment.repository,
                 deployment_revision_preset_repository=domain.repositories.deployment_revision_preset.repository,
                 runtime_variant_repository=domain.repositories.runtime_variant.repository,
+                agent_selector=agent_selector,
             ),
         )
 
@@ -262,16 +273,21 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 distributed_lock_factory=domain.distributed_lock_factory,
                 valkey_profile_target=config.redis.to_valkey_profile_target(),
                 valkey_schedule=infrastructure.valkey.schedule,
+                valkey_live=infrastructure.valkey.live,
                 valkey_stat=infrastructure.valkey.stat,
                 pidx=setup_input.pidx,
                 scheduler_repository=domain.repositories.scheduler.repository,
                 deployment_repository=domain.repositories.deployment.repository,
                 replica_group_repository=domain.repositories.replica_group.repository,
+                idle_checker_repository=domain.repositories.idle_checker.repository,
+                metric_repository=domain.repositories.metric.repository,
                 fair_share_repository=domain.repositories.fair_share.repository,
                 resource_usage_repository=domain.repositories.resource_usage_history.repository,
+                retention_repository=domain.repositories.retention.repository,
                 agent_client_pool=agents.agent_client_pool,
                 appproxy_client_pool=agents.appproxy_client_pool,
                 network_plugin_ctx=plugins.network_plugin_ctx,
+                agent_selector=agent_selector,
                 scheduling_controller=agents.scheduling_controller,
                 deployment_controller=agents.deployment_controller,
                 route_controller=agents.route_controller,
@@ -328,8 +344,6 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 registry_quota_service=domain.services_ctx.per_project_container_registries_quota,
                 # BgtaskRegistry creation
                 agent_client_pool=agents.agent_client_pool,
-                # Log cleanup timer
-                distributed_lock_factory=domain.distributed_lock_factory,
                 # Lifecycle background tasks
                 stats_monitor=monitoring.stats_monitor,
                 pidx=setup_input.pidx,

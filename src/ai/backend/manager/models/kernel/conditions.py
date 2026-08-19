@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.data.kernel.types import KernelStatusInMatchSpec
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.clauses import QueryCondition
@@ -123,6 +124,15 @@ class KernelConditions:
         return inner
 
     @staticmethod
+    def by_resource_group_id(resource_group_id: ResourceGroupID) -> QueryCondition:
+        """Filter kernels by scaling group id."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.resource_group_id == resource_group_id
+
+        return inner
+
+    @staticmethod
     def by_agent_id(agent_id: AgentId) -> QueryCondition:
         """Filter kernels by agent ID."""
 
@@ -163,7 +173,7 @@ class KernelConditions:
 
     @staticmethod
     def for_fair_share_observation(
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> QueryCondition:
         """Filter kernels that need fair share observation.
 
@@ -175,7 +185,7 @@ class KernelConditions:
         The lookback_days is fetched from scaling_groups.fair_share_spec via subquery.
 
         Args:
-            scaling_group: The scaling group to filter
+            resource_group_id: The scaling group id to filter
 
         Returns:
             QueryCondition for fair share observation targets
@@ -194,7 +204,7 @@ class KernelConditions:
                         DEFAULT_LOOKBACK_DAYS,
                     )
                 )
-                .where(ScalingGroupRow.name == scaling_group)
+                .where(ScalingGroupRow.id == resource_group_id)
                 .scalar_subquery()
             )
 
@@ -202,7 +212,7 @@ class KernelConditions:
             lookback_cutoff = sa.func.now() - sa.func.make_interval(0, 0, 0, lookback_days_subquery)
 
             return sa.and_(
-                KernelRow.scaling_group == scaling_group,
+                KernelRow.resource_group_id == resource_group_id,
                 KernelRow.starts_at.isnot(None),  # Must have started
                 sa.or_(
                     # Running kernels (not yet terminated)

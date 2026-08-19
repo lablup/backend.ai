@@ -1,3 +1,5 @@
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -13,6 +15,7 @@ class ObjectStorageNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/object-storage-not-found"
     error_title = "Object Storage Not Found"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.OBJECT_STORAGE,
@@ -25,6 +28,7 @@ class ObjectStorageOperationNotSupported(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/object-storage-operation-not-supported"
     error_title = "Object Storage Operation Not Supported"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.OBJECT_STORAGE,

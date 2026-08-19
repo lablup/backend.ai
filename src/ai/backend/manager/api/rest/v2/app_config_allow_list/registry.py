@@ -23,6 +23,7 @@ def register_v2_app_config_allow_list_routes(
         POST   /                            register an allow-list entry
         POST   /search                      paginated search
         GET    /{app_config_allow_list_id}  get by id
+        PATCH  /{app_config_allow_list_id}  update (rank) by id
         DELETE /{app_config_allow_list_id}  purge by id
     """
     registry = RouteRegistry.create("app-config-allow-list", route_deps.cors_options)
@@ -33,6 +34,12 @@ def register_v2_app_config_allow_list_routes(
         "GET",
         "/{app_config_allow_list_id}",
         handler.admin_get,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "PATCH",
+        "/{app_config_allow_list_id}",
+        handler.admin_update,
         middlewares=[superadmin_required],
     )
     registry.add(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime
+from typing import override
 from unittest.mock import MagicMock
 
 import aiohttp
@@ -22,6 +23,7 @@ def config() -> ClientConfig:
 
 
 class FakeAuth(AuthStrategy):
+    @override
     def sign(
         self,
         method: str,

@@ -9,11 +9,8 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.manager.models.deployment_policy import (
-    BlueGreenSpec,
-    DeploymentPolicyRow,
-    RollingUpdateSpec,
-)
+from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.repositories.base.upserter import UpserterSpec
 
 

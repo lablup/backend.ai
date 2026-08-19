@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, override
 
 from ai.backend.common.cron import PeriodicTask
 
@@ -21,16 +21,20 @@ class ScanImagesTask(PeriodicTask):
         self._agent = agent
 
     @property
+    @override
     def name(self) -> str:
         return "scan_images"
 
     @property
+    @override
     def interval(self) -> float:
         return _SCAN_IMAGES_INTERVAL
 
     @property
+    @override
     def initial_delay(self) -> float:
         return 0.0
 
+    @override
     async def run(self) -> None:
         await self._agent.scan_images_periodically()

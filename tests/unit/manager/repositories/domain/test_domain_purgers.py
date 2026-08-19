@@ -12,9 +12,11 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.errors.resource import DomainHasGroups, DomainHasUsers
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
@@ -28,13 +30,19 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow, SessionStatus, SessionTypes
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
-from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
+from ai.backend.manager.repositories.base.purger import (
+    BatchPurger,
+    Purger,
+    execute_batch_purger,
+    execute_purger,
+)
 from ai.backend.manager.repositories.domain.purgers import (
     DomainBatchPurgerSpec,
     DomainKernelBatchPurgerSpec,
+    DomainPurgerSpec,
 )
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
@@ -138,6 +146,7 @@ class TestDomainPurgersIntegration:
                 domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
+                domain_id=sample_domain.domain_id,
             )
             session.add(user)
             await session.flush()
@@ -181,7 +190,21 @@ class TestDomainPurgersIntegration:
     ) -> list[SessionRow]:
         """Create test sessions belonging to the domain."""
         sessions: list[SessionRow] = []
+        sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
+        sgroup_id = ResourceGroupID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as session:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                id=sgroup_id,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            session.add(sgroup)
+            await session.flush()
             for i in range(3):
                 sess = SessionRow(
                     name=f"test-session-{i}-{uuid.uuid4().hex[:8]}",
@@ -189,7 +212,10 @@ class TestDomainPurgersIntegration:
                     cluster_mode="single-node",
                     cluster_size=1,
                     domain_name=sample_domain.domain_name,
+                    domain_id=sample_domain.domain_id,
                     group_id=sample_group.id,
+                    scaling_group_name=sgroup_name,
+                    resource_group_id=sgroup_id,
                     user_uuid=sample_user.uuid,
                     occupying_slots=ResourceSlot({}),
                     requested_slots=ResourceSlot({}),
@@ -224,6 +250,8 @@ class TestDomainPurgersIntegration:
                     domain_name=sample_domain.domain_name,
                     group_id=sample_group.id,
                     user_uuid=sample_user.uuid,
+                    scaling_group=sess.scaling_group_name,
+                    resource_group_id=sess.resource_group_id,
                     occupied_slots=ResourceSlot({}),
                     requested_slots=ResourceSlot({}),
                     occupied_shares={},
@@ -287,3 +315,87 @@ class TestDomainPurgersIntegration:
                 .where(DomainRow.name == domain_name)
             )
             assert count == 0
+
+    async def test_purge_domain_spec_succeeds_without_conflicts(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_domain: DomainFixtureData,
+    ) -> None:
+        """DomainPurgerSpec deletes a domain with no bound users or groups."""
+        domain_name = sample_domain.domain_name
+
+        async with db_with_cleanup.begin_session() as session:
+            result = await execute_purger(
+                session,
+                Purger(
+                    spec=DomainPurgerSpec(
+                        domain_name=domain_name, domain_id=sample_domain.domain_id
+                    )
+                ),
+            )
+            assert result is not None
+            assert result.row.name == domain_name
+
+        async with db_with_cleanup.begin_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(DomainRow)
+                .where(DomainRow.name == domain_name)
+            )
+            assert count == 0
+
+    async def test_purge_domain_spec_blocked_by_users(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_domain: DomainFixtureData,
+        sample_user: UserRow,
+    ) -> None:
+        """DomainPurgerSpec raises DomainHasUsers while users remain bound."""
+        domain_name = sample_domain.domain_name
+
+        async with db_with_cleanup.begin_session() as session:
+            with pytest.raises(DomainHasUsers):
+                await execute_purger(
+                    session,
+                    Purger(
+                        spec=DomainPurgerSpec(
+                            domain_name=domain_name, domain_id=sample_domain.domain_id
+                        )
+                    ),
+                )
+
+        async with db_with_cleanup.begin_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(DomainRow)
+                .where(DomainRow.name == domain_name)
+            )
+            assert count == 1
+
+    async def test_purge_domain_spec_blocked_by_groups(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_domain: DomainFixtureData,
+        sample_group: GroupRow,
+    ) -> None:
+        """DomainPurgerSpec raises DomainHasGroups while groups remain bound."""
+        domain_name = sample_domain.domain_name
+
+        async with db_with_cleanup.begin_session() as session:
+            with pytest.raises(DomainHasGroups):
+                await execute_purger(
+                    session,
+                    Purger(
+                        spec=DomainPurgerSpec(
+                            domain_name=domain_name, domain_id=sample_domain.domain_id
+                        )
+                    ),
+                )
+
+        async with db_with_cleanup.begin_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(DomainRow)
+                .where(DomainRow.name == domain_name)
+            )
+            assert count == 1
