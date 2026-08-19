@@ -41,6 +41,7 @@ from aiomonitor.task import preserve_termination_log
 from aiotools import TaskGroup
 from async_timeout import timeout
 from cachetools import LRUCache
+from pydantic import BaseModel, Field, field_serializer
 
 from ai.backend.agent.agent import (
     ACTIVE_STATUS_SET,
@@ -49,7 +50,12 @@ from ai.backend.agent.agent import (
     AgentClass,
     ScanImagesResult,
 )
-from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
+from ai.backend.agent.config.unified import (
+    AgentUnifiedConfig,
+    ContainerLogDriver,
+    ContainerSandboxType,
+    ScratchType,
+)
 from ai.backend.agent.errors import (
     ContainerCreationError,
     InvalidArgumentError,
@@ -182,6 +188,9 @@ _SECCOMP_PROFILE_FILENAME: Final[str] = "seccomp.json"
 _SECCOMP_PATH_ENGINES: Final[frozenset[str]] = frozenset({"Podman Engine"})
 # Cached per container, so the capacity is the number of containers an agent may host.
 _CGROUP_PATH_CACHE_SIZE: Final[int] = 2048
+
+# Docker splits the configured total container-log size across this many files.
+_CONTAINER_LOG_FILE_COUNT: Final[int] = 5
 # Controllers the intrinsic plugins read, resolved together from a single inspect.
 _TRACKED_CGROUP_CONTROLLERS: Final[tuple[CgroupController, ...]] = (
     CgroupController.CPUACCT,
@@ -198,6 +207,57 @@ known_glibc_distros: Final[dict[float, str]] = {
     2.35: "ubuntu22.04",
     2.39: "ubuntu24.04",
 }
+
+
+class LogDriverOptions(BaseModel):
+    """
+    Rotation options for the drivers that keep their own on-disk log files.
+    The Docker API takes every value as a string, under kebab-case keys.
+    """
+
+    max_size: str = Field(serialization_alias="max-size")
+    max_file: str = Field(serialization_alias="max-file")
+    compress: str = Field(serialization_alias="compress")
+
+
+class LogConfig(BaseModel):
+    """
+    The ``HostConfig.LogConfig`` payload of a container creation request,
+    keyed in PascalCase as the Docker API expects.
+    Drivers that delegate log storage to the host carry no options at all.
+    """
+
+    type: ContainerLogDriver = Field(serialization_alias="Type")
+    config: LogDriverOptions | None = Field(default=None, serialization_alias="Config")
+
+    @field_serializer("config")
+    def _serialize_config(self, config: LogDriverOptions | None) -> dict[str, str]:
+        """Keep ``Config`` present as an empty object rather than dropping the key."""
+        if config is None:
+            return {}
+        return config.model_dump(by_alias=True)
+
+
+def _build_log_config(local_config: AgentUnifiedConfig) -> LogConfig:
+    """
+    Build the ``HostConfig.LogConfig`` payload for a kernel container.
+
+    Only the drivers that keep their own on-disk files honor size-based rotation;
+    the others delegate log storage to the host and take no rotation options.
+    """
+    container_logs = local_config.container_logs
+    driver = container_logs.driver
+    if driver not in (ContainerLogDriver.LOCAL, ContainerLogDriver.JSON_FILE):
+        return LogConfig(type=driver)
+    file_size = BinarySize(container_logs.max_length // _CONTAINER_LOG_FILE_COUNT)
+    return LogConfig(
+        type=driver,
+        config=LogDriverOptions(
+            max_size=f"{file_size:s}",
+            max_file=str(_CONTAINER_LOG_FILE_COUNT),
+            compress="false",
+        ),
+    )
 
 
 def _parse_distro_from_ldd_output(log_chunks: Sequence[str]) -> str | None:
@@ -1208,10 +1268,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     ],
                 )
 
-        container_log_size = self.local_config.container_logs.max_length
-        container_log_file_count = 5
-        container_log_file_size = BinarySize(container_log_size // container_log_file_count)
-
         if self.image_ref.is_local:
             image = self.image_ref.short
         else:
@@ -1255,16 +1311,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     get_safe_ulimit("nofile", 1048576, 1048576),
                     get_safe_ulimit("memlock", -1, -1),
                 ],
-                "LogConfig": {
-                    "Type": "local",  # for efficient docker-specific storage
-                    "Config": {
-                        # these fields must be str
-                        # (ref: https://docs.docker.com/config/containers/logging/local/)
-                        "max-size": f"{container_log_file_size:s}",
-                        "max-file": str(container_log_file_count),
-                        "compress": "false",
-                    },
-                },
+                "LogConfig": _build_log_config(self.local_config).model_dump(
+                    mode="json", by_alias=True
+                ),
             },
         }
 
