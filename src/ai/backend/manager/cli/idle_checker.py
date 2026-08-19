@@ -65,17 +65,21 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # The agent exports only `current` and `capacity`, so the legacy `.pct` reading is rebuilt here.
-_CURRENT_SELECTOR = CONTAINER_UTILIZATION_METRIC_NAME + '{{{labels},value_type="current"}}'
-_CAPACITY_SELECTOR = CONTAINER_UTILIZATION_METRIC_NAME + '{{{labels},value_type="capacity"}}'
-
-_RATIO_PRESET_NAME = "legacy:idle:container-utilization-ratio"
 _RATIO_PRESET_TEMPLATE = (
-    f"avg by ({{group_by}})({_CURRENT_SELECTOR} / ignoring(value_type) {_CAPACITY_SELECTOR}) * 100"
+    f"avg by ({{group_by}})("
+    f'{CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}},value_type="current"}}}}'
+    " / ignoring(value_type) "
+    f'{CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}},value_type="capacity"}}}}'
+    ") * 100"
 )
 # `cpu_util` is a cumulative msec counter; 1000 msec/s is one core, i.e. 100%.
-_RATE_PRESET_NAME = "legacy:idle:container-utilization-rate"
-_RATE_PRESET_TEMPLATE = f"avg by ({{group_by}})(rate({_CURRENT_SELECTOR}[{{window}}])) / 1000 * 100"
-_RATE_PRESET_TIME_WINDOW = "1m"
+_RATE_PRESET_TEMPLATE = (
+    f"avg by ({{group_by}})(rate("
+    f'{CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}},value_type="current"}}}}'
+    f"[{{window}}])) / 1000 * 100"
+)
+# Wide enough that a missed 30s collection cycle cannot flatten the rate to zero.
+_RATE_PRESET_TIME_WINDOW = "5m"
 
 _DEFAULT_NETWORK_THRESHOLD = timedelta(minutes=10)
 
@@ -335,7 +339,7 @@ async def _migrate_legacy(cli_ctx: CLIContext) -> None:
         if CheckerType.UTILIZATION.value in enabled:
             ratio_preset_id = await _ensure_utilization_preset(
                 preset_db_source,
-                _RATIO_PRESET_NAME,
+                "legacy:idle:container-utilization-ratio",
                 _RATIO_PRESET_TEMPLATE,
                 None,
                 "Per-session utilization percentage rebuilt from the exported current and "
@@ -344,7 +348,7 @@ async def _migrate_legacy(cli_ctx: CLIContext) -> None:
             )
             rate_preset_id = await _ensure_utilization_preset(
                 preset_db_source,
-                _RATE_PRESET_NAME,
+                "legacy:idle:container-utilization-rate",
                 _RATE_PRESET_TEMPLATE,
                 _RATE_PRESET_TIME_WINDOW,
                 "Per-session utilization percentage of a cumulative counter metric such as "
