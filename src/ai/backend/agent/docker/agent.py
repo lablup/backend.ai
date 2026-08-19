@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import json
 import logging
 import os
 import re
@@ -126,6 +125,7 @@ from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, Inv
 from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.json import (
     dump_json,
+    dump_json_str,
     load_json,
 )
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -168,6 +168,13 @@ eof_sentinel = Sentinel.TOKEN
 
 LDD_GLIBC_REGEX = re.compile(r"^ldd \([^\)]+\) (\d+(?:\.\d+)?)[\d\.]*$")
 LDD_MUSL_REGEX = re.compile(r"^musl libc .+$")
+
+# The merged seccomp profile written next to a kernel's scratch contents.
+_SECCOMP_PROFILE_FILENAME: Final[str] = "seccomp.json"
+# Container runtimes disagree on the seccomp option value: some decode it as the profile
+# document, others open it as a path, and neither accepts the other form. These engine
+# components, as reported by the version API, are the ones that require a path.
+_SECCOMP_PATH_ENGINES: Final[frozenset[str]] = frozenset({"Podman Engine"})
 
 known_glibc_distros: Final[dict[float, str]] = {
     2.17: "centos7.6",
@@ -319,6 +326,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     resource_lock: asyncio.Lock
     cluster_ssh_port_mapping: ClusterSSHPortMapping | None
     gwbridge_subnet: str | None
+    _seccomp_profile_as_path: bool
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -338,6 +346,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         restarting: bool = False,
         cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
         gwbridge_subnet: str | None = None,
+        seccomp_profile_as_path: bool = False,
     ) -> None:
         super().__init__(
             ownership_data,
@@ -367,6 +376,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.computer_docker_args = {}
 
         self.cluster_ssh_port_mapping = cluster_ssh_port_mapping
+        self._seccomp_profile_as_path = seccomp_profile_as_path
         self.gwbridge_subnet = gwbridge_subnet
 
         self.network_plugin_ctx = network_plugin_ctx
@@ -1058,18 +1068,27 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         async with aiofiles.open(default_seccomp_path) as fp:
             seccomp_profile = load_json(await fp.read())
 
-            additional_allowed_syscalls = self.additional_allowed_syscalls
-            additional_allowed_syscall_rule = {
-                "names": additional_allowed_syscalls,
-                "action": "SCMP_ACT_ALLOW",
-                "args": [],
-                "comment": "Additionally allowed syscalls by Backend.AI Agent",
-            }
-            seccomp_profile["syscalls"].append(additional_allowed_syscall_rule)
+        additional_allowed_syscalls = self.additional_allowed_syscalls
+        additional_allowed_syscall_rule = {
+            "names": additional_allowed_syscalls,
+            "action": "SCMP_ACT_ALLOW",
+            "args": [],
+            "comment": "Additionally allowed syscalls by Backend.AI Agent",
+        }
+        seccomp_profile["syscalls"].append(additional_allowed_syscall_rule)
 
-            container_config["HostConfig"]["SecurityOpt"] = [
-                f"seccomp={json.dumps(seccomp_profile)}"
-            ]
+        # Some runtimes decode the option value as the profile document itself, others
+        # open it as a path; neither accepts the other's form.
+        if self._seccomp_profile_as_path:
+            profile_path = self.scratch_dir / _SECCOMP_PROFILE_FILENAME
+            async with aiofiles.open(profile_path, "w") as fp:
+                await fp.write(dump_json_str(seccomp_profile))
+            await current_loop().run_in_executor(None, profile_path.chmod, 0o644)
+            security_opt = f"seccomp={profile_path}"
+        else:
+            security_opt = f"seccomp={dump_json_str(seccomp_profile)}"
+
+        container_config["HostConfig"]["SecurityOpt"] = [security_opt]
 
     async def _attach_additional_networks(
         self,
@@ -1474,6 +1493,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: str | None
     checked_invalid_images: set[str]
+    _seccomp_profile_as_path: bool
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -1504,6 +1524,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             agent_class=agent_class,
         )
         self.checked_invalid_images = set()
+        self._seccomp_profile_as_path = False
         pickle_loader_writer_creator = PickleBasedLoaderWriterCreator.create(
             PickleBasedKernelRegistryCreatorArgs(
                 scratch_root=local_config.container.scratch_root,
@@ -1547,10 +1568,19 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     docker_host = "(unknown)"
             log.info("accessing the local Docker daemon via {}", docker_host)
             docker_version = await docker.version()
+            engine_components = [
+                name
+                for component in docker_version.get("Components") or []
+                if (name := component.get("Name")) is not None
+            ]
             log.info(
-                "running with Docker {0} with API {1}",
+                "running with Docker {0} with API {1} (components: {2})",
                 docker_version["Version"],
                 docker_version["ApiVersion"],
+                ", ".join(engine_components),
+            )
+            self._seccomp_profile_as_path = any(
+                component in _SECCOMP_PATH_ENGINES for component in engine_components
             )
             kernel_version = docker_version["KernelVersion"]
             if "linuxkit" in kernel_version:
@@ -2049,6 +2079,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             restarting=restarting,
             cluster_ssh_port_mapping=cluster_ssh_port_mapping,
             gwbridge_subnet=self.gwbridge_subnet,
+            seccomp_profile_as_path=self._seccomp_profile_as_path,
         )
 
     @override
