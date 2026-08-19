@@ -51,10 +51,10 @@ class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):
 def _format_excesses(excesses: Sequence[SlotExcess]) -> str:
     """One indented line per over-quota slot, with the numbers that made it fail."""
     lines: list[str] = []
-    for excess in excesses:
+    for exceeded in excesses:
         lines.append(
-            f"  - {excess.slot_name}: used {excess.used} + requested {excess.requested}"
-            f" > limit {excess.limit} (over by {excess.excess})"
+            f"  - {exceeded.slot_name}: used {exceeded.used} + requested {exceeded.requested}"
+            f" > limit {exceeded.limit} (over by {exceeded.excess})"
         )
     return "\n".join(lines)
 
