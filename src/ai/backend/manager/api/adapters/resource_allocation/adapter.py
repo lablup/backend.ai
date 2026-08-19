@@ -7,6 +7,9 @@ from typing import Any
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import (
     ResourceLimitEntryInfo,
     ResourceSlotEntryInfo,
@@ -37,6 +40,7 @@ from ai.backend.manager.data.resource_allocation.types import (
     ResourceGroupUsageData,
     ScopeUsageData,
 )
+from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.resource_allocation.actions.check_preset_availability import (
     CheckPresetAvailabilityAction,
@@ -58,6 +62,9 @@ from ai.backend.manager.services.resource_allocation.actions.get_resource_group_
 )
 from ai.backend.manager.services.resource_allocation.actions.resolve_keypair_context import (
     ResolveKeypairContextAction,
+)
+from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
+    LookupKeypairOwnerByAccessKeyAction,
 )
 
 
@@ -94,10 +101,8 @@ class ResourceAllocationAdapter(BaseAdapter):
         Used by GQL resolvers where the request context does not carry
         keypair information directly.
         """
-        result = (
-            await self._processors.resource_allocation.resolve_keypair_context.wait_for_complete(
-                ResolveKeypairContextAction(user_id=user_id)
-            )
+        result = await self._processors.resource_allocation.resolve_keypair_context.run(
+            ResolveKeypairContextAction(user_id=UserID(user_id))
         )
         return str(result.access_key), result.resource_policy
 
@@ -169,14 +174,21 @@ class ResourceAllocationAdapter(BaseAdapter):
             resource_policy=resource_policy,
         )
 
+    async def _keypair_owner(self, access_key: AccessKey) -> UserID:
+        result = await self._processors.user.lookup_keypair_owner.run(
+            LookupKeypairOwnerByAccessKeyAction(access_key=access_key)
+        )
+        return UserID(result.entity_id())
+
     async def my_keypair_usage(
         self,
         access_key: str,
         resource_policy: Mapping[str, Any],
     ) -> KeypairResourceAllocationPayload:
         """Get keypair resource usage for the current user."""
-        result = await self._processors.resource_allocation.get_keypair_usage.wait_for_complete(
+        result = await self._processors.resource_allocation.get_keypair_usage.run(
             GetKeypairUsageAction(
+                user_id=await self._keypair_owner(AccessKey(access_key)),
                 access_key=AccessKey(access_key),
                 resource_policy=resource_policy,
             )
@@ -190,9 +202,9 @@ class ResourceAllocationAdapter(BaseAdapter):
         project_id: UUID,
     ) -> ProjectResourceAllocationPayload:
         """Get project resource usage."""
-        result = await self._processors.resource_allocation.get_project_usage.wait_for_complete(
+        result = await self._processors.resource_allocation.get_project_usage.run(
             GetProjectUsageAction(
-                project_id=project_id,
+                project_id=ProjectID(project_id),
             )
         )
         return ProjectResourceAllocationPayload(
@@ -204,10 +216,11 @@ class ResourceAllocationAdapter(BaseAdapter):
         domain_name: str,
     ) -> DomainResourceAllocationPayload:
         """Get domain resource usage (admin only)."""
-        result = await self._processors.resource_allocation.get_domain_usage.wait_for_complete(
-            GetDomainUsageAction(
-                domain_name=domain_name,
-            )
+        domain = await self._processors.domain.lookup.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
+        result = await self._processors.resource_allocation.get_domain_usage.run(
+            GetDomainUsageAction(domain_id=domain.data.id, domain_name=domain_name)
         )
         return DomainResourceAllocationPayload(
             domain=_scope_usage_to_node(result.usage),
@@ -218,11 +231,9 @@ class ResourceAllocationAdapter(BaseAdapter):
         rg_name: str,
     ) -> ResourceGroupResourceAllocationPayload:
         """Get resource group usage."""
-        result = (
-            await self._processors.resource_allocation.get_resource_group_usage.wait_for_complete(
-                GetResourceGroupUsageAction(
-                    rg_name=rg_name,
-                )
+        result = await self._processors.resource_allocation.get_resource_group_usage.run(
+            GetResourceGroupUsageAction(
+                rg_name=rg_name,
             )
         )
         return ResourceGroupResourceAllocationPayload(
@@ -240,19 +251,17 @@ class ResourceAllocationAdapter(BaseAdapter):
         if me is None:
             raise PermissionError("Not authenticated")
         grv, hide = self._visibility_settings()
-        result = (
-            await self._processors.resource_allocation.get_effective_allocation.wait_for_complete(
-                GetEffectiveAllocationAction(
-                    access_key=AccessKey(access_key),
-                    user_id=me.user_id,
-                    project_id=input.project_id,
-                    domain_name=me.domain_name,
-                    resource_policy=resource_policy,
-                    rg_name=input.resource_group_name,
-                    group_resource_visibility=grv,
-                    hide_agents=hide,
-                    is_admin=me.is_admin,
-                )
+        result = await self._processors.resource_allocation.get_effective_allocation.run(
+            GetEffectiveAllocationAction(
+                access_key=AccessKey(access_key),
+                user_id=UserID(me.user_id),
+                project_id=ProjectID(input.project_id),
+                domain_name=me.domain_name,
+                resource_policy=resource_policy,
+                rg_name=input.resource_group_name,
+                group_resource_visibility=grv,
+                hide_agents=hide,
+                is_admin=me.is_admin,
             )
         )
         return _allocation_to_payload(result.allocation)
@@ -265,19 +274,17 @@ class ResourceAllocationAdapter(BaseAdapter):
     ) -> EffectiveResourceAllocationPayload:
         """Get effective allocation for a specific user (admin only)."""
         grv, hide = self._visibility_settings()
-        result = (
-            await self._processors.resource_allocation.get_effective_allocation.wait_for_complete(
-                GetEffectiveAllocationAction(
-                    access_key=AccessKey(access_key),
-                    user_id=input.user_id,
-                    project_id=input.project_id,
-                    domain_name="",  # will be resolved from user_id in the repository
-                    resource_policy=resource_policy,
-                    rg_name=input.resource_group_name,
-                    group_resource_visibility=grv,
-                    hide_agents=hide,
-                    is_admin=True,
-                )
+        result = await self._processors.resource_allocation.get_effective_allocation.run(
+            GetEffectiveAllocationAction(
+                access_key=AccessKey(access_key),
+                user_id=UserID(input.user_id),
+                project_id=ProjectID(input.project_id),
+                domain_name="",  # will be resolved from user_id in the repository
+                resource_policy=resource_policy,
+                rg_name=input.resource_group_name,
+                group_resource_visibility=grv,
+                hide_agents=hide,
+                is_admin=True,
             )
         )
         return _allocation_to_payload(result.allocation)
@@ -293,20 +300,18 @@ class ResourceAllocationAdapter(BaseAdapter):
         if me is None:
             raise PermissionError("Not authenticated")
         grv, hide = self._visibility_settings()
-        result = (
-            await self._processors.resource_allocation.check_preset_availability.wait_for_complete(
-                CheckPresetAvailabilityAction(
-                    access_key=AccessKey(access_key),
-                    user_id=me.user_id,
-                    project_id=input.project_id,
-                    domain_name=me.domain_name,
-                    resource_policy=resource_policy,
-                    rg_name=input.resource_group_name,
-                    group_resource_visibility=grv,
-                    hide_agents=hide,
-                    is_admin=me.is_admin,
-                    scaling_group=input.resource_group_name,
-                )
+        result = await self._processors.resource_allocation.check_preset_availability.run(
+            CheckPresetAvailabilityAction(
+                access_key=AccessKey(access_key),
+                user_id=UserID(me.user_id),
+                project_id=ProjectID(input.project_id),
+                domain_name=me.domain_name,
+                resource_policy=resource_policy,
+                rg_name=input.resource_group_name,
+                group_resource_visibility=grv,
+                hide_agents=hide,
+                is_admin=me.is_admin,
+                scaling_group=input.resource_group_name,
             )
         )
         return CheckPresetAvailabilityPayload(

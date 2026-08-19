@@ -503,7 +503,7 @@ def create_processors(
         service_catalog=ServiceCatalogProcessors(registry.group()),
         template=TemplateProcessors(services.template, action_monitors, validators),
         resource_allocation=ResourceAllocationProcessors(
-            services.resource_allocation, action_monitors, validators
+            registry.group(), services.resource_allocation
         ),
         stream=StreamProcessors(registry.group(), services.stream),
     )

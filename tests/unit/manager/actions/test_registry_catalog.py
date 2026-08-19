@@ -58,6 +58,9 @@ from ai.backend.manager.services.prometheus_query_preset.processors import (
 from ai.backend.manager.services.prometheus_query_preset_category.processors import (
     PrometheusQueryPresetCategoryProcessors,
 )
+from ai.backend.manager.services.resource_allocation.processors import (
+    ResourceAllocationProcessors,
+)
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.services.retention_policy.processors import RetentionPolicyProcessors
@@ -151,6 +154,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     UserProcessors(registry.group(), MagicMock())
     FairShareProcessors(registry.group(), MagicMock())
     ResourcePresetProcessors(registry.group(), MagicMock())
+    ResourceAllocationProcessors(registry.group(), MagicMock())
 
     wired = sorted(cls.action_name() for cls in registry.wired_actions())
     defined = sorted(cls.action_name() for cls in _concrete_v2_action_classes())

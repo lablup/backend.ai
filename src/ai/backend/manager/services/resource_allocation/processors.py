@@ -1,8 +1,11 @@
 """Processors for resource allocation operations."""
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
+from typing import Any
+
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.services.resource_allocation.actions.check_preset_availability import (
     CheckPresetAvailabilityAction,
     CheckPresetAvailabilityActionResult,
@@ -35,40 +38,43 @@ from ai.backend.manager.services.resource_allocation.service import ResourceAllo
 
 
 class ResourceAllocationProcessors:
-    resolve_keypair_context: ActionProcessor[
+    resolve_keypair_context: SingleEntityActionProcessor[
         ResolveKeypairContextAction, ResolveKeypairContextActionResult
     ]
-    get_keypair_usage: ActionProcessor[GetKeypairUsageAction, GetKeypairUsageActionResult]
-    get_project_usage: ActionProcessor[GetProjectUsageAction, GetProjectUsageActionResult]
-    get_domain_usage: ActionProcessor[GetDomainUsageAction, GetDomainUsageActionResult]
-    get_resource_group_usage: ActionProcessor[
+    get_keypair_usage: SingleEntityActionProcessor[
+        GetKeypairUsageAction, GetKeypairUsageActionResult
+    ]
+    get_project_usage: SingleEntityActionProcessor[
+        GetProjectUsageAction, GetProjectUsageActionResult
+    ]
+    get_domain_usage: SingleEntityActionProcessor[GetDomainUsageAction, GetDomainUsageActionResult]
+    get_resource_group_usage: GlobalActionProcessor[
         GetResourceGroupUsageAction, GetResourceGroupUsageActionResult
     ]
-    get_effective_allocation: ActionProcessor[
+    get_effective_allocation: ScopeActionProcessor[
         GetEffectiveAllocationAction, GetEffectiveAllocationActionResult
     ]
-    check_preset_availability: ActionProcessor[
+    check_preset_availability: ScopeActionProcessor[
         CheckPresetAvailabilityAction, CheckPresetAvailabilityActionResult
     ]
 
-    def __init__(
-        self,
-        service: ResourceAllocationService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.resolve_keypair_context = ActionProcessor(
-            service.resolve_keypair_context, action_monitors
+    def __init__(self, group: ProcessorGroup[Any], service: ResourceAllocationService) -> None:
+        self.resolve_keypair_context = group.single_entity(
+            ResolveKeypairContextAction, service.resolve_keypair_context
         )
-        self.get_keypair_usage = ActionProcessor(service.get_keypair_usage, action_monitors)
-        self.get_project_usage = ActionProcessor(service.get_project_usage, action_monitors)
-        self.get_domain_usage = ActionProcessor(service.get_domain_usage, action_monitors)
-        self.get_resource_group_usage = ActionProcessor(
-            service.get_resource_group_usage, action_monitors
+        self.get_keypair_usage = group.single_entity(
+            GetKeypairUsageAction, service.get_keypair_usage
         )
-        self.get_effective_allocation = ActionProcessor(
-            service.get_effective_allocation, action_monitors
+        self.get_project_usage = group.single_entity(
+            GetProjectUsageAction, service.get_project_usage
         )
-        self.check_preset_availability = ActionProcessor(
-            service.check_preset_availability, action_monitors
+        self.get_domain_usage = group.single_entity(GetDomainUsageAction, service.get_domain_usage)
+        self.get_resource_group_usage = group.global_scope(
+            GetResourceGroupUsageAction, service.get_resource_group_usage
+        )
+        self.get_effective_allocation = group.scope(
+            GetEffectiveAllocationAction, service.get_effective_allocation
+        )
+        self.check_preset_availability = group.scope(
+            CheckPresetAvailabilityAction, service.check_preset_availability
         )

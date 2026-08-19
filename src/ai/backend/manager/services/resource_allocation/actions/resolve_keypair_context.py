@@ -1,37 +1,38 @@
-"""Action for resolving keypair context (access_key + resource_policy) from user_id."""
+from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
-from uuid import UUID
 
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.resource_allocation.actions.base import (
-    ResourceAllocationAction,
-)
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 
 
-@dataclass
-class ResolveKeypairContextAction(ResourceAllocationAction):
-    user_id: UUID
+@dataclass(frozen=True)
+class ResolveKeypairContextAction(BaseSingleEntityAction):
+    """Read the access key and resource policy a user's default keypair carries."""
+
+    user_id: UserID
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.user_id)
+    def entity_id(self) -> EntityIdentifier:
+        return self.user_id
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "resolve_keypair_context"
 
-@dataclass
-class ResolveKeypairContextActionResult(BaseActionResult):
+
+@dataclass(frozen=True)
+class ResolveKeypairContextActionResult:
     access_key: AccessKey
     resource_policy: Mapping[str, Any]
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.access_key)
