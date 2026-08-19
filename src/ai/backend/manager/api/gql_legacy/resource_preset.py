@@ -10,7 +10,9 @@ import sqlalchemy as sa
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
@@ -21,6 +23,9 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
 from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
+from ai.backend.manager.services.resource_preset.actions.lookup import (
+    LookupResourcePresetAction,
+)
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import (
@@ -191,6 +196,20 @@ class CreateResourcePresetInput(graphene.InputObjectType):  # type: ignore[misc]
         )
 
 
+async def _resolve_preset_id(
+    graph_ctx: GraphQueryContext, id: UUID | None, name: str | None
+) -> ResourcePresetID:
+    """A preset is reachable by id or by name; the name resolves through the lookup."""
+    if id is not None:
+        return ResourcePresetID(id)
+    if name is None:
+        raise InvalidAPIParameters("One of (`id` or `name`) parameter should not be null")
+    result = await graph_ctx.processors.resource_preset.lookup.run(
+        LookupResourcePresetAction(name=name)
+    )
+    return result.data.id
+
+
 class ModifyResourcePresetInput(graphene.InputObjectType):  # type: ignore[misc]
     name = graphene.String(
         required=False,
@@ -290,8 +309,9 @@ class ModifyResourcePreset(graphene.Mutation):  # type: ignore[misc]
 
         graph_ctx: GraphQueryContext = info.context
 
+        preset_id = await _resolve_preset_id(graph_ctx, id, name)
         await graph_ctx.processors.resource_preset.update_preset.run(
-            UpdateResourcePresetAction(id=id, name=name, updater=props.to_updater(id, name))
+            UpdateResourcePresetAction(preset_id=preset_id, updater=props.to_updater(id, name))
         )
 
         return cls(True, "success")
@@ -327,8 +347,9 @@ class DeleteResourcePreset(graphene.Mutation):  # type: ignore[misc]
 
         graph_ctx: GraphQueryContext = info.context
 
+        preset_id = await _resolve_preset_id(graph_ctx, id, name)
         await graph_ctx.processors.resource_preset.delete_preset.run(
-            DeleteResourcePresetAction(id=id, name=name)
+            DeleteResourcePresetAction(preset_id=preset_id)
         )
 
         return cls(True, "success")

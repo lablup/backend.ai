@@ -1,7 +1,18 @@
-"""Entity type of the resource presets table."""
+"""Entity type and id of the resource presets table."""
 
-from ai.backend.common.data.entity.types import EntityType
+from typing import override
 
-__all__ = ("RESOURCE_PRESET_ENTITY_TYPE",)
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+
+__all__ = ("RESOURCE_PRESET_ENTITY_TYPE", "ResourcePresetID")
 
 RESOURCE_PRESET_ENTITY_TYPE = EntityType("resource_preset")
+
+
+class ResourcePresetID(EntityIdentifier):
+    """A resource preset's entity id."""
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return RESOURCE_PRESET_ENTITY_TYPE

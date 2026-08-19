@@ -10,7 +10,7 @@ from ai.backend.manager.services.artifact_registry.actions.base import (
 
 @dataclass
 class GetArtifactRegistryMetaAction(ArtifactRegistrySingleEntityAction):
-    registry_name: str | None = None
+    """Read one artifact registry by its id."""
 
     @override
     @classmethod

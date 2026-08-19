@@ -5,7 +5,9 @@ from __future__ import annotations
 import uuid
 
 from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotEntryInfo,
@@ -89,6 +91,9 @@ from ai.backend.manager.services.resource_slot.actions.get_project_resource_over
 )
 from ai.backend.manager.services.resource_slot.actions.lookup import (
     LookupResourceSlotTypeAction,
+)
+from ai.backend.manager.services.resource_slot.actions.lookup_kernel_owner import (
+    LookupKernelOwnerAction,
 )
 from ai.backend.manager.services.resource_slot.actions.purge import PurgeResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.search_agent_resources import (
@@ -505,8 +510,15 @@ class ResourceSlotAdapter(BaseAdapter):
         self, kernel_id: uuid.UUID, slot_name: str
     ) -> ResourceAllocationNode:
         """Retrieve a single kernel resource allocation by kernel ID and slot name."""
+        owner = await self._processors.resource_slot.lookup_kernel_owner.run(
+            LookupKernelOwnerAction(kernel_id=KernelID(kernel_id))
+        )
         action_result = await self._processors.resource_slot.get_kernel_allocation_by_slot.run(
-            GetKernelAllocationBySlotAction(kernel_id=kernel_id, slot_name=slot_name)
+            GetKernelAllocationBySlotAction(
+                session_id=SessionID(owner.entity_id()),
+                kernel_id=KernelID(kernel_id),
+                slot_name=slot_name,
+            )
         )
         return self._resource_allocation_data_to_node(action_result.item)
 

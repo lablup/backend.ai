@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
@@ -99,7 +100,7 @@ class PresetAllocatabilityData:
         """Deserialize from cache format."""
         return cls(
             preset=ResourcePresetData(
-                id=UUID(data["preset"]["id"]),
+                id=ResourcePresetID(data["preset"]["id"]),
                 name=data["preset"]["name"],
                 resource_slots=ResourceSlot.from_json(data["preset"]["resource_slots"]),
                 shared_memory=int(BinarySize.from_str(data["preset"]["shared_memory"]))

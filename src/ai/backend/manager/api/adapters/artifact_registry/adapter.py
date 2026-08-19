@@ -7,6 +7,7 @@ from collections.abc import Sequence
 
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.dto.manager.v2.artifact_registry.response import ArtifactRegistryGQLNode
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.models.artifact_registries.conditions import ArtifactRegistryConditions
@@ -21,6 +22,9 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_multi impo
 from ai.backend.manager.services.artifact_registry.actions.common.search import (
     SearchArtifactRegistriesAction,
 )
+from ai.backend.manager.services.artifact_registry.actions.lookup import (
+    LookupArtifactRegistryAction,
+)
 
 
 class ArtifactRegistryAdapter(BaseAdapter):
@@ -29,14 +33,21 @@ class ArtifactRegistryAdapter(BaseAdapter):
     async def get_registry_meta(
         self, registry_name: str | None = None, registry_id: uuid.UUID | None = None
     ) -> ArtifactRegistryGQLNode:
-        """Get metadata for a single artifact registry by name or ID."""
-        action_result = await self._processors.artifact_registry.get_registry_meta.run(
-            GetArtifactRegistryMetaAction(
-                registry_name=registry_name,
-                registry_id=ArtifactRegistryID(registry_id or uuid.UUID(int=0)),
+        """Get metadata for a single artifact registry by id, or by name.
+
+        The two are different reads: an id names the registry, a name resolves to it.
+        """
+        if registry_id is not None:
+            action_result = await self._processors.artifact_registry.get_registry_meta.run(
+                GetArtifactRegistryMetaAction(registry_id=ArtifactRegistryID(registry_id))
             )
+            return self._data_to_dto(action_result.result)
+        if registry_name is None:
+            raise InvalidAPIParameters("One of (`registry_id` or `registry_name`) is required")
+        lookup_result = await self._processors.artifact_registry.lookup.run(
+            LookupArtifactRegistryAction(name=registry_name)
         )
-        return self._data_to_dto(action_result.result)
+        return self._data_to_dto(lookup_result.data)
 
     async def get_registry_metas(
         self, registry_ids: list[uuid.UUID]
@@ -64,7 +75,7 @@ class ArtifactRegistryAdapter(BaseAdapter):
             SearchArtifactRegistriesAction(querier=querier)
         )
         registry_map = {item.id: self._data_to_dto(item) for item in action_result.registries}
-        return [registry_map.get(registry_id) for registry_id in ids]
+        return [registry_map.get(ArtifactRegistryID(registry_id)) for registry_id in ids]
 
     @staticmethod
     def _data_to_dto(data: ArtifactRegistryData) -> ArtifactRegistryGQLNode:

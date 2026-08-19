@@ -60,42 +60,21 @@ class ResourcePresetService:
     async def update_preset(
         self, action: UpdateResourcePresetAction
     ) -> UpdateResourcePresetActionResult:
-        name = action.name
-        preset_id = action.id
         spec = cast(ResourcePresetUpdaterSpec, action.updater.spec)
-
-        if preset_id is None and name is None:
-            raise InvalidAPIParameters("One of (`id` or `name`) parameter should not be null")
-
         if resource_slots := spec.resource_slots.optional_value():
             if not resource_slots.has_intrinsic_slots():
                 raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
 
-        # Ensure the Updater has the correct pk_value
-        if preset_id is not None:
-            action.updater.pk_value = preset_id
-        else:
-            # Need to look up the preset to get its id
-            preset = await self._resource_preset_repository.get_preset_by_name(name)  # type: ignore[arg-type]
-            action.updater.pk_value = preset.id
-
+        action.updater.pk_value = action.preset_id
         preset_data = await self._resource_preset_repository.modify_preset_validated(action.updater)
-
         return UpdateResourcePresetActionResult(resource_preset=preset_data)
 
     async def delete_preset(
         self, action: DeleteResourcePresetAction
     ) -> DeleteResourcePresetActionResult:
-        name = action.name
-        preset_id = action.id
-
-        if preset_id is None and name is None:
-            raise InvalidAPIParameters("One of (`id` or `name`) parameter should not be null")
-
         preset_data = await self._resource_preset_repository.delete_preset_validated(
-            preset_id, name
+            action.preset_id, None
         )
-
         return DeleteResourcePresetActionResult(resource_preset=preset_data)
 
     async def list_presets(self, action: ListResourcePresetsAction) -> ListResourcePresetsResult:

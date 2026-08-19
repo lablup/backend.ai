@@ -7,6 +7,7 @@ from typing import Any
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
     ResourceSlotEntryInfo,
@@ -187,7 +188,7 @@ class ResourcePresetAdapter(BaseAdapter):
         )
         updater = Updater(spec=updater_spec, pk_value=input.id)
         result = await self._processors.resource_preset.update_preset.run(
-            UpdateResourcePresetAction(updater=updater, id=input.id, name=None)
+            UpdateResourcePresetAction(preset_id=ResourcePresetID(input.id), updater=updater)
         )
         return UpdateResourcePresetPayload(
             resource_preset=self._data_to_node(result.resource_preset),
@@ -196,7 +197,7 @@ class ResourcePresetAdapter(BaseAdapter):
     async def delete(self, preset_id: UUID) -> DeleteResourcePresetPayload:
         """Delete a resource preset by ID."""
         result = await self._processors.resource_preset.delete_preset.run(
-            DeleteResourcePresetAction(id=preset_id, name=None)
+            DeleteResourcePresetAction(preset_id=ResourcePresetID(preset_id))
         )
         return DeleteResourcePresetPayload(id=result.resource_preset.id)
 

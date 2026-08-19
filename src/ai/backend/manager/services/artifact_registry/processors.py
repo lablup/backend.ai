@@ -2,7 +2,10 @@ from typing import Any
 
 from ai.backend.manager.actions.registry import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.services.artifact_registry.actions.common.get_meta import (
     GetArtifactRegistryMetaAction,
     GetArtifactRegistryMetaActionResult,
@@ -43,6 +46,9 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.update im
     UpdateHuggingFaceRegistryAction,
     UpdateHuggingFaceRegistryActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.lookup import (
+    LookupArtifactRegistryAction,
+)
 from ai.backend.manager.services.artifact_registry.actions.reservoir.create import (
     CreateReservoirActionResult,
     CreateReservoirRegistryAction,
@@ -76,6 +82,9 @@ from .service import ArtifactRegistryService
 
 
 class ArtifactRegistryProcessors:
+    lookup: LookupActionProcessor[
+        LookupArtifactRegistryAction, LookupOpsResult[ArtifactRegistryData]
+    ]
     create_huggingface_registry: GlobalActionProcessor[
         CreateHuggingFaceRegistryAction, CreateHuggingFaceRegistryActionResult
     ]
@@ -129,6 +138,7 @@ class ArtifactRegistryProcessors:
     ]
 
     def __init__(self, group: ProcessorGroup[Any], service: ArtifactRegistryService) -> None:
+        self.lookup = group.public_lookup_ops(LookupArtifactRegistryAction)
         # Scope actions with RBAC validator
         self.create_huggingface_registry = group.global_scope(
             CreateHuggingFaceRegistryAction, service.create_huggingface_registry

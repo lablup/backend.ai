@@ -10,8 +10,10 @@ from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     CreatedEntityOpsResult,
     EntityOpsResult,
+    FieldOwnerLookupOpsResult,
     LookupOpsResult,
 )
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.services.resource_slot.actions.create import CreateResourceSlotTypeAction
@@ -34,6 +36,9 @@ from ai.backend.manager.services.resource_slot.actions.get_project_resource_over
 from ai.backend.manager.services.resource_slot.actions.lookup import (
     LookupResourceSlotTypeAction,
 )
+from ai.backend.manager.services.resource_slot.actions.lookup_kernel_owner import (
+    LookupKernelOwnerAction,
+)
 from ai.backend.manager.services.resource_slot.actions.purge import PurgeResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.search_agent_resources import (
     GlobalSearchAgentResourcesAction,
@@ -51,10 +56,11 @@ from ai.backend.manager.services.resource_slot.service import ResourceSlotServic
 
 
 class ResourceSlotProcessors:
+    lookup_kernel_owner: LookupActionProcessor[LookupKernelOwnerAction, FieldOwnerLookupOpsResult]
     get_agent_resource_by_slot: SingleEntityActionProcessor[
         GetAgentResourceBySlotAction, GetAgentResourceBySlotResult
     ]
-    get_kernel_allocation_by_slot: GlobalActionProcessor[
+    get_kernel_allocation_by_slot: SingleEntityActionProcessor[
         GetKernelAllocationBySlotAction, GetKernelAllocationBySlotResult
     ]
     search_agent_resources: GlobalActionProcessor[
@@ -71,10 +77,10 @@ class ResourceSlotProcessors:
         SearchResourceSlotTypesAction,
         BatchOpsResult[ResourceSlotTypeData],
     ]
-    get_domain_resource_overview: SingleEntityActionProcessor[
+    get_domain_resource_overview: ScopeActionProcessor[
         GetDomainResourceOverviewAction, GetDomainResourceOverviewResult
     ]
-    get_project_resource_overview: SingleEntityActionProcessor[
+    get_project_resource_overview: ScopeActionProcessor[
         GetProjectResourceOverviewAction, GetProjectResourceOverviewResult
     ]
     global_create_resource_slot_type: GlobalActionProcessor[
@@ -95,10 +101,11 @@ class ResourceSlotProcessors:
         group: ProcessorGroup[ResourceSlotTypeData],
         service: ResourceSlotService,
     ) -> None:
+        self.lookup_kernel_owner = group.key_owner_lookup_ops(LookupKernelOwnerAction)
         self.get_agent_resource_by_slot = group.single_entity(
             GetAgentResourceBySlotAction, service.get_agent_resource_by_slot
         )
-        self.get_kernel_allocation_by_slot = group.global_scope(
+        self.get_kernel_allocation_by_slot = group.single_entity(
             GetKernelAllocationBySlotAction, service.get_kernel_allocation_by_slot
         )
         self.search_agent_resources = group.global_scope(
@@ -113,10 +120,10 @@ class ResourceSlotProcessors:
         self.public_search_resource_slot_types = group.public_search_ops(
             SearchResourceSlotTypesAction
         )
-        self.get_domain_resource_overview = group.single_entity(
+        self.get_domain_resource_overview = group.scope(
             GetDomainResourceOverviewAction, service.get_domain_resource_overview
         )
-        self.get_project_resource_overview = group.single_entity(
+        self.get_project_resource_overview = group.scope(
             GetProjectResourceOverviewAction, service.get_project_resource_overview
         )
         self.global_create_resource_slot_type = group.global_create_ops(

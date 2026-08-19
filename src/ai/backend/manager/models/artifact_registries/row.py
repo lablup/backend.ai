@@ -8,6 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.models.base import (
@@ -71,7 +72,7 @@ class ArtifactRegistryRow(Base):
 
     def to_dataclass(self) -> ArtifactRegistryData:
         return ArtifactRegistryData(
-            id=self.id,
+            id=ArtifactRegistryID(self.id),
             registry_id=self.registry_id,
             name=self.name,
             type=ArtifactRegistryType(self.type),
