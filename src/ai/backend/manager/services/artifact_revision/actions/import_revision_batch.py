@@ -2,7 +2,6 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.services.artifact_revision.actions.base import ArtifactRevisionAction
@@ -14,8 +13,9 @@ class ImportArtifactBatchAction(ArtifactRevisionAction):
     artifact_revision_ids: list[uuid.UUID]
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "import_artifact_batch"
 
     @override
     @classmethod
@@ -24,9 +24,5 @@ class ImportArtifactBatchAction(ArtifactRevisionAction):
 
 
 @dataclass
-class ImportArtifactBatchActionResult(BaseActionResult):
+class ImportArtifactBatchActionResult:
     result: list[ArtifactRevisionData]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.models.model_card.row import ModelCardRow
@@ -14,8 +13,9 @@ class CreateModelCardAction(ModelCardAction):
     creator: RBACEntityCreator[ModelCardRow]
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_model_card"
 
     @override
     @classmethod
@@ -24,9 +24,5 @@ class CreateModelCardAction(ModelCardAction):
 
 
 @dataclass
-class CreateModelCardActionResult(BaseActionResult):
+class CreateModelCardActionResult:
     model_card: ModelCardData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.model_card.id)

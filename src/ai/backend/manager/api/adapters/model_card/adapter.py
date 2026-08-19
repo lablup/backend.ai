@@ -6,6 +6,7 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
@@ -181,7 +182,7 @@ class ModelCardAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.model_card.search.wait_for_complete(
+        result = await self._processors.model_card.search.run(
             SearchModelCardsAction(querier=querier)
         )
         return SearchModelCardsPayload(
@@ -213,7 +214,7 @@ class ModelCardAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.model_card.search_in_project.wait_for_complete(
+        result = await self._processors.model_card.search_in_project.run(
             SearchModelCardsInProjectAction(scope=scope, querier=querier)
         )
         return SearchModelCardsPayload(
@@ -249,7 +250,7 @@ class ModelCardAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.model_card.search.wait_for_complete(
+        result = await self._processors.model_card.search.run(
             SearchModelCardsAction(querier=querier)
         )
         return SearchModelCardsPayload(
@@ -267,7 +268,7 @@ class ModelCardAdapter(BaseAdapter):
             pagination_spec=_model_card_pagination_spec(),
             limit=1,
         )
-        result = await self._processors.model_card.search.wait_for_complete(
+        result = await self._processors.model_card.search.run(
             SearchModelCardsAction(querier=querier)
         )
         if not result.items:
@@ -309,7 +310,7 @@ class ModelCardAdapter(BaseAdapter):
                 element_id=str(input.model_store_project_id),
             ),
         )
-        result = await self._processors.model_card.create.wait_for_complete(
+        result = await self._processors.model_card.create.run(
             CreateModelCardAction(creator=creator)
         )
         return CreateModelCardPayload(
@@ -414,7 +415,7 @@ class ModelCardAdapter(BaseAdapter):
             ),
         )
         updater: Updater[ModelCardRow] = Updater(spec=spec, pk_value=input.id)
-        result = await self._processors.model_card.update.wait_for_complete(
+        result = await self._processors.model_card.update.run(
             UpdateModelCardAction(id=input.id, updater=updater)
         )
         return UpdateModelCardPayload(
@@ -426,7 +427,7 @@ class ModelCardAdapter(BaseAdapter):
         card_id: UUID,
         options: DeleteModelCardOptions,
     ) -> DeleteModelCardPayload:
-        result = await self._processors.model_card.delete.wait_for_complete(
+        result = await self._processors.model_card.delete.run(
             DeleteModelCardAction(
                 purger=Purger(spec=ModelCardPurgerSpec(card_id=card_id)),
                 options=options,
@@ -454,7 +455,7 @@ class ModelCardAdapter(BaseAdapter):
         card_ids: list[UUID],
         options: DeleteModelCardOptions,
     ) -> BulkDeleteModelCardActionResult:
-        return await self._processors.model_card.bulk_delete.wait_for_complete(
+        return await self._processors.model_card.bulk_delete.run(
             BulkDeleteModelCardAction(
                 purgers=[Purger(spec=ModelCardPurgerSpec(card_id=card_id)) for card_id in card_ids],
                 options=options,
@@ -465,7 +466,7 @@ class ModelCardAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        result = await self._processors.model_card.scan.wait_for_complete(
+        result = await self._processors.model_card.scan.run(
             ScanProjectModelCardsAction(
                 project_id=project_id,
                 requester_id=me.user_id,
@@ -561,9 +562,9 @@ class ModelCardAdapter(BaseAdapter):
         model_card_id: UUID,
         input: SearchDeploymentRevisionPresetsInput,
     ) -> SearchDeploymentRevisionPresetsPayload:
-        action_result = await self._processors.model_card.available_presets.wait_for_complete(
+        action_result = await self._processors.model_card.available_presets.run(
             AvailablePresetsAction(
-                model_card_id=model_card_id,
+                model_card_id=ModelCardID(model_card_id),
                 search_input=input,
             )
         )
@@ -584,7 +585,7 @@ class ModelCardAdapter(BaseAdapter):
             pagination_spec=_model_card_pagination_spec(),
             limit=1,
         )
-        result = await self._processors.model_card.search.wait_for_complete(
+        result = await self._processors.model_card.search.run(
             SearchModelCardsAction(querier=querier)
         )
         items: list[ModelCardData] = result.items
@@ -678,7 +679,7 @@ class ModelCardAdapter(BaseAdapter):
         A second read because the requirements are their own table. GraphQL calls it
         from the field resolver, so a query that skips ``minResource`` skips this.
         """
-        result = await self._processors.model_card.get_min_resources.wait_for_complete(
+        result = await self._processors.model_card.get_min_resources.run(
             GetModelCardMinResourcesAction(card_ids=list(card_ids))
         )
         return {

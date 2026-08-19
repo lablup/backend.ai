@@ -8,6 +8,7 @@ from decimal import Decimal
 from functools import lru_cache
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
@@ -553,7 +554,7 @@ class ImageAdapter(BaseAdapter):
             name=str(data.name),
             image=data.image,
             registry=data.registry,
-            registry_id=data.registry_id,
+            registry_id=ArtifactRegistryID(data.registry_id),
             project=data.project,
             tag=data.tag,
             architecture=data.architecture,

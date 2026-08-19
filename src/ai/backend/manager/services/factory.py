@@ -466,7 +466,7 @@ def create_processors(
         deployment_revision_preset=DeploymentPresetProcessors(
             registry.group(), services.deployment_revision_preset
         ),
-        model_card=ModelCardProcessors(services.model_card, action_monitors, validators),
+        model_card=ModelCardProcessors(registry.group(), services.model_card),
         resource_usage=ResourceUsageProcessors(registry.group()),
         scaling_group=ScalingGroupProcessors(registry.group(), services.scaling_group),
         metric=MetricProcessors(services.metric, action_monitors, validators),
@@ -484,13 +484,9 @@ def create_processors(
             services.permission_controller, action_monitors, validators
         ),
         vfs_storage=VFSStorageProcessors(services.vfs_storage, registry.group()),
-        artifact=ArtifactProcessors(services.artifact, action_monitors, validators),
-        artifact_registry=ArtifactRegistryProcessors(
-            services.artifact_registry, action_monitors, validators
-        ),
-        artifact_revision=ArtifactRevisionProcessors(
-            services.artifact_revision, action_monitors, validators
-        ),
+        artifact=ArtifactProcessors(registry.group(), services.artifact),
+        artifact_registry=ArtifactRegistryProcessors(registry.group(), services.artifact_registry),
+        artifact_revision=ArtifactRevisionProcessors(registry.group(), services.artifact_revision),
         deployment=DeploymentProcessors(services.deployment, action_monitors, validators),
         storage_namespace=StorageNamespaceProcessors(registry.group()),
         audit_log=AuditLogProcessors(registry.group()),

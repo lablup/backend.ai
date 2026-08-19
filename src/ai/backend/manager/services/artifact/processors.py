@@ -1,7 +1,8 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
+from typing import Any
+
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.services.artifact.actions.delegate_scan import (
     DelegateScanArtifactsAction,
     DelegateScanArtifactsActionResult,
@@ -55,48 +56,49 @@ from .service import ArtifactService
 
 
 class ArtifactProcessors:
-    scan: ActionProcessor[ScanArtifactsAction, ScanArtifactsActionResult]
+    scan: GlobalActionProcessor[ScanArtifactsAction, ScanArtifactsActionResult]
     get: SingleEntityActionProcessor[GetArtifactAction, GetArtifactActionResult]
-    search_artifacts: ActionProcessor[SearchArtifactsAction, SearchArtifactsActionResult]
-    search_artifacts_with_revisions: ActionProcessor[
+    search_artifacts: GlobalActionProcessor[SearchArtifactsAction, SearchArtifactsActionResult]
+    search_artifacts_with_revisions: GlobalActionProcessor[
         SearchArtifactsWithRevisionsAction, SearchArtifactsWithRevisionsActionResult
     ]
-    get_revisions: ActionProcessor[GetArtifactRevisionsAction, GetArtifactRevisionsActionResult]
+    get_revisions: SingleEntityActionProcessor[
+        GetArtifactRevisionsAction, GetArtifactRevisionsActionResult
+    ]
     update: SingleEntityActionProcessor[UpdateArtifactAction, UpdateArtifactActionResult]
-    upsert_artifacts_with_revisions: ActionProcessor[
+    upsert_artifacts_with_revisions: GlobalActionProcessor[
         UpsertArtifactsAction, UpsertArtifactsActionResult
     ]
-    retrieve_models: ActionProcessor[RetrieveModelsAction, RetrieveModelsActionResult]
-    retrieve_single_model: ActionProcessor[RetrieveModelAction, RetrieveModelActionResult]
-    delete_artifacts: ActionProcessor[DeleteArtifactsAction, DeleteArtifactsActionResult]
-    restore_artifacts: ActionProcessor[RestoreArtifactsAction, RestoreArtifactsActionResult]
+    retrieve_models: GlobalActionProcessor[RetrieveModelsAction, RetrieveModelsActionResult]
+    retrieve_single_model: GlobalActionProcessor[RetrieveModelAction, RetrieveModelActionResult]
+    delete_artifacts: GlobalActionProcessor[DeleteArtifactsAction, DeleteArtifactsActionResult]
+    restore_artifacts: GlobalActionProcessor[RestoreArtifactsAction, RestoreArtifactsActionResult]
 
-    delegate_scan: ActionProcessor[DelegateScanArtifactsAction, DelegateScanArtifactsActionResult]
+    delegate_scan: GlobalActionProcessor[
+        DelegateScanArtifactsAction, DelegateScanArtifactsActionResult
+    ]
 
-    def __init__(
-        self,
-        service: ArtifactService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
+    def __init__(self, group: ProcessorGroup[Any], service: ArtifactService) -> None:
         # TODO: Move scan action to ArtifactRegistryService
-        self.scan = ActionProcessor(service.scan, action_monitors)
-        self.get = SingleEntityActionProcessor(
-            service.get, action_monitors, validators=[validators.rbac.single_entity]
+        self.scan = group.global_scope(ScanArtifactsAction, service.scan)
+        self.get = group.single_entity(GetArtifactAction, service.get)
+        self.search_artifacts = group.global_scope(SearchArtifactsAction, service.search)
+        self.search_artifacts_with_revisions = group.global_scope(
+            SearchArtifactsWithRevisionsAction, service.search_with_revisions
         )
-        self.search_artifacts = ActionProcessor(service.search, action_monitors)
-        self.search_artifacts_with_revisions = ActionProcessor(
-            service.search_with_revisions, action_monitors
+        self.get_revisions = group.single_entity(GetArtifactRevisionsAction, service.get_revisions)
+        self.update = group.single_entity(UpdateArtifactAction, service.update)
+        self.upsert_artifacts_with_revisions = group.global_scope(
+            UpsertArtifactsAction, service.upsert_artifacts_with_revisions
         )
-        self.get_revisions = ActionProcessor(service.get_revisions, action_monitors)
-        self.update = SingleEntityActionProcessor(
-            service.update, action_monitors, validators=[validators.rbac.single_entity]
+        self.retrieve_models = group.global_scope(RetrieveModelsAction, service.retrieve_models)
+        self.retrieve_single_model = group.global_scope(
+            RetrieveModelAction, service.retrieve_single_model
         )
-        self.upsert_artifacts_with_revisions = ActionProcessor(
-            service.upsert_artifacts_with_revisions, action_monitors
+        self.delete_artifacts = group.global_scope(DeleteArtifactsAction, service.delete_artifacts)
+        self.restore_artifacts = group.global_scope(
+            RestoreArtifactsAction, service.restore_artifacts
         )
-        self.retrieve_models = ActionProcessor(service.retrieve_models, action_monitors)
-        self.retrieve_single_model = ActionProcessor(service.retrieve_single_model, action_monitors)
-        self.delete_artifacts = ActionProcessor(service.delete_artifacts, action_monitors)
-        self.restore_artifacts = ActionProcessor(service.restore_artifacts, action_monitors)
-        self.delegate_scan = ActionProcessor(service.delegate_scan_artifacts, action_monitors)
+        self.delegate_scan = group.global_scope(
+            DelegateScanArtifactsAction, service.delegate_scan_artifacts
+        )

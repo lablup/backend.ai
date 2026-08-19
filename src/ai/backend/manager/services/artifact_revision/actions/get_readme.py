@@ -1,20 +1,19 @@
-import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactRevisionReadme
-from ai.backend.manager.services.artifact_revision.actions.base import ArtifactRevisionAction
+from ai.backend.manager.services.artifact_revision.actions.base import (
+    ArtifactRevisionSingleEntityAction,
+)
 
 
 @dataclass
-class GetArtifactRevisionReadmeAction(ArtifactRevisionAction):
-    artifact_revision_id: uuid.UUID
-
+class GetArtifactRevisionReadmeAction(ArtifactRevisionSingleEntityAction):
     @override
-    def entity_id(self) -> str | None:
-        return str(self.artifact_revision_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_artifact_revision_readme"
 
     @override
     @classmethod
@@ -23,9 +22,5 @@ class GetArtifactRevisionReadmeAction(ArtifactRevisionAction):
 
 
 @dataclass
-class GetArtifactRevisionReadmeActionResult(BaseActionResult):
+class GetArtifactRevisionReadmeActionResult:
     readme_data: ArtifactRevisionReadme
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

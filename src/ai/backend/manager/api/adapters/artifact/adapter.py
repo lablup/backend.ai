@@ -6,6 +6,9 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.data.storage.registries.types import ModelTarget as StorageModelTarget
 from ai.backend.common.dto.manager.v2.artifact.request import (
@@ -138,7 +141,7 @@ class ArtifactAdapter(BaseAdapter):
         """Search artifacts (admin, no scope) with filters, orders, and pagination."""
         querier = self.build_querier(input)
 
-        action_result = await self._processors.artifact.search_artifacts.wait_for_complete(
+        action_result = await self._processors.artifact.search_artifacts.run(
             SearchArtifactsAction(querier=querier)
         )
 
@@ -169,7 +172,7 @@ class ArtifactAdapter(BaseAdapter):
         pagination = self._build_gql_pagination_artifacts(input)
         querier = BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
-        action_result = await self._processors.artifact.search_artifacts.wait_for_complete(
+        action_result = await self._processors.artifact.search_artifacts.run(
             SearchArtifactsAction(querier=querier)
         )
 
@@ -200,7 +203,7 @@ class ArtifactAdapter(BaseAdapter):
         pagination = self._build_gql_pagination_revisions(input)
         querier = BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
-        action_result = await self._processors.artifact_revision.search_revision.wait_for_complete(
+        action_result = await self._processors.artifact_revision.search_revision.run(
             SearchArtifactRevisionsAction(querier=querier)
         )
 
@@ -224,7 +227,7 @@ class ArtifactAdapter(BaseAdapter):
             conditions=[ArtifactConditions.by_ids(artifact_ids)],
         )
 
-        action_result = await self._processors.artifact.search_artifacts.wait_for_complete(
+        action_result = await self._processors.artifact.search_artifacts.run(
             SearchArtifactsAction(querier=querier)
         )
 
@@ -246,7 +249,7 @@ class ArtifactAdapter(BaseAdapter):
             conditions=[ArtifactRevisionConditions.by_ids(revision_ids)],
         )
 
-        action_result = await self._processors.artifact_revision.search_revision.wait_for_complete(
+        action_result = await self._processors.artifact_revision.search_revision.run(
             SearchArtifactRevisionsAction(querier=querier)
         )
 
@@ -255,8 +258,8 @@ class ArtifactAdapter(BaseAdapter):
 
     async def get(self, artifact_id: UUID) -> ArtifactNode:
         """Retrieve a single artifact by ID."""
-        action_result = await self._processors.artifact.get.wait_for_complete(
-            GetArtifactAction(artifact_id=artifact_id)
+        action_result = await self._processors.artifact.get.run(
+            GetArtifactAction(artifact_id=ArtifactID(artifact_id))
         )
         return self._data_to_dto(action_result.result)
 
@@ -279,14 +282,14 @@ class ArtifactAdapter(BaseAdapter):
             ),
         )
         updater: Updater[ArtifactRow] = Updater(spec=spec, pk_value=artifact_id)
-        action_result = await self._processors.artifact.update.wait_for_complete(
-            UpdateArtifactAction(updater=updater)
+        action_result = await self._processors.artifact.update.run(
+            UpdateArtifactAction(artifact_id=ArtifactID(artifact_id), updater=updater)
         )
         return UpdateArtifactPayload(artifact=self._data_to_dto(action_result.result))
 
     async def delete(self, input: DeleteArtifactsInput) -> DeleteArtifactsPayload:
         """Delete multiple artifacts by ID."""
-        action_result = await self._processors.artifact.delete_artifacts.wait_for_complete(
+        action_result = await self._processors.artifact.delete_artifacts.run(
             DeleteArtifactsAction(artifact_ids=input.artifact_ids)
         )
         return DeleteArtifactsPayload(
@@ -295,8 +298,8 @@ class ArtifactAdapter(BaseAdapter):
 
     async def get_revision(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
         """Retrieve a single artifact revision by ID."""
-        action_result = await self._processors.artifact_revision.get.wait_for_complete(
-            GetArtifactRevisionAction(artifact_revision_id=artifact_revision_id)
+        action_result = await self._processors.artifact_revision.get.run(
+            GetArtifactRevisionAction(artifact_revision_id=ArtifactRevisionID(artifact_revision_id))
         )
         return self._revision_data_to_dto(action_result.revision)
 
@@ -309,15 +312,13 @@ class ArtifactAdapter(BaseAdapter):
         search: str | None,
     ) -> list[ArtifactNode]:
         """Scan external registries to discover available artifacts."""
-        action_result: ScanArtifactsActionResult = (
-            await self._processors.artifact.scan.wait_for_complete(
-                ScanArtifactsAction(
-                    artifact_type=artifact_type,
-                    registry_id=registry_id,
-                    limit=limit,
-                    order=order,
-                    search=search,
-                )
+        action_result: ScanArtifactsActionResult = await self._processors.artifact.scan.run(
+            ScanArtifactsAction(
+                artifact_type=artifact_type,
+                registry_id=ArtifactRegistryID(registry_id) if registry_id is not None else None,
+                limit=limit,
+                order=order,
+                search=search,
             )
         )
         return [self._data_to_dto(item) for item in action_result.result]
@@ -330,9 +331,9 @@ class ArtifactAdapter(BaseAdapter):
         force: bool,
     ) -> tuple[ArtifactRevisionNode, UUID | None]:
         """Import a single artifact revision and return (revision_node, task_id)."""
-        action_result = await self._processors.artifact_revision.import_revision.wait_for_complete(
+        action_result = await self._processors.artifact_revision.import_revision.run(
             ImportArtifactRevisionAction(
-                artifact_revision_id=artifact_revision_id,
+                artifact_revision_id=ArtifactRevisionID(artifact_revision_id),
                 vfolder_id=vfolder_id,
                 storage_prefix=storage_prefix,
                 force=force,
@@ -353,13 +354,15 @@ class ArtifactAdapter(BaseAdapter):
         service_target = (
             ServiceDelegateeTarget(
                 delegatee_reservoir_id=delegatee_target.delegatee_reservoir_id,
-                target_registry_id=delegatee_target.target_registry_id,
+                target_registry_id=ArtifactRegistryID(delegatee_target.target_registry_id)
+                if delegatee_target.target_registry_id is not None
+                else None,
             )
             if delegatee_target is not None
             else None
         )
         action_result: DelegateScanArtifactsActionResult = (
-            await self._processors.artifact.delegate_scan.wait_for_complete(
+            await self._processors.artifact.delegate_scan.run(
                 DelegateScanArtifactsAction(
                     delegator_reservoir_id=delegator_reservoir_id,
                     delegatee_target=service_target,
@@ -387,12 +390,14 @@ class ArtifactAdapter(BaseAdapter):
         service_target = (
             ServiceDelegateeTarget(
                 delegatee_reservoir_id=delegatee_target.delegatee_reservoir_id,
-                target_registry_id=delegatee_target.target_registry_id,
+                target_registry_id=ArtifactRegistryID(delegatee_target.target_registry_id)
+                if delegatee_target.target_registry_id is not None
+                else None,
             )
             if delegatee_target is not None
             else None
         )
-        action_result = await self._processors.artifact_revision.delegate_import_revision_batch.wait_for_complete(
+        action_result = await self._processors.artifact_revision.delegate_import_revision_batch.run(
             DelegateImportArtifactRevisionBatchAction(
                 delegator_reservoir_id=delegator_reservoir_id,
                 delegatee_target=service_target,
@@ -406,15 +411,17 @@ class ArtifactAdapter(BaseAdapter):
 
     async def cleanup_revision(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
         """Clean up stored artifact revision data and revert to SCANNED status."""
-        action_result = await self._processors.artifact_revision.cleanup.wait_for_complete(
-            CleanupArtifactRevisionAction(artifact_revision_id=artifact_revision_id)
+        action_result = await self._processors.artifact_revision.cleanup.run(
+            CleanupArtifactRevisionAction(
+                artifact_revision_id=ArtifactRevisionID(artifact_revision_id)
+            )
         )
         return self._revision_data_to_dto(action_result.result)
 
     async def restore(self, artifact_ids: list[UUID]) -> list[ArtifactNode]:
         """Restore previously deleted artifacts."""
         action_result: RestoreArtifactsActionResult = (
-            await self._processors.artifact.restore_artifacts.wait_for_complete(
+            await self._processors.artifact.restore_artifacts.run(
                 RestoreArtifactsAction(artifact_ids=artifact_ids)
             )
         )
@@ -422,22 +429,26 @@ class ArtifactAdapter(BaseAdapter):
 
     async def cancel_import(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
         """Cancel an in-progress artifact import and revert to SCANNED status."""
-        action_result = await self._processors.artifact_revision.cancel_import.wait_for_complete(
-            CancelImportAction(artifact_revision_id=artifact_revision_id)
+        action_result = await self._processors.artifact_revision.cancel_import.run(
+            CancelImportAction(artifact_revision_id=ArtifactRevisionID(artifact_revision_id))
         )
         return self._revision_data_to_dto(action_result.result)
 
     async def approve_revision(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
         """Approve an artifact revision for general use."""
-        action_result = await self._processors.artifact_revision.approve.wait_for_complete(
-            ApproveArtifactRevisionAction(artifact_revision_id=artifact_revision_id)
+        action_result = await self._processors.artifact_revision.approve.run(
+            ApproveArtifactRevisionAction(
+                artifact_revision_id=ArtifactRevisionID(artifact_revision_id)
+            )
         )
         return self._revision_data_to_dto(action_result.result)
 
     async def reject_revision(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
         """Reject an artifact revision, preventing its use."""
-        action_result = await self._processors.artifact_revision.reject.wait_for_complete(
-            RejectArtifactRevisionAction(artifact_revision_id=artifact_revision_id)
+        action_result = await self._processors.artifact_revision.reject.run(
+            RejectArtifactRevisionAction(
+                artifact_revision_id=ArtifactRevisionID(artifact_revision_id)
+            )
         )
         return self._revision_data_to_dto(action_result.result)
 
@@ -451,8 +462,13 @@ class ArtifactAdapter(BaseAdapter):
             StorageModelTarget(model_id=m.model_id, revision=m.revision) for m in models
         ]
         action_result: RetrieveModelsActionResult = (
-            await self._processors.artifact.retrieve_models.wait_for_complete(
-                RetrieveModelsAction(models=storage_models, registry_id=registry_id)
+            await self._processors.artifact.retrieve_models.run(
+                RetrieveModelsAction(
+                    models=storage_models,
+                    registry_id=ArtifactRegistryID(registry_id)
+                    if registry_id is not None
+                    else None,
+                )
             )
         )
         return [self._data_with_revisions_to_dto(item) for item in action_result.result]
@@ -779,8 +795,12 @@ class ArtifactAdapter(BaseAdapter):
             name=data.name,
             type=ArtifactType(data.type),
             description=data.description,
-            registry_id=data.registry_id,
-            source_registry_id=data.source_registry_id,
+            registry_id=ArtifactRegistryID(data.registry_id)
+            if data.registry_id is not None
+            else None,
+            source_registry_id=ArtifactRegistryID(data.source_registry_id)
+            if data.source_registry_id is not None
+            else None,
             registry_type=data.registry_type,
             source_registry_type=data.source_registry_type,
             availability=ArtifactAvailability(data.availability),
@@ -794,7 +814,7 @@ class ArtifactAdapter(BaseAdapter):
     def _revision_data_to_dto(data: ArtifactRevisionData) -> ArtifactRevisionNode:
         return ArtifactRevisionNode(
             id=data.id,
-            artifact_id=data.artifact_id,
+            artifact_id=ArtifactID(data.artifact_id),
             version=data.version,
             size=str(data.size) if data.size is not None else None,
             status=ArtifactStatus(data.status),
@@ -811,8 +831,12 @@ class ArtifactAdapter(BaseAdapter):
             name=data.name,
             type=ArtifactType(data.type),
             description=data.description,
-            registry_id=data.registry_id,
-            source_registry_id=data.source_registry_id,
+            registry_id=ArtifactRegistryID(data.registry_id)
+            if data.registry_id is not None
+            else None,
+            source_registry_id=ArtifactRegistryID(data.source_registry_id)
+            if data.source_registry_id is not None
+            else None,
             registry_type=data.registry_type,
             source_registry_type=data.source_registry_type,
             availability=ArtifactAvailability(data.availability),

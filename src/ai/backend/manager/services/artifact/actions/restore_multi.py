@@ -2,7 +2,6 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactData
 from ai.backend.manager.services.artifact.actions.base import ArtifactAction
@@ -13,8 +12,9 @@ class RestoreArtifactsAction(ArtifactAction):
     artifact_ids: list[uuid.UUID]
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "restore_artifacts"
 
     @override
     @classmethod
@@ -23,9 +23,5 @@ class RestoreArtifactsAction(ArtifactAction):
 
 
 @dataclass
-class RestoreArtifactsActionResult(BaseActionResult):
+class RestoreArtifactsActionResult:
     artifacts: list[ArtifactData]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

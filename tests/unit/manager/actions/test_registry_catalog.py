@@ -32,6 +32,9 @@ from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAct
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
+from ai.backend.manager.services.artifact.processors import ArtifactProcessors
+from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
+from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
@@ -47,6 +50,7 @@ from ai.backend.manager.services.keypair_resource_policy.processors import (
 from ai.backend.manager.services.login_client_type.processors import (
     LoginClientTypeProcessors,
 )
+from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.services.notification.processors import NotificationProcessors
 from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
 from ai.backend.manager.services.project_resource_policy.processors import (
@@ -157,6 +161,10 @@ def test_every_defined_v2_action_is_wired() -> None:
     ResourcePresetProcessors(registry.group(), MagicMock())
     ResourceAllocationProcessors(registry.group(), MagicMock())
     ScalingGroupProcessors(registry.group(), MagicMock())
+    ArtifactProcessors(registry.group(), MagicMock())
+    ArtifactRegistryProcessors(registry.group(), MagicMock())
+    ArtifactRevisionProcessors(registry.group(), MagicMock())
+    ModelCardProcessors(registry.group(), MagicMock())
 
     wired = sorted(cls.action_name() for cls in registry.wired_actions())
     defined = sorted(cls.action_name() for cls in _concrete_v2_action_classes())

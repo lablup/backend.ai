@@ -1,6 +1,8 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
+from typing import Any
+
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
     ApproveArtifactRevisionActionResult,
@@ -57,61 +59,68 @@ from ai.backend.manager.services.artifact_revision.service import ArtifactRevisi
 
 
 class ArtifactRevisionProcessors:
-    get: ActionProcessor[GetArtifactRevisionAction, GetArtifactRevisionActionResult]
-    get_readme: ActionProcessor[
+    get: SingleEntityActionProcessor[GetArtifactRevisionAction, GetArtifactRevisionActionResult]
+    get_readme: SingleEntityActionProcessor[
         GetArtifactRevisionReadmeAction, GetArtifactRevisionReadmeActionResult
     ]
-    get_verification_result: ActionProcessor[
+    get_verification_result: SingleEntityActionProcessor[
         GetArtifactRevisionVerificationResultAction,
         GetArtifactRevisionVerificationResultActionResult,
     ]
-    get_download_progress: ActionProcessor[
+    get_download_progress: SingleEntityActionProcessor[
         GetDownloadProgressAction, GetDownloadProgressActionResult
     ]
-    search_revision: ActionProcessor[
+    search_revision: GlobalActionProcessor[
         SearchArtifactRevisionsAction, SearchArtifactRevisionsActionResult
     ]
-    approve: ActionProcessor[ApproveArtifactRevisionAction, ApproveArtifactRevisionActionResult]
-    reject: ActionProcessor[RejectArtifactRevisionAction, RejectArtifactRevisionActionResult]
-    import_revision: ActionProcessor[
+    approve: SingleEntityActionProcessor[
+        ApproveArtifactRevisionAction, ApproveArtifactRevisionActionResult
+    ]
+    reject: SingleEntityActionProcessor[
+        RejectArtifactRevisionAction, RejectArtifactRevisionActionResult
+    ]
+    import_revision: SingleEntityActionProcessor[
         ImportArtifactRevisionAction, ImportArtifactRevisionActionResult
     ]
-    delegate_import_revision_batch: ActionProcessor[
+    delegate_import_revision_batch: GlobalActionProcessor[
         DelegateImportArtifactRevisionBatchAction, DelegateImportArtifactRevisionBatchActionResult
     ]
-    cancel_import: ActionProcessor[CancelImportAction, CancelImportActionResult]
-    cleanup: ActionProcessor[CleanupArtifactRevisionAction, CleanupArtifactRevisionActionResult]
-    associate_with_storage: ActionProcessor[
+    cancel_import: SingleEntityActionProcessor[CancelImportAction, CancelImportActionResult]
+    cleanup: SingleEntityActionProcessor[
+        CleanupArtifactRevisionAction, CleanupArtifactRevisionActionResult
+    ]
+    associate_with_storage: SingleEntityActionProcessor[
         AssociateWithStorageAction, AssociateWithStorageActionResult
     ]
-    disassociate_with_storage: ActionProcessor[
+    disassociate_with_storage: SingleEntityActionProcessor[
         DisassociateWithStorageAction, DisassociateWithStorageActionResult
     ]
 
-    def __init__(
-        self,
-        service: ArtifactRevisionService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.get = ActionProcessor(service.get, action_monitors)
-        self.get_readme = ActionProcessor(service.get_readme, action_monitors)
-        self.get_verification_result = ActionProcessor(
-            service.get_verification_result, action_monitors
+    def __init__(self, group: ProcessorGroup[Any], service: ArtifactRevisionService) -> None:
+        self.get = group.single_entity(GetArtifactRevisionAction, service.get)
+        self.get_readme = group.single_entity(GetArtifactRevisionReadmeAction, service.get_readme)
+        self.get_verification_result = group.single_entity(
+            GetArtifactRevisionVerificationResultAction, service.get_verification_result
         )
-        self.get_download_progress = ActionProcessor(service.get_download_progress, action_monitors)
-        self.search_revision = ActionProcessor(service.search_revision, action_monitors)
-        self.approve = ActionProcessor(service.approve, action_monitors)
-        self.reject = ActionProcessor(service.reject, action_monitors)
-        self.import_revision = ActionProcessor(service.import_revision, action_monitors)
-        self.delegate_import_revision_batch = ActionProcessor(
-            service.delegate_import_revision_batch, action_monitors
+        self.get_download_progress = group.single_entity(
+            GetDownloadProgressAction, service.get_download_progress
         )
-        self.cancel_import = ActionProcessor(service.cancel_import, action_monitors)
-        self.cleanup = ActionProcessor(service.cleanup, action_monitors)
-        self.associate_with_storage = ActionProcessor(
-            service.associate_with_storage, action_monitors
+        self.search_revision = group.global_scope(
+            SearchArtifactRevisionsAction, service.search_revision
         )
-        self.disassociate_with_storage = ActionProcessor(
-            service.disassociate_with_storage, action_monitors
+        self.approve = group.single_entity(ApproveArtifactRevisionAction, service.approve)
+        self.reject = group.single_entity(RejectArtifactRevisionAction, service.reject)
+        self.import_revision = group.single_entity(
+            ImportArtifactRevisionAction, service.import_revision
+        )
+        self.delegate_import_revision_batch = group.global_scope(
+            DelegateImportArtifactRevisionBatchAction, service.delegate_import_revision_batch
+        )
+        self.cancel_import = group.single_entity(CancelImportAction, service.cancel_import)
+        self.cleanup = group.single_entity(CleanupArtifactRevisionAction, service.cleanup)
+        self.associate_with_storage = group.single_entity(
+            AssociateWithStorageAction, service.associate_with_storage
+        )
+        self.disassociate_with_storage = group.single_entity(
+            DisassociateWithStorageAction, service.disassociate_with_storage
         )

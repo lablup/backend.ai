@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_card.types import ResourceRequirementEntry
 from ai.backend.manager.services.model_card.actions.base import ModelCardAction
@@ -22,8 +21,9 @@ class GetModelCardMinResourcesAction(ModelCardAction):
     card_ids: Sequence[UUID]
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_model_card_min_resources"
 
     @override
     @classmethod
@@ -32,9 +32,5 @@ class GetModelCardMinResourcesAction(ModelCardAction):
 
 
 @dataclass
-class GetModelCardMinResourcesActionResult(BaseActionResult):
+class GetModelCardMinResourcesActionResult:
     min_resources: dict[UUID, list[ResourceRequirementEntry]]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

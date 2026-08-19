@@ -2,7 +2,6 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import (
     ArtifactRevisionData,
@@ -22,8 +21,9 @@ class DelegateImportArtifactRevisionBatchAction(ArtifactRevisionAction):
     force: bool
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "delegate_import_artifact_revision_batch"
 
     @override
     @classmethod
@@ -32,10 +32,6 @@ class DelegateImportArtifactRevisionBatchAction(ArtifactRevisionAction):
 
 
 @dataclass
-class DelegateImportArtifactRevisionBatchActionResult(BaseActionResult):
+class DelegateImportArtifactRevisionBatchActionResult:
     result: list[ArtifactRevisionData]
     task_ids: list[uuid.UUID | None]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

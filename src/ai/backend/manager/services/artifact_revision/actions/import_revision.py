@@ -2,22 +2,23 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
-from ai.backend.manager.services.artifact_revision.actions.base import ArtifactRevisionAction
+from ai.backend.manager.services.artifact_revision.actions.base import (
+    ArtifactRevisionSingleEntityAction,
+)
 
 
 @dataclass
-class ImportArtifactRevisionAction(ArtifactRevisionAction):
-    artifact_revision_id: uuid.UUID
+class ImportArtifactRevisionAction(ArtifactRevisionSingleEntityAction):
     vfolder_id: uuid.UUID | None = None
     storage_prefix: str | None = None
     force: bool = False
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.artifact_revision_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "import_artifact_revision"
 
     @override
     @classmethod
@@ -26,10 +27,6 @@ class ImportArtifactRevisionAction(ArtifactRevisionAction):
 
 
 @dataclass
-class ImportArtifactRevisionActionResult(BaseActionResult):
+class ImportArtifactRevisionActionResult:
     result: ArtifactRevisionData
     task_id: uuid.UUID | None
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.result.id)

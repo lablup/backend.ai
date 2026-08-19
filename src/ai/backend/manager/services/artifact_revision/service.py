@@ -16,6 +16,7 @@ from ai.backend.common.data.artifact.types import (
     ArtifactRevisionDownloadProgress,
     CombinedDownloadProgress,
 )
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import (
     ArtifactStorageImportStep,
@@ -294,7 +295,7 @@ class ArtifactRevisionService:
 
                         # Query remote reservoir manager for download progress
                         remote_resp = await remote_reservoir_client.get_download_progress(
-                            artifact_revision_id=action.artifact_revision_id,
+                            artifact_revision_id=ArtifactRevisionID(action.artifact_revision_id),
                         )
 
                         # Parse response - expecting GetDownloadProgressResponse structure
@@ -590,7 +591,9 @@ class ArtifactRevisionService:
 
             await self.associate_with_storage(
                 AssociateWithStorageAction(
-                    revision_data.id, namespace_id, ArtifactStorageType(storage_type)
+                    ArtifactRevisionID(revision_data.id),
+                    namespace_id,
+                    ArtifactStorageType(storage_type),
                 )
             )
 
@@ -678,7 +681,7 @@ class ArtifactRevisionService:
 
         await self.disassociate_with_storage(
             DisassociateWithStorageAction(
-                artifact_revision_id=revision_data.id,
+                artifact_revision_id=ArtifactRevisionID(revision_data.id),
                 storage_namespace_id=namespace_id,
             )
         )
@@ -712,7 +715,7 @@ class ArtifactRevisionService:
                 for revision_id in action.artifact_revision_ids:
                     import_result = await self.import_revision(
                         ImportArtifactRevisionAction(
-                            artifact_revision_id=revision_id,
+                            artifact_revision_id=ArtifactRevisionID(revision_id),
                             force=action.force,
                         )
                     )

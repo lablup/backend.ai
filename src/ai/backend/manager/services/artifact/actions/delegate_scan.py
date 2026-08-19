@@ -3,9 +3,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.data.storage.registries.types import ModelSortKey
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisions,
@@ -27,12 +25,8 @@ class DelegateScanArtifactsAction(ArtifactAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.ARTIFACT_SCAN
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    def action_name(cls) -> str:
+        return "delegate_scan_artifacts"
 
     @override
     @classmethod
@@ -41,12 +35,8 @@ class DelegateScanArtifactsAction(ArtifactAction):
 
 
 @dataclass
-class DelegateScanArtifactsActionResult(BaseActionResult):
+class DelegateScanArtifactsActionResult:
     result: list[ArtifactDataWithRevisions]
     source_registry_id: uuid.UUID
     source_registry_type: ArtifactRegistryType
     readme_data: dict[uuid.UUID, ArtifactRevisionReadme]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

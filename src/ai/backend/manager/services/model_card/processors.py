@@ -1,9 +1,7 @@
-from typing import cast
+from typing import Any
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validator.base import ActionValidator
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.services.model_card.actions.available_presets import (
     AvailablePresetsAction,
     AvailablePresetsActionResult,
@@ -44,38 +42,33 @@ from ai.backend.manager.services.model_card.service import ModelCardService
 
 
 class ModelCardProcessors:
-    create: ActionProcessor[CreateModelCardAction, CreateModelCardActionResult]
-    update: ActionProcessor[UpdateModelCardAction, UpdateModelCardActionResult]
-    delete: ActionProcessor[DeleteModelCardAction, DeleteModelCardActionResult]
-    bulk_delete: ActionProcessor[BulkDeleteModelCardAction, BulkDeleteModelCardActionResult]
-    search: ActionProcessor[SearchModelCardsAction, SearchModelCardsActionResult]
-    search_in_project: ActionProcessor[
+    create: GlobalActionProcessor[CreateModelCardAction, CreateModelCardActionResult]
+    update: GlobalActionProcessor[UpdateModelCardAction, UpdateModelCardActionResult]
+    delete: GlobalActionProcessor[DeleteModelCardAction, DeleteModelCardActionResult]
+    bulk_delete: GlobalActionProcessor[BulkDeleteModelCardAction, BulkDeleteModelCardActionResult]
+    search: GlobalActionProcessor[SearchModelCardsAction, SearchModelCardsActionResult]
+    search_in_project: GlobalActionProcessor[
         SearchModelCardsInProjectAction, SearchModelCardsInProjectActionResult
     ]
-    scan: ActionProcessor[ScanProjectModelCardsAction, ScanProjectModelCardsActionResult]
-    available_presets: ActionProcessor[AvailablePresetsAction, AvailablePresetsActionResult]
-    get_min_resources: ActionProcessor[
+    scan: GlobalActionProcessor[ScanProjectModelCardsAction, ScanProjectModelCardsActionResult]
+    available_presets: GlobalActionProcessor[AvailablePresetsAction, AvailablePresetsActionResult]
+    get_min_resources: GlobalActionProcessor[
         GetModelCardMinResourcesAction, GetModelCardMinResourcesActionResult
     ]
 
-    def __init__(
-        self,
-        service: ModelCardService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        scope_validator = validators.rbac.scope
-
-        self.create = ActionProcessor(service.create, action_monitors)
-        self.update = ActionProcessor(service.update, action_monitors)
-        self.delete = ActionProcessor(service.delete, action_monitors)
-        self.bulk_delete = ActionProcessor(service.bulk_delete, action_monitors)
-        self.search = ActionProcessor(service.search, action_monitors)
-        self.search_in_project = ActionProcessor(
-            service.search_in_project,
-            action_monitors,
-            validators=[cast(ActionValidator, scope_validator)],
+    def __init__(self, group: ProcessorGroup[Any], service: ModelCardService) -> None:
+        self.create = group.global_scope(CreateModelCardAction, service.create)
+        self.update = group.global_scope(UpdateModelCardAction, service.update)
+        self.delete = group.global_scope(DeleteModelCardAction, service.delete)
+        self.bulk_delete = group.global_scope(BulkDeleteModelCardAction, service.bulk_delete)
+        self.search = group.global_scope(SearchModelCardsAction, service.search)
+        self.search_in_project = group.global_scope(
+            SearchModelCardsInProjectAction, service.search_in_project
         )
-        self.scan = ActionProcessor(service.scan, action_monitors)
-        self.available_presets = ActionProcessor(service.available_presets, action_monitors)
-        self.get_min_resources = ActionProcessor(service.get_min_resources, action_monitors)
+        self.scan = group.global_scope(ScanProjectModelCardsAction, service.scan)
+        self.available_presets = group.global_scope(
+            AvailablePresetsAction, service.available_presets
+        )
+        self.get_min_resources = group.global_scope(
+            GetModelCardMinResourcesAction, service.get_min_resources
+        )

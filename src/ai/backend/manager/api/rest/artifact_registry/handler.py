@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Final, cast
 import sqlalchemy as sa
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, QueryParam
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import (
@@ -92,9 +93,11 @@ class ArtifactRegistryHandler:
         This is the first step in the artifact workflow: Scan -> Import -> Use.
         """
 
-        action_result = await self._artifact.scan.wait_for_complete(
+        action_result = await self._artifact.scan.run(
             ScanArtifactsAction(
-                registry_id=body.parsed.registry_id,
+                registry_id=ArtifactRegistryID(body.parsed.registry_id)
+                if body.parsed.registry_id is not None
+                else None,
                 artifact_type=body.parsed.artifact_type,
                 limit=body.parsed.limit,
                 order=ModelSortKey.DOWNLOADS,
@@ -114,7 +117,7 @@ class ArtifactRegistryHandler:
         self,
         body: BodyParam[DelegateScanArtifactsReq],
     ) -> APIResponse:
-        action_result = await self._artifact.delegate_scan.wait_for_complete(
+        action_result = await self._artifact.delegate_scan.run(
             DelegateScanArtifactsAction(
                 delegator_reservoir_id=body.parsed.delegator_reservoir_id,
                 artifact_type=body.parsed.artifact_type,
@@ -132,7 +135,9 @@ class ArtifactRegistryHandler:
                 ArtifactDataWithRevisionsResponse.from_artifact_with_revisions(artifact)
                 for artifact in action_result.result
             ],
-            source_registry_id=action_result.source_registry_id,
+            source_registry_id=ArtifactRegistryID(action_result.source_registry_id)
+            if action_result.source_registry_id is not None
+            else None,
             source_registry_type=action_result.source_registry_type,
             readme_data=action_result.readme_data,
         )
@@ -143,17 +148,15 @@ class ArtifactRegistryHandler:
         body: BodyParam[DelegateImportArtifactsReq],
     ) -> APIResponse:
         force = body.parsed.options.force
-        action_result = (
-            await self._artifact_revision.delegate_import_revision_batch.wait_for_complete(
-                DelegateImportArtifactRevisionBatchAction(
-                    delegator_reservoir_id=body.parsed.delegator_reservoir_id,
-                    artifact_type=body.parsed.artifact_type,
-                    delegatee_target=body.parsed.delegatee_target
-                    if body.parsed.delegatee_target
-                    else None,
-                    artifact_revision_ids=body.parsed.artifact_revision_ids,
-                    force=force,
-                )
+        action_result = await self._artifact_revision.delegate_import_revision_batch.run(
+            DelegateImportArtifactRevisionBatchAction(
+                delegator_reservoir_id=body.parsed.delegator_reservoir_id,
+                artifact_type=body.parsed.artifact_type,
+                delegatee_target=body.parsed.delegatee_target
+                if body.parsed.delegatee_target
+                else None,
+                artifact_revision_ids=body.parsed.artifact_revision_ids,
+                force=force,
             )
         )
 
@@ -215,7 +218,7 @@ class ArtifactRegistryHandler:
             orders=orders,
         )
 
-        action_result = await self._artifact.search_artifacts_with_revisions.wait_for_complete(
+        action_result = await self._artifact.search_artifacts_with_revisions.run(
             SearchArtifactsWithRevisionsAction(querier=querier)
         )
 
@@ -240,10 +243,12 @@ class ArtifactRegistryHandler:
         unlike single model scanning which retrieves this information immediately.
         """
 
-        action_result = await self._artifact.retrieve_models.wait_for_complete(
+        action_result = await self._artifact.retrieve_models.run(
             RetrieveModelsAction(
                 models=body.parsed.models,
-                registry_id=body.parsed.registry_id,
+                registry_id=ArtifactRegistryID(body.parsed.registry_id)
+                if body.parsed.registry_id is not None
+                else None,
             )
         )
 
@@ -272,10 +277,12 @@ class ArtifactRegistryHandler:
             model_id=path.parsed.model_id,
             revision=query.parsed.revision,
         )
-        action_result = await self._artifact.retrieve_single_model.wait_for_complete(
+        action_result = await self._artifact.retrieve_single_model.run(
             RetrieveModelAction(
                 model=model,
-                registry_id=query.parsed.registry_id,
+                registry_id=ArtifactRegistryID(query.parsed.registry_id)
+                if query.parsed.registry_id is not None
+                else None,
             )
         )
 
