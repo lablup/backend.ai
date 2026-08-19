@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from typing import override
 
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user import UserRole
 
@@ -17,7 +16,6 @@ from .create_task_template import TaskTemplateItemInput
 class UpdateTaskTemplateAction(TemplateAction):
     """Action to update an existing task template."""
 
-    template_id: str
     domain_name: str
     requesting_project: ProjectID
     requester_uuid: uuid.UUID
@@ -29,18 +27,15 @@ class UpdateTaskTemplateAction(TemplateAction):
 
     @override
     @classmethod
+    def action_name(cls) -> str:
+        return "update_task_template"
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
-    @override
-    def entity_id(self) -> str | None:
-        return self.template_id
-
 
 @dataclass
-class UpdateTaskTemplateActionResult(BaseActionResult):
+class UpdateTaskTemplateActionResult:
     """Result of updating a task template."""
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

@@ -12,6 +12,7 @@ import json
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
+from uuid import UUID
 
 import yaml
 
@@ -23,6 +24,8 @@ from ai.backend.common.api_handlers import (
 )
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session_template import SessionTemplateID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.template.request import (
     CreateSessionTemplateRequest,
     DeleteSessionTemplateRequest,
@@ -131,7 +134,7 @@ class SessionTemplateHandler:
             owner_access_key=owner_access_key,
             items=items,
         )
-        result = await self._template.create_task.wait_for_complete(action)
+        result = await self._template.create_task.run(action)
         resp = [CreateSessionTemplateItemDTO(id=item.id, user=item.user) for item in result.created]
         return APIResponse.build(
             HTTPStatus.OK,
@@ -146,8 +149,8 @@ class SessionTemplateHandler:
     ) -> APIResponse:
         log.info("SESSION_TEMPLATE.LIST (ak:{})", ctx.access_key)
 
-        action = ListTaskTemplatesAction(user_uuid=ctx.user_uuid)
-        result = await self._template.list_task.wait_for_complete(action)
+        action = ListTaskTemplatesAction(user_uuid=UserID(ctx.user_uuid))
+        result = await self._template.list_task.run(action)
 
         items = [
             SessionTemplateListItemDTO(
@@ -189,8 +192,8 @@ class SessionTemplateHandler:
         )
 
         template_id = path.parsed.template_id
-        action = GetTaskTemplateAction(template_id=template_id)
-        result = await self._template.get_task.wait_for_complete(action)
+        action = GetTaskTemplateAction(template_id=SessionTemplateID(UUID(template_id)))
+        result = await self._template.get_task.run(action)
         return APIResponse.build(
             HTTPStatus.OK,
             GetSessionTemplateResponse(
@@ -239,7 +242,7 @@ class SessionTemplateHandler:
 
         project_id = await self._resolve_project_id(domain, params.group)
         action = UpdateTaskTemplateAction(
-            template_id=template_id,
+            template_id=SessionTemplateID(UUID(template_id)),
             domain_name=domain,
             requesting_project=project_id,
             requester_uuid=ctx.user_uuid,
@@ -249,7 +252,7 @@ class SessionTemplateHandler:
             owner_access_key=owner_access_key,
             items=items,
         )
-        await self._template.update_task.wait_for_complete(action)
+        await self._template.update_task.run(action)
         return APIResponse.build(
             HTTPStatus.OK,
             UpdateSessionTemplateResponse(success=True),
@@ -272,8 +275,8 @@ class SessionTemplateHandler:
             else "*",
         )
 
-        action = DeleteTaskTemplateAction(template_id=template_id)
-        await self._template.delete_task.wait_for_complete(action)
+        action = DeleteTaskTemplateAction(template_id=SessionTemplateID(UUID(template_id)))
+        await self._template.delete_task.run(action)
         return APIResponse.build(
             HTTPStatus.OK,
             DeleteSessionTemplateResponse(success=True),

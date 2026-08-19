@@ -81,6 +81,7 @@ from ai.backend.manager.services.service_catalog.processors import ServiceCatalo
 from ai.backend.manager.services.storage_namespace.processors import (
     StorageNamespaceProcessors,
 )
+from ai.backend.manager.services.template.processors import TemplateProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
@@ -171,6 +172,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     ContainerRegistryProcessors(registry.group(), MagicMock())
     ImageProcessors(registry.group(), MagicMock())
     ExportProcessors(registry.group(), MagicMock())
+    TemplateProcessors(registry.group(), MagicMock())
 
     wired = sorted(cls.action_name() for cls in registry.wired_actions())
     defined = sorted(cls.action_name() for cls in _concrete_v2_action_classes())

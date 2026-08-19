@@ -497,7 +497,7 @@ def create_processors(
             services.scheduling_history, action_monitors, validators
         ),
         service_catalog=ServiceCatalogProcessors(registry.group()),
-        template=TemplateProcessors(services.template, action_monitors, validators),
+        template=TemplateProcessors(registry.group(), services.template),
         resource_allocation=ResourceAllocationProcessors(
             registry.group(), services.resource_allocation
         ),
