@@ -571,6 +571,8 @@ class ImageAdapter(BaseAdapter):
             identity=ImageIdentityInfoDTO(
                 canonical_name=str(data.name),
                 namespace=data.image,
+                tag=data.tag,
+                version=data.version,
                 architecture=data.architecture,
             ),
             metadata=ImageMetadataInfoDTO(

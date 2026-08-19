@@ -71,6 +71,7 @@ class ImageData:
     image: str
     created_at: datetime | None = field(compare=False)
     tag: str | None
+    version: str
     registry: str
     registry_id: UUID
     architecture: str
