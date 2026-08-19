@@ -43,6 +43,11 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
+# Podman's Docker-compatible API takes the `PidsLimit: 0` that the Docker CLI always sends
+# literally and writes it into cgroup v2 `pids.max`, allowing a single process.
+# Pass an explicit limit so the extractor can fork.
+_KRUNNER_EXTRACTOR_PIDS_LIMIT: Final = 2048
+
 
 class DockerKernel(AbstractKernel):
     network_driver: str
@@ -558,6 +563,8 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
                     "run",
                     "--rm",
                     "-i",
+                    "--pids-limit",
+                    str(_KRUNNER_EXTRACTOR_PIDS_LIMIT),
                     "-v",
                     f"{archive_path}:/root/archive.tar.xz",
                     "-v",
