@@ -4,7 +4,6 @@ from typing import Any, override
 from aiohttp import MultipartReader
 
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.session.actions.file_base import SessionFileAction
@@ -18,8 +17,9 @@ class UploadFilesAction(SessionFileAction):
     reader: MultipartReader
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "upload_files"
 
     @override
     @classmethod
@@ -28,11 +28,7 @@ class UploadFilesAction(SessionFileAction):
 
 
 @dataclass
-class UploadFilesActionResult(BaseActionResult):
+class UploadFilesActionResult:
     # TODO: Add proper type
     result: Any
     session_data: SessionData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.session_data.id)

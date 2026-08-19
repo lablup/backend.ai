@@ -4,19 +4,18 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.types import AgentId, ClusterMode
-from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.compute_schedule import (
     ComputeScheduleResult,
 )
 from ai.backend.manager.data.session.draft import KernelResourceInput
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
+from ai.backend.manager.services.session.base import SessionGlobalAction
 
 
 @dataclass(frozen=True)
-class ComputeScheduleAction(BaseAction):
+class ComputeScheduleAction(SessionGlobalAction):
     """Compute a session's scheduling against a resource group without provisioning.
 
     The fields mirror the scheduler's selection criteria so the real selector can
@@ -35,12 +34,8 @@ class ComputeScheduleAction(BaseAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.RESOURCE_GROUP
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.resource_group_id)
+    def action_name(cls) -> str:
+        return "global_compute_schedule"
 
     @override
     @classmethod
@@ -49,9 +44,5 @@ class ComputeScheduleAction(BaseAction):
 
 
 @dataclass(frozen=True)
-class ComputeScheduleActionResult(BaseActionResult):
+class ComputeScheduleActionResult:
     result: ComputeScheduleResult
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

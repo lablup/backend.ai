@@ -81,6 +81,7 @@ from ai.backend.manager.services.scheduling_history.processors import (
     SchedulingHistoryProcessors,
 )
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
+from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.storage_namespace.processors import (
     StorageNamespaceProcessors,
 )
@@ -177,6 +178,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     ExportProcessors(registry.group(), MagicMock())
     TemplateProcessors(registry.group(), MagicMock())
     SchedulingHistoryProcessors(registry.group(), MagicMock())
+    SessionProcessors(registry.group(), MagicMock())
 
     wired = sorted(cls.action_name() for cls in registry.wired_actions())
     defined = sorted(cls.action_name() for cls in _concrete_v2_action_classes())

@@ -44,6 +44,7 @@ from ai.backend.common.types import (
     ContainerId,
     ImageAlias,
     ResourceSlotEntry,
+    SessionId,
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -208,10 +209,6 @@ from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
     RenameSessionActionResult,
 )
-from ai.backend.manager.services.session.actions.resolve_session import (
-    ResolveSessionAction,
-    ResolveSessionActionResult,
-)
 from ai.backend.manager.services.session.actions.resolve_session_name import (
     ResolveSessionNameAction,
     ResolveSessionNameActionResult,
@@ -309,20 +306,6 @@ class SessionService:
         self._rpc_ptask_group = aiotools.PersistentTaskGroup()
         self._webhook_ptask_group = aiotools.PersistentTaskGroup()
 
-    async def resolve_session(self, action: ResolveSessionAction) -> ResolveSessionActionResult:
-        """Resolve a live session to its ``session_id`` by ``(session_name, user_id)``.
-        DO NOT USE THIS FOR NEW DEVELOPMENT. This is only for backward compatibility with existing resolvers.
-
-        Callers go through this resolver before invoking any other session operation, so
-        that downstream lookups can rely solely on ``session_id``. The ``user_id`` scope
-        covers sessions created with any of the user's keypair access keys.
-        """
-        session_id = await self._session_repository.resolve_session_id(
-            action.session_name,
-            action.user_id,
-        )
-        return ResolveSessionActionResult(session_id=session_id)
-
     async def compute_schedule(self, action: ComputeScheduleAction) -> ComputeScheduleActionResult:
         """Build a resource-only draft (one kernel group per requested
         kernel, unique role for positional correlation) and delegate the
@@ -360,7 +343,7 @@ class SessionService:
         downstream name-keyed operations receive a real name. DO NOT USE THIS FOR
         NEW DEVELOPMENT — it only bridges the legacy name-or-id path parameter.
         """
-        session_name = await self._session_repository.get_session_name(action.session_id)
+        session_name = await self._session_repository.get_session_name(SessionId(action.session_id))
         return ResolveSessionNameActionResult(session_name=session_name)
 
     async def commit_session(self, action: CommitSessionAction) -> CommitSessionActionResult:
@@ -1265,7 +1248,7 @@ class SessionService:
         )
         result = session_row.status_history or {}
 
-        return GetStatusHistoryActionResult(status_history=result, session_id=session_row.id)
+        return GetStatusHistoryActionResult(status_history=result)
 
     async def interrupt(self, action: InterruptSessionAction) -> InterruptSessionActionResult:
         session_name = action.session_name
@@ -1511,7 +1494,7 @@ class SessionService:
     async def get_session(self, action: GetSessionAction) -> GetSessionActionResult:
         """Get a single session by ID with RBAC validation."""
         session_data = await self._session_repository.get_session_data_by_id(
-            action.session_id,
+            SessionId(action.session_id)
         )
         return GetSessionActionResult(session_data=session_data)
 

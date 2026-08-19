@@ -33,6 +33,7 @@ from aiotools import apartial
 
 from ai.backend.common.api_handlers import PathParam, QueryParam
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.stream.request import SessionNamePath, StreamProxyRequest
 from ai.backend.common.dto.manager.stream.response import StreamAppItem
 from ai.backend.common.exception import BackendAIError, UnreachableError
@@ -140,8 +141,8 @@ class StreamHandler:
             session_id = SessionId(uuid.UUID(session_name_or_id))
         except (ValueError, TypeError):
             return session_name_or_id
-        result = await self._session.resolve_session_name.wait_for_complete(
-            ResolveSessionNameAction(session_id=session_id)
+        result = await self._session.resolve_session_name.run(
+            ResolveSessionNameAction(session_id=SessionID(session_id))
         )
         return result.session_name
 

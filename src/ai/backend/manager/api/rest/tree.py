@@ -216,6 +216,8 @@ def build_api_routes(
     session_handler = SessionHandler(
         auth=processors.auth,
         session=processors.session,
+        group=processors.group,
+        user=processors.user,
         agent=processors.agent,
         vfolder=processors.vfolder,
         config_provider=config_provider,

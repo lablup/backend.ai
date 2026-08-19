@@ -23,6 +23,8 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common import validators as tx
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.exception import SessionWithInvalidStateError
 from ai.backend.common.types import (
@@ -375,7 +377,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             # ownership
             domain_name=row.domain_name,
             project_id=row.group_id,
-            user_id=row.user_uuid,
+            user_id=UserID(row.user_uuid),
             access_key=row.access_key,
             owner=UserNode.from_row(ctx, row.user),
             # status
@@ -436,7 +438,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             # ownership
             domain_name=session_data.domain_name,
             project_id=session_data.group_id,
-            user_id=session_data.user_uuid,
+            user_id=UserID(session_data.user_uuid),
             access_key=session_data.access_key,
             owner=UserNode.from_dataclass(ctx, session_data.owner),
             # status
@@ -919,9 +921,9 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):  # type: ignore[mis
         if name:
             _validate_name_input(name)
 
-        result = await graph_ctx.processors.session.update_session.wait_for_complete(
+        result = await graph_ctx.processors.session.update_session.run(
             UpdateSessionAction(
-                session_id=session_id,
+                session_id=SessionID(session_id),
                 updater=Updater(
                     spec=SessionUpdaterSpec(
                         name=OptionalState[str].from_graphql(name),

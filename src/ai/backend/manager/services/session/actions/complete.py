@@ -4,7 +4,6 @@ from typing import Any, override
 
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.session.base import SessionAction
@@ -20,8 +19,9 @@ class CompleteAction(SessionAction):
     options: Mapping[str, Any] | None
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "complete"
 
     @override
     @classmethod
@@ -30,11 +30,7 @@ class CompleteAction(SessionAction):
 
 
 @dataclass
-class CompleteActionResult(BaseActionResult):
+class CompleteActionResult:
     session_data: SessionData
 
     result: CodeCompletionResp
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.session_data.id)

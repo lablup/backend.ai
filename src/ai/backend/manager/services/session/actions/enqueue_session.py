@@ -1,21 +1,24 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import override
 
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT
 from ai.backend.common.types import AccessKey, ClusterMode, MountInfoEntry, SessionTypes
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.services.session.base import SessionScopeAction
+from ai.backend.manager.services.session.base import (
+    SessionScopeAction,
+    SessionScopeActionResult,
+)
 
 
 @dataclass(frozen=True)
@@ -76,8 +79,10 @@ class EnqueueSessionAction(SessionScopeAction):
     The session is placed in PENDING status immediately.
     The scheduler picks it up asynchronously for resource allocation and launch.
 
-    RBAC validation checks if the user has CREATE permission in USER scope.
+    Answered for by the project the session is created in.
     """
+
+    project_id: ProjectID
 
     session_name: str
     session_type: SessionTypes
@@ -104,38 +109,22 @@ class EnqueueSessionAction(SessionScopeAction):
     """
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id),)
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "enqueue_session"
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
-    @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.USER
-
-    @override
-    def scope_id(self) -> str:
-        return str(self.owner_id) if self.owner_id is not None else str(self.user_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        # When delegating, authorize against the owner's scope, not the caller's.
-        target_user_id = self.owner_id if self.owner_id is not None else self.user_id
-        return RBACElementRef(
-            element_type=RBACElementType.USER,
-            element_id=str(target_user_id),
-        )
-
 
 @dataclass
-class EnqueueSessionActionResult(BaseActionResult):
+class EnqueueSessionActionResult(SessionScopeActionResult):
     """Returns full session data for SessionNode conversion."""
 
     session_data: SessionData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.session_data.id)

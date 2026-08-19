@@ -24,7 +24,10 @@ from pydantic import BaseModel
 
 from ai.backend.common.api_handlers import APIResponse, BaseResponseModel, BodyParam, QueryParam
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.session.request import (
     CommitSessionRequest,
     CompleteRequest,
@@ -83,6 +86,7 @@ from ai.backend.common.dto.manager.session.types import (
 )
 from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.types import (
+    AccessKey,
     AgentId,
     KernelId,
 )
@@ -101,6 +105,8 @@ from ai.backend.manager.services.agent.actions.sync_agent_registry import (
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
 )
+from ai.backend.manager.services.group.actions.lookup import LookupProjectAction
+from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
 )
@@ -157,14 +163,12 @@ from ai.backend.manager.services.session.actions.interrupt_session import (
     InterruptSessionAction,
 )
 from ai.backend.manager.services.session.actions.list_files import ListFilesAction
+from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
 from ai.backend.manager.services.session.actions.match_sessions import (
     MatchSessionsAction,
 )
 from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
-)
-from ai.backend.manager.services.session.actions.resolve_session import (
-    ResolveSessionAction,
 )
 from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
@@ -175,6 +179,10 @@ from ai.backend.manager.services.session.actions.start_service import (
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
 )
+from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
+    LookupKeypairOwnerByAccessKeyAction,
+)
+from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.actions.base import GetTaskLogsAction
 from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
     ResolveIdsByNamesAction,
@@ -411,15 +419,42 @@ class SessionHandler:
         *,
         auth: AuthProcessors,
         session: SessionProcessors,
+        group: GroupProcessors,
+        user: UserProcessors,
         agent: AgentProcessors,
         vfolder: VFolderProcessors,
         config_provider: ManagerConfigProvider,
     ) -> None:
         self._auth = auth
         self._session = session
+        self._group = group
+        self._user = user
         self._agent = agent
         self._vfolder = vfolder
         self._config_provider = config_provider
+
+    async def _resolve_project_id(self, domain_name: str, group_name: str) -> ProjectID:
+        """Resolve the project a session is created in, at the API boundary."""
+        result = await self._group.lookup.run(
+            LookupProjectAction(domain_name=DomainName(domain_name), project_name=group_name)
+        )
+        return result.data.entity_id()
+
+    async def _resolve_session_id(
+        self, owner_access_key: AccessKey, session_name: str
+    ) -> SessionID:
+        """Resolve the session a request names, at the API boundary.
+
+        Keyed by the owner rather than the requester: a delegated call names a
+        session under the access key it acts for.
+        """
+        owner = await self._user.lookup_keypair_owner.run(
+            LookupKeypairOwnerByAccessKeyAction(access_key=owner_access_key)
+        )
+        result = await self._session.lookup.run(
+            LookupSessionAction(user_uuid=owner.entity_id(), name=session_name)
+        )
+        return result.data.entity_id()
 
     def _require_user_id(self) -> UUID:
         """Return the authenticated user's id from the request context.
@@ -561,8 +596,9 @@ class SessionHandler:
         # (equivalent to the old Trafaret ``undefined`` sentinel).
         _set = params.model_fields_set
 
-        result = await self._session.create_from_template.wait_for_complete(
+        result = await self._session.create_from_template.run(
             CreateFromTemplateAction(
+                project_id=await self._resolve_project_id(domain_name, str(params.group)),
                 params=CreateFromTemplateActionParams(
                     template_id=params.template_id or UUID(int=0),
                     session_name=(
@@ -671,8 +707,9 @@ class SessionHandler:
         )
         architecture = params.architecture or DEFAULT_IMAGE_ARCH
 
-        result = await self._session.create_from_params.wait_for_complete(
+        result = await self._session.create_from_params.run(
             CreateFromParamsAction(
+                project_id=await self._resolve_project_id(domain_name, params.group),
                 params=CreateFromParamsActionParams(
                     session_name=params.session_name,
                     image=params.image,
@@ -740,8 +777,9 @@ class SessionHandler:
             params.session_name,
         )
 
-        result = await self._session.create_cluster.wait_for_complete(
+        result = await self._session.create_cluster.run(
             CreateClusterAction(
+                project_id=await self._resolve_project_id(domain_name, params.group),
                 session_name=params.session_name,
                 user_id=request["user"]["uuid"],
                 user_role=request["user"]["role"],
@@ -790,11 +828,11 @@ class SessionHandler:
             owner_access_key,
             params.id,
         )
-        result = await self._session.match_sessions.wait_for_complete(
+        result = await self._session.match_sessions.run(
             MatchSessionsAction(
                 id_or_name_prefix=params.id,
                 owner_access_key=owner_access_key,
-                user_id=user.user_id,
+                user_id=UserID(user.user_id),
             )
         )
         return APIResponse.build(HTTPStatus.OK, MatchSessionsResponse(matches=result.result))
@@ -874,8 +912,9 @@ class SessionHandler:
             session_name,
         )
         try:
-            result = await self._session.get_session_info.wait_for_complete(
+            result = await self._session.get_session_info.run(
                 GetSessionInfoAction(
+                    session_id=await self._resolve_session_id(owner_access_key, session_name),
                     session_name=session_name,
                     owner_access_key=owner_access_key,
                 )
@@ -946,8 +985,9 @@ class SessionHandler:
             params.recursive,
         )
 
-        result = await self._session.destroy_session.wait_for_complete(
+        result = await self._session.destroy_session.run(
             DestroySessionAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
                 session_name=session_name,
                 owner_access_key=owner_access_key,
                 user_role=user_role,
@@ -985,8 +1025,9 @@ class SessionHandler:
             session_name,
         )
 
-        result = await self._session.execute_session.wait_for_complete(
+        result = await self._session.execute_session.run(
             ExecuteSessionAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
                 session_name=session_name,
                 owner_access_key=owner_access_key,
                 api_version=request["api_version"],
@@ -1023,8 +1064,9 @@ class SessionHandler:
             session_name,
         )
         try:
-            await self._session.interrupt.wait_for_complete(
+            await self._session.interrupt.run(
                 InterruptSessionAction(
+                    session_id=await self._resolve_session_id(owner_access_key, session_name),
                     session_name=session_name,
                     owner_access_key=owner_access_key,
                 )
@@ -1062,8 +1104,9 @@ class SessionHandler:
             session_name,
         )
 
-        action_result = await self._session.complete.wait_for_complete(
+        action_result = await self._session.complete.run(
             CompleteAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
                 session_name=session_name,
                 owner_access_key=owner_access_key,
                 code=params.code or "",
@@ -1091,12 +1134,12 @@ class SessionHandler:
         if myself is None:
             raise NoCurrentTaskContext("No current task context")
         user_id = self._require_user_id()
-        resolved = await self._session.resolve_session.wait_for_complete(
-            ResolveSessionAction(session_name=session_name, user_id=user_id)
+        resolved = await self._session.lookup.run(
+            LookupSessionAction(user_uuid=user_id, name=session_name)
         )
-        result = await self._session.start_service.wait_for_complete(
+        result = await self._session.start_service.run(
             StartServiceAction(
-                session_id=SessionID(resolved.session_id),
+                session_id=resolved.data.entity_id(),
                 service=params.app,
                 login_session_token=params.login_session_token,
                 port=params.port,
@@ -1137,8 +1180,9 @@ class SessionHandler:
             session_name,
         )
         try:
-            await self._session.shutdown_service.wait_for_complete(
+            await self._session.shutdown_service.run(
                 ShutdownServiceAction(
+                    session_id=await self._resolve_session_id(owner_access_key, session_name),
                     session_name=session_name,
                     owner_access_key=owner_access_key,
                     service_name=params.service_name,
@@ -1173,8 +1217,9 @@ class SessionHandler:
             session_name,
         )
         try:
-            await self._session.upload_files.wait_for_complete(
+            await self._session.upload_files.run(
                 UploadFilesAction(
+                    session_id=await self._resolve_session_id(owner_access_key, session_name),
                     session_name=session_name,
                     owner_access_key=owner_access_key,
                     reader=reader,
@@ -1213,8 +1258,9 @@ class SessionHandler:
             session_name,
             params.files[0],
         )
-        result = await self._session.download_files.wait_for_complete(
+        result = await self._session.download_files.run(
             DownloadFilesAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
                 user_id=request["user"]["uuid"],
                 owner_access_key=owner_access_key,
                 session_name=session_name,
@@ -1251,8 +1297,9 @@ class SessionHandler:
             session_name,
             params.file,
         )
-        result = await self._session.download_file.wait_for_complete(
+        result = await self._session.download_file.run(
             DownloadFileAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
                 user_id=request["user"]["uuid"],
                 session_name=session_name,
                 owner_access_key=owner_access_key,
@@ -1289,8 +1336,9 @@ class SessionHandler:
             session_name,
             params.path,
         )
-        result = await self._session.list_files.wait_for_complete(
+        result = await self._session.list_files.run(
             ListFilesAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
                 user_id=request["user"]["uuid"],
                 path=params.path,
                 session_name=session_name,
@@ -1328,8 +1376,9 @@ class SessionHandler:
             session_name,
             new_name,
         )
-        await self._session.rename_session.wait_for_complete(
+        await self._session.rename_session.run(
             RenameSessionAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
                 session_name=session_name,
                 new_name=new_name,
                 owner_access_key=owner_access_key,
@@ -1364,8 +1413,9 @@ class SessionHandler:
             owner_access_key,
             session_name,
         )
-        action_result = await self._session.commit_session.wait_for_complete(
+        action_result = await self._session.commit_session.run(
             CommitSessionAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
                 session_name=session_name,
                 owner_access_key=owner_access_key,
                 filename=params.filename,
@@ -1403,8 +1453,9 @@ class SessionHandler:
             owner_access_key,
             session_name,
         )
-        result = await self._session.convert_session_to_image.wait_for_complete(
+        result = await self._session.convert_session_to_image.run(
             ConvertSessionToImageAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
                 session_name=session_name,
                 owner_access_key=owner_access_key,
                 image_name=params.image_name,
@@ -1450,8 +1501,9 @@ class SessionHandler:
             owner_access_key,
             session_name,
         )
-        result = await self._session.get_commit_status.wait_for_complete(
+        result = await self._session.get_commit_status.run(
             GetCommitStatusAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
                 session_name=session_name,
                 owner_access_key=owner_access_key,
             )
@@ -1487,8 +1539,9 @@ class SessionHandler:
             owner_access_key,
             session_name,
         )
-        result = await self._session.get_abusing_report.wait_for_complete(
+        result = await self._session.get_abusing_report.run(
             GetAbusingReportAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
                 session_name=session_name,
                 owner_access_key=owner_access_key,
             )
@@ -1527,8 +1580,9 @@ class SessionHandler:
             owner_access_key,
             session_name,
         )
-        result = await self._session.get_status_history.wait_for_complete(
+        result = await self._session.get_status_history.run(
             GetStatusHistoryAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
                 session_name=session_name,
                 owner_access_key=request["keypair"]["access_key"],
             )
@@ -1554,8 +1608,9 @@ class SessionHandler:
             )
         )
         owner_access_key = scope.owner_access_key
-        result = await self._session.get_direct_access_info.wait_for_complete(
+        result = await self._session.get_direct_access_info.run(
             GetDirectAccessInfoAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
                 session_name=session_name,
                 owner_access_key=owner_access_key,
             )
@@ -1595,8 +1650,9 @@ class SessionHandler:
             kernel_id,
         )
         try:
-            result = await self._session.get_container_logs.wait_for_complete(
+            result = await self._session.get_container_logs.run(
                 GetContainerLogsAction(
+                    session_id=await self._resolve_session_id(owner_access_key, session_name),
                     session_name=session_name,
                     owner_access_key=owner_access_key,
                     kernel_id=kernel_id,
@@ -1670,8 +1726,9 @@ class SessionHandler:
             owner_access_key,
             root_session_name,
         )
-        result = await self._session.get_dependency_graph.wait_for_complete(
+        result = await self._session.get_dependency_graph.run(
             GetDependencyGraphAction(
+                session_id=await self._resolve_session_id(owner_access_key, root_session_name),
                 root_session_name=root_session_name,
                 owner_access_key=owner_access_key,
             )
