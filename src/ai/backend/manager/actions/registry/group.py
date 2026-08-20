@@ -40,7 +40,7 @@ from ai.backend.manager.actions.v2.bulk.processor import (
     BulkActionProcessor,
     PartialEntityResultJudge,
 )
-from ai.backend.manager.actions.v2.bulk.result import BaseBulkActionResult
+from ai.backend.manager.actions.v2.bulk.result import BasePartialBulkActionResult
 from ai.backend.manager.actions.v2.bulk.validator import BulkActionValidator
 from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.field.bulk_processor import (
@@ -280,7 +280,7 @@ class ProcessorGroup[TData: EntityData]:
             validators=(),
         )
 
-    def bulk[TAction: BaseBulkAction, TResult: BaseBulkActionResult](
+    def bulk[TAction: BaseBulkAction, TResult: BasePartialBulkActionResult](
         self,
         action_cls: type[TAction],
         func: Callable[[TAction], Awaitable[TResult]],

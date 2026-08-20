@@ -11,7 +11,7 @@ from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.result import (
-    BaseBulkActionResult,
+    BasePartialBulkActionResult,
     BulkActionProcessResult,
     BulkActionResultMeta,
     BulkEntityResult,
@@ -34,7 +34,7 @@ class EntityResultJudge[TResult](ABC):
         raise NotImplementedError
 
 
-class PartialEntityResultJudge[TResult: BaseBulkActionResult](EntityResultJudge[TResult]):
+class PartialEntityResultJudge[TResult: BasePartialBulkActionResult](EntityResultJudge[TResult]):
     """Some entities may go through while others fail, so the result says which."""
 
     @override

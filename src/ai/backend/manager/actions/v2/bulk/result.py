@@ -10,7 +10,7 @@ from ai.backend.manager.actions.types import OperationStatus
 
 __all__ = (
     "BulkEntityResult",
-    "BaseBulkActionResult",
+    "BasePartialBulkActionResult",
     "BulkActionResultMeta",
     "BulkActionProcessResult",
 )
@@ -26,7 +26,13 @@ class BulkEntityResult:
     error_code: ErrorCode | None
 
 
-class BaseBulkActionResult(ABC):
+class BasePartialBulkActionResult(ABC):
+    """The result of a run whose entities may not share one fate.
+
+    Only such a run has anything to report per entity; one that stands or falls as a
+    whole is judged by whether it raised, so it needs no result of this kind.
+    """
+
     @abstractmethod
     def entity_results(self) -> Sequence[BulkEntityResult]:
         """Return one result per entity in ``action.entity_ids()``.

@@ -24,7 +24,7 @@ from ai.backend.manager.actions.v2.bulk.processor import (
     PartialEntityResultJudge,
 )
 from ai.backend.manager.actions.v2.bulk.result import (
-    BaseBulkActionResult,
+    BasePartialBulkActionResult,
     BulkActionProcessResult,
     BulkEntityResult,
 )
@@ -65,7 +65,7 @@ class _Action(BaseBulkAction):
 
 
 @dataclass
-class _Result(BaseBulkActionResult):
+class _Result(BasePartialBulkActionResult):
     results: list[BulkEntityResult]
 
     @override
