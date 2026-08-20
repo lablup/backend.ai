@@ -105,7 +105,7 @@ async def test_denied_validation_reaches_monitors_as_denied() -> None:
     assert monitor.prepared == 1
     meta = monitor.done_results[0].meta
     assert meta.status is OperationStatus.DENIED
-    assert monitor.done_metas[0].entity.entity_id == _ENTITY_ID
+    assert monitor.done_metas[0].entity == _ENTITY_ID
 
 
 async def test_non_authorization_validation_failure_is_an_error_not_a_denial() -> None:

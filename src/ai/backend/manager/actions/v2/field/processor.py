@@ -79,7 +79,7 @@ class SingleFieldActionProcessor[TAction: BaseSingleFieldAction[Any, Any], TResu
         trigger_meta = SingleEntityActionTriggerMeta(
             action_id=uuid.uuid4(),
             started_at=started_at,
-            entity=lookup_result.owner_entity_id.entity_ref(),
+            entity=lookup_result.owner_entity_id,
             operation_type=action.operation_type(),
             action_name=action.action_name(),
         )

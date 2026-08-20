@@ -73,7 +73,7 @@ class SingleEntityActionProcessor[TAction: BaseSingleEntityAction, TResult]:
         trigger_meta = SingleEntityActionTriggerMeta(
             action_id=action_id,
             started_at=started_at,
-            entity=action.entity_id().entity_ref(),
+            entity=action.entity_id(),
             operation_type=action.operation_type(),
             action_name=action.action_name(),
         )

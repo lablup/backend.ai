@@ -757,7 +757,7 @@ class TestVirtualScopeSingleEntityActionRBACValidator:
                 SingleEntityActionTriggerMeta(
                     action_id=trigger_meta.action_id,
                     started_at=trigger_meta.started_at,
-                    entity=single_entity_action.entity_id().entity_ref(),
+                    entity=single_entity_action.entity_id(),
                     operation_type=single_entity_action.operation_type(),
                     action_name=single_entity_action.action_name(),
                 )
@@ -776,7 +776,7 @@ class TestVirtualScopeSingleEntityActionRBACValidator:
                     SingleEntityActionTriggerMeta(
                         action_id=trigger_meta.action_id,
                         started_at=trigger_meta.started_at,
-                        entity=single_entity_action.entity_id().entity_ref(),
+                        entity=single_entity_action.entity_id(),
                         operation_type=single_entity_action.operation_type(),
                         action_name=single_entity_action.action_name(),
                     )
@@ -795,7 +795,7 @@ class TestVirtualScopeSingleEntityActionRBACValidator:
                     SingleEntityActionTriggerMeta(
                         action_id=trigger_meta.action_id,
                         started_at=trigger_meta.started_at,
-                        entity=single_entity_action.entity_id().entity_ref(),
+                        entity=single_entity_action.entity_id(),
                         operation_type=single_entity_action.operation_type(),
                         action_name=single_entity_action.action_name(),
                     )
@@ -823,7 +823,7 @@ class TestUpsertRequiresBothCreateAndUpdate:
                     SingleEntityActionTriggerMeta(
                         action_id=trigger_meta.action_id,
                         started_at=trigger_meta.started_at,
-                        entity=upsert_action.entity_id().entity_ref(),
+                        entity=upsert_action.entity_id(),
                         operation_type=upsert_action.operation_type(),
                         action_name=upsert_action.action_name(),
                     )
@@ -842,7 +842,7 @@ class TestUpsertRequiresBothCreateAndUpdate:
                     SingleEntityActionTriggerMeta(
                         action_id=trigger_meta.action_id,
                         started_at=trigger_meta.started_at,
-                        entity=upsert_action.entity_id().entity_ref(),
+                        entity=upsert_action.entity_id(),
                         operation_type=upsert_action.operation_type(),
                         action_name=upsert_action.action_name(),
                     )
@@ -860,7 +860,7 @@ class TestUpsertRequiresBothCreateAndUpdate:
                 SingleEntityActionTriggerMeta(
                     action_id=trigger_meta.action_id,
                     started_at=trigger_meta.started_at,
-                    entity=upsert_action.entity_id().entity_ref(),
+                    entity=upsert_action.entity_id(),
                     operation_type=upsert_action.operation_type(),
                     action_name=upsert_action.action_name(),
                 )
@@ -879,7 +879,7 @@ class TestUpsertRequiresBothCreateAndUpdate:
                 SingleEntityActionTriggerMeta(
                     action_id=trigger_meta.action_id,
                     started_at=trigger_meta.started_at,
-                    entity=single_entity_action.entity_id().entity_ref(),
+                    entity=single_entity_action.entity_id(),
                     operation_type=single_entity_action.operation_type(),
                     action_name=single_entity_action.action_name(),
                 )

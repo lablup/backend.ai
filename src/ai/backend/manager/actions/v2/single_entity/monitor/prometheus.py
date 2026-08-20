@@ -29,7 +29,7 @@ class SingleEntityActionPrometheusMonitor(SingleEntityActionMonitor):
         self, meta: SingleEntityActionTriggerMeta, result: SingleEntityActionProcessResult
     ) -> None:
         self._observer.observe_action(
-            entity_type=meta.entity.entity_type,
+            entity_type=meta.entity.entity_type(),
             operation_type=meta.operation_type,
             status=result.meta.status,
             duration=result.meta.duration.total_seconds(),

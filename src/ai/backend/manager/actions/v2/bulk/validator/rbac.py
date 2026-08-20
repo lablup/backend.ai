@@ -1,7 +1,6 @@
 from typing import override
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.entity.types import EntityRef
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
@@ -46,10 +45,7 @@ class VirtualScopeBulkActionRBACValidator(BulkActionValidator):
         keys = [
             EntityPermissionCheckKey(
                 user_id=UserID(user.user_id),
-                entity=EntityRef(
-                    entity_type=meta.entity_type,
-                    entity_id=entity_id,
-                ),
+                entity=entity_id,
             )
             for entity_id in meta.entity_ids
         ]
@@ -57,7 +53,7 @@ class VirtualScopeBulkActionRBACValidator(BulkActionValidator):
         permission_map = await self._repository.check_bulk_permission_via_virtual_scope(
             keys, permission
         )
-        denied = [key.entity.entity_id for key in keys if not permission_map.get(key, False)]
+        denied = [key.entity for key in keys if not permission_map.get(key, False)]
         if denied:
             raise NotEnoughPermission(
                 f"User {user.user_id} lacks permission {permission!r} "

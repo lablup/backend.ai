@@ -51,5 +51,5 @@ class VirtualScopeSingleEntityActionRBACValidator(SingleEntityActionValidator):
         if not allowed:
             raise NotEnoughPermission(
                 f"User {user.user_id} lacks permission {permission!r} "
-                f"on {meta.entity.entity_type} {meta.entity.entity_id}"
+                f"on {meta.entity.entity_type()} {meta.entity}"
             )

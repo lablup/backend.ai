@@ -80,7 +80,7 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
         meta = SingleEntityActionTriggerMeta(
             action_id=action_id,
             started_at=started_at,
-            entity=entity_id.entity_ref(),
+            entity=entity_id,
             operation_type=action.operation_type(),
             action_name=action.action_name(),
         )

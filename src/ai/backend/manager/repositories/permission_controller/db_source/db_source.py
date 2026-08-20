@@ -1262,8 +1262,8 @@ class PermissionDBSource:
             groups[
                 _VirtualScopePermissionGroupKey(
                     user_id=key.user_id,
-                    entity_type=key.entity.entity_type,
-                    subject_entity_type=key.entity.entity_type,
+                    entity_type=key.entity.entity_type(),
+                    subject_entity_type=key.entity.entity_type(),
                 )
             ].append(key)
 
@@ -1273,10 +1273,10 @@ class PermissionDBSource:
                 granted = await self._resolve_permissions_for_virtual_scope_group(
                     db_session=db_session,
                     group_key=group_key,
-                    entity_ids=[k.entity.entity_id for k in members],
+                    entity_ids=[k.entity for k in members],
                 )
                 for key in members:
-                    result[key] = granted.get(key.entity.entity_id, Permission.NONE)
+                    result[key] = granted.get(key.entity, Permission.NONE)
         return result
 
     async def _resolve_effective_scope_permissions_via_virtual_scope(

@@ -20,6 +20,9 @@ from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.types import EntityID, EntityRef, EntityType, ScopeType
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
@@ -359,7 +362,7 @@ class TestCheckPermissionViaVirtualScope:
     ) -> None:
         key = EntityPermissionCheckKey(
             user_id=chain.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
+            entity=VFolderUUID(chain.entity_id),
         )
         result = await db_source.check_single_entity_permission_via_virtual_scope(key, permission)
         assert result is expected
@@ -392,7 +395,7 @@ class TestCheckPermissionViaVirtualScope:
     ) -> None:
         key = EntityPermissionCheckKey(
             user_id=chain.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
+            entity=VFolderUUID(chain.entity_id),
         )
         resolved = await db_source.resolve_effective_permissions_via_virtual_scope([key])
         assert resolved[key] == expected
@@ -409,11 +412,11 @@ class TestCheckPermissionViaVirtualScope:
     ) -> None:
         reachable = EntityPermissionCheckKey(
             user_id=chain.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
+            entity=VFolderUUID(chain.entity_id),
         )
         unreachable = EntityPermissionCheckKey(
             user_id=chain.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=uuid.uuid4()),
+            entity=VFolderUUID(uuid.uuid4()),
         )
         result = await db_source.check_bulk_permission_via_virtual_scope(
             [reachable, unreachable], Permission.READ
@@ -437,7 +440,7 @@ class TestCheckPermissionViaVirtualScope:
     ) -> None:
         reachable = EntityPermissionCheckKey(
             user_id=chain.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
+            entity=VFolderUUID(chain.entity_id),
         )
         result = await db_source.check_bulk_permission_via_virtual_scope(
             [reachable], Permission.CREATE | Permission.UPDATE
@@ -456,7 +459,7 @@ class TestCheckPermissionViaVirtualScope:
     ) -> None:
         key = EntityPermissionCheckKey(
             user_id=UserID(uuid.uuid4()),
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
+            entity=VFolderUUID(chain.entity_id),
         )
         result = await db_source.check_single_entity_permission_via_virtual_scope(
             key, Permission.READ
@@ -612,7 +615,7 @@ class TestScopeMemberEnrollmentCascade:
 
         key = EntityPermissionCheckKey(
             user_id=ids.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=ids.entity_id),
+            entity=VFolderUUID(ids.entity_id),
         )
         result = await db_source.check_single_entity_permission_via_virtual_scope(
             key, Permission.READ
@@ -644,7 +647,7 @@ class TestScopeMemberEnrollmentCascade:
 
         key = EntityPermissionCheckKey(
             user_id=ids.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=ids.entity_id),
+            entity=VFolderUUID(ids.entity_id),
         )
         result = await db_source.check_single_entity_permission_via_virtual_scope(
             key, Permission.READ
