@@ -3,14 +3,14 @@ name: action-framework-design
 type: design-rationale
 description: v2 action shapes and derived permissions, why a field row's operations are answered for by its owning entity, why a bulk field answers per row but records per entity, audit recording principles (writes always, reads on subscription, failures always, DENIED), lookup existence-leak handling, public read gate, ops-backed backing axis
 scope: src/ai/backend/manager/actions
-keywords: [BaseSingleEntityAction, BaseScopeAction, BaseGlobalAction, BaseLookupAction, BaseBulkLookupAction, BaseSingleFieldAction, BaseBulkFieldAction, FieldOwnerLookup, PublicActionProcessor, anonymous_scope, AuditLogPolicy, ProcessorRegistry, wired_actions, RESTORE, soft-delete]
+keywords: [BaseSingleEntityAction, BaseScopeAction, BaseGlobalAction, BaseLookupAction, BaseBulkLookupAction, BaseSingleFieldAction, BaseBulkFieldAction, FieldOwnerLookup, PublicActionProcessor, AnonymousGlobalActionProcessor, anonymous_scope, anonymous_global, AuditLogPolicy, ProcessorRegistry, wired_actions, RESTORE, soft-delete]
 sources:
   - src/ai/backend/manager/actions/v2
   - src/ai/backend/manager/actions/registry
   - src/ai/backend/manager/actions/audit_policy.py
 generated:
   by: claude-code/opus-5
-  at: 2026-08-18
+  at: 2026-08-21
 status: stable
 ---
 
@@ -122,6 +122,7 @@ which is why handlers call processors, not services.
 - `PublicActionProcessor` replaces the SUPERADMIN gate with an authentication check and does nothing else.
 - It is the only processor constructed together with the action class, so it rejects write operations at wiring time, not at request time.
 - A read that runs before anyone has signed in therefore has no processor of its own: `ScopeActionProcessor` pins no gate, so `ProcessorGroup.anonymous_scope` wires one without adding a class. It takes read operations only, checked at wiring time.
+- A write that no principal can ever reach — an external system posting to a webhook, authenticated by a secret the entity stores — has nowhere else to go, so `AnonymousGlobalActionProcessor` runs it with no validator at all. Recording the wiring as an anonymous gate is what keeps that set countable.
 
 ## The registry is the catalog
 

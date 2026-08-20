@@ -56,6 +56,7 @@ from ai.backend.manager.actions.v2.field.processor import (
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.global_scope.monitor import GlobalActionMonitor
 from ai.backend.manager.actions.v2.global_scope.processor import (
+    AnonymousGlobalActionProcessor,
     GlobalActionProcessor,
     PublicActionProcessor,
 )
@@ -315,6 +316,30 @@ class ProcessorGroup[TData: EntityData]:
             func,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=list(validators),
+        )
+
+    def anonymous_global[TAction: BaseGlobalAction, TResult](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[TResult]],
+        *,
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> AnonymousGlobalActionProcessor[TAction, TResult]:
+        """Global state reached with no gate at all, writes included.
+
+        Discouraged: every other factory is a better answer. This one exists for the
+        caller that can never hold a principal -- an external system posting to a
+        webhook -- where the operation checks that caller itself against a secret the
+        entity stores. Nothing here verifies that it does, so read the service before
+        wiring one.
+
+        The catalog records the wiring as an anonymous gate, which is how the ungated
+        writes stay countable.
+        """
+        self._record(action_cls, ActionKind.GLOBAL, ActionGate.ANONYMOUS, ActionBacking.SERVICE)
+        return AnonymousGlobalActionProcessor(
+            func,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
         )
 
     def global_scope[TAction: BaseGlobalAction, TResult](

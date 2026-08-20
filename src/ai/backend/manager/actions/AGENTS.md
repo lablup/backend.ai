@@ -97,6 +97,14 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 - `global` extends `scope` to the whole installation and runs behind the SUPERADMIN
   gate. Global reads open to all authenticated users are wired via the `public_*`
   factories — read operations only; the constructor rejects writes.
+- `anonymous_global` takes no gate at all and accepts writes. Wire through any other
+  factory that fits. It is available only when both hold — the caller is an external
+  system that can never hold a principal, and the service checks that caller itself
+  against a secret the entity stores. The factory verifies neither, so read the
+  service before wiring one.
+- A gated action wired to a REST route with no auth middleware fails at request time
+  with no context to check. Decide the route's middleware and the action's gate
+  together.
 - `lookup` and `bulk_lookup` check authentication first and the permission on whatever
   the key resolved to after. The check splits in two because the entity a key names is
   not known until the run produces it. The second half takes the `single_entity` and

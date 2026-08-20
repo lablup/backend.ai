@@ -54,6 +54,11 @@ class GroupConfigHandler:
         self._group = group
 
     async def _resolve(self, group: UUID | str, domain: str | None, ctx: UserContext) -> ProjectID:
+        if isinstance(group, str):
+            try:
+                group = UUID(group)
+            except ValueError:
+                pass
         if isinstance(group, UUID):
             return ProjectID(group)
         result = await self._group.lookup.run(

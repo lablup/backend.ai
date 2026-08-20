@@ -1,5 +1,8 @@
 from ai.backend.manager.actions.registry.group import ProcessorGroup
-from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    AnonymousGlobalActionProcessor,
+    GlobalActionProcessor,
+)
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.services.container_registry.actions.clear_images import (
     ClearImagesAction,
@@ -84,7 +87,7 @@ class ContainerRegistryProcessors:
     search_container_registries: GlobalActionProcessor[
         SearchContainerRegistriesAction, SearchContainerRegistriesActionResult
     ]
-    handle_harbor_webhook: GlobalActionProcessor[
+    handle_harbor_webhook: AnonymousGlobalActionProcessor[
         HandleHarborWebhookAction, HandleHarborWebhookActionResult
     ]
     create_registry_quota: GlobalActionProcessor[
@@ -126,7 +129,8 @@ class ContainerRegistryProcessors:
         self.search_container_registries = group.global_scope(
             SearchContainerRegistriesAction, service.search_container_registries
         )
-        self.handle_harbor_webhook = group.global_scope(
+        # Harbor holds no keypair; the service checks its webhook secret instead.
+        self.handle_harbor_webhook = group.anonymous_global(
             HandleHarborWebhookAction, service.handle_harbor_webhook
         )
         self.create_registry_quota = group.global_scope(
