@@ -60993,8 +60993,13 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "parameters": [],
-        "description": ""
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "put": {
         "operationId": "manager.update_manager_status",
@@ -61035,8 +61040,13 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "parameters": [],
-        "description": ""
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "post": {
         "operationId": "manager.update_announcement",
@@ -61077,8 +61087,13 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "parameters": [],
-        "description": ""
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/manager/scheduler/operation": {
