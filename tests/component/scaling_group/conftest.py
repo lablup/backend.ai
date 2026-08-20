@@ -4,7 +4,8 @@ from typing import Any
 
 import pytest
 
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.scaling_group.handler import ScalingGroupHandler
 from ai.backend.manager.api.rest.scaling_group.registry import register_scaling_group_routes
@@ -21,7 +22,9 @@ def scaling_group_processors(
 ) -> ScalingGroupProcessors:
     repo = ScalingGroupRepository(database_engine)
     service = ScalingGroupService(repo)
-    return ScalingGroupProcessors(processor_registry.group(), service)
+    return ScalingGroupProcessors(
+        processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()

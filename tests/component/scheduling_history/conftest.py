@@ -21,11 +21,11 @@ from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedu
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import KernelId, ResourceSlot
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.adapters.scheduling_history.adapter import SchedulingHistoryAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
@@ -74,7 +74,9 @@ def scheduling_history_processors(
 ) -> SchedulingHistoryProcessors:
     repo = SchedulingHistoryRepository(database_engine)
     service = SchedulingHistoryService(repo)
-    return SchedulingHistoryProcessors(processor_registry.group(), service)
+    return SchedulingHistoryProcessors(
+        processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()

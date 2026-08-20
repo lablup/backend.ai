@@ -8,10 +8,13 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.data.entity.error_log import ERROR_LOG_FIELD_TYPE
+from ai.backend.common.data.entity.manager_admin import MANAGER_ADMIN_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair, ResourceSlot
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry import FieldGroupMeta, GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.rest.error_log.handler import ErrorLogHandler
 from ai.backend.manager.api.rest.error_log.registry import register_error_log_routes
 from ai.backend.manager.api.rest.manager.handler import ManagerHandler
@@ -20,11 +23,16 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.manager_admin.repository import ManagerAdminRepository
+from ai.backend.manager.services.error_log.actions.lookup_owner import (
+    LookupBulkErrorLogOwnerAction,
+    LookupErrorLogOwnerAction,
+)
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
 from ai.backend.manager.services.manager_admin.service import ManagerAdminService
@@ -33,7 +41,14 @@ from ai.backend.testutils.processors import ops_processor_group
 
 @pytest.fixture()
 def error_log_processors(database_engine: ExtendedAsyncSAEngine) -> ErrorLogProcessors:
-    return ErrorLogProcessors(group=ops_processor_group(database_engine))
+    return ErrorLogProcessors(
+        ops_processor_group(database_engine, GroupMeta(USER_ENTITY_TYPE)).field_group(
+            FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
+            ErrorLogData,
+            LookupErrorLogOwnerAction,
+            LookupBulkErrorLogOwnerAction,
+        )
+    )
 
 
 @pytest.fixture()
@@ -69,7 +84,9 @@ def manager_admin_processors(
         db=database_engine,
         valkey_stat=valkey_clients.stat,
     )
-    return ManagerAdminProcessors(processor_registry.group(), service)
+    return ManagerAdminProcessors(
+        processor_registry.group(GroupMeta(MANAGER_ADMIN_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()

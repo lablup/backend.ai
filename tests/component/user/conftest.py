@@ -15,13 +15,16 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
     CreateUserResponse,
     PurgeUserRequest,
     UserStatus,
 )
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry import FieldGroupMeta, GroupMeta, ProcessorRegistry
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
@@ -35,6 +38,7 @@ from ai.backend.manager.api.rest.v2.user.handler import V2UserHandler
 from ai.backend.manager.api.rest.v2.user.registry import register_v2_user_routes
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.user import users
@@ -46,6 +50,10 @@ from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
+    LookupBulkKeypairOwnerAction,
+    LookupKeypairOwnerAction,
+)
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -81,7 +89,16 @@ def user_processors(
         user_repository=user_repository,
         scheduling_controller=AsyncMock(),
     )
-    return UserProcessors(processor_registry.group(), service)
+    return UserProcessors(
+        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
+            FieldGroupMeta(KEYPAIR_FIELD_TYPE),
+            KeyPairData,
+            LookupKeypairOwnerAction,
+            LookupBulkKeypairOwnerAction,
+        ),
+        service,
+    )
 
 
 @pytest.fixture()
@@ -92,7 +109,7 @@ def domain_processors(
     service = DomainService(
         repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
     )
-    return DomainProcessors(processor_registry.group(), service, [])
+    return DomainProcessors(processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), service, [])
 
 
 @pytest.fixture()

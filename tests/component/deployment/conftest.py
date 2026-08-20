@@ -11,13 +11,14 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.api.rest.deployment.handler import DeploymentAPIHandler
 from ai.backend.manager.api.rest.deployment.registry import register_deployment_routes
@@ -145,7 +146,9 @@ def deployment_processors(
         repo,
         appproxy_client_pool=mock_appproxy_client_pool,
     )
-    return DeploymentProcessors(processor_registry.group(), service)
+    return DeploymentProcessors(
+        processor_registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()

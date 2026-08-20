@@ -9,7 +9,9 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.storage_namespace import STORAGE_NAMESPACE_ENTITY_TYPE
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.object_storage.handler import ObjectStorageHandler
 from ai.backend.manager.api.rest.object_storage.registry import register_object_storage_routes
@@ -56,14 +58,18 @@ def object_storage_processors(
         storage_manager=storage_manager,
         config_provider=config_provider,
     )
-    return ObjectStorageProcessors(processor_registry.group(), service)
+    return ObjectStorageProcessors(
+        processor_registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()
 def storage_namespace_processors(
     database_engine: ExtendedAsyncSAEngine,
 ) -> StorageNamespaceProcessors:
-    return StorageNamespaceProcessors(group=ops_processor_group(database_engine))
+    return StorageNamespaceProcessors(
+        group=ops_processor_group(database_engine, GroupMeta(STORAGE_NAMESPACE_ENTITY_TYPE))
+    )
 
 
 @pytest.fixture()

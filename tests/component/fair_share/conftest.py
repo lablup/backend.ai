@@ -9,13 +9,24 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.fair_share import DOMAIN_FAIR_SHARE_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE, ResourceGroupID
+from ai.backend.common.data.entity.usage_bucket import (
+    DOMAIN_USAGE_BUCKET_ENTITY_TYPE,
+    PROJECT_USAGE_BUCKET_ENTITY_TYPE,
+    USER_USAGE_BUCKET_ENTITY_TYPE,
+)
 from ai.backend.common.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry, SidecarGroupMeta
 from ai.backend.manager.api.rest.fair_share.handler import FairShareAPIHandler
 from ai.backend.manager.api.rest.fair_share.registry import register_fair_share_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.data.resource_usage_history.types import (
+    DomainUsageBucketData,
+    ProjectUsageBucketData,
+    UserUsageBucketData,
+)
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.scaling_group import sgroups_for_groups
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -38,14 +49,26 @@ def fair_share_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> FairShareProcessors:
     service = FairShareService(FairShareRepository(database_engine))
-    return FairShareProcessors(processor_registry.group(), service)
+    return FairShareProcessors(
+        processor_registry.group(GroupMeta(DOMAIN_FAIR_SHARE_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()
 def resource_usage_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ResourceUsageProcessors:
-    return ResourceUsageProcessors(processor_registry.group())
+    return ResourceUsageProcessors(
+        processor_registry.sidecar_group(
+            SidecarGroupMeta(DOMAIN_USAGE_BUCKET_ENTITY_TYPE), DomainUsageBucketData
+        ),
+        processor_registry.sidecar_group(
+            SidecarGroupMeta(PROJECT_USAGE_BUCKET_ENTITY_TYPE), ProjectUsageBucketData
+        ),
+        processor_registry.sidecar_group(
+            SidecarGroupMeta(USER_USAGE_BUCKET_ENTITY_TYPE), UserUsageBucketData
+        ),
+    )
 
 
 @pytest.fixture()
@@ -54,7 +77,9 @@ def scaling_group_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ScalingGroupProcessors:
     service = ScalingGroupService(ScalingGroupRepository(database_engine))
-    return ScalingGroupProcessors(processor_registry.group(), service)
+    return ScalingGroupProcessors(
+        processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()

@@ -19,8 +19,70 @@ import re
 from typing import Any
 from unittest.mock import MagicMock
 
+from ai.backend.common.data.entity.app_config import (
+    APP_CONFIG_ALLOW_LIST_ENTITY_TYPE,
+    APP_CONFIG_ENTITY_TYPE,
+    APP_CONFIG_FRAGMENT_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.app_config_definition import APP_CONFIG_DEFINITION_ENTITY_TYPE
+from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE
+from ai.backend.common.data.entity.artifact_registry import ARTIFACT_REGISTRY_ENTITY_TYPE
+from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_ENTITY_TYPE
+from ai.backend.common.data.entity.audit_log import AUDIT_LOG_ENTITY_TYPE
+from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
+from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
+from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.error_log import ERROR_LOG_FIELD_TYPE
+from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
+from ai.backend.common.data.entity.fair_share import DOMAIN_FAIR_SHARE_ENTITY_TYPE
+from ai.backend.common.data.entity.image import IMAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
+from ai.backend.common.data.entity.login_client_type import LOGIN_CLIENT_TYPE_ENTITY_TYPE
+from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
+from ai.backend.common.data.entity.notification import (
+    NOTIFICATION_CHANNEL_ENTITY_TYPE,
+    NOTIFICATION_RULE_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.preset_resource_slot import (
+    DEPLOYMENT_PRESET_RESOURCE_SLOT_FIELD_TYPE,
+)
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.prometheus_query_preset import (
+    PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_policy import (
+    KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
+    PROJECT_RESOURCE_POLICY_ENTITY_TYPE,
+    USER_RESOURCE_POLICY_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.retention_policy import RETENTION_POLICY_ENTITY_TYPE
+from ai.backend.common.data.entity.role_permission_preset import ROLE_PERMISSION_PRESET_FIELD_TYPE
+from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.runtime_variant import RUNTIME_VARIANT_ENTITY_TYPE
+from ai.backend.common.data.entity.runtime_variant_preset import RUNTIME_VARIANT_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.service_catalog import SERVICE_CATALOG_ENTITY_TYPE
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
+from ai.backend.common.data.entity.session_template import SESSION_TEMPLATE_ENTITY_TYPE
+from ai.backend.common.data.entity.storage_namespace import STORAGE_NAMESPACE_ENTITY_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.common.data.entity.vfolder_invitation import VFOLDER_INVITATION_ENTITY_TYPE
+from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
 from ai.backend.manager.actions.monitors import ActionMonitors
-from ai.backend.manager.actions.registry import ProcessorDependencies, ProcessorRegistry
+from ai.backend.manager.actions.registry import (
+    FieldGroupMeta,
+    GroupMeta,
+    ProcessorDependencies,
+    ProcessorRegistry,
+    SidecarGroupMeta,
+)
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
 from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
@@ -30,6 +92,11 @@ from ai.backend.manager.actions.v2.lookup.bulk_base import BaseBulkLookupAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.validators import ActionValidators
+from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotData
+from ai.backend.manager.data.error_log.types import ErrorLogData
+from ai.backend.manager.data.keypair.types import KeyPairData
+from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
@@ -38,10 +105,18 @@ from ai.backend.manager.services.artifact_revision.processors import ArtifactRev
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
+from ai.backend.manager.services.deployment_revision_preset.actions.lookup_slot_owner import (
+    LookupBulkPresetResourceSlotOwnerAction,
+    LookupPresetResourceSlotOwnerAction,
+)
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.error_log.actions.lookup_owner import (
+    LookupBulkErrorLogOwnerAction,
+    LookupErrorLogOwnerAction,
+)
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
@@ -78,6 +153,10 @@ from ai.backend.manager.services.resource_allocation.processors import (
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.services.retention_policy.processors import RetentionPolicyProcessors
+from ai.backend.manager.services.role_preset.actions.lookup_permission_owner import (
+    LookupBulkRolePermissionPresetOwnerAction,
+    LookupRolePermissionPresetOwnerAction,
+)
 from ai.backend.manager.services.role_preset.processors import RolePresetProcessors
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
 from ai.backend.manager.services.runtime_variant_preset.processors import (
@@ -93,6 +172,10 @@ from ai.backend.manager.services.storage_namespace.processors import (
     StorageNamespaceProcessors,
 )
 from ai.backend.manager.services.template.processors import TemplateProcessors
+from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
+    LookupBulkKeypairOwnerAction,
+    LookupKeypairOwnerAction,
+)
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
@@ -152,53 +235,111 @@ def test_every_defined_v2_action_is_wired() -> None:
     # through it, so its wired_actions() is the complete catalog of registered actions.
     registry = _ops_registry()
     AppConfigProcessors(
-        registry.group(), registry.group(), registry.group(), registry.group(), MagicMock()
+        registry.group(GroupMeta(APP_CONFIG_ENTITY_TYPE)),
+        registry.group(GroupMeta(APP_CONFIG_DEFINITION_ENTITY_TYPE)),
+        registry.group(GroupMeta(APP_CONFIG_ALLOW_LIST_ENTITY_TYPE)),
+        registry.group(GroupMeta(APP_CONFIG_FRAGMENT_ENTITY_TYPE)),
+        MagicMock(),
     )
-    ResourceSlotProcessors(registry.group(), MagicMock())
-    IdleCheckerProcessors(registry.group(), MagicMock(), [])
-    RetentionPolicyProcessors(registry.group())
-    LoginClientTypeProcessors(registry.group())
-    ServiceCatalogProcessors(registry.group())
-    ProjectResourcePolicyProcessors(registry.group())
-    UserResourcePolicyProcessors(registry.group())
-    KeypairResourcePolicyProcessors(registry.group())
-    RolePresetProcessors(registry.group(), MagicMock())
-    RuntimeVariantProcessors(registry.group())
-    ObjectStorageProcessors(registry.group(), MagicMock())
-    VFSStorageProcessors(registry.group(), MagicMock())
-    NotificationProcessors(registry.group(), registry.group(), MagicMock())
-    PrometheusQueryPresetCategoryProcessors(registry.group())
-    RuntimeVariantPresetProcessors(registry.group(), MagicMock())
-    ErrorLogProcessors(registry.group())
-    AuditLogProcessors(registry.group())
-    PrometheusQueryPresetProcessors(registry.group(), MagicMock())
-    StorageNamespaceProcessors(registry.group())
-    DeploymentPresetProcessors(registry.group(), MagicMock())
-    DomainProcessors(registry.group(), MagicMock(), [])
-    GroupProcessors(registry.group(), MagicMock())
-    UserProcessors(registry.group(), MagicMock())
-    FairShareProcessors(registry.group(), MagicMock())
-    ResourcePresetProcessors(registry.group(), MagicMock())
-    ResourceAllocationProcessors(registry.group(), MagicMock())
-    ScalingGroupProcessors(registry.group(), MagicMock())
-    ArtifactProcessors(registry.group(), MagicMock())
-    ArtifactRegistryProcessors(registry.group(), MagicMock())
-    ArtifactRevisionProcessors(registry.group(), MagicMock())
-    ModelCardProcessors(registry.group(), MagicMock())
-    ContainerRegistryProcessors(registry.group(), MagicMock())
-    ImageProcessors(registry.group(), MagicMock())
-    ExportProcessors(registry.group(), MagicMock())
-    TemplateProcessors(registry.group(), MagicMock())
-    SchedulingHistoryProcessors(registry.group(), MagicMock())
-    SessionProcessors(registry.group(), MagicMock())
-    DeploymentProcessors(registry.group(), MagicMock())
-    VFolderProcessors(registry.group(), MagicMock())
-    VFolderAdminProcessors(registry.group(), MagicMock())
-    VFolderFileProcessors(registry.group(), MagicMock())
-    VFolderInviteProcessors(registry.group(), MagicMock())
-    VFolderSharingProcessors(registry.group(), MagicMock())
-    ModelServingProcessors(registry.group(), MagicMock())
-    ModelServingAutoScalingProcessors(registry.group(), MagicMock())
+    ResourceSlotProcessors(registry.group(GroupMeta(SESSION_ENTITY_TYPE)), MagicMock())
+    IdleCheckerProcessors(registry.group(GroupMeta(SESSION_ENTITY_TYPE)), MagicMock(), [])
+    RetentionPolicyProcessors(registry.group(GroupMeta(RETENTION_POLICY_ENTITY_TYPE)))
+    LoginClientTypeProcessors(registry.group(GroupMeta(LOGIN_CLIENT_TYPE_ENTITY_TYPE)))
+    ServiceCatalogProcessors(registry.group(GroupMeta(SERVICE_CATALOG_ENTITY_TYPE)))
+    ProjectResourcePolicyProcessors(registry.group(GroupMeta(PROJECT_RESOURCE_POLICY_ENTITY_TYPE)))
+    UserResourcePolicyProcessors(registry.group(GroupMeta(USER_RESOURCE_POLICY_ENTITY_TYPE)))
+    KeypairResourcePolicyProcessors(registry.group(GroupMeta(KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE)))
+    RolePresetProcessors(
+        registry.group(GroupMeta(ROLE_PRESET_ENTITY_TYPE)),
+        registry.group(GroupMeta(ROLE_PRESET_ENTITY_TYPE)).field_group(
+            FieldGroupMeta(ROLE_PERMISSION_PRESET_FIELD_TYPE),
+            RolePermissionPresetData,
+            LookupRolePermissionPresetOwnerAction,
+            LookupBulkRolePermissionPresetOwnerAction,
+        ),
+        MagicMock(),
+    )
+    RuntimeVariantProcessors(registry.group(GroupMeta(RUNTIME_VARIANT_ENTITY_TYPE)))
+    ObjectStorageProcessors(registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)), MagicMock())
+    VFSStorageProcessors(registry.group(GroupMeta(VFS_STORAGE_ENTITY_TYPE)), MagicMock())
+    NotificationProcessors(
+        registry.group(GroupMeta(NOTIFICATION_CHANNEL_ENTITY_TYPE)),
+        registry.group(GroupMeta(NOTIFICATION_RULE_ENTITY_TYPE)),
+        MagicMock(),
+    )
+    PrometheusQueryPresetCategoryProcessors(
+        registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE))
+    )
+    RuntimeVariantPresetProcessors(
+        registry.group(GroupMeta(RUNTIME_VARIANT_PRESET_ENTITY_TYPE)), MagicMock()
+    )
+    ErrorLogProcessors(
+        registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
+            FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
+            ErrorLogData,
+            LookupErrorLogOwnerAction,
+            LookupBulkErrorLogOwnerAction,
+        )
+    )
+    AuditLogProcessors(
+        registry.sidecar_group(SidecarGroupMeta(AUDIT_LOG_ENTITY_TYPE), AuditLogData)
+    )
+    PrometheusQueryPresetProcessors(
+        registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)), MagicMock()
+    )
+    StorageNamespaceProcessors(registry.group(GroupMeta(STORAGE_NAMESPACE_ENTITY_TYPE)))
+    DeploymentPresetProcessors(
+        registry.group(GroupMeta(DEPLOYMENT_PRESET_ENTITY_TYPE)),
+        registry.group(GroupMeta(DEPLOYMENT_PRESET_ENTITY_TYPE)).field_group(
+            FieldGroupMeta(DEPLOYMENT_PRESET_RESOURCE_SLOT_FIELD_TYPE),
+            PresetResourceSlotData,
+            LookupPresetResourceSlotOwnerAction,
+            LookupBulkPresetResourceSlotOwnerAction,
+        ),
+        MagicMock(),
+    )
+    DomainProcessors(registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), MagicMock(), [])
+    GroupProcessors(registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), MagicMock())
+    UserProcessors(
+        registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
+            FieldGroupMeta(KEYPAIR_FIELD_TYPE),
+            KeyPairData,
+            LookupKeypairOwnerAction,
+            LookupBulkKeypairOwnerAction,
+        ),
+        MagicMock(),
+    )
+    FairShareProcessors(registry.group(GroupMeta(DOMAIN_FAIR_SHARE_ENTITY_TYPE)), MagicMock())
+    ResourcePresetProcessors(registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)), MagicMock())
+    ResourceAllocationProcessors(registry.group(GroupMeta(USER_ENTITY_TYPE)), MagicMock())
+    ScalingGroupProcessors(registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), MagicMock())
+    ArtifactProcessors(registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)), MagicMock())
+    ArtifactRegistryProcessors(
+        registry.group(GroupMeta(ARTIFACT_REGISTRY_ENTITY_TYPE)), MagicMock()
+    )
+    ArtifactRevisionProcessors(
+        registry.group(GroupMeta(ARTIFACT_REVISION_ENTITY_TYPE)), MagicMock()
+    )
+    ModelCardProcessors(registry.group(GroupMeta(MODEL_CARD_ENTITY_TYPE)), MagicMock())
+    ContainerRegistryProcessors(
+        registry.group(GroupMeta(CONTAINER_REGISTRY_ENTITY_TYPE)), MagicMock()
+    )
+    ImageProcessors(registry.group(GroupMeta(IMAGE_ENTITY_TYPE)), MagicMock())
+    ExportProcessors(registry.group(GroupMeta(EXPORT_ENTITY_TYPE)), MagicMock())
+    TemplateProcessors(registry.group(GroupMeta(SESSION_TEMPLATE_ENTITY_TYPE)), MagicMock())
+    SchedulingHistoryProcessors(registry.group(GroupMeta(SESSION_ENTITY_TYPE)), MagicMock())
+    SessionProcessors(registry.group(GroupMeta(SESSION_ENTITY_TYPE)), MagicMock())
+    DeploymentProcessors(registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), MagicMock())
+    VFolderProcessors(registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), MagicMock())
+    VFolderAdminProcessors(registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), MagicMock())
+    VFolderFileProcessors(registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), MagicMock())
+    VFolderInviteProcessors(registry.group(GroupMeta(VFOLDER_INVITATION_ENTITY_TYPE)), MagicMock())
+    VFolderSharingProcessors(registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), MagicMock())
+    ModelServingProcessors(registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), MagicMock())
+    ModelServingAutoScalingProcessors(
+        registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), MagicMock()
+    )
 
     wired = sorted(cls.action_name() for cls in registry.wired_actions())
     defined = sorted(cls.action_name() for cls in _concrete_v2_action_classes())

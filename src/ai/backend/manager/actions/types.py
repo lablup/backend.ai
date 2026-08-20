@@ -32,6 +32,16 @@ class ActionKind(enum.StrEnum):
     UNKNOWN = "unknown"
 
 
+class ActionGate(enum.StrEnum):
+    """Who a wired processor lets through, orthogonal to :class:`ActionKind`."""
+
+    ANONYMOUS = "anonymous"
+    # Every authenticated caller, whatever their roles.
+    PUBLIC = "public"
+    # Checked against the caller's permissions; ``ActionKind`` says where.
+    PERMISSION = "permission"
+
+
 class ActionOperationType(enum.StrEnum):
     GET = "get"
     SEARCH = "search"

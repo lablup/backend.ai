@@ -10,12 +10,13 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
 from ai.backend.common.dto.manager.domain import (
     CreateDomainRequest,
     CreateDomainResponse,
     PurgeDomainRequest,
 )
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.domain.handler import DomainHandler
@@ -39,7 +40,7 @@ def domain_processors(
 ) -> DomainProcessors:
     repo = DomainRepository(database_engine, V2DBOpsProvider(database_engine))
     service = DomainService(repo)
-    return DomainProcessors(processor_registry.group(), service, [])
+    return DomainProcessors(processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), service, [])
 
 
 @pytest.fixture()

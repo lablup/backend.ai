@@ -10,6 +10,10 @@ import pytest
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.dto.manager.config import (
     CreateDomainDotfileRequest,
     CreateDotfileResponse,
@@ -20,7 +24,12 @@ from ai.backend.common.dto.manager.config import (
     DeleteUserDotfileRequest,
 )
 from ai.backend.manager.actions.monitors import ActionMonitors
-from ai.backend.manager.actions.registry import ProcessorDependencies, ProcessorRegistry
+from ai.backend.manager.actions.registry import (
+    FieldGroupMeta,
+    GroupMeta,
+    ProcessorDependencies,
+    ProcessorRegistry,
+)
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.api.rest.domainconfig.handler import DomainConfigHandler
 from ai.backend.manager.api.rest.domainconfig.registry import register_domainconfig_routes
@@ -30,6 +39,7 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.userconfig.handler import UserConfigHandler
 from ai.backend.manager.api.rest.userconfig.registry import register_userconfig_routes
+from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.group.repository import GroupRepository
@@ -41,6 +51,10 @@ from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.group.service import GroupService
+from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
+    LookupBulkKeypairOwnerAction,
+    LookupKeypairOwnerAction,
+)
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -71,12 +85,12 @@ def server_module_registries(
     """Load only the modules required for config-domain tests."""
     v2_ops = V2DBOpsProvider(database_engine)
     domain = DomainProcessors(
-        config_registry.group(),
+        config_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
         DomainService(DomainRepository(database_engine, v2_ops)),
         [],
     )
     group = GroupProcessors(
-        config_registry.group(),
+        config_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)),
         GroupService(
             MagicMock(),
             MagicMock(),
@@ -89,7 +103,13 @@ def server_module_registries(
         ),
     )
     user = UserProcessors(
-        config_registry.group(),
+        config_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        config_registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
+            FieldGroupMeta(KEYPAIR_FIELD_TYPE),
+            KeyPairData,
+            LookupKeypairOwnerAction,
+            LookupBulkKeypairOwnerAction,
+        ),
         UserService(
             MagicMock(),
             MagicMock(),

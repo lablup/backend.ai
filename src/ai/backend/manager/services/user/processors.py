@@ -1,4 +1,7 @@
-from ai.backend.manager.actions.registry import FieldProcessorGroup, ProcessorGroup
+from ai.backend.manager.actions.registry import (
+    FieldProcessorGroup,
+    ProcessorGroup,
+)
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
@@ -73,8 +76,6 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
 )
 from ai.backend.manager.services.user.actions.lookup import LookupUserAction
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
-    LookupBulkKeypairOwnerAction,
-    LookupKeypairOwnerAction,
     LookupKeypairOwnerByAccessKeyAction,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
@@ -186,13 +187,12 @@ class UserProcessors:
     def __init__(
         self,
         group: ProcessorGroup[UserData],
+        keypair_group: FieldProcessorGroup[KeyPairData],
         user_service: UserService,
     ) -> None:
         self.lookup = group.public_lookup_ops(LookupUserAction)
         self.lookup_keypair_owner = group.key_owner_lookup_ops(LookupKeypairOwnerByAccessKeyAction)
-        self.keypair_group = group.field_group(
-            KeyPairData, LookupKeypairOwnerAction, LookupBulkKeypairOwnerAction
-        )
+        self.keypair_group = keypair_group
         self.global_search = group.global_search_ops(GlobalSearchUsersAction)
         self.search_users_by_domain = group.scope_search_ops(SearchUsersByDomainAction)
         self.search_users_by_project = group.scope_search_ops(SearchUsersByProjectAction)

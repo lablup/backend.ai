@@ -33,6 +33,7 @@ from ai.backend.common.data.entity.types import (
     EntityType,
     FieldData,
     FieldIdentifier,
+    FieldType,
     ScopeRef,
     ScopeType,
 )
@@ -138,7 +139,15 @@ _ENTITY_TYPE = EntityType("role_preset")
 _SCOPE_TYPE = ScopeType(_ENTITY_TYPE)
 
 
+_FIELD_TYPE = FieldType("test_field")
+
+
 class _FieldID(FieldIdentifier):
+    @override
+    @classmethod
+    def field_type(cls) -> FieldType:
+        return _FIELD_TYPE
+
     @override
     @classmethod
     def owner_entity_type(cls) -> EntityType:

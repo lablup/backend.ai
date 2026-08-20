@@ -19,13 +19,14 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.dto.manager.v2.resource_allocation.request import (
     EffectiveResourceAllocationInput,
 )
 from ai.backend.common.dto.manager.v2.resource_allocation.response import (
     EffectiveResourceAllocationPayload,
 )
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.adapters.resource_allocation.adapter import ResourceAllocationAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -148,7 +149,9 @@ class TestHideAgentsVisibility:
             resource_allocation_repository=ra_repo,
             resource_preset_repository=rp_repo,
         )
-        return ResourceAllocationProcessors(processor_registry.group(), service)
+        return ResourceAllocationProcessors(
+            processor_registry.group(GroupMeta(USER_ENTITY_TYPE)), service
+        )
 
     @pytest.fixture()
     def server_module_registries(
@@ -275,7 +278,9 @@ class TestGroupResourceVisibility:
             resource_allocation_repository=ra_repo,
             resource_preset_repository=rp_repo,
         )
-        return ResourceAllocationProcessors(processor_registry.group(), service)
+        return ResourceAllocationProcessors(
+            processor_registry.group(GroupMeta(USER_ENTITY_TYPE)), service
+        )
 
     @pytest.fixture()
     def server_module_registries(

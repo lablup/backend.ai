@@ -15,6 +15,7 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -22,7 +23,7 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderUsageMode,
 )
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -102,7 +103,7 @@ def vfolder_processors(
         user_repository=user_repository,
         valkey_stat_client=MagicMock(),
     )
-    return VFolderProcessors(processor_registry.group(), service)
+    return VFolderProcessors(processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()

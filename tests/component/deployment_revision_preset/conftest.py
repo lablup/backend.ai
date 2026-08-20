@@ -19,6 +19,11 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
+from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.preset_resource_slot import (
+    DEPLOYMENT_PRESET_RESOURCE_SLOT_FIELD_TYPE,
+)
+from ai.backend.manager.actions.registry import FieldGroupMeta, GroupMeta
 from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
 )
@@ -30,9 +35,14 @@ from ai.backend.manager.api.rest.v2.deployment_revision_preset.handler import (
 from ai.backend.manager.api.rest.v2.deployment_revision_preset.registry import (
     register_v2_deployment_revision_preset_routes,
 )
+from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotData
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
+)
+from ai.backend.manager.services.deployment_revision_preset.actions.lookup_slot_owner import (
+    LookupBulkPresetResourceSlotOwnerAction,
+    LookupPresetResourceSlotOwnerAction,
 )
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
@@ -66,7 +76,16 @@ def deployment_revision_preset_processors(
 ) -> DeploymentPresetProcessors:
     repo = DeploymentPresetRepository(V2DBOpsProvider(database_engine))
     service = DeploymentPresetService(repo)
-    return DeploymentPresetProcessors(processor_registry.group(), service)
+    return DeploymentPresetProcessors(
+        processor_registry.group(GroupMeta(DEPLOYMENT_PRESET_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(DEPLOYMENT_PRESET_ENTITY_TYPE)).field_group(
+            FieldGroupMeta(DEPLOYMENT_PRESET_RESOURCE_SLOT_FIELD_TYPE),
+            PresetResourceSlotData,
+            LookupPresetResourceSlotOwnerAction,
+            LookupBulkPresetResourceSlotOwnerAction,
+        ),
+        service,
+    )
 
 
 @pytest.fixture()

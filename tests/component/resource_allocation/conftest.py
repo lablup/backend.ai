@@ -16,7 +16,8 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.adapters.resource_allocation.adapter import ResourceAllocationAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -65,7 +66,9 @@ def resource_allocation_processors(
         resource_allocation_repository=ra_repo,
         resource_preset_repository=rp_repo,
     )
-    return ResourceAllocationProcessors(processor_registry.group(), service)
+    return ResourceAllocationProcessors(
+        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()

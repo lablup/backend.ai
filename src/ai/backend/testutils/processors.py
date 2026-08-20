@@ -9,6 +9,7 @@ from typing import Any
 
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry import (
+    GroupMeta,
     ProcessorDependencies,
     ProcessorGroup,
     ProcessorRegistry,
@@ -19,7 +20,7 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 
-def ops_processor_group(db: ExtendedAsyncSAEngine) -> ProcessorGroup[Any]:
+def ops_processor_group(db: ExtendedAsyncSAEngine, meta: GroupMeta) -> ProcessorGroup[Any]:
     """A processor group backed by the given engine, with no extra monitors or validators.
 
     The gates a processor imposes on itself still apply — the global processor prepends
@@ -31,4 +32,4 @@ def ops_processor_group(db: ExtendedAsyncSAEngine) -> ProcessorGroup[Any]:
             validators=ActionValidators(),
             repository=OpsRepository(V2DBOpsProvider(db)),
         )
-    ).group()
+    ).group(meta)

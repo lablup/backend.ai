@@ -14,10 +14,16 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
+from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import AgentId, ResourceSlot, SessionId, SessionTypes
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry import FieldGroupMeta, GroupMeta, ProcessorRegistry
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 
@@ -30,6 +36,7 @@ from ai.backend.manager.api.rest.session.registry import register_session_routes
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.kernel import kernels
@@ -41,6 +48,10 @@ from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
+    LookupBulkKeypairOwnerAction,
+    LookupKeypairOwnerAction,
+)
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
@@ -110,14 +121,14 @@ async def session_processors(
         user_repository=AsyncMock(),
     )
     service = SessionService(args)
-    return SessionProcessors(processor_registry.group(), service)
+    return SessionProcessors(processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()
 def agent_processors_mock(processor_registry: ProcessorRegistry[Any]) -> AgentProcessors:
     """AgentProcessors with a mocked AgentService."""
     return AgentProcessors(
-        processor_registry.group(),
+        processor_registry.group(GroupMeta(AGENT_ENTITY_TYPE)),
         AsyncMock(),
         [],
         ActionValidators(
@@ -130,7 +141,7 @@ def agent_processors_mock(processor_registry: ProcessorRegistry[Any]) -> AgentPr
 @pytest.fixture()
 def vfolder_processors_mock(processor_registry: ProcessorRegistry[Any]) -> VFolderProcessors:
     """VFolderProcessors with a mocked VFolderService."""
-    return VFolderProcessors(processor_registry.group(), AsyncMock())
+    return VFolderProcessors(processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), AsyncMock())
 
 
 @pytest.fixture()
@@ -147,8 +158,19 @@ def server_module_registries(
     return [
         register_session_routes(
             SessionHandler(
-                group=GroupProcessors(processor_registry.group(), AsyncMock()),
-                user=UserProcessors(processor_registry.group(), AsyncMock()),
+                group=GroupProcessors(
+                    processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), AsyncMock()
+                ),
+                user=UserProcessors(
+                    processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+                    processor_registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
+                        FieldGroupMeta(KEYPAIR_FIELD_TYPE),
+                        KeyPairData,
+                        LookupKeypairOwnerAction,
+                        LookupBulkKeypairOwnerAction,
+                    ),
+                    AsyncMock(),
+                ),
                 auth=auth_processors,
                 session=session_processors,
                 agent=agent_processors_mock,

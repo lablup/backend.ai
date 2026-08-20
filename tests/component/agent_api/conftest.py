@@ -9,12 +9,13 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair, ResourceSlot
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.agent_cache import AgentRPCCache
@@ -95,7 +96,7 @@ def agent_processors(
         agent_cache=agent_cache,
     )
     return AgentProcessors(
-        processor_registry.group(),
+        processor_registry.group(GroupMeta(AGENT_ENTITY_TYPE)),
         service,
         [],
         ActionValidators(

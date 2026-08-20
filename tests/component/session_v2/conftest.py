@@ -24,6 +24,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
@@ -35,7 +36,7 @@ from ai.backend.common.data.permission.types import (
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -150,7 +151,7 @@ async def session_processors(
         user_repository=AsyncMock(),
     )
     service = SessionService(args)
-    return SessionProcessors(processor_registry.group(), service)
+    return SessionProcessors(processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)), service)
 
 
 def build_session_registries(
@@ -686,4 +687,4 @@ async def compute_session_processors(
         user_repository=UserRepository(database_engine, V2DBOpsProvider(database_engine)),
     )
     service = SessionService(args)
-    return SessionProcessors(processor_registry.group(), service)
+    return SessionProcessors(processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)), service)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.registry import FieldProcessorGroup, ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.field.bulk_processor import BulkFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
@@ -32,10 +32,6 @@ from ai.backend.manager.services.role_preset.actions.delete import (
     BulkDeleteRolePresetsAction,
 )
 from ai.backend.manager.services.role_preset.actions.get import GetRolePresetAction
-from ai.backend.manager.services.role_preset.actions.lookup_permission_owner import (
-    LookupBulkRolePermissionPresetOwnerAction,
-    LookupRolePermissionPresetOwnerAction,
-)
 from ai.backend.manager.services.role_preset.actions.purge import PurgeRolePresetAction
 from ai.backend.manager.services.role_preset.actions.restore import (
     BulkRestoreRolePresetsAction,
@@ -80,7 +76,10 @@ class RolePresetProcessors:
     ]
 
     def __init__(
-        self, preset_group: ProcessorGroup[RolePresetData], service: RolePresetService
+        self,
+        preset_group: ProcessorGroup[RolePresetData],
+        permissions: FieldProcessorGroup[RolePermissionPresetData],
+        service: RolePresetService,
     ) -> None:
         self.create = preset_group.global_scope(CreateRolePresetAction, service.create)
         self.get = preset_group.single_get_ops(GetRolePresetAction)
@@ -91,11 +90,6 @@ class RolePresetProcessors:
         self.purge = preset_group.entity_purge_ops(PurgeRolePresetAction)
         self.bulk_purge = preset_group.global_partial_bulk_purge_ops(BulkPurgeRolePresetsAction)
 
-        permissions = preset_group.field_group(
-            RolePermissionPresetData,
-            LookupRolePermissionPresetOwnerAction,
-            LookupBulkRolePermissionPresetOwnerAction,
-        )
         self.search_permission_presets = permissions.search_ops(SearchRolePermissionPresetsAction)
         self.bulk_add_permissions = permissions.atomic_create_ops(
             BulkAddRolePermissionPresetsAction

@@ -9,11 +9,17 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
+from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
+from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry import FieldGroupMeta, GroupMeta, ProcessorRegistry
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
@@ -22,6 +28,7 @@ from ai.backend.manager.api.rest.resource.registry import register_resource_rout
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
@@ -44,6 +51,10 @@ from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.group.service import GroupService
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
+from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
+    LookupBulkKeypairOwnerAction,
+    LookupKeypairOwnerAction,
+)
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
@@ -71,7 +82,9 @@ def container_registry_processors(
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine)
     service = ContainerRegistryService(database_engine, repo)
-    return ContainerRegistryProcessors(processor_registry.group(), service)
+    return ContainerRegistryProcessors(
+        processor_registry.group(GroupMeta(CONTAINER_REGISTRY_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()
@@ -83,7 +96,9 @@ def resource_preset_processors(
 ) -> ResourcePresetProcessors:
     repo = ResourcePresetRepository(database_engine, valkey_clients.stat, config_provider)
     service = ResourcePresetService(repo)
-    return ResourcePresetProcessors(processor_registry.group(), service)
+    return ResourcePresetProcessors(
+        processor_registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()
@@ -122,7 +137,7 @@ def agent_processors(
         agent_cache=AsyncMock(),
     )
     return AgentProcessors(
-        processor_registry.group(),
+        processor_registry.group(GroupMeta(AGENT_ENTITY_TYPE)),
         service,
         [],
         ActionValidators(
@@ -149,7 +164,7 @@ def group_processors(
     )
     group_repos = GroupRepositories(repository=group_repo)
     service = GroupService(storage_manager, config_provider, valkey_clients.stat, group_repos)
-    return GroupProcessors(processor_registry.group(), service)
+    return GroupProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()
@@ -161,7 +176,16 @@ def user_processors(
 ) -> UserProcessors:
     user_repo = UserRepository(database_engine, V2DBOpsProvider(database_engine))
     service = UserService(storage_manager, valkey_clients.stat, AsyncMock(), user_repo, AsyncMock())
-    return UserProcessors(processor_registry.group(), service)
+    return UserProcessors(
+        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
+            FieldGroupMeta(KEYPAIR_FIELD_TYPE),
+            KeyPairData,
+            LookupKeypairOwnerAction,
+            LookupBulkKeypairOwnerAction,
+        ),
+        service,
+    )
 
 
 @pytest.fixture()

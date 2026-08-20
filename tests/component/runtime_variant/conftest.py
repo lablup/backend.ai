@@ -16,6 +16,8 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
+from ai.backend.common.data.entity.runtime_variant import RUNTIME_VARIANT_ENTITY_TYPE
+from ai.backend.manager.actions.registry import GroupMeta
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -33,7 +35,9 @@ from ai.backend.testutils.processors import ops_processor_group
 def runtime_variant_processors(
     database_engine: ExtendedAsyncSAEngine,
 ) -> RuntimeVariantProcessors:
-    return RuntimeVariantProcessors(group=ops_processor_group(database_engine))
+    return RuntimeVariantProcessors(
+        group=ops_processor_group(database_engine, GroupMeta(RUNTIME_VARIANT_ENTITY_TYPE))
+    )
 
 
 @pytest.fixture()

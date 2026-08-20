@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE
+from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_ENTITY_TYPE
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.rest.artifact_registry.handler import ArtifactRegistryHandler
 from ai.backend.manager.api.rest.artifact_registry.registry import (
     register_artifact_registry_routes,
@@ -84,7 +86,7 @@ def artifact_processors(
         storage_manager=storage_manager,
         config_provider=config_provider,
     )
-    return ArtifactProcessors(processor_registry.group(), service)
+    return ArtifactProcessors(processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()
@@ -118,7 +120,9 @@ def artifact_revision_processors(
         valkey_artifact_client=valkey_clients.artifact,
         background_task_manager=background_task_manager,
     )
-    return ArtifactRevisionProcessors(processor_registry.group(), service)
+    return ArtifactRevisionProcessors(
+        processor_registry.group(GroupMeta(ARTIFACT_REVISION_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()

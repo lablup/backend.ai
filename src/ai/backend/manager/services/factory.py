@@ -1,10 +1,89 @@
 from typing import Any
 
+from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
+from ai.backend.common.data.entity.app_config import (
+    APP_CONFIG_ALLOW_LIST_ENTITY_TYPE,
+    APP_CONFIG_ENTITY_TYPE,
+    APP_CONFIG_FRAGMENT_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.app_config_definition import APP_CONFIG_DEFINITION_ENTITY_TYPE
+from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE
+from ai.backend.common.data.entity.artifact_registry import ARTIFACT_REGISTRY_ENTITY_TYPE
+from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_ENTITY_TYPE
+from ai.backend.common.data.entity.audit_log import AUDIT_LOG_ENTITY_TYPE
+from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
+from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
+from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.error_log import ERROR_LOG_FIELD_TYPE
+from ai.backend.common.data.entity.etcd_config import ETCD_CONFIG_ENTITY_TYPE
+from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
+from ai.backend.common.data.entity.fair_share import DOMAIN_FAIR_SHARE_ENTITY_TYPE
+from ai.backend.common.data.entity.image import IMAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
+from ai.backend.common.data.entity.login_client_type import LOGIN_CLIENT_TYPE_ENTITY_TYPE
+from ai.backend.common.data.entity.manager_admin import MANAGER_ADMIN_ENTITY_TYPE
+from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
+from ai.backend.common.data.entity.notification import (
+    NOTIFICATION_CHANNEL_ENTITY_TYPE,
+    NOTIFICATION_RULE_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.preset_resource_slot import (
+    DEPLOYMENT_PRESET_RESOURCE_SLOT_FIELD_TYPE,
+)
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.prometheus_query_preset import (
+    PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_policy import (
+    KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
+    PROJECT_RESOURCE_POLICY_ENTITY_TYPE,
+    USER_RESOURCE_POLICY_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.retention_policy import RETENTION_POLICY_ENTITY_TYPE
+from ai.backend.common.data.entity.role_permission_preset import ROLE_PERMISSION_PRESET_FIELD_TYPE
+from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.runtime_variant import RUNTIME_VARIANT_ENTITY_TYPE
+from ai.backend.common.data.entity.runtime_variant_preset import RUNTIME_VARIANT_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.service_catalog import SERVICE_CATALOG_ENTITY_TYPE
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
+from ai.backend.common.data.entity.session_template import SESSION_TEMPLATE_ENTITY_TYPE
+from ai.backend.common.data.entity.storage_namespace import STORAGE_NAMESPACE_ENTITY_TYPE
+from ai.backend.common.data.entity.usage_bucket import (
+    DOMAIN_USAGE_BUCKET_ENTITY_TYPE,
+    PROJECT_USAGE_BUCKET_ENTITY_TYPE,
+    USER_USAGE_BUCKET_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.common.data.entity.vfolder_invitation import VFOLDER_INVITATION_ENTITY_TYPE
+from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
 from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
 from ai.backend.manager.actions.monitors import ActionMonitors
-from ai.backend.manager.actions.registry import ProcessorDependencies, ProcessorRegistry
+from ai.backend.manager.actions.registry import (
+    FieldGroupMeta,
+    GroupMeta,
+    ProcessorDependencies,
+    ProcessorRegistry,
+    SidecarGroupMeta,
+)
 from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
+from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotData
+from ai.backend.manager.data.error_log.types import ErrorLogData
+from ai.backend.manager.data.keypair.types import KeyPairData
+from ai.backend.manager.data.resource_usage_history.types import (
+    DomainUsageBucketData,
+    ProjectUsageBucketData,
+    UserUsageBucketData,
+)
+from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
@@ -30,6 +109,10 @@ from ai.backend.manager.services.container_registry.processors import ContainerR
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
+from ai.backend.manager.services.deployment_revision_preset.actions.lookup_slot_owner import (
+    LookupBulkPresetResourceSlotOwnerAction,
+    LookupPresetResourceSlotOwnerAction,
+)
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
 )
@@ -38,6 +121,10 @@ from ai.backend.manager.services.deployment_revision_preset.service import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.error_log.actions.lookup_owner import (
+    LookupBulkErrorLogOwnerAction,
+    LookupErrorLogOwnerAction,
+)
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
 from ai.backend.manager.services.etcd_config.service import EtcdConfigService
@@ -115,6 +202,10 @@ from ai.backend.manager.services.resource_slot.processors import ResourceSlotPro
 from ai.backend.manager.services.resource_slot.service import ResourceSlotService
 from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
 from ai.backend.manager.services.retention_policy.processors import RetentionPolicyProcessors
+from ai.backend.manager.services.role_preset.actions.lookup_permission_owner import (
+    LookupBulkRolePermissionPresetOwnerAction,
+    LookupRolePermissionPresetOwnerAction,
+)
 from ai.backend.manager.services.role_preset.processors import RolePresetProcessors
 from ai.backend.manager.services.role_preset.service import RolePresetService
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
@@ -134,6 +225,10 @@ from ai.backend.manager.services.stream.processors import StreamProcessors
 from ai.backend.manager.services.stream.service import StreamService
 from ai.backend.manager.services.template.processors import TemplateProcessors
 from ai.backend.manager.services.template.service import TemplateService
+from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
+    LookupBulkKeypairOwnerAction,
+    LookupKeypairOwnerAction,
+)
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.services.user_resource_policy.processors import UserResourcePolicyProcessors
@@ -415,88 +510,199 @@ def create_processors(
         event_hub=args.event_hub,
         event_fetcher=args.event_fetcher,
         events_service=services.events,
-        agent=AgentProcessors(registry.group(), services.agent, action_monitors, validators),
+        agent=AgentProcessors(
+            registry.group(GroupMeta(AGENT_ENTITY_TYPE)),
+            services.agent,
+            action_monitors,
+            validators,
+        ),
         app_config=AppConfigProcessors(
-            registry.group(),
-            registry.group(),
-            registry.group(),
-            registry.group(),
+            registry.group(GroupMeta(APP_CONFIG_ENTITY_TYPE)),
+            registry.group(GroupMeta(APP_CONFIG_DEFINITION_ENTITY_TYPE)),
+            registry.group(GroupMeta(APP_CONFIG_ALLOW_LIST_ENTITY_TYPE)),
+            registry.group(GroupMeta(APP_CONFIG_FRAGMENT_ENTITY_TYPE)),
             services.app_config,
         ),
-        domain=DomainProcessors(registry.group(), services.domain, action_monitors),
-        error_log=ErrorLogProcessors(registry.group()),
-        etcd_config=EtcdConfigProcessors(registry.group(), services.etcd_config),
-        export=ExportProcessors(registry.group(), services.export),
-        fair_share=FairShareProcessors(registry.group(), services.fair_share),
-        group=GroupProcessors(registry.group(), services.group),
-        user=UserProcessors(registry.group(), services.user),
+        domain=DomainProcessors(
+            registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), services.domain, action_monitors
+        ),
+        error_log=ErrorLogProcessors(
+            registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
+                FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
+                ErrorLogData,
+                LookupErrorLogOwnerAction,
+                LookupBulkErrorLogOwnerAction,
+            )
+        ),
+        etcd_config=EtcdConfigProcessors(
+            registry.group(GroupMeta(ETCD_CONFIG_ENTITY_TYPE)), services.etcd_config
+        ),
+        export=ExportProcessors(registry.group(GroupMeta(EXPORT_ENTITY_TYPE)), services.export),
+        fair_share=FairShareProcessors(
+            registry.group(GroupMeta(DOMAIN_FAIR_SHARE_ENTITY_TYPE)), services.fair_share
+        ),
+        group=GroupProcessors(registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), services.group),
+        user=UserProcessors(
+            registry.group(GroupMeta(USER_ENTITY_TYPE)),
+            registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
+                FieldGroupMeta(KEYPAIR_FIELD_TYPE),
+                KeyPairData,
+                LookupKeypairOwnerAction,
+                LookupBulkKeypairOwnerAction,
+            ),
+            services.user,
+        ),
         idle_checker=IdleCheckerProcessors(
-            registry.group(), services.idle_checker, action_monitors
+            registry.group(GroupMeta(SESSION_ENTITY_TYPE)), services.idle_checker, action_monitors
         ),
-        image=ImageProcessors(registry.group(), services.image),
+        image=ImageProcessors(registry.group(GroupMeta(IMAGE_ENTITY_TYPE)), services.image),
         container_registry=ContainerRegistryProcessors(
-            registry.group(), services.container_registry
+            registry.group(GroupMeta(CONTAINER_REGISTRY_ENTITY_TYPE)), services.container_registry
         ),
-        vfolder=VFolderProcessors(registry.group(), services.vfolder),
-        vfolder_admin=VFolderAdminProcessors(registry.group(), services.vfolder_admin),
-        vfolder_file=VFolderFileProcessors(registry.group(), services.vfolder_file),
-        vfolder_invite=VFolderInviteProcessors(registry.group(), services.vfolder_invite),
-        vfolder_sharing=VFolderSharingProcessors(registry.group(), services.vfolder_sharing),
-        session=SessionProcessors(registry.group(), services.session),
-        keypair_resource_policy=KeypairResourcePolicyProcessors(registry.group()),
-        manager_admin=ManagerAdminProcessors(registry.group(), services.manager_admin),
-        user_resource_policy=UserResourcePolicyProcessors(registry.group()),
-        project_resource_policy=ProjectResourcePolicyProcessors(registry.group()),
+        vfolder=VFolderProcessors(registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), services.vfolder),
+        vfolder_admin=VFolderAdminProcessors(
+            registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), services.vfolder_admin
+        ),
+        vfolder_file=VFolderFileProcessors(
+            registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), services.vfolder_file
+        ),
+        vfolder_invite=VFolderInviteProcessors(
+            registry.group(GroupMeta(VFOLDER_INVITATION_ENTITY_TYPE)), services.vfolder_invite
+        ),
+        vfolder_sharing=VFolderSharingProcessors(
+            registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), services.vfolder_sharing
+        ),
+        session=SessionProcessors(registry.group(GroupMeta(SESSION_ENTITY_TYPE)), services.session),
+        keypair_resource_policy=KeypairResourcePolicyProcessors(
+            registry.group(GroupMeta(KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE))
+        ),
+        manager_admin=ManagerAdminProcessors(
+            registry.group(GroupMeta(MANAGER_ADMIN_ENTITY_TYPE)), services.manager_admin
+        ),
+        user_resource_policy=UserResourcePolicyProcessors(
+            registry.group(GroupMeta(USER_RESOURCE_POLICY_ENTITY_TYPE))
+        ),
+        project_resource_policy=ProjectResourcePolicyProcessors(
+            registry.group(GroupMeta(PROJECT_RESOURCE_POLICY_ENTITY_TYPE))
+        ),
         prometheus_query_preset=PrometheusQueryPresetProcessors(
-            registry.group(), services.prometheus_query_preset
+            registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)),
+            services.prometheus_query_preset,
         ),
-        prometheus_query_preset_category=PrometheusQueryPresetCategoryProcessors(registry.group()),
-        resource_preset=ResourcePresetProcessors(registry.group(), services.resource_preset),
-        resource_slot=ResourceSlotProcessors(registry.group(), services.resource_slot),
-        retention_policy=RetentionPolicyProcessors(registry.group()),
-        role_preset=RolePresetProcessors(registry.group(), services.role_preset),
-        runtime_variant=RuntimeVariantProcessors(registry.group()),
+        prometheus_query_preset_category=PrometheusQueryPresetCategoryProcessors(
+            registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE))
+        ),
+        resource_preset=ResourcePresetProcessors(
+            registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)), services.resource_preset
+        ),
+        resource_slot=ResourceSlotProcessors(
+            registry.group(GroupMeta(SESSION_ENTITY_TYPE)), services.resource_slot
+        ),
+        retention_policy=RetentionPolicyProcessors(
+            registry.group(GroupMeta(RETENTION_POLICY_ENTITY_TYPE))
+        ),
+        role_preset=RolePresetProcessors(
+            registry.group(GroupMeta(ROLE_PRESET_ENTITY_TYPE)),
+            registry.group(GroupMeta(ROLE_PRESET_ENTITY_TYPE)).field_group(
+                FieldGroupMeta(ROLE_PERMISSION_PRESET_FIELD_TYPE),
+                RolePermissionPresetData,
+                LookupRolePermissionPresetOwnerAction,
+                LookupBulkRolePermissionPresetOwnerAction,
+            ),
+            services.role_preset,
+        ),
+        runtime_variant=RuntimeVariantProcessors(
+            registry.group(GroupMeta(RUNTIME_VARIANT_ENTITY_TYPE))
+        ),
         runtime_variant_preset=RuntimeVariantPresetProcessors(
-            registry.group(), services.runtime_variant_preset
+            registry.group(GroupMeta(RUNTIME_VARIANT_PRESET_ENTITY_TYPE)),
+            services.runtime_variant_preset,
         ),
         deployment_revision_preset=DeploymentPresetProcessors(
-            registry.group(), services.deployment_revision_preset
+            registry.group(GroupMeta(DEPLOYMENT_PRESET_ENTITY_TYPE)),
+            registry.group(GroupMeta(DEPLOYMENT_PRESET_ENTITY_TYPE)).field_group(
+                FieldGroupMeta(DEPLOYMENT_PRESET_RESOURCE_SLOT_FIELD_TYPE),
+                PresetResourceSlotData,
+                LookupPresetResourceSlotOwnerAction,
+                LookupBulkPresetResourceSlotOwnerAction,
+            ),
+            services.deployment_revision_preset,
         ),
-        model_card=ModelCardProcessors(registry.group(), services.model_card),
-        resource_usage=ResourceUsageProcessors(registry.group()),
-        scaling_group=ScalingGroupProcessors(registry.group(), services.scaling_group),
+        model_card=ModelCardProcessors(
+            registry.group(GroupMeta(MODEL_CARD_ENTITY_TYPE)), services.model_card
+        ),
+        resource_usage=ResourceUsageProcessors(
+            registry.sidecar_group(
+                SidecarGroupMeta(DOMAIN_USAGE_BUCKET_ENTITY_TYPE), DomainUsageBucketData
+            ),
+            registry.sidecar_group(
+                SidecarGroupMeta(PROJECT_USAGE_BUCKET_ENTITY_TYPE), ProjectUsageBucketData
+            ),
+            registry.sidecar_group(
+                SidecarGroupMeta(USER_USAGE_BUCKET_ENTITY_TYPE), UserUsageBucketData
+            ),
+        ),
+        scaling_group=ScalingGroupProcessors(
+            registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), services.scaling_group
+        ),
         metric=MetricProcessors(services.metric, action_monitors, validators),
-        model_serving=ModelServingProcessors(registry.group(), services.model_serving),
+        model_serving=ModelServingProcessors(
+            registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), services.model_serving
+        ),
         model_serving_auto_scaling=ModelServingAutoScalingProcessors(
-            registry.group(), services.model_serving_auto_scaling
+            registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), services.model_serving_auto_scaling
         ),
         auth=AuthProcessors(services.auth, action_monitors, validators),
-        login_client_type=LoginClientTypeProcessors(registry.group()),
-        notification=NotificationProcessors(
-            registry.group(), registry.group(), services.notification
+        login_client_type=LoginClientTypeProcessors(
+            registry.group(GroupMeta(LOGIN_CLIENT_TYPE_ENTITY_TYPE))
         ),
-        object_storage=ObjectStorageProcessors(registry.group(), services.object_storage),
+        notification=NotificationProcessors(
+            registry.group(GroupMeta(NOTIFICATION_CHANNEL_ENTITY_TYPE)),
+            registry.group(GroupMeta(NOTIFICATION_RULE_ENTITY_TYPE)),
+            services.notification,
+        ),
+        object_storage=ObjectStorageProcessors(
+            registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)), services.object_storage
+        ),
         permission_controller=PermissionControllerProcessors(
             services.permission_controller, action_monitors, validators
         ),
-        vfs_storage=VFSStorageProcessors(registry.group(), services.vfs_storage),
-        artifact=ArtifactProcessors(registry.group(), services.artifact),
-        artifact_registry=ArtifactRegistryProcessors(registry.group(), services.artifact_registry),
-        artifact_revision=ArtifactRevisionProcessors(registry.group(), services.artifact_revision),
-        deployment=DeploymentProcessors(registry.group(), services.deployment),
-        storage_namespace=StorageNamespaceProcessors(registry.group()),
-        audit_log=AuditLogProcessors(registry.group()),
+        vfs_storage=VFSStorageProcessors(
+            registry.group(GroupMeta(VFS_STORAGE_ENTITY_TYPE)), services.vfs_storage
+        ),
+        artifact=ArtifactProcessors(
+            registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)), services.artifact
+        ),
+        artifact_registry=ArtifactRegistryProcessors(
+            registry.group(GroupMeta(ARTIFACT_REGISTRY_ENTITY_TYPE)), services.artifact_registry
+        ),
+        artifact_revision=ArtifactRevisionProcessors(
+            registry.group(GroupMeta(ARTIFACT_REVISION_ENTITY_TYPE)), services.artifact_revision
+        ),
+        deployment=DeploymentProcessors(
+            registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), services.deployment
+        ),
+        storage_namespace=StorageNamespaceProcessors(
+            registry.group(GroupMeta(STORAGE_NAMESPACE_ENTITY_TYPE))
+        ),
+        audit_log=AuditLogProcessors(
+            registry.sidecar_group(SidecarGroupMeta(AUDIT_LOG_ENTITY_TYPE), AuditLogData)
+        ),
         idle_checker_assignment=IdleCheckerAssignmentProcessors(
             services.idle_checker_assignment, action_monitors, validators
         ),
         scheduling_history=SchedulingHistoryProcessors(
-            registry.group(), services.scheduling_history
+            registry.group(GroupMeta(SESSION_ENTITY_TYPE)), services.scheduling_history
         ),
-        service_catalog=ServiceCatalogProcessors(registry.group()),
-        template=TemplateProcessors(registry.group(), services.template),
+        service_catalog=ServiceCatalogProcessors(
+            registry.group(GroupMeta(SERVICE_CATALOG_ENTITY_TYPE))
+        ),
+        template=TemplateProcessors(
+            registry.group(GroupMeta(SESSION_TEMPLATE_ENTITY_TYPE)), services.template
+        ),
         resource_allocation=ResourceAllocationProcessors(
-            registry.group(), services.resource_allocation
+            registry.group(GroupMeta(USER_ENTITY_TYPE)), services.resource_allocation
         ),
-        stream=StreamProcessors(registry.group(), services.stream),
+        stream=StreamProcessors(registry.group(GroupMeta(SESSION_ENTITY_TYPE)), services.stream),
     )
     return ProcessorsBundle(processors=processors, registry=registry)

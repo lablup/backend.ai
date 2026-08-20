@@ -16,7 +16,10 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.common.data.entity.prometheus_query_preset import (
+    PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
+)
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
     PrometheusQueryPresetAdapter,
 )
@@ -85,7 +88,9 @@ def prometheus_query_preset_processors(
         default_timewindow="5m",
         template_renderer=PromQLTemplateRenderer(),
     )
-    return PrometheusQueryPresetProcessors(processor_registry.group(), service)
+    return PrometheusQueryPresetProcessors(
+        processor_registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()

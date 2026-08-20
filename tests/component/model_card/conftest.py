@@ -16,10 +16,12 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.permission.types import EntityType, OperationType, Permission, ScopeType
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
@@ -102,7 +104,7 @@ def model_card_processors(
     """Real ModelCardProcessors with real RBAC enforcement."""
     repo = ModelCardRepository(database_engine)
     service = ModelCardService(repo, storage_manager)
-    return ModelCardProcessors(processor_registry.group(), service)
+    return ModelCardProcessors(processor_registry.group(GroupMeta(MODEL_CARD_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()
@@ -128,7 +130,7 @@ def group_processors(
         valkey_stat_client=valkey_clients.stat,
         group_repositories=repositories,
     )
-    return GroupProcessors(processor_registry.group(), service)
+    return GroupProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()

@@ -8,8 +8,8 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.data.entity.vfs_storage import VFSStorageID
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE, VFSStorageID
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -40,7 +40,9 @@ def vfs_storage_processors(
         vfs_storage_repository=vfs_storage_repository,
         storage_manager=storage_manager,
     )
-    return VFSStorageProcessors(processor_registry.group(), service)
+    return VFSStorageProcessors(
+        processor_registry.group(GroupMeta(VFS_STORAGE_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()

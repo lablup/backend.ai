@@ -5,7 +5,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.rest.export.handler import ExportHandler
 from ai.backend.manager.api.rest.export.registry import register_export_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -27,7 +29,7 @@ def export_processors(
     registry = ExportReportRegistry.create_default()
     repo = ExportRepository(db_source, registry)
     service = ExportService(repo)
-    return ExportProcessors(processor_registry.group(), service)
+    return ExportProcessors(processor_registry.group(GroupMeta(EXPORT_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()
@@ -41,7 +43,9 @@ def server_module_registries(
         register_export_routes(
             ExportHandler(
                 export=export_processors,
-                domain=DomainProcessors(processor_registry.group(), AsyncMock(), []),
+                domain=DomainProcessors(
+                    processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), AsyncMock(), []
+                ),
                 export_config=MagicMock(),
             ),
             route_deps,

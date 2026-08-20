@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.registry import FieldProcessorGroup, ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
@@ -20,10 +20,6 @@ from ai.backend.manager.services.deployment_revision_preset.actions.create impor
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.get import (
     GetDeploymentPresetAction,
-)
-from ai.backend.manager.services.deployment_revision_preset.actions.lookup_slot_owner import (
-    LookupBulkPresetResourceSlotOwnerAction,
-    LookupPresetResourceSlotOwnerAction,
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.purge import (
     PurgeDeploymentPresetAction,
@@ -67,6 +63,7 @@ class DeploymentPresetProcessors:
     def __init__(
         self,
         group: ProcessorGroup[DeploymentRevisionPresetData],
+        slots: FieldProcessorGroup[PresetResourceSlotData],
         service: DeploymentPresetService,
     ) -> None:
         self.create = group.global_create_with_fields_ops(CreateDeploymentPresetAction)
@@ -74,9 +71,4 @@ class DeploymentPresetProcessors:
         self.global_search = group.global_search_ops(GlobalSearchDeploymentPresetsAction)
         self.update = group.single_entity(UpdateDeploymentPresetAction, service.update)
         self.purge = group.entity_purge_ops(PurgeDeploymentPresetAction)
-        slots = group.field_group(
-            PresetResourceSlotData,
-            LookupPresetResourceSlotOwnerAction,
-            LookupBulkPresetResourceSlotOwnerAction,
-        )
         self.search_resource_slots = slots.search_ops(SearchPresetResourceSlotsAction)

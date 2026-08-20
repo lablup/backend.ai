@@ -4,8 +4,10 @@ from typing import Any
 
 import pytest
 
+from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
+from ai.backend.common.data.entity.etcd_config import ETCD_CONFIG_ENTITY_TYPE
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.rest.etcd.handler import EtcdHandler
 from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -30,7 +32,9 @@ def container_registry_processors(
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine)
     service = ContainerRegistryService(database_engine, repo)
-    return ContainerRegistryProcessors(processor_registry.group(), service)
+    return ContainerRegistryProcessors(
+        processor_registry.group(GroupMeta(CONTAINER_REGISTRY_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()
@@ -48,7 +52,9 @@ def etcd_config_processors(
         etcd=async_etcd,
         valkey_stat=valkey_clients.stat,
     )
-    return EtcdConfigProcessors(processor_registry.group(), service)
+    return EtcdConfigProcessors(
+        processor_registry.group(GroupMeta(ETCD_CONFIG_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()

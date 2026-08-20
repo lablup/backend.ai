@@ -9,7 +9,8 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.rest.container_registry.handler import ContainerRegistryHandler
 from ai.backend.manager.api.rest.container_registry.registry import (
     register_container_registry_routes,
@@ -32,7 +33,9 @@ def container_registry_processors(
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine)
     service = ContainerRegistryService(database_engine, repo)
-    return ContainerRegistryProcessors(processor_registry.group(), service)
+    return ContainerRegistryProcessors(
+        processor_registry.group(GroupMeta(CONTAINER_REGISTRY_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()

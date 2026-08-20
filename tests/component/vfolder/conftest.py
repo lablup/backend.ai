@@ -10,6 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.common.data.entity.vfolder_invitation import VFOLDER_INVITATION_ENTITY_TYPE
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
@@ -27,7 +29,7 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderUsageMode,
 )
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -127,7 +129,7 @@ def vfolder_processors(
         user_repository=user_repository,
         valkey_stat_client=valkey_clients.stat,
     )
-    return VFolderProcessors(processor_registry.group(), service)
+    return VFolderProcessors(processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()
@@ -145,7 +147,7 @@ def vfolder_file_processors(
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
     )
-    return VFolderFileProcessors(processor_registry.group(), service)
+    return VFolderFileProcessors(processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()
@@ -161,7 +163,9 @@ def vfolder_invite_processors(
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
     )
-    return VFolderInviteProcessors(processor_registry.group(), service)
+    return VFolderInviteProcessors(
+        processor_registry.group(GroupMeta(VFOLDER_INVITATION_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()
@@ -177,7 +181,9 @@ def vfolder_sharing_processors(
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
     )
-    return VFolderSharingProcessors(processor_registry.group(), service)
+    return VFolderSharingProcessors(
+        processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()

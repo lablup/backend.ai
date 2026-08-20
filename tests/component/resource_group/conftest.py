@@ -16,7 +16,8 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
+from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -38,7 +39,9 @@ def scaling_group_processors(
 ) -> ScalingGroupProcessors:
     repo = ScalingGroupRepository(database_engine)
     service = ScalingGroupService(repo)
-    return ScalingGroupProcessors(processor_registry.group(), service)
+    return ScalingGroupProcessors(
+        processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service
+    )
 
 
 @pytest.fixture()
