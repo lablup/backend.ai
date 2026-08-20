@@ -2,17 +2,17 @@
 
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
 
-__all__ = ("REPLICA_GROUP_HISTORY_ENTITY_TYPE", "ReplicaGroupHistoryID")
+__all__ = ("REPLICA_GROUP_HISTORY_FIELD_TYPE", "ReplicaGroupHistoryID")
 
-REPLICA_GROUP_HISTORY_ENTITY_TYPE = EntityType("replica_group_history")
+REPLICA_GROUP_HISTORY_FIELD_TYPE = FieldType("replica_group_history")
 
 
-class ReplicaGroupHistoryID(EntityIdentifier):
+class ReplicaGroupHistoryID(FieldIdentifier):
     """A replica group history row's id."""
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return REPLICA_GROUP_HISTORY_ENTITY_TYPE
+    def field_type(cls) -> FieldType:
+        return REPLICA_GROUP_HISTORY_FIELD_TYPE

@@ -13,6 +13,5 @@ class ImageID(EntityIdentifier):
     """An image's entity id."""
 
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return IMAGE_ENTITY_TYPE

@@ -1,20 +1,37 @@
-from ai.backend.common.data.entity.types import EntityType, SidecarIdentifier
+from typing import override
+
+from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
 
 __all__ = (
-    "AUDIT_LOG_ENTITY_TYPE",
+    "AUDIT_LOG_FIELD_TYPE",
+    "AUDIT_LOG_SCOPE_FIELD_TYPE",
     "AuditLogID",
     "AuditLogScopeID",
 )
 
 
-# Raw string mirroring the RBAC-managed EntityType.AUDIT_LOG value. An audit row is not
-# an entity; this names the kind of thing the rows are about, on the action that reads them.
-AUDIT_LOG_ENTITY_TYPE = EntityType("audit_log")
+AUDIT_LOG_FIELD_TYPE = FieldType("audit_log")
+AUDIT_LOG_SCOPE_FIELD_TYPE = FieldType("audit_log_scope")
 
 
-class AuditLogID(SidecarIdentifier):
-    pass
+class AuditLogID(FieldIdentifier):
+    """One audit record's id.
+
+    A field of whatever entity the recorded action was about, so the owner's type is a
+    value on the row rather than a declaration here — and a record of an action that
+    named nothing has no owner at all.
+    """
+
+    @override
+    @classmethod
+    def field_type(cls) -> FieldType:
+        return AUDIT_LOG_FIELD_TYPE
 
 
-class AuditLogScopeID(SidecarIdentifier):
-    pass
+class AuditLogScopeID(FieldIdentifier):
+    """One scope an audit record sits in, owned by that record."""
+
+    @override
+    @classmethod
+    def field_type(cls) -> FieldType:
+        return AUDIT_LOG_SCOPE_FIELD_TYPE

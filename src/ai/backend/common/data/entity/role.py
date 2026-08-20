@@ -14,6 +14,5 @@ ROLE_ENTITY_TYPE = EntityType("role")
 
 class RoleID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return ROLE_ENTITY_TYPE

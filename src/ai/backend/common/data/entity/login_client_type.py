@@ -14,6 +14,5 @@ LOGIN_CLIENT_TYPE_ENTITY_TYPE = EntityType("login_client_type")
 
 class LoginClientTypeID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return LOGIN_CLIENT_TYPE_ENTITY_TYPE

@@ -14,6 +14,5 @@ PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE = EntityType("prometheus_query_pres
 
 class PrometheusQueryPresetCategoryID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE

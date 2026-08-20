@@ -14,6 +14,5 @@ class DeploymentID(EntityIdentifier):
     """A deployment's entity id."""
 
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return DEPLOYMENT_ENTITY_TYPE

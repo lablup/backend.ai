@@ -13,6 +13,5 @@ class ResourcePresetID(EntityIdentifier):
     """A resource preset's entity id."""
 
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return RESOURCE_PRESET_ENTITY_TYPE

@@ -1,7 +1,6 @@
 from typing import override
 
-from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityType, FieldIdentifier, FieldType
+from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
 
 __all__ = ("AgentResourceID",)
 
@@ -16,8 +15,3 @@ class AgentResourceID(FieldIdentifier):
     @classmethod
     def field_type(cls) -> FieldType:
         return AGENT_RESOURCE_FIELD_TYPE
-
-    @override
-    @classmethod
-    def owner_entity_type(cls) -> EntityType:
-        return AGENT_ENTITY_TYPE

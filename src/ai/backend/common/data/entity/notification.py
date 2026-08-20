@@ -17,13 +17,11 @@ NOTIFICATION_RULE_ENTITY_TYPE = EntityType("notification_rule")
 
 class NotificationChannelID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return NOTIFICATION_CHANNEL_ENTITY_TYPE
 
 
 class NotificationRuleID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return NOTIFICATION_RULE_ENTITY_TYPE

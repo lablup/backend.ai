@@ -14,6 +14,5 @@ STORAGE_NAMESPACE_ENTITY_TYPE = EntityType("storage_namespace")
 
 class StorageNamespaceID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return STORAGE_NAMESPACE_ENTITY_TYPE

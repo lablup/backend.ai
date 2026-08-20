@@ -8,6 +8,5 @@ __all__ = ("AppConfigAllowListID",)
 
 class AppConfigAllowListID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return APP_CONFIG_ALLOW_LIST_ENTITY_TYPE

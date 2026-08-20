@@ -14,6 +14,5 @@ MODEL_CARD_ENTITY_TYPE = EntityType("model_card")
 
 class ModelCardID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return MODEL_CARD_ENTITY_TYPE

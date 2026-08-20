@@ -14,6 +14,5 @@ APP_CONFIG_DEFINITION_ENTITY_TYPE = EntityType("app_config_definition")
 
 class AppConfigDefinitionID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return APP_CONFIG_DEFINITION_ENTITY_TYPE

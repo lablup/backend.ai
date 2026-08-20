@@ -14,6 +14,5 @@ RETENTION_POLICY_ENTITY_TYPE = EntityType("retention_policy")
 
 class RetentionPolicyID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return RETENTION_POLICY_ENTITY_TYPE

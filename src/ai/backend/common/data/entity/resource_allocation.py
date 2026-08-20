@@ -1,7 +1,6 @@
 from typing import override
 
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityType, FieldIdentifier, FieldType
+from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
 
 __all__ = ("ResourceAllocationID",)
 
@@ -19,8 +18,3 @@ class ResourceAllocationID(FieldIdentifier):
     @classmethod
     def field_type(cls) -> FieldType:
         return RESOURCE_ALLOCATION_FIELD_TYPE
-
-    @override
-    @classmethod
-    def owner_entity_type(cls) -> EntityType:
-        return SESSION_ENTITY_TYPE

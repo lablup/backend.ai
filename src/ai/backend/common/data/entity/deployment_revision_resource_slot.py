@@ -1,7 +1,6 @@
 from typing import override
 
-from ai.backend.common.data.entity.deployment_revision import DEPLOYMENT_REVISION_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityType, FieldIdentifier, FieldType
+from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
 
 __all__ = ("DeploymentRevisionResourceSlotID",)
 
@@ -16,8 +15,3 @@ class DeploymentRevisionResourceSlotID(FieldIdentifier):
     @classmethod
     def field_type(cls) -> FieldType:
         return DEPLOYMENT_REVISION_RESOURCE_SLOT_FIELD_TYPE
-
-    @override
-    @classmethod
-    def owner_entity_type(cls) -> EntityType:
-        return DEPLOYMENT_REVISION_ENTITY_TYPE

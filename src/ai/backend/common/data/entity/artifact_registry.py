@@ -13,6 +13,5 @@ class ArtifactRegistryID(EntityIdentifier):
     """An artifact registry's entity id."""
 
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return ARTIFACT_REGISTRY_ENTITY_TYPE

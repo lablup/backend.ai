@@ -14,6 +14,5 @@ SERVICE_CATALOG_ENTITY_TYPE = EntityType("service_catalog")
 
 class ServiceCatalogID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return SERVICE_CATALOG_ENTITY_TYPE

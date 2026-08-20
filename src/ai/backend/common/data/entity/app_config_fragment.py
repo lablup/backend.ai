@@ -8,6 +8,5 @@ __all__ = ("AppConfigFragmentID",)
 
 class AppConfigFragmentID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return APP_CONFIG_FRAGMENT_ENTITY_TYPE

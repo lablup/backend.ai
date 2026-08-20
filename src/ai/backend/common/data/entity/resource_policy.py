@@ -20,20 +20,17 @@ PROJECT_RESOURCE_POLICY_ENTITY_TYPE = EntityType("project_resource_policy")
 
 class KeyPairResourcePolicyUUID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE
 
 
 class UserResourcePolicyUUID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return USER_RESOURCE_POLICY_ENTITY_TYPE
 
 
 class ProjectResourcePolicyUUID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return PROJECT_RESOURCE_POLICY_ENTITY_TYPE

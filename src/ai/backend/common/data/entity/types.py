@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, NewType
+from typing import Any, NewType, override
 from uuid import UUID
 
 from pydantic import GetCoreSchemaHandler
@@ -111,9 +111,13 @@ class EntityIdentifier(UUID):
     def __init__(self, value: UUID) -> None:
         super().__init__(int=value.int)
 
-    @classmethod
     @abstractmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
+        """The type this is an id of.
+
+        Read from the value, not the class: an id built from what a caller named carries
+        its type instead of declaring one.
+        """
         raise NotImplementedError
 
     def entity_ref(self) -> EntityRef:
@@ -126,29 +130,31 @@ class EntityIdentifier(UUID):
         return core_schema.no_info_after_validator_function(cls, core_schema.uuid_schema())
 
 
-class SidecarIdentifier(UUID):
-    """A sidecar row's id.
+class RuntimeEntityID(EntityIdentifier):
+    """An entity id built from what a caller named, carrying its type as a value.
 
-    It names no type, unlike the other two: a sidecar sits outside the graph, so there
-    is neither an entity type it is nor an owner type it belongs to. Subclassing `UUID`
-    is what keeps such ids apart from each other at the type level.
+    For an input or a row that says which kind it is; where the kind is known statically,
+    the declaring id class says so and this must not stand in for it.
     """
 
-    def __init__(self, value: UUID) -> None:
-        super().__init__(int=value.int)
+    _entity_type: EntityType
 
-    @classmethod
-    def __get_pydantic_core_schema__(cls, source: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
-        """Validated as the uuid it is; pydantic builds no schema for a `UUID`
-        subclass on its own."""
-        return core_schema.no_info_after_validator_function(cls, core_schema.uuid_schema())
+    def __init__(self, entity_type: EntityType, value: UUID) -> None:
+        super().__init__(value)
+        object.__setattr__(self, "_entity_type", entity_type)
+
+    @override
+    def entity_type(self) -> EntityType:
+        return self._entity_type
 
 
 class FieldIdentifier(UUID):
-    """A field row's id, which knows the entity type that owns it.
+    """A field row's id.
 
     No `entity_ref()`: a field row carries no membership of its own, so what it belongs
-    to is only knowable through the entity that owns it.
+    to is only knowable through the entity that owns it. Which entity that is comes from
+    the owner lookup, not from this class: an owner may be another field row, and some
+    kinds have none at all.
     """
 
     def __init__(self, value: UUID) -> None:
@@ -158,12 +164,6 @@ class FieldIdentifier(UUID):
     @abstractmethod
     def field_type(cls) -> FieldType:
         """Return the type of field row this id names."""
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def owner_entity_type(cls) -> EntityType:
-        """Return the type of entity that owns rows this id names."""
         raise NotImplementedError
 
     @classmethod

@@ -22,8 +22,7 @@ DOMAIN_SCOPE_TYPE = ScopeType(DOMAIN_ENTITY_TYPE)
 
 class DomainID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return DOMAIN_ENTITY_TYPE
 
 

@@ -14,6 +14,5 @@ VFS_STORAGE_ENTITY_TYPE = EntityType("vfs_storage")
 
 class VFSStorageID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return VFS_STORAGE_ENTITY_TYPE

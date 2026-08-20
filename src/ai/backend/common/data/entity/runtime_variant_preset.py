@@ -15,6 +15,5 @@ RUNTIME_VARIANT_PRESET_ENTITY_TYPE = EntityType("runtime_variant_preset")
 
 class RuntimeVariantPresetID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return RUNTIME_VARIANT_PRESET_ENTITY_TYPE

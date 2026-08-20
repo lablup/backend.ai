@@ -16,6 +16,5 @@ USER_SCOPE_TYPE = ScopeType(USER_ENTITY_TYPE)
 
 class UserID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return USER_ENTITY_TYPE

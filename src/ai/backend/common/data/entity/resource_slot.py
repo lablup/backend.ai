@@ -22,6 +22,5 @@ class ResourceSlotName(NaturalKey):
 
 class ResourceSlotTypeUUID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return RESOURCE_SLOT_TYPE_ENTITY_TYPE

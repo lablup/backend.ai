@@ -16,6 +16,5 @@ PROJECT_SCOPE_TYPE = ScopeType(PROJECT_ENTITY_TYPE)
 
 class ProjectID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return PROJECT_ENTITY_TYPE

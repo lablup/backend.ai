@@ -13,6 +13,5 @@ class SessionTemplateID(EntityIdentifier):
     """A session template's entity id."""
 
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return SESSION_TEMPLATE_ENTITY_TYPE

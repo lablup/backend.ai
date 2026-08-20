@@ -16,6 +16,5 @@ SESSION_SCOPE_TYPE = ScopeType(SESSION_ENTITY_TYPE)
 
 class SessionID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return SESSION_ENTITY_TYPE

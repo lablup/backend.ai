@@ -1,7 +1,6 @@
 from typing import override
 
-from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityType, FieldIdentifier, FieldType
+from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
 
 __all__ = ("ModelCardResourceRequirementID",)
 
@@ -16,8 +15,3 @@ class ModelCardResourceRequirementID(FieldIdentifier):
     @classmethod
     def field_type(cls) -> FieldType:
         return MODEL_CARD_RESOURCE_REQUIREMENT_FIELD_TYPE
-
-    @override
-    @classmethod
-    def owner_entity_type(cls) -> EntityType:
-        return MODEL_CARD_ENTITY_TYPE

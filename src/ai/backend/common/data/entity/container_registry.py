@@ -16,6 +16,5 @@ CONTAINER_REGISTRY_SCOPE_TYPE = ScopeType(CONTAINER_REGISTRY_ENTITY_TYPE)
 
 class ContainerRegistryID(EntityIdentifier):
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(self) -> EntityType:
         return CONTAINER_REGISTRY_ENTITY_TYPE
