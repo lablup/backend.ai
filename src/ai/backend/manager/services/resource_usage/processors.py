@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.registry.sidecar import SidecarProcessorGroup
+from ai.backend.manager.actions.registry.field import FieldGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, ScopedFieldsOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
@@ -61,9 +61,9 @@ class ResourceUsageProcessors:
 
     def __init__(
         self,
-        domain: SidecarProcessorGroup[DomainUsageBucketData],
-        project: SidecarProcessorGroup[ProjectUsageBucketData],
-        user: SidecarProcessorGroup[UserUsageBucketData],
+        domain: FieldGroup[DomainUsageBucketData],
+        project: FieldGroup[ProjectUsageBucketData],
+        user: FieldGroup[UserUsageBucketData],
     ) -> None:
         self.global_search_domain_usage_buckets = domain.global_search_ops(
             GlobalSearchDomainUsageBucketsAction

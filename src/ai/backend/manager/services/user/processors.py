@@ -1,4 +1,4 @@
-from ai.backend.manager.actions.registry.field import FieldProcessorGroup
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
@@ -112,7 +112,7 @@ class UserProcessors:
     lookup_keypair_owner: LookupActionProcessor[
         LookupKeypairOwnerByAccessKeyAction, FieldOwnerLookupOpsResult
     ]
-    keypair_group: FieldProcessorGroup[KeyPairData]
+    keypair_group: LookupFieldGroup[KeyPairData]
     global_search: GlobalActionProcessor[GlobalSearchUsersAction, BatchOpsResult[UserData]]
     search_users_by_domain: ScopeActionProcessor[
         SearchUsersByDomainAction, ScopedBatchOpsResult[UserData]
@@ -185,7 +185,7 @@ class UserProcessors:
     def __init__(
         self,
         group: ProcessorGroup[UserData],
-        keypair_group: FieldProcessorGroup[KeyPairData],
+        keypair_group: LookupFieldGroup[KeyPairData],
         user_service: UserService,
     ) -> None:
         self.lookup = group.public_lookup_ops(LookupUserAction)

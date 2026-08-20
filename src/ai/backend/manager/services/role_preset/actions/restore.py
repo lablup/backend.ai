@@ -4,8 +4,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE, RolePresetID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import RestorePartialBulkOpsAction
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.row import (
@@ -21,11 +21,6 @@ class BulkRestoreRolePresetsAction(RestorePartialBulkOpsAction[RolePresetRow, Ro
     """Undo the soft delete on the named presets, answering for each one."""
 
     ids: Sequence[RolePresetID]
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return ROLE_PRESET_ENTITY_TYPE
 
     @override
     @classmethod

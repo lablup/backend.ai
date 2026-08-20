@@ -5,11 +5,9 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.deployment import (
+    DEPLOYMENT_ENTITY_TYPE,
     DEPLOYMENT_SCOPE_TYPE,
     DeploymentID,
-)
-from ai.backend.common.data.entity.replica_group_history import (
-    REPLICA_GROUP_HISTORY_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
 from ai.backend.manager.actions.types import ActionOperationType
@@ -65,7 +63,7 @@ class ScopedSearchReplicaGroupHistoryAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return REPLICA_GROUP_HISTORY_ENTITY_TYPE
+        return DEPLOYMENT_ENTITY_TYPE
 
     @override
     @classmethod

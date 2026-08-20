@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.usage_bucket import PROJECT_USAGE_BUCKET_ENTITY_TYPE
+from ai.backend.common.data.entity.types import GLOBAL_ENTITY_TYPE, EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.resource_usage_history.types import ProjectUsageBucketData
 from ai.backend.manager.models.resource_usage_history.row import ProjectUsageBucketRow
@@ -24,7 +23,7 @@ class GlobalSearchProjectUsageBucketsAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return PROJECT_USAGE_BUCKET_ENTITY_TYPE
+        return GLOBAL_ENTITY_TYPE
 
     @override
     @classmethod

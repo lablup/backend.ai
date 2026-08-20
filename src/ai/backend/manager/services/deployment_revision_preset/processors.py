@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.registry.field import FieldProcessorGroup
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
@@ -64,7 +64,7 @@ class DeploymentPresetProcessors:
     def __init__(
         self,
         group: ProcessorGroup[DeploymentRevisionPresetData],
-        slots: FieldProcessorGroup[PresetResourceSlotData],
+        slots: LookupFieldGroup[PresetResourceSlotData],
         service: DeploymentPresetService,
     ) -> None:
         self.create = group.global_create_with_fields_ops(CreateDeploymentPresetAction)

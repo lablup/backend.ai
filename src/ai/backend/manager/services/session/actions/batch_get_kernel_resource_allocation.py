@@ -4,8 +4,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.types import KernelId
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
@@ -21,11 +21,6 @@ class BatchGetKernelResourceAllocationAction(BaseBulkAction):
     """
 
     kernel_ids: list[KernelId]
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return SESSION_ENTITY_TYPE
 
     @override
     @classmethod

@@ -28,10 +28,6 @@ class DeleteErrorLogAction(DeleteFieldOpsAction[ErrorLogID, UserID, ErrorLogRow,
         return "delete_error_log"
 
     @override
-    def field_id(self) -> ErrorLogID:
-        return self.log_id
-
-    @override
     def to_owner_lookup_action(self) -> LookupErrorLogOwnerAction:
         return LookupErrorLogOwnerAction(log_id=self.log_id)
 

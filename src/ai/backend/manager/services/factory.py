@@ -9,8 +9,8 @@ from ai.backend.common.data.entity.app_config import (
 from ai.backend.common.data.entity.app_config_definition import APP_CONFIG_DEFINITION_ENTITY_TYPE
 from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE
 from ai.backend.common.data.entity.artifact_registry import ARTIFACT_REGISTRY_ENTITY_TYPE
-from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_ENTITY_TYPE
-from ai.backend.common.data.entity.audit_log import AUDIT_LOG_ENTITY_TYPE
+from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_FIELD_TYPE
+from ai.backend.common.data.entity.audit_log import AUDIT_LOG_FIELD_TYPE
 from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
@@ -43,7 +43,6 @@ from ai.backend.common.data.entity.prometheus_query_preset import (
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE,
 )
-from ai.backend.common.data.entity.replica_group_history import REPLICA_GROUP_HISTORY_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_policy import (
     KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
@@ -62,9 +61,9 @@ from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
 from ai.backend.common.data.entity.session_template import SESSION_TEMPLATE_ENTITY_TYPE
 from ai.backend.common.data.entity.storage_namespace import STORAGE_NAMESPACE_ENTITY_TYPE
 from ai.backend.common.data.entity.usage_bucket import (
-    DOMAIN_USAGE_BUCKET_ENTITY_TYPE,
-    PROJECT_USAGE_BUCKET_ENTITY_TYPE,
-    USER_USAGE_BUCKET_ENTITY_TYPE,
+    DOMAIN_USAGE_BUCKET_FIELD_TYPE,
+    PROJECT_USAGE_BUCKET_FIELD_TYPE,
+    USER_USAGE_BUCKET_FIELD_TYPE,
 )
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
@@ -78,9 +77,9 @@ from ai.backend.manager.actions.registry.types import (
     FieldGroupMeta,
     GroupMeta,
     ProcessorDependencies,
-    SidecarGroupMeta,
 )
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotData
 from ai.backend.manager.data.error_log.types import ErrorLogData
@@ -107,6 +106,10 @@ from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
+from ai.backend.manager.services.artifact_revision.actions.lookup_owner import (
+    LookupArtifactRevisionOwnerAction,
+    LookupBulkArtifactRevisionOwnerAction,
+)
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
@@ -515,6 +518,12 @@ def create_processors(
     )
     # Areas covering several entities: every group made here names the area.
     fair_share_groups = registry.concern(ConcernMeta("fair_share"))
+    artifact_revisions = registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
+        FieldGroupMeta(ARTIFACT_REVISION_FIELD_TYPE),
+        ArtifactRevisionData,
+        LookupArtifactRevisionOwnerAction,
+        LookupBulkArtifactRevisionOwnerAction,
+    )
     resource_slot_groups = registry.concern(ConcernMeta("resource_slot"))
     scheduling_history_groups = registry.concern(ConcernMeta("scheduling_history"))
     resource_allocation_groups = registry.concern(ConcernMeta("resource_allocation"))
@@ -650,14 +659,14 @@ def create_processors(
             registry.group(GroupMeta(MODEL_CARD_ENTITY_TYPE)), services.model_card
         ),
         resource_usage=ResourceUsageProcessors(
-            registry.sidecar_group(
-                SidecarGroupMeta(DOMAIN_USAGE_BUCKET_ENTITY_TYPE), DomainUsageBucketData
+            registry.dangling_field_group(
+                FieldGroupMeta(DOMAIN_USAGE_BUCKET_FIELD_TYPE), DomainUsageBucketData
             ),
-            registry.sidecar_group(
-                SidecarGroupMeta(PROJECT_USAGE_BUCKET_ENTITY_TYPE), ProjectUsageBucketData
+            registry.dangling_field_group(
+                FieldGroupMeta(PROJECT_USAGE_BUCKET_FIELD_TYPE), ProjectUsageBucketData
             ),
-            registry.sidecar_group(
-                SidecarGroupMeta(USER_USAGE_BUCKET_ENTITY_TYPE), UserUsageBucketData
+            registry.dangling_field_group(
+                FieldGroupMeta(USER_USAGE_BUCKET_FIELD_TYPE), UserUsageBucketData
             ),
         ),
         scaling_group=ScalingGroupProcessors(
@@ -681,7 +690,7 @@ def create_processors(
         ),
         object_storage=ObjectStorageProcessors(
             registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)),
-            registry.group(GroupMeta(ARTIFACT_REVISION_ENTITY_TYPE)),
+            artifact_revisions,
             services.object_storage,
         ),
         permission_controller=PermissionControllerProcessors(
@@ -697,7 +706,9 @@ def create_processors(
             registry.group(GroupMeta(ARTIFACT_REGISTRY_ENTITY_TYPE)), services.artifact_registry
         ),
         artifact_revision=ArtifactRevisionProcessors(
-            registry.group(GroupMeta(ARTIFACT_REVISION_ENTITY_TYPE)), services.artifact_revision
+            registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+            artifact_revisions,
+            services.artifact_revision,
         ),
         deployment=DeploymentProcessors(
             registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), services.deployment
@@ -706,7 +717,7 @@ def create_processors(
             registry.group(GroupMeta(STORAGE_NAMESPACE_ENTITY_TYPE))
         ),
         audit_log=AuditLogProcessors(
-            registry.sidecar_group(SidecarGroupMeta(AUDIT_LOG_ENTITY_TYPE), AuditLogData)
+            registry.dangling_field_group(FieldGroupMeta(AUDIT_LOG_FIELD_TYPE), AuditLogData)
         ),
         idle_checker_assignment=IdleCheckerAssignmentProcessors(
             services.idle_checker_assignment, action_monitors, validators
@@ -714,7 +725,7 @@ def create_processors(
         scheduling_history=SchedulingHistoryProcessors(
             scheduling_history_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
             scheduling_history_groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
-            scheduling_history_groups.group(GroupMeta(REPLICA_GROUP_HISTORY_ENTITY_TYPE)),
+            scheduling_history_groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
             services.scheduling_history,
         ),
         service_catalog=ServiceCatalogProcessors(

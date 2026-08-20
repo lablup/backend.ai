@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
-
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
@@ -12,6 +12,7 @@ from ai.backend.manager.actions.v2.ops.result import (
 from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,
 )
+from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.services.object_storage.actions.create import (
     CreateObjectStorageAction,
@@ -53,17 +54,17 @@ class ObjectStorageProcessors:
     global_search_object_storages: GlobalActionProcessor[
         SearchObjectStoragesAction, BatchOpsResult[ObjectStorageData]
     ]
-    get_presigned_download_url: SingleEntityActionProcessor[
+    get_presigned_download_url: SingleFieldActionProcessor[
         GetDownloadPresignedURLAction, GetDownloadPresignedURLActionResult
     ]
-    get_presigned_upload_url: SingleEntityActionProcessor[
+    get_presigned_upload_url: SingleFieldActionProcessor[
         GetUploadPresignedURLAction, GetUploadPresignedURLActionResult
     ]
 
     def __init__(
         self,
         group: ProcessorGroup[ObjectStorageData],
-        revision: ProcessorGroup[Any],
+        revision: LookupFieldGroup[ArtifactRevisionData],
         service: ObjectStorageService,
     ) -> None:
         self.global_create = group.global_create_ops(CreateObjectStorageAction)
@@ -72,9 +73,9 @@ class ObjectStorageProcessors:
         self.get = group.single_get_ops(GetObjectStorageAction)
         self.global_list_storages = group.global_search_ops(ListObjectStorageAction)
         self.global_search_object_storages = group.global_search_ops(SearchObjectStoragesAction)
-        self.get_presigned_download_url = revision.single_entity(
+        self.get_presigned_download_url = revision.single_field(
             GetDownloadPresignedURLAction, service.get_presigned_download_url
         )
-        self.get_presigned_upload_url = revision.single_entity(
+        self.get_presigned_upload_url = revision.single_field(
             GetUploadPresignedURLAction, service.get_presigned_upload_url
         )

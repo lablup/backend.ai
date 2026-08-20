@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
@@ -16,11 +16,6 @@ from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckP
 class ExcludeSessionIdleChecksAction(BaseBulkAction):
     targets: list[SessionIdleCheckPair]
     user_id: UserID
-
-    @classmethod
-    @override
-    def entity_type(cls) -> EntityType:
-        return EntityType("session")
 
     @classmethod
     @override

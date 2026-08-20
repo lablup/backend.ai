@@ -2,14 +2,17 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
-from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
+from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
+from ai.backend.manager.services.artifact_revision.actions.lookup_owner import (
+    LookupArtifactRevisionOwnerAction,
+)
 
 
 @dataclass
-class GetDownloadPresignedURLAction(BaseSingleEntityAction):
+class GetDownloadPresignedURLAction(BaseSingleFieldAction[ArtifactRevisionID, ArtifactID]):
     """Hand out a URL that reads one artifact revision's object.
 
     Answered for by the revision: the storage is picked from the reservoir config,
@@ -31,8 +34,8 @@ class GetDownloadPresignedURLAction(BaseSingleEntityAction):
         return ActionOperationType.GET
 
     @override
-    def entity_id(self) -> EntityIdentifier:
-        return self.artifact_revision_id
+    def to_owner_lookup_action(self) -> LookupArtifactRevisionOwnerAction:
+        return LookupArtifactRevisionOwnerAction(revision_id=self.artifact_revision_id)
 
 
 @dataclass

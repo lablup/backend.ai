@@ -6,11 +6,12 @@ from datetime import datetime, timedelta
 
 from ai.backend.common.data.entity.action import ActionID
 from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.entity.types import FieldData
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 
 
 @dataclass
-class AuditLogData:
+class AuditLogData(FieldData):
     """One audit record, mirroring the row.
 
     ``action_kind`` says which shape wrote it; only that shape's target columns are

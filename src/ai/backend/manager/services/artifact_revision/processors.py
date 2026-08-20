@@ -1,8 +1,10 @@
 from typing import Any
 
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
-from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
     ApproveArtifactRevisionActionResult,
@@ -59,68 +61,75 @@ from ai.backend.manager.services.artifact_revision.service import ArtifactRevisi
 
 
 class ArtifactRevisionProcessors:
-    get: SingleEntityActionProcessor[GetArtifactRevisionAction, GetArtifactRevisionActionResult]
-    get_readme: SingleEntityActionProcessor[
+    get: SingleFieldActionProcessor[GetArtifactRevisionAction, GetArtifactRevisionActionResult]
+    get_readme: SingleFieldActionProcessor[
         GetArtifactRevisionReadmeAction, GetArtifactRevisionReadmeActionResult
     ]
-    get_verification_result: SingleEntityActionProcessor[
+    get_verification_result: SingleFieldActionProcessor[
         GetArtifactRevisionVerificationResultAction,
         GetArtifactRevisionVerificationResultActionResult,
     ]
-    get_download_progress: SingleEntityActionProcessor[
+    get_download_progress: SingleFieldActionProcessor[
         GetDownloadProgressAction, GetDownloadProgressActionResult
     ]
     search_revision: GlobalActionProcessor[
         SearchArtifactRevisionsAction, SearchArtifactRevisionsActionResult
     ]
-    approve: SingleEntityActionProcessor[
+    approve: SingleFieldActionProcessor[
         ApproveArtifactRevisionAction, ApproveArtifactRevisionActionResult
     ]
-    reject: SingleEntityActionProcessor[
+    reject: SingleFieldActionProcessor[
         RejectArtifactRevisionAction, RejectArtifactRevisionActionResult
     ]
-    import_revision: SingleEntityActionProcessor[
+    import_revision: SingleFieldActionProcessor[
         ImportArtifactRevisionAction, ImportArtifactRevisionActionResult
     ]
     delegate_import_revision_batch: GlobalActionProcessor[
         DelegateImportArtifactRevisionBatchAction, DelegateImportArtifactRevisionBatchActionResult
     ]
-    cancel_import: SingleEntityActionProcessor[CancelImportAction, CancelImportActionResult]
-    cleanup: SingleEntityActionProcessor[
+    cancel_import: SingleFieldActionProcessor[CancelImportAction, CancelImportActionResult]
+    cleanup: SingleFieldActionProcessor[
         CleanupArtifactRevisionAction, CleanupArtifactRevisionActionResult
     ]
-    associate_with_storage: SingleEntityActionProcessor[
+    associate_with_storage: SingleFieldActionProcessor[
         AssociateWithStorageAction, AssociateWithStorageActionResult
     ]
-    disassociate_with_storage: SingleEntityActionProcessor[
+    disassociate_with_storage: SingleFieldActionProcessor[
         DisassociateWithStorageAction, DisassociateWithStorageActionResult
     ]
 
-    def __init__(self, group: ProcessorGroup[Any], service: ArtifactRevisionService) -> None:
-        self.get = group.single_entity(GetArtifactRevisionAction, service.get)
-        self.get_readme = group.single_entity(GetArtifactRevisionReadmeAction, service.get_readme)
-        self.get_verification_result = group.single_entity(
+    def __init__(
+        self,
+        group: ProcessorGroup[Any],
+        revisions: LookupFieldGroup[ArtifactRevisionData],
+        service: ArtifactRevisionService,
+    ) -> None:
+        self.get = revisions.single_field(GetArtifactRevisionAction, service.get)
+        self.get_readme = revisions.single_field(
+            GetArtifactRevisionReadmeAction, service.get_readme
+        )
+        self.get_verification_result = revisions.single_field(
             GetArtifactRevisionVerificationResultAction, service.get_verification_result
         )
-        self.get_download_progress = group.single_entity(
+        self.get_download_progress = revisions.single_field(
             GetDownloadProgressAction, service.get_download_progress
         )
         self.search_revision = group.global_scope(
             SearchArtifactRevisionsAction, service.search_revision
         )
-        self.approve = group.single_entity(ApproveArtifactRevisionAction, service.approve)
-        self.reject = group.single_entity(RejectArtifactRevisionAction, service.reject)
-        self.import_revision = group.single_entity(
+        self.approve = revisions.single_field(ApproveArtifactRevisionAction, service.approve)
+        self.reject = revisions.single_field(RejectArtifactRevisionAction, service.reject)
+        self.import_revision = revisions.single_field(
             ImportArtifactRevisionAction, service.import_revision
         )
         self.delegate_import_revision_batch = group.global_scope(
             DelegateImportArtifactRevisionBatchAction, service.delegate_import_revision_batch
         )
-        self.cancel_import = group.single_entity(CancelImportAction, service.cancel_import)
-        self.cleanup = group.single_entity(CleanupArtifactRevisionAction, service.cleanup)
-        self.associate_with_storage = group.single_entity(
+        self.cancel_import = revisions.single_field(CancelImportAction, service.cancel_import)
+        self.cleanup = revisions.single_field(CleanupArtifactRevisionAction, service.cleanup)
+        self.associate_with_storage = revisions.single_field(
             AssociateWithStorageAction, service.associate_with_storage
         )
-        self.disassociate_with_storage = group.single_entity(
+        self.disassociate_with_storage = revisions.single_field(
             DisassociateWithStorageAction, service.disassociate_with_storage
         )

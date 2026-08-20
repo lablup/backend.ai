@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.registry.field import FieldProcessorGroup
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.field.bulk_processor import BulkFieldActionProcessor
@@ -79,7 +79,7 @@ class RolePresetProcessors:
     def __init__(
         self,
         preset_group: ProcessorGroup[RolePresetData],
-        permissions: FieldProcessorGroup[RolePermissionPresetData],
+        permissions: LookupFieldGroup[RolePermissionPresetData],
         service: RolePresetService,
     ) -> None:
         self.create = preset_group.global_scope(CreateRolePresetAction, service.create)

@@ -3,10 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.replica_group_history import (
-    REPLICA_GROUP_HISTORY_ENTITY_TYPE,
-)
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import GLOBAL_ENTITY_TYPE, EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.data.deployment.types import ReplicaGroupHistoryData
@@ -22,7 +19,7 @@ class GlobalSearchReplicaGroupHistoryAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return REPLICA_GROUP_HISTORY_ENTITY_TYPE
+        return GLOBAL_ENTITY_TYPE
 
     @override
     @classmethod

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.registry.field import FieldProcessorGroup
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
@@ -30,7 +30,7 @@ class ErrorLogProcessors:
     scoped_search: ScopeActionProcessor[SearchErrorLogsAction, ScopedFieldsOpsResult[ErrorLogData]]
     delete: SingleFieldActionProcessor[DeleteErrorLogAction, EntityOpsResult[ErrorLogData]]
 
-    def __init__(self, logs: FieldProcessorGroup[ErrorLogData]) -> None:
+    def __init__(self, logs: LookupFieldGroup[ErrorLogData]) -> None:
         self.create = logs.create_ops(CreateErrorLogAction)
         self.global_search = logs.global_search_ops(GlobalSearchErrorLogsAction)
         self.scoped_search = logs.search_ops(SearchErrorLogsAction)

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import FieldData
 from ai.backend.common.types import ResourceSlot
 
 
@@ -28,7 +29,7 @@ class KernelUsageRecordData:
 
 
 @dataclass(frozen=True)
-class DomainUsageBucketData:
+class DomainUsageBucketData(FieldData):
     """Domain usage bucket data (period-based aggregation)."""
 
     id: uuid.UUID
@@ -45,7 +46,7 @@ class DomainUsageBucketData:
 
 
 @dataclass(frozen=True)
-class ProjectUsageBucketData:
+class ProjectUsageBucketData(FieldData):
     """Project usage bucket data (period-based aggregation)."""
 
     id: uuid.UUID
@@ -63,7 +64,7 @@ class ProjectUsageBucketData:
 
 
 @dataclass(frozen=True)
-class UserUsageBucketData:
+class UserUsageBucketData(FieldData):
     """User usage bucket data (period-based aggregation)."""
 
     id: uuid.UUID

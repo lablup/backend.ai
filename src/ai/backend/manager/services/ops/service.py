@@ -348,7 +348,7 @@ class FieldCreateService[TData: FieldData]:
         self, action: FieldCreateOpsAction[Any, Any, TData]
     ) -> CreatedFieldOpsResult[TData]:
         return CreatedFieldOpsResult(
-            data=await self._repository.create_field_entity(action.owner_id(), action.to_creator())
+            data=await self._repository.create_field(action.owner_id(), action.to_creator())
         )
 
 

@@ -6,7 +6,8 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.common.data.entity.audit_log import AuditLogID
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.audit_log.request import (
     AdminSearchAuditLogsInput,
     AuditLogFilter,
@@ -143,12 +144,11 @@ class AuditLogAdapter(BaseAdapter):
                 ) from e
             items.append(
                 EntityAuditLogScopeItem(
-                    entity_type=RBACElementType(entity_scope.entity_type.value),
-                    entity_id=entity_id,
+                    owner=RuntimeEntityID(EntityType(entity_scope.entity_type.value), entity_id),
                 )
             )
         for user_scope in input.scope.triggered_user or []:
-            items.append(TriggeredByAuditLogScopeItem(user_id=user_scope.value))
+            items.append(TriggeredByAuditLogScopeItem(user_id=UserID(user_scope.value)))
         return items
 
     def _convert_filter(self, f: AuditLogFilter) -> list[QueryCondition]:

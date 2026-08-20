@@ -10,6 +10,7 @@ from ai.backend.common.data.artifact.types import (
 )
 from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
+from ai.backend.common.data.entity.types import FieldData
 from ai.backend.manager.data.common.types import StringFilterData
 
 
@@ -73,7 +74,7 @@ class ArtifactData:
 
 
 @dataclass
-class ArtifactRevisionData:
+class ArtifactRevisionData(FieldData):
     id: ArtifactRevisionID
     artifact_id: ArtifactID
     version: str

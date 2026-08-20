@@ -1,13 +1,14 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.artifact_revision import (
-    ARTIFACT_REVISION_ENTITY_TYPE,
-    ArtifactRevisionID,
-)
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
+from ai.backend.common.data.entity.types import GLOBAL_ENTITY_TYPE, EntityType
+from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
-from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
+from ai.backend.manager.services.artifact_revision.actions.lookup_owner import (
+    LookupArtifactRevisionOwnerAction,
+)
 
 
 @dataclass
@@ -17,7 +18,7 @@ class ArtifactRevisionAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return ARTIFACT_REVISION_ENTITY_TYPE
+        return GLOBAL_ENTITY_TYPE
 
 
 @dataclass
@@ -26,11 +27,15 @@ class ArtifactRevisionScopeAction(ArtifactRevisionAction):
 
 
 @dataclass
-class ArtifactRevisionSingleEntityAction(BaseSingleEntityAction):
-    """Base for an operation on one artifact revision."""
+class ArtifactRevisionSingleEntityAction(BaseSingleFieldAction[ArtifactRevisionID, ArtifactID]):
+    """Base for an operation on one artifact revision.
+
+    A revision is a field of the artifact it belongs to, so the artifact answers for it
+    and is read by the lookup this names.
+    """
 
     artifact_revision_id: ArtifactRevisionID
 
     @override
-    def entity_id(self) -> EntityIdentifier:
-        return self.artifact_revision_id
+    def to_owner_lookup_action(self) -> LookupArtifactRevisionOwnerAction:
+        return LookupArtifactRevisionOwnerAction(revision_id=self.artifact_revision_id)

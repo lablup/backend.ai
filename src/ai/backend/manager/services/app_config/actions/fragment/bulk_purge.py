@@ -4,8 +4,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.app_config import APP_CONFIG_FRAGMENT_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import PartialBulkPurgeEntityOpsAction
 from ai.backend.manager.data.app_config.types import AppConfigFragmentData
 from ai.backend.manager.models.app_config_fragment.purgers import AppConfigFragmentPurger
@@ -19,11 +18,6 @@ class BulkPurgeAppConfigFragmentAction(
     """Purge many fragments, each answered for separately."""
 
     purgers: Sequence[AppConfigFragmentPurger]
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return APP_CONFIG_FRAGMENT_ENTITY_TYPE
 
     @override
     @classmethod
