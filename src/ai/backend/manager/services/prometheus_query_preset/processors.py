@@ -55,8 +55,8 @@ class PrometheusQueryPresetProcessors:
 
     def __init__(
         self,
-        service: PrometheusQueryPresetService,
         group: ProcessorGroup[PrometheusQueryPresetData],
+        service: PrometheusQueryPresetService,
     ) -> None:
             CreatePresetAction, service.create_preset
         self.purge_preset = group.entity_purge_ops(PurgePresetAction)

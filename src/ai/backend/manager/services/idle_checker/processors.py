@@ -50,9 +50,9 @@ class IdleCheckerProcessors:
 
     def __init__(
         self,
+        group: ProcessorGroup[Any],
         service: IdleCheckerService,
         action_monitors: list[ActionMonitor],
-        group: ProcessorGroup[Any],
     ) -> None:
         self.admin_search = GlobalActionProcessor(service.admin_search, action_monitors)
         self.create = GlobalActionProcessor(service.create, action_monitors)

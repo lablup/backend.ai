@@ -81,9 +81,9 @@ def notification_processors(
     # built but never reached, so the groups may sit on a stand-in engine.
     engine = MagicMock()
     return NotificationProcessors(
-        service=service,
         channel_group=ops_processor_group(engine),
         rule_group=ops_processor_group(engine),
+        service=service,
     )
 
 

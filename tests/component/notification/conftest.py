@@ -23,9 +23,9 @@ def notification_processors(
     service = NotificationService(repo, notification_center)
     # Create properly structured ActionValidators mock with async validators
     return NotificationProcessors(
-        service=service,
         channel_group=ops_processor_group(database_engine),
         rule_group=ops_processor_group(database_engine),
+        service=service,
     )
 
 

@@ -431,7 +431,7 @@ def create_processors(
         group=GroupProcessors(registry.group(), services.group),
         user=UserProcessors(registry.group(), services.user),
         idle_checker=IdleCheckerProcessors(
-            services.idle_checker, action_monitors, registry.group()
+            registry.group(), services.idle_checker, action_monitors
         ),
         image=ImageProcessors(registry.group(), services.image),
         container_registry=ContainerRegistryProcessors(
@@ -448,7 +448,7 @@ def create_processors(
         user_resource_policy=UserResourcePolicyProcessors(registry.group()),
         project_resource_policy=ProjectResourcePolicyProcessors(registry.group()),
         prometheus_query_preset=PrometheusQueryPresetProcessors(
-            services.prometheus_query_preset, registry.group()
+            registry.group(), services.prometheus_query_preset
         ),
         prometheus_query_preset_category=PrometheusQueryPresetCategoryProcessors(registry.group()),
         resource_preset=ResourcePresetProcessors(registry.group(), services.resource_preset),
@@ -457,7 +457,7 @@ def create_processors(
         role_preset=RolePresetProcessors(registry.group(), services.role_preset),
         runtime_variant=RuntimeVariantProcessors(registry.group()),
         runtime_variant_preset=RuntimeVariantPresetProcessors(
-            services.runtime_variant_preset, registry.group()
+            registry.group(), services.runtime_variant_preset
         ),
         deployment_revision_preset=DeploymentPresetProcessors(
             registry.group(), services.deployment_revision_preset
@@ -473,13 +473,13 @@ def create_processors(
         auth=AuthProcessors(services.auth, action_monitors, validators),
         login_client_type=LoginClientTypeProcessors(registry.group()),
         notification=NotificationProcessors(
-            services.notification, registry.group(), registry.group()
+            registry.group(), registry.group(), services.notification
         ),
-        object_storage=ObjectStorageProcessors(services.object_storage, registry.group()),
+        object_storage=ObjectStorageProcessors(registry.group(), services.object_storage),
         permission_controller=PermissionControllerProcessors(
             services.permission_controller, action_monitors, validators
         ),
-        vfs_storage=VFSStorageProcessors(services.vfs_storage, registry.group()),
+        vfs_storage=VFSStorageProcessors(registry.group(), services.vfs_storage),
         artifact=ArtifactProcessors(registry.group(), services.artifact),
         artifact_registry=ArtifactRegistryProcessors(registry.group(), services.artifact_registry),
         artifact_revision=ArtifactRevisionProcessors(registry.group(), services.artifact_revision),

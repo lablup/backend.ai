@@ -54,8 +54,8 @@ class RuntimeVariantPresetProcessors:
 
     def __init__(
         self,
-        service: RuntimeVariantPresetService,
         group: ProcessorGroup[RuntimeVariantPresetData],
+        service: RuntimeVariantPresetService,
     ) -> None:
         self.public_get = group.public_get_ops(GetRuntimeVariantPresetAction)
         self.global_create = group.global_scope(CreateRuntimeVariantPresetAction, service.create)

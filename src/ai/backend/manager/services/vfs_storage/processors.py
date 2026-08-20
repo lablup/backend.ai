@@ -73,8 +73,8 @@ class VFSStorageProcessors:
 
     def __init__(
         self,
-        service: VFSStorageService,
         group: ProcessorGroup[VFSStorageData],
+        service: VFSStorageService,
     ) -> None:
         self._service = service
         self.global_create = group.global_create_ops(CreateVFSStorageAction)

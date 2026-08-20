@@ -60,8 +60,8 @@ class ObjectStorageProcessors:
 
     def __init__(
         self,
-        service: ObjectStorageService,
         group: ProcessorGroup[ObjectStorageData],
+        service: ObjectStorageService,
     ) -> None:
         self.global_create = group.global_create_ops(CreateObjectStorageAction)
         self.update = group.single_update_ops(UpdateObjectStorageAction)

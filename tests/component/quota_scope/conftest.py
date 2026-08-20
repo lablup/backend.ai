@@ -26,7 +26,7 @@ def vfs_storage_processors(
 ) -> VFSStorageProcessors:
     repo = VFSStorageRepository(database_engine)
     service = VFSStorageService(repo, storage_manager=storage_manager)
-    return VFSStorageProcessors(service, processor_registry.group())
+    return VFSStorageProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()

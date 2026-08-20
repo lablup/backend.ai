@@ -76,9 +76,9 @@ class NotificationProcessors:
 
     def __init__(
         self,
-        service: NotificationService,
         channel_group: ProcessorGroup[NotificationChannelData],
         rule_group: ProcessorGroup[NotificationRuleData],
+        service: NotificationService,
     ) -> None:
         self.create_channel = channel_group.global_create_ops(CreateChannelAction)
         self.update_channel = channel_group.single_update_ops(UpdateChannelAction)

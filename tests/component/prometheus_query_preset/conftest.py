@@ -85,7 +85,7 @@ def prometheus_query_preset_processors(
         default_timewindow="5m",
         template_renderer=PromQLTemplateRenderer(),
     )
-    return PrometheusQueryPresetProcessors(service, processor_registry.group())
+    return PrometheusQueryPresetProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()

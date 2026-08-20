@@ -56,7 +56,7 @@ def object_storage_processors(
         storage_manager=storage_manager,
         config_provider=config_provider,
     )
-    return ObjectStorageProcessors(service, processor_registry.group())
+    return ObjectStorageProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()

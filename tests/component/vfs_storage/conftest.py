@@ -40,7 +40,7 @@ def vfs_storage_processors(
         vfs_storage_repository=vfs_storage_repository,
         storage_manager=storage_manager,
     )
-    return VFSStorageProcessors(service, processor_registry.group())
+    return VFSStorageProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()
