@@ -48,16 +48,14 @@ class SingleEntityActionAuditLogMonitor(SingleEntityActionMonitor):
         acting = current_user()
         creator = SingleEntityAuditLogCreator(
             action_id=meta.action_id,
-            entity_type=meta.entity.entity_type(),
             operation=meta.operation_type,
             action_name=meta.action_name,
             created_at=meta.started_at,
             description=result.meta.description,
             status=result.meta.status,
-            entity_id=meta.entity,
             request_id=current_request_id() or BLANK_ID,
             triggered_by=str(trigger.user_id) if trigger else None,
             acted_as=acting.user_id if acting else None,
             duration=result.meta.duration,
         )
-        await self._repository.create_sidecar(creator)
+        await self._repository.create_field(meta.entity, creator)

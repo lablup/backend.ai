@@ -4,6 +4,7 @@ from typing import override
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
+from ai.backend.common.data.entity.types import GLOBAL_ENTITY_TYPE
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.types import BLANK_ID
@@ -44,7 +45,6 @@ class GlobalActionAuditLogMonitor(GlobalActionMonitor):
         acting = current_user()
         creator = GlobalAuditLogCreator(
             action_id=meta.action_id,
-            entity_type=action.entity_type(),
             operation=action.operation_type(),
             action_name=action.action_name(),
             created_at=meta.started_at,
@@ -55,4 +55,4 @@ class GlobalActionAuditLogMonitor(GlobalActionMonitor):
             acted_as=acting.user_id if acting else None,
             duration=meta.duration,
         )
-        await self._repository.create_sidecar(creator)
+        await self._repository.create_dangling_field(GLOBAL_ENTITY_TYPE, creator)

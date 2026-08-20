@@ -11,7 +11,10 @@ from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, LookupKe
 from ai.backend.manager.actions.v2.lookup.monitor.base import LookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.result import LookupActionProcessResult
 from ai.backend.manager.data.audit_log.types import AuditLogData
-from ai.backend.manager.models.audit_log.creators import LookupAuditLogCreator
+from ai.backend.manager.models.audit_log.creators import (
+    LookupAuditLogCreator,
+    MissedLookupAuditLogCreator,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = ("LookupActionAuditLogMonitor",)
@@ -48,23 +51,43 @@ class LookupActionAuditLogMonitor(LookupActionMonitor):
         key = action.lookup_key()
         trigger = triggered_user()
         acting = current_user()
-        creator = LookupAuditLogCreator(
-            action_id=meta.action_id,
-            entity_type=action.entity_type(),
-            operation=action.operation_type(),
-            action_name=action.action_name(),
-            created_at=meta.started_at,
-            description=meta.description,
-            status=meta.status,
-            lookup_kind=key.kind(),
-            lookup_key=self._render_key(key),
-            entity_id=meta.entity_id,
-            request_id=current_request_id() or BLANK_ID,
-            triggered_by=str(trigger.user_id) if trigger else None,
-            acted_as=acting.user_id if acting else None,
-            duration=meta.duration,
+        if meta.entity_id is None:
+            # The key named nothing, so only the key itself identifies the row.
+            await self._repository.create_dangling_field(
+                action.entity_type(),
+                MissedLookupAuditLogCreator(
+                    action_id=meta.action_id,
+                    operation=action.operation_type(),
+                    action_name=action.action_name(),
+                    created_at=meta.started_at,
+                    description=meta.description,
+                    status=meta.status,
+                    lookup_kind=key.kind(),
+                    lookup_key=self._render_key(key),
+                    request_id=current_request_id() or BLANK_ID,
+                    triggered_by=str(trigger.user_id) if trigger else None,
+                    acted_as=acting.user_id if acting else None,
+                    duration=meta.duration,
+                ),
+            )
+            return
+        await self._repository.create_field(
+            meta.entity_id,
+            LookupAuditLogCreator(
+                action_id=meta.action_id,
+                operation=action.operation_type(),
+                action_name=action.action_name(),
+                created_at=meta.started_at,
+                description=meta.description,
+                status=meta.status,
+                lookup_kind=key.kind(),
+                lookup_key=self._render_key(key),
+                request_id=current_request_id() or BLANK_ID,
+                triggered_by=str(trigger.user_id) if trigger else None,
+                acted_as=acting.user_id if acting else None,
+                duration=meta.duration,
+            ),
         )
-        await self._repository.create_sidecar(creator)
 
     def _render_key(self, key: LookupKey) -> str:
         """Render the key as one filterable string.

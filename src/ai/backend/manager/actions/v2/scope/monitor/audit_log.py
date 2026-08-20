@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from typing import override
+from typing import Any, override
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
-from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.types import BLANK_ID
@@ -14,8 +13,10 @@ from ai.backend.manager.actions.v2.scope.result import ScopeActionProcessResult
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.audit_log.creators import (
     AuditLogScopeCreator,
+    EmptyScopeAuditLogCreator,
     ScopeAuditLogCreator,
 )
+from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = ("ScopeActionAuditLogMonitor",)
@@ -45,38 +46,49 @@ class ScopeActionAuditLogMonitor(ScopeActionMonitor):
         meta = result.meta
         if not self._policy.should_record(action.operation_type(), meta.status):
             return
-        specs = [self._build_spec(action, result, entity_id) for entity_id in meta.entity_ids]
-        if not specs:
-            # Nothing was touched, but the run still has to leave a trace.
-            specs = [self._build_spec(action, result, None)]
-        await self._repository.atomic_create_sidecars_with_fields(
-            specs,
-            [
-                AuditLogScopeCreator(scope_type=str(s.scope_type), scope_id=s.scope_id)
-                for s in meta.scope_targets
-            ],
+        nested = [
+            AuditLogScopeCreator(scope_type=str(s.scope_type), scope_id=s.scope_id)
+            for s in meta.scope_targets
+        ]
+        if meta.entity_ids:
+            await self._repository.atomic_create_fields_with_nested(
+                [
+                    FieldToCreate(owner_id=entity_id, creator=self._build_spec(action, result))
+                    for entity_id in meta.entity_ids
+                ],
+                nested,
+            )
+            return
+        # Nothing was touched, but the run still has to leave a trace.
+        await self._repository.atomic_create_dangling_fields_with_nested(
+            action.entity_type(),
+            [self._build_empty_spec(action, result)],
+            nested,
         )
 
     def _build_spec(
-        self,
-        action: BaseScopeAction,
-        result: ScopeActionProcessResult,
-        entity_id: EntityIdentifier | None,
+        self, action: BaseScopeAction, result: ScopeActionProcessResult
     ) -> ScopeAuditLogCreator:
+        return ScopeAuditLogCreator(**self._fields(action, result))
+
+    def _build_empty_spec(
+        self, action: BaseScopeAction, result: ScopeActionProcessResult
+    ) -> EmptyScopeAuditLogCreator:
+        return EmptyScopeAuditLogCreator(**self._fields(action, result))
+
+    def _fields(self, action: BaseScopeAction, result: ScopeActionProcessResult) -> dict[str, Any]:
         trigger = triggered_user()
         acting = current_user()
         meta = result.meta
-        return ScopeAuditLogCreator(
-            action_id=meta.action_id,
-            entity_type=action.entity_type(),
-            operation=action.operation_type(),
-            action_name=action.action_name(),
-            created_at=meta.started_at,
-            description=meta.description,
-            status=meta.status,
-            entity_id=entity_id,
-            request_id=current_request_id() or BLANK_ID,
-            triggered_by=str(trigger.user_id) if trigger else None,
-            acted_as=acting.user_id if acting else None,
-            duration=meta.duration,
-        )
+        return {
+            "action_id": meta.action_id,
+            "operation": action.operation_type(),
+            "action_name": action.action_name(),
+            "created_at": meta.started_at,
+            "description": meta.description,
+            "status": meta.status,
+            "request_id": current_request_id() or BLANK_ID,
+            "triggered_by": str(trigger.user_id) if trigger else None,
+            "acted_as": acting.user_id if acting else None,
+            "duration": meta.duration,
+        }

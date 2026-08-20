@@ -8,7 +8,7 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.audit_log.scope_row import AuditLogScopeRow
 from ai.backend.manager.models.clauses import QueryCondition
@@ -31,7 +31,7 @@ class EntityAuditLogOperationScope(OperationScope):
     ``existence_checks`` is empty — RBAC validation already gates entity reachability.
     """
 
-    entity_type: RBACElementType
+    entity_type: EntityType
     entity_id: str
 
     @override

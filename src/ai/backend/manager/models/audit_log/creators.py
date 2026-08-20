@@ -11,20 +11,28 @@ from typing import override
 
 from ai.backend.common.data.entity.action import ActionID
 from ai.backend.common.data.entity.audit_log import AuditLogID
-from ai.backend.common.data.entity.types import EntityID, ScopeID
+from ai.backend.common.data.entity.types import EntityID, EntityIdentifier, EntityType, ScopeID
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.audit_log.scope_row import AuditLogScopeRow
-from ai.backend.manager.models.specs.creator import SidecarCreator, SidecarFieldCreator
+from ai.backend.manager.models.specs.creator import (
+    DanglingFieldCreator,
+    FieldCreator,
+    NestedFieldCreator,
+)
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 __all__ = (
-    "AuditLogCreator",
+    "BaseAuditLogFields",
+    "OwnedAuditLogCreator",
+    "DanglingAuditLogCreator",
     "SingleEntityAuditLogCreator",
     "BulkAuditLogCreator",
     "ScopeAuditLogCreator",
     "LookupAuditLogCreator",
+    "MissedLookupAuditLogCreator",
+    "EmptyScopeAuditLogCreator",
     "GlobalAuditLogCreator",
     "LegacyAuditLogCreator",
     "AuditLogScopeCreator",
@@ -32,15 +40,14 @@ __all__ = (
 
 
 @dataclass
-class AuditLogCreator(SidecarCreator[AuditLogRow, AuditLogData]):
-    """Fields every audit row is written with.
+class BaseAuditLogFields:
+    """Columns every audit row is written with, whoever owns it.
 
     Subclasses add the one target field their shape has and declare their
     ``action_kind``, so neither is something a writer can get wrong.
     """
 
     action_id: ActionID
-    entity_type: str
     operation: str
     action_name: str
     created_at: datetime
@@ -56,21 +63,19 @@ class AuditLogCreator(SidecarCreator[AuditLogRow, AuditLogData]):
     def action_kind(cls) -> ActionKind:
         raise NotImplementedError
 
-    @override
-    def sidecar_id(self, row: AuditLogRow) -> AuditLogID:
-        return AuditLogID(row.id)
+    def field_id(self, row: AuditLogRow) -> AuditLogID:
+        return row.id
 
-    @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return ()
 
-    @override
     def to_data(self, row: AuditLogRow) -> AuditLogData:
         return row.to_dataclass()
 
     def _build_row(
         self,
         *,
+        entity_type: str,
         entity_id: EntityID | str | None = None,
         lookup_kind: str | None = None,
         lookup_key: str | None = None,
@@ -79,7 +84,7 @@ class AuditLogCreator(SidecarCreator[AuditLogRow, AuditLogData]):
             action_id=self.action_id,
             action_kind=self.action_kind(),
             action_name=self.action_name,
-            entity_type=self.entity_type,
+            entity_type=entity_type,
             operation=self.operation,
             created_at=self.created_at,
             description=self.description,
@@ -95,57 +100,65 @@ class AuditLogCreator(SidecarCreator[AuditLogRow, AuditLogData]):
 
 
 @dataclass
-class SingleEntityAuditLogCreator(AuditLogCreator):
-    entity_id: EntityID
+class OwnedAuditLogCreator(
+    BaseAuditLogFields, FieldCreator[EntityIdentifier, AuditLogRow, AuditLogData]
+):
+    """A record of what an operation did to one entity, written under that entity.
 
+    The entity columns come from the owner handed in, so nothing carries its type as a
+    loose string.
+    """
+
+    @override
+    def build_row(self, owner_id: EntityIdentifier) -> AuditLogRow:
+        return self._build_row(entity_type=owner_id.entity_type(), entity_id=owner_id)
+
+
+@dataclass
+class DanglingAuditLogCreator(BaseAuditLogFields, DanglingFieldCreator[AuditLogRow, AuditLogData]):
+    """A record of an operation that named no entity, so the row has a kind and no id."""
+
+    @override
+    def build_row(self, entity_type: EntityType) -> AuditLogRow:
+        return self._build_row(entity_type=entity_type, entity_id=None)
+
+
+@dataclass
+class SingleEntityAuditLogCreator(OwnedAuditLogCreator):
     @classmethod
     @override
     def action_kind(cls) -> ActionKind:
         return ActionKind.SINGLE_ENTITY
 
-    @override
-    def build_row(self) -> AuditLogRow:
-        return self._build_row(entity_id=self.entity_id)
-
 
 @dataclass
-class BulkAuditLogCreator(AuditLogCreator):
-    entity_id: EntityID
-
+class BulkAuditLogCreator(OwnedAuditLogCreator):
     @classmethod
     @override
     def action_kind(cls) -> ActionKind:
         return ActionKind.BULK
 
-    @override
-    def build_row(self) -> AuditLogRow:
-        return self._build_row(entity_id=self.entity_id)
-
 
 @dataclass
-class ScopeAuditLogCreator(AuditLogCreator):
-    """One entity a scope action affected; ``None`` when it affected nothing.
+class ScopeAuditLogCreator(OwnedAuditLogCreator):
+    """One entity a scope action affected.
 
-    The scopes go to ``audit_log_scopes`` via :class:`AuditLogScopeCreator`.
+    The scopes go to ``audit_log_scopes`` via :class:`AuditLogScopeCreator`; a run that
+    affected nothing is recorded by :class:`EmptyScopeAuditLogCreator` instead.
     """
-
-    entity_id: EntityID | None
 
     @classmethod
     @override
     def action_kind(cls) -> ActionKind:
         return ActionKind.SCOPE
 
-    @override
-    def build_row(self) -> AuditLogRow:
-        return self._build_row(entity_id=self.entity_id)
-
 
 @dataclass
-class LookupAuditLogCreator(AuditLogCreator):
+class LookupAuditLogCreator(OwnedAuditLogCreator):
+    """A key that resolved, recorded against what it named."""
+
     lookup_kind: str
     lookup_key: str
-    entity_id: EntityID | None
 
     @classmethod
     @override
@@ -153,48 +166,71 @@ class LookupAuditLogCreator(AuditLogCreator):
         return ActionKind.LOOKUP
 
     @override
-    def build_row(self) -> AuditLogRow:
+    def build_row(self, owner_id: EntityIdentifier) -> AuditLogRow:
         return self._build_row(
-            entity_id=self.entity_id,
+            entity_type=owner_id.entity_type(),
+            entity_id=owner_id,
             lookup_kind=self.lookup_kind,
             lookup_key=self.lookup_key,
         )
 
 
 @dataclass
-class GlobalAuditLogCreator(AuditLogCreator):
+class MissedLookupAuditLogCreator(DanglingAuditLogCreator):
+    """A key that named nothing, so only the key itself identifies the row."""
+
+    lookup_kind: str
+    lookup_key: str
+
+    @classmethod
+    @override
+    def action_kind(cls) -> ActionKind:
+        return ActionKind.LOOKUP
+
+    @override
+    def build_row(self, entity_type: EntityType) -> AuditLogRow:
+        return self._build_row(
+            entity_type=entity_type,
+            entity_id=None,
+            lookup_kind=self.lookup_kind,
+            lookup_key=self.lookup_key,
+        )
+
+
+@dataclass
+class EmptyScopeAuditLogCreator(DanglingAuditLogCreator):
+    """A scope run that affected no entity, which still has to leave a trace."""
+
+    @classmethod
+    @override
+    def action_kind(cls) -> ActionKind:
+        return ActionKind.SCOPE
+
+
+@dataclass
+class GlobalAuditLogCreator(DanglingAuditLogCreator):
     @classmethod
     @override
     def action_kind(cls) -> ActionKind:
         return ActionKind.GLOBAL
 
-    @override
-    def build_row(self) -> AuditLogRow:
-        return self._build_row()
-
 
 @dataclass
-class LegacyAuditLogCreator(AuditLogCreator):
+class LegacyAuditLogCreator(DanglingAuditLogCreator):
     """An action on the legacy ``BaseAction`` base, which declares no shape.
 
     ``entity_id`` is whatever the runner resolved, often nothing. Goes away with
     the legacy base.
     """
 
-    entity_id: str | None
-
     @classmethod
     @override
     def action_kind(cls) -> ActionKind:
         return ActionKind.UNKNOWN
 
-    @override
-    def build_row(self) -> AuditLogRow:
-        return self._build_row(entity_id=self.entity_id)
-
 
 @dataclass
-class AuditLogScopeCreator(SidecarFieldCreator[AuditLogID, AuditLogScopeRow, AuditLogScopeData]):
+class AuditLogScopeCreator(NestedFieldCreator[AuditLogID, AuditLogScopeRow, AuditLogScopeData]):
     """A scope the audited run covered, owned by the audit row it is written under."""
 
     scope_type: str

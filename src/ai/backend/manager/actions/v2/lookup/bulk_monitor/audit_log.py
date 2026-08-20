@@ -4,6 +4,7 @@ from typing import override
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.types import BLANK_ID
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
@@ -11,7 +12,12 @@ from ai.backend.manager.actions.v2.lookup.bulk_monitor.base import BulkLookupAct
 from ai.backend.manager.actions.v2.lookup.bulk_result import BulkLookupActionProcessResult
 from ai.backend.manager.actions.v2.lookup.bulk_trigger import BulkLookupActionTriggerMeta
 from ai.backend.manager.data.audit_log.types import AuditLogData
-from ai.backend.manager.models.audit_log.creators import LookupAuditLogCreator
+from ai.backend.manager.models.audit_log.creators import (
+    LookupAuditLogCreator,
+    MissedLookupAuditLogCreator,
+)
+from ai.backend.manager.models.audit_log.row import AuditLogRow
+from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = ("BulkLookupActionAuditLogMonitor",)
@@ -43,29 +49,53 @@ class BulkLookupActionAuditLogMonitor(BulkLookupActionMonitor):
         trigger = triggered_user()
         acting = current_user()
         request_id = current_request_id() or BLANK_ID
-        specs = [
-            LookupAuditLogCreator(
-                action_id=result.meta.action_id,
-                entity_type=meta.entity_type,
-                operation=meta.operation_type,
-                action_name=meta.action_name,
-                created_at=result.meta.started_at,
-                description=key_result.description,
-                status=key_result.status,
-                lookup_kind=key_result.key.kind(),
-                lookup_key=self._render_key(key_result.key),
-                entity_id=key_result.entity_id,
-                request_id=request_id,
-                triggered_by=str(trigger.user_id) if trigger else None,
-                acted_as=acting.user_id if acting else None,
-                duration=result.meta.duration,
+        resolved: list[FieldToCreate[EntityIdentifier, AuditLogRow, AuditLogData]] = []
+        missed: list[MissedLookupAuditLogCreator] = []
+        for key_result in result.meta.key_results:
+            if not self._policy.should_record(meta.operation_type, key_result.status):
+                continue
+            if key_result.entity_id is None:
+                # The key named nothing, so only the key itself identifies the row.
+                missed.append(
+                    MissedLookupAuditLogCreator(
+                        action_id=result.meta.action_id,
+                        operation=meta.operation_type,
+                        action_name=meta.action_name,
+                        created_at=result.meta.started_at,
+                        description=key_result.description,
+                        status=key_result.status,
+                        lookup_kind=key_result.key.kind(),
+                        lookup_key=self._render_key(key_result.key),
+                        request_id=request_id,
+                        triggered_by=str(trigger.user_id) if trigger else None,
+                        acted_as=acting.user_id if acting else None,
+                        duration=result.meta.duration,
+                    )
+                )
+                continue
+            resolved.append(
+                FieldToCreate(
+                    owner_id=key_result.entity_id,
+                    creator=LookupAuditLogCreator(
+                        action_id=result.meta.action_id,
+                        operation=meta.operation_type,
+                        action_name=meta.action_name,
+                        created_at=result.meta.started_at,
+                        description=key_result.description,
+                        status=key_result.status,
+                        lookup_kind=key_result.key.kind(),
+                        lookup_key=self._render_key(key_result.key),
+                        request_id=request_id,
+                        triggered_by=str(trigger.user_id) if trigger else None,
+                        acted_as=acting.user_id if acting else None,
+                        duration=result.meta.duration,
+                    ),
+                )
             )
-            for key_result in result.meta.key_results
-            if self._policy.should_record(meta.operation_type, key_result.status)
-        ]
-        if not specs:
-            return
-        await self._repository.atomic_create_sidecars(specs)
+        if resolved:
+            await self._repository.atomic_create_fields(resolved)
+        if missed:
+            await self._repository.atomic_create_dangling_fields(meta.entity_type, missed)
 
     def _render_key(self, key: LookupKey) -> str:
         """Rendered as the single lookup's is, so both are filterable the same way."""
