@@ -57,7 +57,7 @@ class TestAgentFilter:
         assert result.schedulable is True
 
     def test_scaling_group_filter(self) -> None:
-        f = AgentFilterGQL(resource_group=StringFilter(equals="default"))
+        f = AgentFilterGQL(scaling_group=StringFilter(equals="default"))
         result = f.to_pydantic()
         assert isinstance(result, AgentFilter)
         assert result.scaling_group is not None
@@ -67,7 +67,7 @@ class TestAgentFilter:
         f = AgentFilterGQL(
             id=StringFilter(contains="agent"),
             schedulable=True,
-            resource_group=StringFilter(equals="gpu"),
+            scaling_group=StringFilter(equals="gpu"),
         )
         result = f.to_pydantic()
         assert isinstance(result, AgentFilter)

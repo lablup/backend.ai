@@ -149,9 +149,9 @@ async def _resolve_resource_group_id(
 
 async def _resolve_resource_group_ids(
     graph_ctx: GraphQueryContext,
-    resource_groups: Sequence[str],
+    scaling_groups: Sequence[str],
 ) -> list[ResourceGroupID]:
-    return [await _resolve_resource_group_id(graph_ctx, name) for name in resource_groups]
+    return [await _resolve_resource_group_id(graph_ctx, name) for name in scaling_groups]
 
 
 @graphene_federation.key("id")
@@ -885,7 +885,7 @@ class AssociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        resource_groups = graphene.List(graphene.String, required=True)
+        scaling_groups = graphene.List(graphene.String, required=True)
         domain = graphene.String(required=True)
 
     ok = graphene.Boolean()
@@ -896,7 +896,7 @@ class AssociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[misc]
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        resource_groups: Sequence[str],
+        scaling_groups: Sequence[str],
         domain: str,
     ) -> AssociateScalingGroupsWithDomain:
         graph_ctx: GraphQueryContext = info.context
@@ -905,7 +905,7 @@ class AssociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[misc]
                 LookupDomainAction(name=DomainName(domain))
             )
         ).data
-        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, resource_groups)
+        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
         action = AssociateResourceGroupWithDomainsAction(
             domain_id=domain_data.id,
             binder=RBACScopeBinder(
@@ -972,7 +972,7 @@ class DisassociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[mi
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        resource_groups = graphene.List(graphene.String, required=True)
+        scaling_groups = graphene.List(graphene.String, required=True)
         domain = graphene.String(required=True)
 
     ok = graphene.Boolean()
@@ -983,7 +983,7 @@ class DisassociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[mi
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        resource_groups: Sequence[str],
+        scaling_groups: Sequence[str],
         domain: str,
     ) -> DisassociateScalingGroupsWithDomain:
         graph_ctx: GraphQueryContext = info.context
@@ -992,7 +992,7 @@ class DisassociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[mi
                 LookupDomainAction(name=DomainName(domain))
             )
         ).data
-        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, resource_groups)
+        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
         action = DisassociateResourceGroupWithDomainsAction(
             domain_id=domain_data.id,
             unbinder=ResourceGroupDomainEntityUnbinder(
@@ -1090,7 +1090,7 @@ class AssociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore[mi
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        resource_groups = graphene.List(graphene.String, required=True)
+        scaling_groups = graphene.List(graphene.String, required=True)
         user_group = graphene.UUID(required=True)
 
     ok = graphene.Boolean()
@@ -1101,11 +1101,11 @@ class AssociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore[mi
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        resource_groups: Sequence[str],
+        scaling_groups: Sequence[str],
         user_group: uuid.UUID,
     ) -> AssociateScalingGroupsWithUserGroup:
         graph_ctx: GraphQueryContext = info.context
-        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, resource_groups)
+        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
         action = AssociateResourceGroupWithUserGroupsAction(
             project_id=ProjectID(user_group),
             binder=RBACScopeBinder(
@@ -1169,7 +1169,7 @@ class DisassociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        resource_groups = graphene.List(graphene.String, required=True)
+        scaling_groups = graphene.List(graphene.String, required=True)
         user_group = graphene.UUID(required=True)
 
     ok = graphene.Boolean()
@@ -1180,11 +1180,11 @@ class DisassociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        resource_groups: Sequence[str],
+        scaling_groups: Sequence[str],
         user_group: uuid.UUID,
     ) -> DisassociateScalingGroupsWithUserGroup:
         graph_ctx: GraphQueryContext = info.context
-        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, resource_groups)
+        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
         action = DisassociateResourceGroupWithUserGroupsAction(
             project_id=ProjectID(user_group),
             unbinder=ResourceGroupProjectEntityUnbinder(
@@ -1269,7 +1269,7 @@ class AssociateScalingGroupsWithKeyPair(graphene.Mutation):  # type: ignore[misc
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        resource_groups = graphene.List(graphene.String, required=True)
+        scaling_groups = graphene.List(graphene.String, required=True)
         access_key = graphene.String(required=True)
 
     ok = graphene.Boolean()
@@ -1280,11 +1280,11 @@ class AssociateScalingGroupsWithKeyPair(graphene.Mutation):  # type: ignore[misc
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        resource_groups: Sequence[str],
+        scaling_groups: Sequence[str],
         access_key: str,
     ) -> AssociateScalingGroupsWithKeyPair:
         graph_ctx: GraphQueryContext = info.context
-        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, resource_groups)
+        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
         action = AssociateResourceGroupWithKeypairsAction(
             resource_group_id=resource_group_ids[0],
             bulk_creator=BulkCreator(
@@ -1340,7 +1340,7 @@ class DisassociateScalingGroupsWithKeyPair(graphene.Mutation):  # type: ignore[m
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        resource_groups = graphene.List(graphene.String, required=True)
+        scaling_groups = graphene.List(graphene.String, required=True)
         access_key = graphene.String(required=True)
 
     ok = graphene.Boolean()
@@ -1351,11 +1351,11 @@ class DisassociateScalingGroupsWithKeyPair(graphene.Mutation):  # type: ignore[m
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        resource_groups: Sequence[str],
+        scaling_groups: Sequence[str],
         access_key: str,
     ) -> DisassociateScalingGroupsWithKeyPair:
         graph_ctx: GraphQueryContext = info.context
-        resource_group_id = await _resolve_resource_group_id(graph_ctx, resource_groups[0])
+        resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_groups[0])
         action = DisassociateResourceGroupWithKeypairsAction(
             resource_group_id=resource_group_id,
             purger=create_resource_group_for_keypairs_purger(
