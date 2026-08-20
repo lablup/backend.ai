@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
@@ -44,7 +45,7 @@ class ResourcePresetData(EntityData):
     def from_cache(cls, data: dict[str, Any]) -> ResourcePresetData:
         """Deserialize from cache format."""
         return cls(
-            id=ResourcePresetID(data["id"]),
+            id=ResourcePresetID(uuid.UUID(data["id"])),
             name=data["name"],
             resource_slots=ResourceSlot.from_json(data["resource_slots"]),
             shared_memory=int(BinarySize.from_str(data["shared_memory"]))
