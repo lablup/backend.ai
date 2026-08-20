@@ -1588,10 +1588,7 @@ class ContainerdAgent(
         # The container runtime is the OCI runtime interface, implemented by the native
         # containerd gRPC client (no nerdctl/ctr CLI). The agent owns it and injects it into
         # the network facade; opened in __ainit__.
-        self._runtime = ContainerdGrpcRuntime(
-            namespace="backend-ai",
-            registry_hosts_dir=self.local_config.container.registry_hosts_dir,
-        )
+        self._runtime = self._create_runtime()
         self._event_monitor_task = None
         # In-container helpers (libbaihook LD_PRELOAD hook, jail) talk back to the agent over
         # a per-agent socket for host<->container PID translation + jail status. Bind ZMQ REP
@@ -1669,6 +1666,18 @@ class ContainerdAgent(
         self._kernel_recovery_adapter = KernelRecoveryDataAdapter(
             pickle_creator.create_loader(),
             [KernelRecoveryDataAdapterTarget(container_loader, container_writer)],
+        )
+
+    def _create_runtime(self) -> OciRuntime:
+        """Construct the OCI runtime this agent drives.
+
+        Overridable seam: a subclass (e.g. the enroot backend) returns a different
+        ``OciRuntime`` implementation while reusing the rest of the containerd agent — the
+        OCI-spec build, BEP-1062 session networking, scratch, ssh, and recovery all stay.
+        """
+        return ContainerdGrpcRuntime(
+            namespace="backend-ai",
+            registry_hosts_dir=self.local_config.container.registry_hosts_dir,
         )
 
     @override

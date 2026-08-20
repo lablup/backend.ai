@@ -2,10 +2,10 @@
 
 A multi-node session's kernels only reach each other if every member agent puts them on the same
 fabric. The two fabrics are not interchangeable: 'overlay' is Docker Swarm, which only the docker
-backend speaks, and 'cni' is the BEP-1062 stack, which only the containerd backend speaks. Handing
-a driver to an agent of the other kind does not fail — the agent falls back to something node-local
-and the session comes up with kernels that cannot see each other, with nothing in the logs to say
-why. That is what this refuses.
+backend speaks, and 'cni' is the BEP-1062 stack, which the containerd backend and its enroot
+subclass speak. Handing a driver to an agent of the other kind does not fail — the agent falls back
+to something node-local and the session comes up with kernels that cannot see each other, with
+nothing in the logs to say why. That is what this refuses.
 
 The check is deliberately one-sided: agents publish their backend at startup, and an agent whose
 backend is not published yet (an older agent, or one that has not finished starting) is treated as
@@ -19,8 +19,11 @@ from ai.backend.common.network.keys import agent_backend_key
 from ai.backend.manager.errors.network import NetworkBackendMismatch
 
 # Which agent backend can serve which inter-container network driver.
+# 'enroot' rides the containerd backend's BEP-1062/CNI stack unchanged (EnrootAgent subclasses
+# ContainerdAgent and overrides only the container runtime), so it serves 'cni' exactly like
+# 'containerd' does.
 DRIVER_COMPATIBLE_BACKENDS: dict[str, frozenset[str]] = {
-    "cni": frozenset({"containerd"}),
+    "cni": frozenset({"containerd", "enroot"}),
     "overlay": frozenset({"docker"}),
 }
 # ...and the inverse: the driver an agent backend needs. Choosing the container runtime is the

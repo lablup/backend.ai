@@ -2464,6 +2464,10 @@ class AgentSpecificConfig(BaseConfigSchema):
                 # containerd runs the same Linux containers as Docker; reuse its
                 # container-config validation. See BEP-1062.
                 DockerExtraConfig.model_validate(self.container.model_dump())
+            case AgentBackend.ENROOT:
+                # enroot runs the same Linux containers (via squashfs + userns), reusing the
+                # containerd agent's OCI-spec build; reuse the Docker container-config validation.
+                DockerExtraConfig.model_validate(self.container.model_dump())
             case AgentBackend.DUMMY:
                 pass
 
