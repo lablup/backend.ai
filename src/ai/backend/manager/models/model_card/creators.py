@@ -3,9 +3,11 @@ from __future__ import annotations
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
 from ai.backend.common.data.entity.model_card import ModelCardID
+from ai.backend.common.data.entity.model_card_resource_requirement import (
+    ModelCardResourceRequirementID,
+)
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
@@ -15,7 +17,7 @@ from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import ModelCardConflict
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
-from ai.backend.manager.models.specs.creator import EntityCreator
+from ai.backend.manager.models.specs.creator import EntityCreator, FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
@@ -42,7 +44,6 @@ class ModelCardCreator(EntityCreator[ModelCardRow, ModelCardData]):
     framework: list[str]
     label: list[str]
     license: str | None
-    min_resource: list[ResourceRequirementEntry]
     readme: str | None
     access_level: str
 
@@ -85,17 +86,38 @@ class ModelCardCreator(EntityCreator[ModelCardRow, ModelCardData]):
         row.access_level = self.access_level
         return row
 
-    def build_requirement_rows(self, card_id: UUID) -> list[ModelCardResourceRequirementRow]:
-        """The requirement rows this card owns, once the card has an id."""
-        return [
-            ModelCardResourceRequirementRow(
-                model_card_id=card_id,
-                slot_name=entry.slot_name,
-                min_quantity=entry.min_quantity,
-            )
-            for entry in (self.min_resource or [])
-        ]
-
     @override
     def to_data(self, row: ModelCardRow) -> ModelCardData:
         return row.to_data()
+
+
+@dataclass
+class ModelCardResourceRequirementCreator(
+    FieldCreator[ModelCardID, ModelCardResourceRequirementRow, ResourceRequirementEntry]
+):
+    """Insert one minimum slot quantity of the card that owns it."""
+
+    entry: ResourceRequirementEntry
+
+    @override
+    def field_id(self, row: ModelCardResourceRequirementRow) -> ModelCardResourceRequirementID:
+        return row.id
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_row(self, owner_id: ModelCardID) -> ModelCardResourceRequirementRow:
+        return ModelCardResourceRequirementRow(
+            model_card_id=owner_id,
+            slot_name=self.entry.slot_name,
+            min_quantity=self.entry.min_quantity,
+        )
+
+    @override
+    def to_data(self, row: ModelCardResourceRequirementRow) -> ResourceRequirementEntry:
+        return ResourceRequirementEntry(
+            slot_name=row.slot_name,
+            min_quantity=str(row.min_quantity),
+        )

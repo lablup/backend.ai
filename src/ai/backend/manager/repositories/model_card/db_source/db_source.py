@@ -30,7 +30,6 @@ from ai.backend.manager.data.model_card.types import (
     ResourceRequirementEntry,
     VFolderScanData,
 )
-from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import (
     InvalidProjectTypeForModelCard,
     ModelCardNotFound,
@@ -68,7 +67,6 @@ from ai.backend.manager.repositories.model_card.creators import ModelCardCreator
 from ai.backend.manager.repositories.model_card.types import (
     AvailablePresetsSearchResult,
     ModelCardSearchResult,
-    ProjectModelCardOperationScope,
 )
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
@@ -291,24 +289,6 @@ class ModelCardDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(ModelCardRow)
             result = await execute_batch_querier(db_sess, query, querier)
-            return ModelCardSearchResult(
-                items=[row.ModelCardRow.to_data() for row in result.rows],
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_in_project(
-        self,
-        querier: BatchQuerier,
-        scope: ProjectModelCardOperationScope,
-    ) -> ModelCardSearchResult:
-        async with self._db.begin_readonly_session() as db_sess:
-            is_member = (await db_sess.execute(scope.membership_check_query)).scalar()
-            if not is_member:
-                raise GenericForbidden("User is not a member of this project")
-            query = sa.select(ModelCardRow)
-            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
             return ModelCardSearchResult(
                 items=[row.ModelCardRow.to_data() for row in result.rows],
                 total_count=result.total_count,

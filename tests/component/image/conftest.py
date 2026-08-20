@@ -216,3 +216,8 @@ async def image_fixture(
     image_id = await helper.create()
     yield image_id, helper
     await helper.cleanup()
+
+
+@pytest.fixture(autouse=True)
+def _act_as_superadmin(acting_superadmin: None) -> None:
+    """These tests drive processors directly, so they supply the caller the gates read."""

@@ -286,3 +286,8 @@ async def target_preset(
 ) -> PresetFixtureData:
     """Pre-created preset for tests that need an existing preset."""
     return await preset_factory()
+
+
+@pytest.fixture(autouse=True)
+def _act_as_superadmin(acting_superadmin: None) -> None:
+    """These tests drive processors directly, so they supply the caller the gates read."""

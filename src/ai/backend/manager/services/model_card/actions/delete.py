@@ -6,11 +6,11 @@ from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardO
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.services.model_card.actions.base import ModelCardAction
+from ai.backend.manager.services.model_card.actions.base import ModelCardSingleEntityAction
 
 
 @dataclass
-class DeleteModelCardAction(ModelCardAction):
+class DeleteModelCardAction(ModelCardSingleEntityAction):
     purger: Purger[ModelCardRow]
     options: DeleteModelCardOptions
 

@@ -9,7 +9,6 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.data.model_card.types import ModelCardData
@@ -18,7 +17,6 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
-from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 
 __all__ = (
     "AvailablePresetsSearchResult",
@@ -50,14 +48,9 @@ class ModelCardSearchResult:
 
 @dataclass(frozen=True)
 class ProjectModelCardOperationScope(OperationScope):
-    """Scope for searching model cards within a MODEL_STORE project.
-
-    Includes user_id for membership validation — only project members
-    can search model cards in the project.
-    """
+    """Scope for searching model cards within a MODEL_STORE project."""
 
     project_id: UUID
-    user_id: UUID
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -78,13 +71,6 @@ class ProjectModelCardOperationScope(OperationScope):
                 error=ProjectNotFound(str(self.project_id)),
             ),
         ]
-
-    @property
-    def membership_check_query(self) -> sa.Select[tuple[bool]]:
-        """Query to validate user is a member of this project."""
-        return sa.select(
-            user_scope_membership_exists(PROJECT_SCOPE_TYPE, self.project_id, self.user_id)
-        )
 
 
 @dataclass(frozen=True)

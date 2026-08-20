@@ -3,30 +3,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.model_card.types import ModelCardData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.model_card.actions.base import ModelCardAction
+from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.searchers import ModelCardSearcher
 
 
-@dataclass
-class SearchModelCardsAction(ModelCardAction):
-    querier: BatchQuerier
+@dataclass(frozen=True)
+class GlobalSearchModelCardsAction(SearchGlobalOpsAction[ModelCardRow, ModelCardData]):
+    """Page through every model card in the installation."""
+
+    searcher: ModelCardSearcher
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return MODEL_CARD_ENTITY_TYPE
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "search_model_cards"
+        return "global_search_model_cards"
 
     @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchModelCardsActionResult:
-    items: list[ModelCardData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def to_searcher(self) -> ModelCardSearcher:
+        return self.searcher

@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import override
 from uuid import UUID
 
+from ai.backend.common.data.entity.model_card import ModelCardID
+from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID
 
@@ -17,7 +20,7 @@ class ResourceRequirementEntry:
 
 
 @dataclass(frozen=True)
-class ModelCardData:
+class ModelCardData(EntityData):
     id: UUID
     name: str
     vfolder_id: VFolderUUID
@@ -38,6 +41,10 @@ class ModelCardData:
     access_level: str
     created_at: datetime
     updated_at: datetime | None
+
+    @override
+    def entity_id(self) -> ModelCardID:
+        return ModelCardID(self.id)
 
 
 @dataclass(frozen=True)

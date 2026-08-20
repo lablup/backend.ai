@@ -169,6 +169,21 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.create_entity(creator)
 
+    async def create_entity_with_fields[TEntityData: EntityData, TFieldData](
+        self,
+        creator: EntityCreator[Any, TEntityData],
+        field_creators: Sequence[FieldCreator[Any, Any, TFieldData]],
+    ) -> EntityWithFieldsResult[TEntityData, TFieldData]:
+        """Insert an entity row and the field rows it owns, in one transaction.
+
+        The owner id is not known until the parent row exists. The two writes share
+        this session, so a failed field row takes the parent down with it.
+        """
+        async with self._ops.write_ops() as w:
+            data = await w.create_entity(creator)
+            fields = await w.atomic_create_field_entities(data.entity_id(), field_creators)
+            return EntityWithFieldsResult(data=data, fields=fields)
+
     async def create_role_managed_entity(
         self, creator: RoleManagedEntityCreator[Any, TData]
     ) -> TData:

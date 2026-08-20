@@ -206,6 +206,26 @@ class EntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
+class EntityWithFieldsCreateOpsAction[TRow: Base, TData, TFieldRow: Base, TFieldData](
+    OpsBackendAction
+):
+    """Carries an entity insert spec together with the field specs it owns.
+
+    One action so the two writes share a transaction: split apart, the parent could
+    survive a failed field row.
+    """
+
+    @abstractmethod
+    def to_creator(self) -> EntityCreator[TRow, TData]:
+        """Return the insert spec for the owning row."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_field_creators(self) -> Sequence[FieldCreator[Any, TFieldRow, TFieldData]]:
+        """Return one insert spec per field row created under the owner."""
+        raise NotImplementedError
+
+
 class RoleManagedEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
     """Carries the role-managed entity insert spec: the entity create plus the
     preset-role provisioning the combined spec declares."""
@@ -559,6 +579,23 @@ class CreateEntityOpsAction[TRow: Base, TData](
 
     Scope-shaped: the new entity's id does not exist until the row does, so the
     action targets the scope context it creates in rather than an entity.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+
+class CreateEntityWithFieldsOpsAction[TRow: Base, TData, TFieldRow: Base, TFieldData](
+    BaseScopeAction,
+    EntityWithFieldsCreateOpsAction[TRow, TData, TFieldRow, TFieldData],
+    ABC,
+):
+    """An insert of one entity row together with the rows it owns.
+
+    Scope-shaped for the same reason as :class:`CreateEntityOpsAction`: neither the
+    entity nor its fields exist until the write runs.
     """
 
     @override

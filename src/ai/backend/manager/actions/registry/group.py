@@ -79,6 +79,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     BatchUpdateGlobalOpsAction,
     BatchUpdateScopeOpsAction,
     CreateEntityOpsAction,
+    CreateEntityWithFieldsOpsAction,
     CreateGlobalOpsAction,
     CreateGlobalWithFieldsOpsAction,
     CreateRoleManagedEntityOpsAction,
@@ -132,6 +133,7 @@ from ai.backend.manager.services.ops.service import (
     EntityAtomicCreateService,
     EntityAtomicUpsertService,
     EntityCreateService,
+    EntityCreateWithFieldsService,
     EntityPartialBulkPurgeService,
     EntityPurgeService,
     EntityUpsertService,
@@ -589,6 +591,20 @@ class ProcessorGroup[TData: EntityData]:
         self._record(action_cls, ActionKind.SCOPE, ActionGate.PERMISSION, ActionBacking.OPS)
         return ScopeActionProcessor(
             EntityCreateService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(*self._deps.validators.scope, *validators),
+        )
+
+    def entity_create_with_fields_ops[TAction: CreateEntityWithFieldsOpsAction[Any, Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[ScopeActionValidator] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[TAction, CreatedEntityWithFieldsOpsResult[TData, Any]]:
+        self._record(action_cls, ActionKind.SCOPE, ActionGate.PERMISSION, ActionBacking.OPS)
+        return ScopeActionProcessor(
+            EntityCreateWithFieldsService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.scope, *monitors),
             validators=(*self._deps.validators.scope, *validators),
         )

@@ -1,17 +1,15 @@
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.services.model_card.actions.base import ModelCardAction
+from ai.backend.manager.services.model_card.actions.base import ModelCardSingleEntityAction
 
 
 @dataclass
-class UpdateModelCardAction(ModelCardAction):
-    id: UUID
+class UpdateModelCardAction(ModelCardSingleEntityAction):
     updater: Updater[ModelCardRow]
 
     @override

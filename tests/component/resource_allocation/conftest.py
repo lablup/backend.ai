@@ -46,6 +46,7 @@ from ai.backend.manager.repositories.resource_preset.repository import (
     ResourcePresetRepository,
 )
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
 )
@@ -95,6 +96,8 @@ def server_module_registries(
 ) -> list[RouteRegistry]:
     """Register v2 resource allocation REST routes for testing."""
     processors = MagicMock(spec=Processors)
+    # spec= reads dir(), which omits value-less annotations, so build the branch itself.
+    processors.session = MagicMock(spec=SessionProcessors)
     processors.session.resource_allocation = resource_allocation_processors
 
     adapter = ResourceAllocationAdapter(

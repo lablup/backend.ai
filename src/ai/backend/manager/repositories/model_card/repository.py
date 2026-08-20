@@ -17,14 +17,10 @@ from ai.backend.manager.data.model_card.types import (
 )
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.types import (
     AvailablePresetsSearchResult,
-    ModelCardSearchResult,
-    ProjectModelCardOperationScope,
 )
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
 
@@ -38,9 +34,6 @@ class ModelCardRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = ModelCardDBSource(db)
-
-    async def create(self, creator: RBACEntityCreator[ModelCardRow]) -> ModelCardData:
-        return await self._db_source.create(creator)
 
     async def get_by_id(self, card_id: UUID) -> ModelCardData:
         return await self._db_source.get_by_id(card_id)
@@ -67,19 +60,6 @@ class ModelCardRepository:
         options: DeleteModelCardOptions,
     ) -> BulkModelCardDeleteResultData:
         return await self._db_source.bulk_delete(purgers, options)
-
-    async def search(
-        self,
-        querier: BatchQuerier,
-    ) -> ModelCardSearchResult:
-        return await self._db_source.search(querier)
-
-    async def search_in_project(
-        self,
-        querier: BatchQuerier,
-        scope: ProjectModelCardOperationScope,
-    ) -> ModelCardSearchResult:
-        return await self._db_source.search_in_project(querier, scope)
 
     async def get_scan_target_vfolders(self, project_id: UUID) -> list[VFolderScanData]:
         return await self._db_source.get_scan_target_vfolders(project_id)
