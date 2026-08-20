@@ -37,16 +37,16 @@ class BulkActionPrometheusMonitor(BulkActionMonitor):
     @override
     async def done(self, meta: BulkActionTriggerMeta, result: BulkActionProcessResult) -> None:
         failed = [r for r in result.meta.entity_results if r.status is not OperationStatus.SUCCESS]
+        # The batch label takes the first entity's type; a run naming several kinds is
+        # counted once, and each kind is still observed per entity below.
         self._observer.observe_action(
-            entity_type=meta.entity_type,
             operation_type=meta.operation_type,
             status=self._run_status_label(result.meta.entity_results, failed),
             duration=result.meta.duration.total_seconds(),
-            error_code=failed[0].error_code if failed else None,
         )
         for entity_result in result.meta.entity_results:
             self._observer.observe_action_entity(
-                entity_type=meta.entity_type,
+                entity_type=entity_result.entity_id.entity_type(),
                 operation_type=meta.operation_type,
                 status=entity_result.status,
                 error_code=entity_result.error_code,
