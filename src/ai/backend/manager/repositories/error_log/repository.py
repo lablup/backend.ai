@@ -41,7 +41,6 @@ class ErrorLogRepository:
         self._db_source = ErrorLogDBSource(db)
 
     @error_log_repository_resilience.apply()
-    @error_log_repository_resilience.apply()
     async def list_logs(
         self,
         *,

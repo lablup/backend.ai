@@ -1,6 +1,6 @@
 """
-Tests for ErrorLogRepository functionality.
-Tests the repository layer with real database operations.
+Tests for error log writes and searches.
+Both run through the generic ops repository against a real database.
 """
 
 from __future__ import annotations
@@ -11,6 +11,8 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.error_log import ErrorLogID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.error_log.types import (
     ErrorLogData,
@@ -49,15 +51,14 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.error_log import ErrorLogRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
-class TestErrorLogRepository:
-    """Test cases for ErrorLogRepository"""
+class TestErrorLogOps:
+    """Test cases for the error log ops path"""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -146,9 +147,9 @@ class TestErrorLogRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
-    ) -> uuid.UUID:
+    ) -> UserID:
         """Create test user and return user UUID"""
-        user_uuid = uuid.uuid4()
+        user_uuid = UserID(uuid.uuid4())
 
         password_info = PasswordInfo(
             password="dummy",
@@ -177,14 +178,6 @@ class TestErrorLogRepository:
         return user_uuid
 
     @pytest.fixture
-    def error_log_repository(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> ErrorLogRepository:
-        """Create ErrorLogRepository instance with database"""
-        return ErrorLogRepository(db=db_with_cleanup)
-
-    @pytest.fixture
     def error_log_ops(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -194,16 +187,14 @@ class TestErrorLogRepository:
 
     async def test_create_multiple_error_logs(
         self,
-        error_log_repository: ErrorLogRepository,
         error_log_ops: OpsRepository[ErrorLogData],
-        test_user_id: uuid.UUID,
+        test_user_id: UserID,
     ) -> None:
         """Test creating multiple error logs and verifying them"""
         error_log_specs = [
             ErrorLogCreator(
                 severity=ErrorLogSeverity.CRITICAL,
                 source="manager",
-                user=test_user_id,
                 message="Critical error occurred",
                 context_lang="en",
                 context_env={"version": "1.0.0"},
@@ -214,7 +205,6 @@ class TestErrorLogRepository:
             ErrorLogCreator(
                 severity=ErrorLogSeverity.ERROR,
                 source="agent",
-                user=test_user_id,
                 message="Error in agent",
                 context_lang="en",
                 context_env={"agent_id": "agent-001"},
@@ -233,7 +223,7 @@ class TestErrorLogRepository:
         created_logs: list[ErrorLogData] = []
 
         for creator in error_log_specs:
-            created_logs.append(await error_log_repository.create(creator))
+            created_logs.append(await error_log_ops.create_field_entity(test_user_id, creator))
 
         # Verify all logs were created with correct data
         assert len(created_logs) == 3
@@ -280,12 +270,11 @@ class TestErrorLogRepository:
     @pytest.fixture
     async def sample_error_logs_for_filtering(
         self,
-        error_log_repository: ErrorLogRepository,
         error_log_ops: OpsRepository[ErrorLogData],
-        test_user_id: uuid.UUID,
-    ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
+        test_user_id: UserID,
+    ) -> AsyncGenerator[dict[str, ErrorLogID], None]:
         """Create sample error logs with different sources for filter testing"""
-        entity_map: dict[str, uuid.UUID] = {}
+        entity_map: dict[str, ErrorLogID] = {}
 
         test_data = [
             ("manager", ErrorLogSeverity.CRITICAL, "Manager critical error"),
@@ -296,12 +285,11 @@ class TestErrorLogRepository:
             creator = ErrorLogCreator(
                 severity=severity,
                 source=source,
-                user=test_user_id,
                 message=message,
                 context_lang="en",
                 context_env={},
             )
-            result = await error_log_repository.create(creator)
+            result = await error_log_ops.create_field_entity(test_user_id, creator)
             entity_map[source] = result.id
 
         yield entity_map
@@ -309,24 +297,22 @@ class TestErrorLogRepository:
     @pytest.fixture
     async def sample_error_logs_for_ordering(
         self,
-        error_log_repository: ErrorLogRepository,
         error_log_ops: OpsRepository[ErrorLogData],
-        test_user_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+        test_user_id: UserID,
+    ) -> AsyncGenerator[list[ErrorLogID], None]:
         """Create sample error logs with predictable sources for ordering tests"""
-        error_log_ids: list[uuid.UUID] = []
+        error_log_ids: list[ErrorLogID] = []
         sources = ["alpha-source", "beta-source", "gamma-source", "delta-source"]
 
         for source in sources:
             creator = ErrorLogCreator(
                 severity=ErrorLogSeverity.ERROR,
                 source=source,
-                user=test_user_id,
                 message=f"Error from {source}",
                 context_lang="en",
                 context_env={},
             )
-            result = await error_log_repository.create(creator)
+            result = await error_log_ops.create_field_entity(test_user_id, creator)
             error_log_ids.append(result.id)
 
         yield error_log_ids
@@ -335,14 +321,13 @@ class TestErrorLogRepository:
     async def sample_error_logs_for_pagination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_user_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+        test_user_id: UserID,
+    ) -> AsyncGenerator[list[ErrorLogID], None]:
         """Create 25 error logs for pagination testing"""
         specs = [
             ErrorLogCreator(
                 severity=ErrorLogSeverity.ERROR,
                 source=f"source_{i:02d}",
-                user=test_user_id,
                 message=f"Error message {i}",
                 context_lang="en",
                 context_env={},
@@ -351,7 +336,7 @@ class TestErrorLogRepository:
         ]
 
         async with db_with_cleanup.begin_session() as db_sess:
-            rows = [creator.build_row() for creator in specs]
+            rows = [creator.build_row(test_user_id) for creator in specs]
             db_sess.add_all(rows)
             await db_sess.flush()
             ids = [row.id for row in rows]
