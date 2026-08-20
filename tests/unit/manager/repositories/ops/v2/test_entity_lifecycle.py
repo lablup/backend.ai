@@ -35,8 +35,9 @@ from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
     EntityType,
+    FieldIdentifier,
+    FieldType,
     ScopeType,
-    SidecarIdentifier,
 )
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -63,9 +64,9 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.specs.creator import (
+    DanglingFieldCreator,
     EntityCreator,
     RoleManagedEntityCreator,
-    SidecarCreator,
 )
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
@@ -730,18 +731,26 @@ class TestEntityPurge:
 # =============================================================================
 
 
-class _SidecarID(SidecarIdentifier):
+_SIDECAR_FIELD_TYPE = FieldType("test_sidecar")
+
+
+class _SidecarID(FieldIdentifier):
+    @override
+    @classmethod
+    def field_type(cls) -> FieldType:
+        return _SIDECAR_FIELD_TYPE
+
     """The id of a row that rides beside the graph."""
 
 
-class _Sidecar(SidecarCreator[EntityLifecycleTestRow, _EntityData]):
+class _Sidecar(DanglingFieldCreator[EntityLifecycleTestRow, _EntityData]):
     """A row that rides beside the graph: no node, no owner."""
 
     def __init__(self, name: str) -> None:
         self.name = name
 
     @override
-    def sidecar_id(self, row: EntityLifecycleTestRow) -> SidecarIdentifier:
+    def field_id(self, row: EntityLifecycleTestRow) -> FieldIdentifier:
         return _SidecarID(row.id)
 
     @override
@@ -749,7 +758,7 @@ class _Sidecar(SidecarCreator[EntityLifecycleTestRow, _EntityData]):
         return ()
 
     @override
-    def build_row(self) -> EntityLifecycleTestRow:
+    def build_row(self, entity_type: EntityType) -> EntityLifecycleTestRow:
         return EntityLifecycleTestRow(name=self.name)
 
     @override
@@ -761,7 +770,9 @@ class TestSidecarCreate:
     async def test_create_provisions_no_scope_and_joins_nothing(
         self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
     ) -> None:
-        data = await repository.create_sidecar(_Sidecar(name="a"))
+        data = await repository.create_dangling_field(
+            EntityType("test_dangling"), _Sidecar(name="a")
+        )
 
         assert await _virtual_scope_id(database, data.id) is None
         assert not await _self_membership_exists(database, data.id)
@@ -769,7 +780,13 @@ class TestSidecarCreate:
     async def test_atomic_create_writes_every_row(
         self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
     ) -> None:
-        items = await repository.atomic_create_sidecars([_Sidecar(name="a"), _Sidecar(name="b")])
+        items = await repository.atomic_create_dangling_fields(
+            EntityType("test_dangling"),
+            [
+                _Sidecar(name="a"),
+                _Sidecar(name="b"),
+            ],
+        )
 
         assert [item.name for item in items] == ["a", "b"]
         assert await _row_count(database) == 2
@@ -778,7 +795,9 @@ class TestSidecarCreate:
         self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
     ) -> None:
         with pytest.raises(RepositoryIntegrityError):
-            await repository.atomic_create_sidecars([_Sidecar(name="a"), _Sidecar(name="a")])
+            await repository.atomic_create_dangling_fields(
+                EntityType("test_dangling"), [_Sidecar(name="a"), _Sidecar(name="a")]
+            )
 
         assert await _row_count(database) == 0
 

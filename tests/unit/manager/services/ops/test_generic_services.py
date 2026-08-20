@@ -148,11 +148,6 @@ class _FieldID(FieldIdentifier):
     def field_type(cls) -> FieldType:
         return _FIELD_TYPE
 
-    @override
-    @classmethod
-    def owner_entity_type(cls) -> EntityType:
-        return _ENTITY_TYPE
-
 
 @dataclass(frozen=True)
 class _PresetFieldData(FieldData):
@@ -431,6 +426,10 @@ class _PresetGlobalCreator(GlobalEntityCreator[RolePresetRow, _PresetData]):
 
 
 class _PresetFieldCreator(FieldCreator[_EntityID, RolePresetRow, _PresetFieldData]):
+    @override
+    def field_id(self, row: RolePresetRow) -> _FieldID:
+        return _FieldID(row.id)
+
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return ()
@@ -788,11 +787,6 @@ class _BulkUpdateAction(BaseBulkAction, PartialBulkUpdateOpsAction[RolePresetRow
 
     @classmethod
     @override
-    def entity_type(cls) -> EntityType:
-        return _ENTITY_TYPE
-
-    @classmethod
-    @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
@@ -813,11 +807,6 @@ class _BulkPurgeAction(BaseBulkAction, EntityPartialBulkPurgeOpsAction[RolePrese
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:
         return tuple(self.purgers)
-
-    @classmethod
-    @override
-    def entity_type(cls) -> EntityType:
-        return _ENTITY_TYPE
 
     @classmethod
     @override
@@ -924,11 +913,6 @@ class _BulkPurgeGlobalAction(
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:
         return tuple(self.purgers)
-
-    @classmethod
-    @override
-    def entity_type(cls) -> EntityType:
-        return _ENTITY_TYPE
 
     @classmethod
     @override

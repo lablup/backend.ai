@@ -9,11 +9,12 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_ENTITY_TYPE
+from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE
+from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_FIELD_TYPE
 from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
 from ai.backend.common.data.entity.storage_namespace import STORAGE_NAMESPACE_ENTITY_TYPE
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.actions.registry.types import FieldGroupMeta, GroupMeta
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.object_storage.handler import ObjectStorageHandler
 from ai.backend.manager.api.rest.object_storage.registry import register_object_storage_routes
@@ -21,12 +22,17 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
+from ai.backend.manager.services.artifact_revision.actions.lookup_owner import (
+    LookupArtifactRevisionOwnerAction,
+    LookupBulkArtifactRevisionOwnerAction,
+)
 from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
 from ai.backend.manager.services.object_storage.service import ObjectStorageService
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
@@ -62,7 +68,12 @@ def object_storage_processors(
     )
     return ObjectStorageProcessors(
         processor_registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)),
-        processor_registry.group(GroupMeta(ARTIFACT_REVISION_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
+            FieldGroupMeta(ARTIFACT_REVISION_FIELD_TYPE),
+            ArtifactRevisionData,
+            LookupArtifactRevisionOwnerAction,
+            LookupBulkArtifactRevisionOwnerAction,
+        ),
         service,
     )
 

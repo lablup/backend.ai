@@ -16,16 +16,16 @@ from ai.backend.common.data.entity.fair_share import (
 )
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE, ResourceGroupID
 from ai.backend.common.data.entity.usage_bucket import (
-    DOMAIN_USAGE_BUCKET_ENTITY_TYPE,
-    PROJECT_USAGE_BUCKET_ENTITY_TYPE,
-    USER_USAGE_BUCKET_ENTITY_TYPE,
+    DOMAIN_USAGE_BUCKET_FIELD_TYPE,
+    PROJECT_USAGE_BUCKET_FIELD_TYPE,
+    USER_USAGE_BUCKET_FIELD_TYPE,
 )
 from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     ConcernMeta,
+    FieldGroupMeta,
     GroupMeta,
-    SidecarGroupMeta,
 )
 from ai.backend.manager.api.rest.fair_share.handler import FairShareAPIHandler
 from ai.backend.manager.api.rest.fair_share.registry import register_fair_share_routes
@@ -72,14 +72,14 @@ def resource_usage_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ResourceUsageProcessors:
     return ResourceUsageProcessors(
-        processor_registry.sidecar_group(
-            SidecarGroupMeta(DOMAIN_USAGE_BUCKET_ENTITY_TYPE), DomainUsageBucketData
+        processor_registry.dangling_field_group(
+            FieldGroupMeta(DOMAIN_USAGE_BUCKET_FIELD_TYPE), DomainUsageBucketData
         ),
-        processor_registry.sidecar_group(
-            SidecarGroupMeta(PROJECT_USAGE_BUCKET_ENTITY_TYPE), ProjectUsageBucketData
+        processor_registry.dangling_field_group(
+            FieldGroupMeta(PROJECT_USAGE_BUCKET_FIELD_TYPE), ProjectUsageBucketData
         ),
-        processor_registry.sidecar_group(
-            SidecarGroupMeta(USER_USAGE_BUCKET_ENTITY_TYPE), UserUsageBucketData
+        processor_registry.dangling_field_group(
+            FieldGroupMeta(USER_USAGE_BUCKET_FIELD_TYPE), UserUsageBucketData
         ),
     )
 

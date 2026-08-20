@@ -33,6 +33,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
@@ -1014,7 +1015,7 @@ class TestDeploymentsRetention:
         async with db.begin_session() as sess:
             sess.add(
                 EndpointTokenRow(
-                    id=uuid.uuid4(),
+                    id=DeploymentTokenID(uuid.uuid4()),
                     token=f"tok-{uuid.uuid4()}",
                     endpoint=endpoint_id,
                     session_owner=UserID(scope.user_uuid),

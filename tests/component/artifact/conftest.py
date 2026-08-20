@@ -11,9 +11,9 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE
-from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_ENTITY_TYPE
+from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_FIELD_TYPE
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.actions.registry.types import FieldGroupMeta, GroupMeta
 from ai.backend.manager.api.rest.artifact.handler import ArtifactHandler
 from ai.backend.manager.api.rest.artifact.registry import register_artifact_routes
 from ai.backend.manager.api.rest.artifact_registry.handler import ArtifactRegistryHandler
@@ -24,6 +24,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
+    ArtifactRevisionData,
     ArtifactStatus,
     ArtifactType,
 )
@@ -43,6 +44,10 @@ from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
+from ai.backend.manager.services.artifact_revision.actions.lookup_owner import (
+    LookupArtifactRevisionOwnerAction,
+    LookupBulkArtifactRevisionOwnerAction,
+)
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
 
@@ -115,7 +120,14 @@ def artifact_revision_processors(
         background_task_manager=background_task_manager,
     )
     return ArtifactRevisionProcessors(
-        processor_registry.group(GroupMeta(ARTIFACT_REVISION_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
+            FieldGroupMeta(ARTIFACT_REVISION_FIELD_TYPE),
+            ArtifactRevisionData,
+            LookupArtifactRevisionOwnerAction,
+            LookupBulkArtifactRevisionOwnerAction,
+        ),
+        service,
     )
 
 

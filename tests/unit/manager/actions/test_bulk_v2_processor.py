@@ -19,7 +19,10 @@ from ai.backend.common.exception import PermissionDeniedError
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
-from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
+from ai.backend.manager.actions.v2.bulk.processor import (
+    BulkActionProcessor,
+    PartialEntityResultJudge,
+)
 from ai.backend.manager.actions.v2.bulk.result import (
     BaseBulkActionResult,
     BulkActionProcessResult,
@@ -49,11 +52,6 @@ class _Action(BaseBulkAction):
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:
         return self.ids
-
-    @classmethod
-    @override
-    def entity_type(cls) -> EntityType:
-        return _SESSION_ENTITY_TYPE
 
     @classmethod
     @override
@@ -124,7 +122,9 @@ async def test_partial_failure_keeps_each_entity_status(action: _Action) -> None
         return _Result(results=results)
 
     monitor = _RecordingMonitor()
-    await BulkActionProcessor[_Action, _Result](func=run, monitors=[monitor]).run(action)
+    await BulkActionProcessor[_Action, _Result](
+        func=run, judge=PartialEntityResultJudge(), monitors=[monitor]
+    ).run(action)
 
     meta = monitor.done_results[0].meta
     assert [(r.entity_id, r.status) for r in meta.entity_results] == [
@@ -139,7 +139,9 @@ async def test_all_entities_succeeding_summarizes_as_success(action: _Action) ->
         return _Result(results=[_ok(entity_id) for entity_id in a.entity_ids()])
 
     monitor = _RecordingMonitor()
-    await BulkActionProcessor[_Action, _Result](func=run, monitors=[monitor]).run(action)
+    await BulkActionProcessor[_Action, _Result](
+        func=run, judge=PartialEntityResultJudge(), monitors=[monitor]
+    ).run(action)
 
     assert all(
         r.status is OperationStatus.SUCCESS for r in monitor.done_results[0].meta.entity_results
@@ -152,7 +154,10 @@ async def test_denial_is_attributed_to_every_named_entity(action: _Action) -> No
 
     monitor = _RecordingMonitor()
     processor = BulkActionProcessor[_Action, _Result](
-        func=run, monitors=[monitor], validators=[_DenyingValidator()]
+        func=run,
+        judge=PartialEntityResultJudge(),
+        monitors=[monitor],
+        validators=[_DenyingValidator()],
     )
 
     with pytest.raises(PermissionDeniedError):

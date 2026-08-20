@@ -193,11 +193,6 @@ class _BulkVfolderUpdateAction(BaseBulkAction):
 
     @classmethod
     @override
-    def entity_type(cls) -> EntityType:
-        return EntityType("vfolder")
-
-    @classmethod
-    @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
@@ -217,7 +212,6 @@ def _bulk_meta(
     return BulkActionTriggerMeta(
         action_id=trigger_meta.action_id,
         started_at=trigger_meta.started_at,
-        entity_type=action.entity_type(),
         entity_ids=action.entity_ids(),
         operation_type=action.operation_type(),
         action_name=action.action_name(),
@@ -900,7 +894,6 @@ class TestVirtualScopeBulkActionRBACValidator:
                 BulkActionTriggerMeta(
                     action_id=trigger_meta.action_id,
                     started_at=trigger_meta.started_at,
-                    entity_type=bulk_vfolder_action.entity_type(),
                     entity_ids=bulk_vfolder_action.entity_ids(),
                     operation_type=bulk_vfolder_action.operation_type(),
                     action_name=bulk_vfolder_action.action_name(),
@@ -919,7 +912,6 @@ class TestVirtualScopeBulkActionRBACValidator:
                 BulkActionTriggerMeta(
                     action_id=trigger_meta.action_id,
                     started_at=trigger_meta.started_at,
-                    entity_type=bulk_vfolder_action.entity_type(),
                     entity_ids=bulk_vfolder_action.entity_ids(),
                     operation_type=bulk_vfolder_action.operation_type(),
                     action_name=bulk_vfolder_action.action_name(),
@@ -940,7 +932,6 @@ class TestVirtualScopeBulkActionRBACValidator:
                     BulkActionTriggerMeta(
                         action_id=trigger_meta.action_id,
                         started_at=trigger_meta.started_at,
-                        entity_type=bulk_vfolder_action.entity_type(),
                         entity_ids=bulk_vfolder_action.entity_ids(),
                         operation_type=bulk_vfolder_action.operation_type(),
                         action_name=bulk_vfolder_action.action_name(),

@@ -223,7 +223,7 @@ class TestErrorLogOps:
         created_logs: list[ErrorLogData] = []
 
         for creator in error_log_specs:
-            created_logs.append(await error_log_ops.create_field_entity(test_user_id, creator))
+            created_logs.append(await error_log_ops.create_field(test_user_id, creator))
 
         # Verify all logs were created with correct data
         assert len(created_logs) == 3
@@ -289,7 +289,7 @@ class TestErrorLogOps:
                 context_lang="en",
                 context_env={},
             )
-            result = await error_log_ops.create_field_entity(test_user_id, creator)
+            result = await error_log_ops.create_field(test_user_id, creator)
             entity_map[source] = result.id
 
         yield entity_map
@@ -312,7 +312,7 @@ class TestErrorLogOps:
                 context_lang="en",
                 context_env={},
             )
-            result = await error_log_ops.create_field_entity(test_user_id, creator)
+            result = await error_log_ops.create_field(test_user_id, creator)
             error_log_ids.append(result.id)
 
         yield error_log_ids

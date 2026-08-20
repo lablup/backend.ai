@@ -1550,7 +1550,7 @@ class DeploymentRepository:
     ) -> ModelDeploymentAccessTokenData:
         """Register an access token under the deployment it grants access to."""
         async with self._v2_ops.write_ops() as w:
-            return await w.create_field_entity(deployment_id, creator)
+            return await w.create_field(deployment_id, creator)
 
     @deployment_repository_resilience.apply()
     async def get_access_token(

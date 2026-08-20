@@ -20,6 +20,7 @@ from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.replica import ReplicaID
@@ -4047,8 +4048,8 @@ class TestDeploymentRepositoryDuplicateName:
                     lifecycle_stage=EndpointLifecycle.CREATED,
                 ),
             ])
-            target_token_ids = [uuid.uuid4(), uuid.uuid4()]
-            sibling_token_id = uuid.uuid4()
+            target_token_ids = [DeploymentTokenID(uuid.uuid4()), DeploymentTokenID(uuid.uuid4())]
+            sibling_token_id = DeploymentTokenID(uuid.uuid4())
             db_sess.add_all([
                 EndpointTokenRow(
                     id=target_token_ids[0],

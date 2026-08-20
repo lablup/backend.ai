@@ -20,7 +20,6 @@ from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, Dep
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.replica_group_history import (
-    REPLICA_GROUP_HISTORY_ENTITY_TYPE,
     ReplicaGroupHistoryID,
 )
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
@@ -85,7 +84,7 @@ def scheduling_history_processors(
     return SchedulingHistoryProcessors(
         groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
         groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
-        groups.group(GroupMeta(REPLICA_GROUP_HISTORY_ENTITY_TYPE)),
+        groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
         service,
     )
 
