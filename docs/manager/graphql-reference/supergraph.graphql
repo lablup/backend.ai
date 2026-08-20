@@ -416,7 +416,7 @@ input AgentFilter
   id: StringFilter = null
   status: AgentStatusFilter = null
   schedulable: Boolean = null
-  resourceGroup: StringFilter = null
+  scalingGroup: StringFilter = null
   AND: [AgentFilter!] = null
   OR: [AgentFilter!] = null
   NOT: [AgentFilter!] = null
@@ -757,7 +757,7 @@ type AgentV2 implements Node
   """
   Name of the scaling group this agent belongs to. Scaling groups are logical collections of agents used for resource scheduling, quota management, and workload isolation across different user groups or projects.
   """
-  resourceGroup: String!
+  scalingGroup: String!
 
   """Added in 26.1.0. Load the container count for this agent."""
   containerCount: Int
@@ -12305,27 +12305,27 @@ type Mutation
   associate_scaling_group_with_domain(domain: String!, scaling_group: String!): AssociateScalingGroupWithDomain @join__field(graph: GRAPHENE)
 
   """Added in 24.03.9"""
-  associate_scaling_groups_with_domain(domain: String!, resource_groups: [String]!): AssociateScalingGroupsWithDomain @join__field(graph: GRAPHENE)
+  associate_scaling_groups_with_domain(domain: String!, scaling_groups: [String]!): AssociateScalingGroupsWithDomain @join__field(graph: GRAPHENE)
   associate_scaling_group_with_user_group(scaling_group: String!, user_group: UUID!): AssociateScalingGroupWithUserGroup @join__field(graph: GRAPHENE)
 
   """Added in 24.03.9"""
-  associate_scaling_groups_with_user_group(resource_groups: [String]!, user_group: UUID!): AssociateScalingGroupsWithUserGroup @join__field(graph: GRAPHENE)
+  associate_scaling_groups_with_user_group(scaling_groups: [String]!, user_group: UUID!): AssociateScalingGroupsWithUserGroup @join__field(graph: GRAPHENE)
   associate_scaling_group_with_keypair(access_key: String!, scaling_group: String!): AssociateScalingGroupWithKeyPair @join__field(graph: GRAPHENE)
 
   """Added in 24.03.9"""
-  associate_scaling_groups_with_keypair(access_key: String!, resource_groups: [String]!): AssociateScalingGroupsWithKeyPair @join__field(graph: GRAPHENE)
+  associate_scaling_groups_with_keypair(access_key: String!, scaling_groups: [String]!): AssociateScalingGroupsWithKeyPair @join__field(graph: GRAPHENE)
   disassociate_scaling_group_with_domain(domain: String!, scaling_group: String!): DisassociateScalingGroupWithDomain @join__field(graph: GRAPHENE)
 
   """Added in 24.03.9"""
-  disassociate_scaling_groups_with_domain(domain: String!, resource_groups: [String]!): DisassociateScalingGroupsWithDomain @join__field(graph: GRAPHENE)
+  disassociate_scaling_groups_with_domain(domain: String!, scaling_groups: [String]!): DisassociateScalingGroupsWithDomain @join__field(graph: GRAPHENE)
   disassociate_scaling_group_with_user_group(scaling_group: String!, user_group: UUID!): DisassociateScalingGroupWithUserGroup @join__field(graph: GRAPHENE)
 
   """Added in 24.03.9"""
-  disassociate_scaling_groups_with_user_group(resource_groups: [String]!, user_group: UUID!): DisassociateScalingGroupsWithUserGroup @join__field(graph: GRAPHENE)
+  disassociate_scaling_groups_with_user_group(scaling_groups: [String]!, user_group: UUID!): DisassociateScalingGroupsWithUserGroup @join__field(graph: GRAPHENE)
   disassociate_scaling_group_with_keypair(access_key: String!, scaling_group: String!): DisassociateScalingGroupWithKeyPair @join__field(graph: GRAPHENE)
 
   """Added in 24.03.9"""
-  disassociate_scaling_groups_with_keypair(access_key: String!, resource_groups: [String]!): DisassociateScalingGroupsWithKeyPair @join__field(graph: GRAPHENE)
+  disassociate_scaling_groups_with_keypair(access_key: String!, scaling_groups: [String]!): DisassociateScalingGroupsWithKeyPair @join__field(graph: GRAPHENE)
   disassociate_all_scaling_groups_with_domain(domain: String!): DisassociateAllScalingGroupsWithDomain @join__field(graph: GRAPHENE)
   disassociate_all_scaling_groups_with_group(user_group: UUID!): DisassociateAllScalingGroupsWithGroup @join__field(graph: GRAPHENE)
   set_quota_scope(props: QuotaScopeInput!, quota_scope_id: String!, storage_host_name: String!): SetQuotaScope @join__field(graph: GRAPHENE)
@@ -22020,7 +22020,7 @@ type UpdateResourceGroupFairShareSpecPayload
 }
 
 """
-Added in 26.2.0. Resource group configuration update input. All fields are optional - only provided fields will be updated. Supports all ResourceGroupUpdaterSpec fields (except fair_share, use separate mutation).
+Added in 26.2.0. Resource group configuration update input. All fields are optional - only provided fields will be updated. Supports all ScalingGroupUpdaterSpec fields (except fair_share, use separate mutation).
 """
 input UpdateResourceGroupInput
   @join__type(graph: STRAWBERRY)

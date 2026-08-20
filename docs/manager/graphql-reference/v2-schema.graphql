@@ -282,7 +282,7 @@ input AgentFilter {
   id: StringFilter = null
   status: AgentStatusFilter = null
   schedulable: Boolean = null
-  resourceGroup: StringFilter = null
+  scalingGroup: StringFilter = null
   AND: [AgentFilter!] = null
   OR: [AgentFilter!] = null
   NOT: [AgentFilter!] = null
@@ -515,7 +515,7 @@ type AgentV2 implements Node {
   """
   Name of the scaling group this agent belongs to. Scaling groups are logical collections of agents used for resource scheduling, quota management, and workload isolation across different user groups or projects.
   """
-  resourceGroup: String!
+  scalingGroup: String!
 
   """Added in 26.1.0. Load the container count for this agent."""
   containerCount: Int
@@ -15870,7 +15870,7 @@ type UpdateResourceGroupFairShareSpecPayload {
 }
 
 """
-Added in 26.2.0. Resource group configuration update input. All fields are optional - only provided fields will be updated. Supports all ResourceGroupUpdaterSpec fields (except fair_share, use separate mutation).
+Added in 26.2.0. Resource group configuration update input. All fields are optional - only provided fields will be updated. Supports all ScalingGroupUpdaterSpec fields (except fair_share, use separate mutation).
 """
 input UpdateResourceGroupInput {
   """Name of the resource group to update."""
