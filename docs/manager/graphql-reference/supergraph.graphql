@@ -22020,7 +22020,7 @@ type UpdateResourceGroupFairShareSpecPayload
 }
 
 """
-Added in 26.2.0. Resource group configuration update input. All fields are optional - only provided fields will be updated. Supports all ScalingGroupUpdaterSpec fields (except fair_share, use separate mutation).
+Added in 26.2.0. Resource group configuration update input. All fields are optional - only provided fields will be updated. Supports all ResourceGroupUpdaterSpec fields (except fair_share, use separate mutation).
 """
 input UpdateResourceGroupInput
   @join__type(graph: STRAWBERRY)

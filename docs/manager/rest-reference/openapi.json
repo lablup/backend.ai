@@ -20768,7 +20768,7 @@
         "type": "string"
       },
       "KernelExecutionSpecInput": {
-        "description": "Per-kernel execution spec shared by all replicas of one group.\n\nEvery field is optional. The resolver fills gaps from\n`ScalingGroupRow.default_session_options.default_kernel_execution_spec`\nbefore a session is enqueued; any remaining gaps are surfaced as\nvalidation errors (e.g. an image must ultimately be resolved).",
+        "description": "Per-kernel execution spec shared by all replicas of one group.\n\nEvery field is optional. The resolver fills gaps from\n`ResourceGroupRow.default_session_options.default_kernel_execution_spec`\nbefore a session is enqueued; any remaining gaps are surfaced as\nvalidation errors (e.g. an image must ultimately be resolved).",
         "properties": {
           "image_id": {
             "anyOf": [
