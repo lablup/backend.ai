@@ -7,13 +7,14 @@ from unittest.mock import AsyncMock
 import pytest
 
 from ai.backend.accelerator.cuda_open.plugin import (
-    CDIAttachMechanism,
+    CDIInjector,
     CUDADevice,
     CUDAPlugin,
     EngineVersion,
-    LegacyRuntimeAttachMechanism,
-    NvidiaDriverAttachMechanism,
+    LegacyRuntimeInjector,
+    NvidiaDriverInjector,
 )
+from ai.backend.agent.data.device import DeviceAllocation
 from ai.backend.agent.errors.resources import InvalidResourceArgument
 from ai.backend.common.types import DeviceId, DeviceName, SlotName
 
@@ -47,8 +48,8 @@ def _docker_info(server_version: str, *, with_nvidia_runtime: bool = True) -> di
     return {"Runtimes": runtimes, "ServerVersion": server_version}
 
 
-class TestDetectAttachMechanism:
-    """Tests for picking the device attach mechanism from the container engine."""
+class TestDetectDeviceInjector:
+    """Tests for picking the device injector from the container engine."""
 
     @pytest.fixture
     def plugin(self) -> CUDAPlugin:
@@ -65,27 +66,27 @@ class TestDetectAttachMechanism:
     def test_podman_at_the_minimum_version_uses_cdi(
         self, plugin: CUDAPlugin, cdi_spec_available: None
     ) -> None:
-        mechanism = plugin._detect_attach_mechanism(
+        mechanism = plugin._detect_device_injector(
             _docker_info("5.4.0", with_nvidia_runtime=False),
             _version_info(("Podman Engine", "5.4.0")),
         )
-        assert isinstance(mechanism, CDIAttachMechanism)
+        assert isinstance(mechanism, CDIInjector)
 
     def test_podman_does_not_require_the_nvidia_runtime(
         self, plugin: CUDAPlugin, cdi_spec_available: None
     ) -> None:
         # Podman selects its OCI runtime from its own configuration, so the nvidia runtime
         # being absent from the reported runtimes must not disable the plugin.
-        mechanism = plugin._detect_attach_mechanism(
+        mechanism = plugin._detect_device_injector(
             _docker_info("5.8.4", with_nvidia_runtime=False),
             _version_info(("Podman Engine", "5.8.4")),
         )
-        assert isinstance(mechanism, CDIAttachMechanism)
+        assert isinstance(mechanism, CDIInjector)
 
     def test_podman_below_the_minimum_version_is_rejected(
         self, plugin: CUDAPlugin, cdi_spec_available: None
     ) -> None:
-        mechanism = plugin._detect_attach_mechanism(
+        mechanism = plugin._detect_device_injector(
             _docker_info("4.9.3"),
             _version_info(("Podman Engine", "4.9.3"), ("Conmon", "conmon version 2.1.10")),
         )
@@ -94,7 +95,7 @@ class TestDetectAttachMechanism:
     def test_podman_without_a_cdi_spec_is_rejected(
         self, plugin: CUDAPlugin, cdi_spec_missing: None
     ) -> None:
-        mechanism = plugin._detect_attach_mechanism(
+        mechanism = plugin._detect_device_injector(
             _docker_info("5.4.0"),
             _version_info(("Podman Engine", "5.4.0")),
         )
@@ -103,23 +104,23 @@ class TestDetectAttachMechanism:
     def test_docker_above_the_device_request_version_uses_the_nvidia_driver(
         self, plugin: CUDAPlugin
     ) -> None:
-        mechanism = plugin._detect_attach_mechanism(
+        mechanism = plugin._detect_device_injector(
             _docker_info("28.1.1"),
             _version_info(("Engine", "28.1.1")),
         )
-        assert isinstance(mechanism, NvidiaDriverAttachMechanism)
+        assert isinstance(mechanism, NvidiaDriverInjector)
 
     def test_docker_below_the_device_request_version_uses_the_legacy_runtime(
         self, plugin: CUDAPlugin
     ) -> None:
-        mechanism = plugin._detect_attach_mechanism(
+        mechanism = plugin._detect_device_injector(
             _docker_info("18.9.0"),
             _version_info(("Engine", "18.9.0")),
         )
-        assert isinstance(mechanism, LegacyRuntimeAttachMechanism)
+        assert isinstance(mechanism, LegacyRuntimeInjector)
 
     def test_docker_without_the_nvidia_runtime_is_rejected(self, plugin: CUDAPlugin) -> None:
-        mechanism = plugin._detect_attach_mechanism(
+        mechanism = plugin._detect_device_injector(
             _docker_info("28.1.1", with_nvidia_runtime=False),
             _version_info(("Engine", "28.1.1")),
         )
@@ -128,25 +129,31 @@ class TestDetectAttachMechanism:
     def test_a_cdi_only_engine_with_an_unparsable_version_is_rejected(
         self, plugin: CUDAPlugin, cdi_spec_available: None
     ) -> None:
-        mechanism = plugin._detect_attach_mechanism(
+        mechanism = plugin._detect_device_injector(
             _docker_info("5.4.0"),
             _version_info(("Podman Engine", "unknown")),
         )
         assert mechanism is None
 
     def test_an_unparsable_docker_version_is_rejected(self, plugin: CUDAPlugin) -> None:
-        mechanism = plugin._detect_attach_mechanism(
+        mechanism = plugin._detect_device_injector(
             _docker_info("unknown"),
             _version_info(("Engine", "unknown")),
         )
         assert mechanism is None
 
 
-def _alloc(*device_ids: str) -> dict[SlotName, dict[DeviceId, Decimal]]:
+def _device_alloc(*device_ids: str) -> dict[SlotName, dict[DeviceId, Decimal]]:
+    """The resource-spec form the agent hands to the plugin."""
     return {SlotName("cuda.device"): {DeviceId(device_id): Decimal(1) for device_id in device_ids}}
 
 
-class TestCDIAttachMechanism:
+def _alloc(*device_ids: str) -> DeviceAllocation:
+    """The transposed form a mechanism receives."""
+    return DeviceAllocation.from_device_alloc(_device_alloc(*device_ids))
+
+
+class TestCDIInjector:
     @pytest.fixture
     def devices(self) -> list[CUDADevice]:
         return [
@@ -157,7 +164,7 @@ class TestCDIAttachMechanism:
     def test_names_devices_by_uuid(self, devices: list[CUDADevice]) -> None:
         # The alloc map keys devices by the CUDA runtime index, which is not guaranteed to
         # match the index CDI assigns, so the UUID is what must reach the engine.
-        device_config = CDIAttachMechanism().build_device_config(_alloc("1"), devices)
+        device_config = CDIInjector().build_device_config(_alloc("1"), devices)
         assert device_config == {
             "HostConfig": {
                 "DeviceRequests": [
@@ -167,54 +174,54 @@ class TestCDIAttachMechanism:
         }
 
     def test_names_every_allocated_device(self, devices: list[CUDADevice]) -> None:
-        device_config = CDIAttachMechanism().build_device_config(_alloc("0", "1"), devices)
+        device_config = CDIInjector().build_device_config(_alloc("0", "1"), devices)
         assert device_config["HostConfig"]["DeviceRequests"][0]["DeviceIDs"] == [
             f"nvidia.com/gpu=GPU-{DEVICE_0_UUID}",
             f"nvidia.com/gpu=GPU-{DEVICE_1_UUID}",
         ]
 
     def test_omits_the_legacy_runtime_fields(self, devices: list[CUDADevice]) -> None:
-        device_config = CDIAttachMechanism().build_device_config(_alloc("0"), devices)
+        device_config = CDIInjector().build_device_config(_alloc("0"), devices)
         assert "Env" not in device_config
         assert "Runtime" not in device_config["HostConfig"]
 
     def test_skips_devices_without_an_allocation(self, devices: list[CUDADevice]) -> None:
-        device_alloc = {
+        allocation = DeviceAllocation.from_device_alloc({
             SlotName("cuda.device"): {DeviceId("0"): Decimal(0), DeviceId("1"): Decimal(1)},
-        }
-        device_config = CDIAttachMechanism().build_device_config(device_alloc, devices)
+        })
+        device_config = CDIInjector().build_device_config(allocation, devices)
         assert device_config["HostConfig"]["DeviceRequests"][0]["DeviceIDs"] == [
             f"nvidia.com/gpu=GPU-{DEVICE_1_UUID}",
         ]
 
     def test_emits_nothing_for_an_empty_allocation(self, devices: list[CUDADevice]) -> None:
-        assert CDIAttachMechanism().build_device_config({}, devices) == {}
+        assert CDIInjector().build_device_config(_alloc(), devices) == {}
 
     def test_rejects_an_allocation_of_an_unknown_device(self, devices: list[CUDADevice]) -> None:
         # Skipping the device would charge the slot while the container runs without a GPU.
         with pytest.raises(InvalidResourceArgument):
-            CDIAttachMechanism().build_device_config(_alloc("7"), devices)
+            CDIInjector().build_device_config(_alloc("7"), devices)
 
 
-class TestNvidiaDriverAttachMechanism:
+class TestNvidiaDriverInjector:
     def test_names_devices_by_the_runtime_index(self) -> None:
-        device_config = NvidiaDriverAttachMechanism().build_device_config(_alloc("0"), [])
+        device_config = NvidiaDriverInjector().build_device_config(_alloc("0"), [])
         device_request = device_config["HostConfig"]["DeviceRequests"][0]
         assert device_request["Driver"] == "nvidia"
         assert device_request["DeviceIDs"] == ["0"]
 
     def test_emits_nothing_for_an_empty_allocation(self) -> None:
-        assert NvidiaDriverAttachMechanism().build_device_config({}, []) == {}
+        assert NvidiaDriverInjector().build_device_config(_alloc(), []) == {}
 
 
-class TestLegacyRuntimeAttachMechanism:
+class TestLegacyRuntimeInjector:
     def test_selects_the_nvidia_runtime_and_lists_devices_in_the_environment(self) -> None:
-        device_config = LegacyRuntimeAttachMechanism().build_device_config(_alloc("0", "1"), [])
+        device_config = LegacyRuntimeInjector().build_device_config(_alloc("0", "1"), [])
         assert device_config["HostConfig"]["Runtime"] == "nvidia"
         assert "NVIDIA_VISIBLE_DEVICES=0,1" in device_config["Env"]
 
     def test_still_selects_the_nvidia_runtime_for_an_empty_allocation(self) -> None:
-        device_config = LegacyRuntimeAttachMechanism().build_device_config({}, [])
+        device_config = LegacyRuntimeInjector().build_device_config(_alloc(), [])
         assert device_config["HostConfig"]["Runtime"] == "nvidia"
         assert "NVIDIA_VISIBLE_DEVICES=" in device_config["Env"]
 
@@ -229,7 +236,7 @@ class TestGenerateDockerArgs:
         plugin.local_config = {}
         plugin.enabled = True
         plugin.device_mask = []
-        plugin._attach_mechanism = CDIAttachMechanism()
+        plugin._device_injector = CDIInjector()
         plugin.list_devices = AsyncMock(  # type: ignore[method-assign]
             return_value=[_make_device("0", DEVICE_0_UUID), _make_device("1", DEVICE_1_UUID)],
         )
@@ -238,13 +245,13 @@ class TestGenerateDockerArgs:
     async def test_passes_the_allocation_and_the_devices_to_the_mechanism(
         self, cuda_plugin: CUDAPlugin
     ) -> None:
-        docker_args = await cuda_plugin.generate_docker_args(AsyncMock(), _alloc("1"))
+        docker_args = await cuda_plugin.generate_docker_args(AsyncMock(), _device_alloc("1"))
         assert docker_args["HostConfig"]["DeviceRequests"][0]["DeviceIDs"] == [
             f"nvidia.com/gpu=GPU-{DEVICE_1_UUID}",
         ]
 
     async def test_a_disabled_plugin_emits_nothing(self, cuda_plugin: CUDAPlugin) -> None:
         cuda_plugin.enabled = False
-        docker_args = await cuda_plugin.generate_docker_args(AsyncMock(), _alloc("0"))
+        docker_args = await cuda_plugin.generate_docker_args(AsyncMock(), _device_alloc("0"))
         assert docker_args == {}
         cuda_plugin.list_devices.assert_not_awaited()  # type: ignore[attr-defined]

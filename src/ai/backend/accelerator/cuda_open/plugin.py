@@ -9,7 +9,6 @@ from pprint import pformat
 from typing import (
     Any,
     Final,
-    final,
     override,
 )
 
@@ -19,6 +18,7 @@ from aiodocker.exceptions import DockerError
 from aiotools import closing_async
 from pydantic import BaseModel, Field
 
+from ai.backend.agent.data.device import DeviceAllocation
 from ai.backend.agent.errors.resources import InvalidResourceArgument
 from ai.backend.agent.resources import (
     AbstractAllocMap,
@@ -128,7 +128,7 @@ class CUDADevice(AbstractComputeDevice):
         return str(self)
 
 
-class DeviceAttachMechanism(ABC):
+class DeviceInjector(ABC):
     """How the container engine is told to attach GPUs to a container."""
 
     @property
@@ -139,26 +139,14 @@ class DeviceAttachMechanism(ABC):
     @abstractmethod
     def build_device_config(
         self,
-        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+        allocation: DeviceAllocation,
         devices: Collection[CUDADevice],
     ) -> Mapping[str, Any]:
         """The container creation config that attaches the allocated devices."""
         raise NotImplementedError
 
-    @final
-    def _allocated_device_ids(
-        self,
-        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> list[DeviceId]:
-        device_ids: list[DeviceId] = []
-        for per_device_alloc in device_alloc.values():
-            for device_id, alloc in per_device_alloc.items():
-                if alloc > 0:
-                    device_ids.append(device_id)
-        return device_ids
 
-
-class LegacyRuntimeAttachMechanism(DeviceAttachMechanism):
+class LegacyRuntimeInjector(DeviceInjector):
     """Selects the nvidia runtime shim, which takes the device list from the environment."""
 
     @property
@@ -169,10 +157,10 @@ class LegacyRuntimeAttachMechanism(DeviceAttachMechanism):
     @override
     def build_device_config(
         self,
-        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+        allocation: DeviceAllocation,
         devices: Collection[CUDADevice],
     ) -> Mapping[str, Any]:
-        device_ids = self._allocated_device_ids(device_alloc)
+        device_ids = allocation.attached_device_ids
         return {
             "HostConfig": {
                 "Runtime": "nvidia",
@@ -184,7 +172,7 @@ class LegacyRuntimeAttachMechanism(DeviceAttachMechanism):
         }
 
 
-class NvidiaDriverAttachMechanism(DeviceAttachMechanism):
+class NvidiaDriverInjector(DeviceInjector):
     """Delegates to the nvidia device driver registered with the Docker daemon."""
 
     @property
@@ -195,10 +183,10 @@ class NvidiaDriverAttachMechanism(DeviceAttachMechanism):
     @override
     def build_device_config(
         self,
-        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+        allocation: DeviceAllocation,
         devices: Collection[CUDADevice],
     ) -> Mapping[str, Any]:
-        device_ids = self._allocated_device_ids(device_alloc)
+        device_ids = allocation.attached_device_ids
         if not device_ids:
             return {}
         # NOTE: You may put additional Docker container creation API params here.
@@ -224,7 +212,7 @@ class NvidiaDriverAttachMechanism(DeviceAttachMechanism):
         }
 
 
-class CDIAttachMechanism(DeviceAttachMechanism):
+class CDIInjector(DeviceInjector):
     """
     Names the devices of a CDI kind and lets the engine apply the spec, hooks included.
     CDI identifies a GPU by its UUID while the alloc map keys it by the CUDA runtime index,
@@ -239,10 +227,10 @@ class CDIAttachMechanism(DeviceAttachMechanism):
     @override
     def build_device_config(
         self,
-        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+        allocation: DeviceAllocation,
         devices: Collection[CUDADevice],
     ) -> Mapping[str, Any]:
-        device_ids = self._allocated_device_ids(device_alloc)
+        device_ids = allocation.attached_device_ids
         if not device_ids:
             return {}
         device_uuids = {dev.device_id: dev.uuid for dev in devices}
@@ -272,7 +260,7 @@ class CUDAPlugin(AbstractComputePlugin):
         (SlotName("cuda.device"), SlotTypes("count")),
     )
 
-    _attach_mechanism: DeviceAttachMechanism = LegacyRuntimeAttachMechanism()
+    _device_injector: DeviceInjector = LegacyRuntimeInjector()
     device_mask: Sequence[str] = []
     enabled: bool = True
 
@@ -287,13 +275,13 @@ class CUDAPlugin(AbstractComputePlugin):
             self.enabled = False
             return
 
-        attach_mechanism = self._detect_attach_mechanism(docker_info, version_info)
-        if attach_mechanism is None:
+        device_injector = self._detect_device_injector(docker_info, version_info)
+        if device_injector is None:
             log.info("CUDA acceleration is disabled.")
             self.enabled = False
             return
-        self._attach_mechanism = attach_mechanism
-        log.info("attaching GPUs via the {} mechanism.", attach_mechanism.name)
+        self._device_injector = device_injector
+        log.info("attaching GPUs via the {} mechanism.", device_injector.name)
 
         raw_device_mask = self.plugin_config.get("device_mask")
         if raw_device_mask is not None:
@@ -311,11 +299,11 @@ class CUDAPlugin(AbstractComputePlugin):
             log.info("CUDA acceleration is disabled.")
             self.enabled = False
 
-    def _detect_attach_mechanism(
+    def _detect_device_injector(
         self,
         docker_info: Mapping[str, Any],
         version_info: EngineVersion,
-    ) -> DeviceAttachMechanism | None:
+    ) -> DeviceInjector | None:
         cdi_only_engine = _find_cdi_only_engine(version_info)
         if cdi_only_engine is not None:
             engine_version = self._parse_version(cdi_only_engine.version)
@@ -334,7 +322,7 @@ class CUDAPlugin(AbstractComputePlugin):
             if not self._has_cdi_spec():
                 log.error("could not find a CDI spec for {}!", CDI_KIND)
                 return None
-            return CDIAttachMechanism()
+            return CDIInjector()
 
         if "nvidia" not in docker_info["Runtimes"]:
             log.error("could not detect valid NVIDIA Container Runtime!")
@@ -344,8 +332,8 @@ class CUDAPlugin(AbstractComputePlugin):
             log.error("could not detect docker version!")
             return None
         if docker_version >= MIN_DOCKER_DEVICE_REQUEST_VERSION:
-            return NvidiaDriverAttachMechanism()
-        return LegacyRuntimeAttachMechanism()
+            return NvidiaDriverInjector()
+        return LegacyRuntimeInjector()
 
     def _parse_version(self, raw_version: str) -> tuple[int, ...] | None:
         m = rx_triple_version.search(raw_version)
@@ -603,8 +591,8 @@ class CUDAPlugin(AbstractComputePlugin):
     ) -> Mapping[str, Any]:
         if not self.enabled:
             return {}
-        return self._attach_mechanism.build_device_config(
-            device_alloc,
+        return self._device_injector.build_device_config(
+            DeviceAllocation.from_device_alloc(device_alloc),
             await self.list_devices(),
         )
 
