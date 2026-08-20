@@ -289,19 +289,13 @@ class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
         """
         pass
 
-    # We don't have "allocate_slots()" method here because:
-    # - resource_spec is initialized by allocating slots at computer's alloc_map
-    #   when creating new kernels.
-    # - restoration from running containers is done by computer's classmethod
-    #   "restore_from_container"
-
-    def release_slots(self, computer_ctxs: Mapping[str, Any]) -> None:
-        """
-        Release the resource slots occupied by the kernel
-        to the allocation maps.
-        """
-        for accel_key, accel_alloc in self.resource_spec.allocations.items():
-            computer_ctxs[accel_key].alloc_map.free(accel_alloc)
+    # The kernel carries no allocate_slots()/release_slots() of its own: resource accounting is
+    # reconciliation-based, not explicit per-kernel free. Slots are allocated at the computer's
+    # alloc_map when a kernel is created, and released by AbstractAgent.reconstruct_resource_usage()
+    # (called on every kernel termination), which clears each alloc_map and rebuilds it from the
+    # still-running containers via the computer's restore_from_container(). A terminated kernel's
+    # container drops out of that enumeration, so its slots are freed. (An earlier explicit
+    # release_slots() was orphaned since the monorepo import and has been removed.)
 
     @property
     def stats_enabled(self) -> bool:
