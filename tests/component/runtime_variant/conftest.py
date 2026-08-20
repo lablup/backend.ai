@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
 from ai.backend.common.data.entity.runtime_variant import RUNTIME_VARIANT_ENTITY_TYPE
-from ai.backend.manager.actions.registry import GroupMeta
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps

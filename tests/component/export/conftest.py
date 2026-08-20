@@ -7,7 +7,8 @@ import pytest
 
 from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
 from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
-from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.export.handler import ExportHandler
 from ai.backend.manager.api.rest.export.registry import register_export_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry

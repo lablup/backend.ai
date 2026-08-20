@@ -6,7 +6,7 @@ from ai.backend.common.data.entity.notification import (
     NOTIFICATION_CHANNEL_ENTITY_TYPE,
     NOTIFICATION_RULE_ENTITY_TYPE,
 )
-from ai.backend.manager.actions.registry import GroupMeta
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.notification.handler import NotificationHandler
 from ai.backend.manager.api.rest.notification.registry import register_notification_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry

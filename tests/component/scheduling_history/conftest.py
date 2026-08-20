@@ -28,7 +28,11 @@ from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import KernelId, ResourceSlot
-from ai.backend.manager.actions.registry import ConcernMeta, GroupMeta, ProcessorRegistry
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    ConcernMeta,
+    GroupMeta,
+)
 from ai.backend.manager.api.adapters.scheduling_history.adapter import SchedulingHistoryAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 

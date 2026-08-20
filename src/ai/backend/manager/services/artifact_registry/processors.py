@@ -1,6 +1,6 @@
 from typing import Any
 
-from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import LookupOpsResult

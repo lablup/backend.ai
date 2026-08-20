@@ -22,7 +22,11 @@ from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_T
 from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
-from ai.backend.manager.actions.registry import ConcernMeta, GroupMeta, ProcessorRegistry
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    ConcernMeta,
+    GroupMeta,
+)
 from ai.backend.manager.api.adapters.resource_allocation.adapter import ResourceAllocationAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps

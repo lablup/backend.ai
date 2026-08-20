@@ -42,6 +42,15 @@ class ActionGate(enum.StrEnum):
     PERMISSION = "permission"
 
 
+class ActionBacking(enum.StrEnum):
+    """What runs a wired processor's operation."""
+
+    # A generic service over the repository's ops, driven by the spec on the action.
+    OPS = "ops"
+    # A method the domain wrote.
+    SERVICE = "service"
+
+
 class ActionOperationType(enum.StrEnum):
     GET = "get"
     SEARCH = "search"

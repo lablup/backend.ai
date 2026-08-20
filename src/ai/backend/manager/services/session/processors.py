@@ -1,4 +1,4 @@
-from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import PublicActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor

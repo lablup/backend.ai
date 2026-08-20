@@ -1,4 +1,4 @@
-from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (

@@ -18,7 +18,11 @@ if TYPE_CHECKING:
 
 from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
-from ai.backend.manager.actions.registry import FieldGroupMeta, GroupMeta, ProcessorRegistry
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    FieldGroupMeta,
+    GroupMeta,
+)
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps

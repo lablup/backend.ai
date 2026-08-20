@@ -14,7 +14,11 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID, Resour
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair, ResourceSlot
-from ai.backend.manager.actions.registry import FieldGroupMeta, GroupMeta, ProcessorRegistry
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    FieldGroupMeta,
+    GroupMeta,
+)
 from ai.backend.manager.api.rest.error_log.handler import ErrorLogHandler
 from ai.backend.manager.api.rest.error_log.registry import register_error_log_routes
 from ai.backend.manager.api.rest.manager.handler import ManagerHandler

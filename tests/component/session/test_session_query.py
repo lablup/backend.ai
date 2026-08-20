@@ -38,7 +38,11 @@ from ai.backend.common.dto.manager.session.response import (
     MatchSessionsResponse,
 )
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
-from ai.backend.manager.actions.registry import FieldGroupMeta, GroupMeta, ProcessorRegistry
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    FieldGroupMeta,
+    GroupMeta,
+)
 from ai.backend.manager.api.rest.compute_sessions.handler import ComputeSessionsHandler
 from ai.backend.manager.api.rest.compute_sessions.registry import (
     register_compute_sessions_routes,

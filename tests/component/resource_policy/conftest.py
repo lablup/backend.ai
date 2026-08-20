@@ -33,7 +33,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
     CreateProjectResourcePolicyPayload,
     CreateUserResourcePolicyPayload,
 )
-from ai.backend.manager.actions.registry import GroupMeta
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps

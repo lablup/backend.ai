@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.registry import SidecarProcessorGroup
+from ai.backend.manager.actions.registry.sidecar import SidecarProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, ScopedFieldsOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor

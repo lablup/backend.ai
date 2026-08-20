@@ -1,7 +1,7 @@
 from collections.abc import Awaitable, Callable
 
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,

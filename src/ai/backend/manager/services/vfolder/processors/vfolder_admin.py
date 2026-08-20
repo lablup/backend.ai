@@ -1,4 +1,4 @@
-from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (

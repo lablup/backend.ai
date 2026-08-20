@@ -19,7 +19,11 @@ from ai.backend.common.data.entity.app_config import (
 )
 from ai.backend.common.data.entity.app_config_definition import APP_CONFIG_DEFINITION_ENTITY_TYPE
 from ai.backend.manager.actions.monitors import ActionMonitors
-from ai.backend.manager.actions.registry import GroupMeta, ProcessorDependencies, ProcessorRegistry
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    GroupMeta,
+    ProcessorDependencies,
+)
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.api.adapters.app_config.adapter import AppConfigAdapter
 from ai.backend.manager.api.adapters.app_config_allow_list.adapter import AppConfigAllowListAdapter

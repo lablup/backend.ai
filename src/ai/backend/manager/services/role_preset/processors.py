@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.registry import FieldProcessorGroup, ProcessorGroup
+from ai.backend.manager.actions.registry.field import FieldProcessorGroup
+from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.field.bulk_processor import BulkFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor

@@ -24,11 +24,11 @@ from ai.backend.common.dto.manager.config import (
     DeleteUserDotfileRequest,
 )
 from ai.backend.manager.actions.monitors import ActionMonitors
-from ai.backend.manager.actions.registry import (
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
     FieldGroupMeta,
     GroupMeta,
     ProcessorDependencies,
-    ProcessorRegistry,
 )
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.api.rest.domainconfig.handler import DomainConfigHandler

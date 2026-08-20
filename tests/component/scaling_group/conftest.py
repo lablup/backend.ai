@@ -5,7 +5,8 @@ from typing import Any
 import pytest
 
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
-from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.scaling_group.handler import ScalingGroupHandler
 from ai.backend.manager.api.rest.scaling_group.registry import register_scaling_group_routes

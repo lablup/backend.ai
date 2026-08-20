@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 

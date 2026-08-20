@@ -8,11 +8,11 @@ lands in one place rather than in every conftest.
 from typing import Any
 
 from ai.backend.manager.actions.monitors import ActionMonitors
-from ai.backend.manager.actions.registry import (
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
     GroupMeta,
     ProcessorDependencies,
-    ProcessorGroup,
-    ProcessorRegistry,
 )
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

@@ -13,7 +13,8 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE
 from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_ENTITY_TYPE
-from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.artifact_registry.handler import ArtifactRegistryHandler
 from ai.backend.manager.api.rest.artifact_registry.registry import (
     register_artifact_registry_routes,

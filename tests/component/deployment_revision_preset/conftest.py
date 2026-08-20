@@ -13,7 +13,7 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 if TYPE_CHECKING:
@@ -23,7 +23,10 @@ from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_EN
 from ai.backend.common.data.entity.preset_resource_slot import (
     DEPLOYMENT_PRESET_RESOURCE_SLOT_FIELD_TYPE,
 )
-from ai.backend.manager.actions.registry import FieldGroupMeta, GroupMeta
+from ai.backend.manager.actions.registry.types import (
+    FieldGroupMeta,
+    GroupMeta,
+)
 from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
 )

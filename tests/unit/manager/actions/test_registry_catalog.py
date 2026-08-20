@@ -81,12 +81,12 @@ from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.common.data.entity.vfolder_invitation import VFOLDER_INVITATION_ENTITY_TYPE
 from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
 from ai.backend.manager.actions.monitors import ActionMonitors
-from ai.backend.manager.actions.registry import (
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
     ConcernMeta,
     FieldGroupMeta,
     GroupMeta,
     ProcessorDependencies,
-    ProcessorRegistry,
     SidecarGroupMeta,
 )
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction

@@ -19,7 +19,8 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.entity.prometheus_query_preset import (
     PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
 )
-from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
     PrometheusQueryPresetAdapter,
 )

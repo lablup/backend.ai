@@ -30,7 +30,7 @@ from ai.backend.common.data.notification.types import (
     WebhookSpec,
 )
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.manager.actions.registry import GroupMeta
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,

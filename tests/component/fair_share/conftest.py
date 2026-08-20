@@ -21,10 +21,10 @@ from ai.backend.common.data.entity.usage_bucket import (
     USER_USAGE_BUCKET_ENTITY_TYPE,
 )
 from ai.backend.common.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.actions.registry import (
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
     ConcernMeta,
     GroupMeta,
-    ProcessorRegistry,
     SidecarGroupMeta,
 )
 from ai.backend.manager.api.rest.fair_share.handler import FairShareAPIHandler

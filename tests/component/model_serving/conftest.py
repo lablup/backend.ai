@@ -8,7 +8,8 @@ import pytest
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.service.handler import ServiceHandler
 from ai.backend.manager.api.rest.service.registry import register_service_routes
