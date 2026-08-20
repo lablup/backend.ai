@@ -23,7 +23,7 @@ from ai.backend.common.data.entity.types import (
     FieldIdentifier,
 )
 from ai.backend.manager.actions.run_status import ActionRunStatus
-from ai.backend.manager.actions.v2.bulk.result import BaseBulkActionResult, BulkEntityResult
+from ai.backend.manager.actions.v2.bulk.result import BasePartialBulkActionResult, BulkEntityResult
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupActionResult
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 
@@ -111,7 +111,7 @@ class FieldOwnerLookupOpsResult(BaseLookupActionResult):
 
 
 @dataclass
-class BulkOpsResult[TData](BaseBulkActionResult):
+class BulkOpsResult[TData](BasePartialBulkActionResult):
     """How each entity a bulk write named fared.
 
     The bulk shape is the one that reports per entity: the caller named them, so each

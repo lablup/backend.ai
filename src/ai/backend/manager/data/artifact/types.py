@@ -2,7 +2,7 @@ import enum
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Self
+from typing import Any, Self, override
 
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
@@ -10,7 +10,7 @@ from ai.backend.common.data.artifact.types import (
 )
 from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
-from ai.backend.common.data.entity.types import FieldData
+from ai.backend.common.data.entity.types import EntityData, FieldData
 from ai.backend.manager.data.common.types import StringFilterData
 
 
@@ -57,7 +57,7 @@ class ArtifactAvailability(enum.StrEnum):
 
 
 @dataclass
-class ArtifactData:
+class ArtifactData(EntityData):
     id: ArtifactID
     name: str
     type: ArtifactType
@@ -71,6 +71,10 @@ class ArtifactData:
     updated_at: datetime
     readonly: bool
     extra: dict[str, Any] | None
+
+    @override
+    def entity_id(self) -> ArtifactID:
+        return self.id
 
 
 @dataclass

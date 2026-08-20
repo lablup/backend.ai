@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
@@ -17,7 +15,9 @@ from ai.backend.manager.actions.v2.ops.result import (
 )
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
+from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.resource_slot.actions.create import CreateResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.get_agent_resource_by_slot import (
     GetAgentResourceBySlotAction,
@@ -101,8 +101,8 @@ class ResourceSlotProcessors:
     def __init__(
         self,
         slot_type: ProcessorGroup[ResourceSlotTypeData],
-        session: ProcessorGroup[Any],
-        agent: ProcessorGroup[Any],
+        session: ProcessorGroup[SessionData],
+        agent: ProcessorGroup[AgentData],
         service: ResourceSlotService,
     ) -> None:
         self.lookup_kernel_owner = session.key_owner_lookup_ops(LookupKernelOwnerAction)

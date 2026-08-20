@@ -1,10 +1,8 @@
-from typing import Any
-
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
-from ai.backend.manager.data.artifact.types import ArtifactRevisionData
+from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRevisionData
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
     ApproveArtifactRevisionActionResult,
@@ -100,7 +98,7 @@ class ArtifactRevisionProcessors:
 
     def __init__(
         self,
-        group: ProcessorGroup[Any],
+        group: ProcessorGroup[ArtifactData],
         revisions: LookupFieldGroup[ArtifactRevisionData],
         service: ArtifactRevisionService,
     ) -> None:

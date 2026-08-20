@@ -1,7 +1,6 @@
-from typing import Any
-
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.services.container_registry.actions.clear_images import (
     ClearImagesAction,
     ClearImagesActionResult,
@@ -101,7 +100,9 @@ class ContainerRegistryProcessors:
         DeleteRegistryQuotaAction, DeleteRegistryQuotaActionResult
     ]
 
-    def __init__(self, group: ProcessorGroup[Any], service: ContainerRegistryService) -> None:
+    def __init__(
+        self, group: ProcessorGroup[ContainerRegistryData], service: ContainerRegistryService
+    ) -> None:
         self.rescan_images = group.global_scope(RescanImagesAction, service.rescan_images)
         self.clear_images = group.global_scope(ClearImagesAction, service.clear_images)
         self.load_container_registries = group.global_scope(

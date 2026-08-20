@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
-from ai.backend.manager.actions.v2.bulk.result import BaseBulkActionResult, BulkEntityResult
+from ai.backend.manager.actions.v2.bulk.result import BasePartialBulkActionResult, BulkEntityResult
 from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
 
 
@@ -33,7 +33,7 @@ class IncludeSessionIdleChecksAction(BaseBulkAction):
 
 
 @dataclass(frozen=True)
-class IncludeSessionIdleChecksActionResult(BaseBulkActionResult):
+class IncludeSessionIdleChecksActionResult(BasePartialBulkActionResult):
     success: Sequence[SessionIdleCheckPair]
     errors: Mapping[SessionIdleCheckPair, Exception]
 

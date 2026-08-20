@@ -1,12 +1,13 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, override
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.types import EntityData
 
 
 @dataclass
-class ContainerRegistryData:
+class ContainerRegistryData(EntityData):
     id: ContainerRegistryID
     url: str
     registry_name: str
@@ -18,6 +19,10 @@ class ContainerRegistryData:
     is_global: bool | None
     # TODO: Add proper type
     extra: dict[str, Any] | None
+
+    @override
+    def entity_id(self) -> ContainerRegistryID:
+        return self.id
 
 
 @dataclass

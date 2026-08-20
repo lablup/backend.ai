@@ -1,8 +1,7 @@
-from typing import Any
-
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageActionResult,
@@ -133,7 +132,7 @@ class ImageProcessors:
     search_images: GlobalActionProcessor[SearchImagesAction, SearchImagesActionResult]
     search_aliases: GlobalActionProcessor[SearchAliasesAction, SearchAliasesActionResult]
 
-    def __init__(self, group: ProcessorGroup[Any], service: ImageService) -> None:
+    def __init__(self, group: ProcessorGroup[ImageData], service: ImageService) -> None:
         # Actions without RBAC validation (internal/system or special entity types)
         self.get_image_installed_agents = group.global_scope(
             GetImageInstalledAgentsAction, service.get_image_installed_agents

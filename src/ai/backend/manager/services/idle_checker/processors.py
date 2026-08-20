@@ -1,9 +1,8 @@
-from typing import Any
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
+from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.idle_checker.actions.admin_search import (
     AdminSearchIdleCheckersAction,
     SearchIdleCheckersActionResult,
@@ -50,7 +49,7 @@ class IdleCheckerProcessors:
 
     def __init__(
         self,
-        group: ProcessorGroup[Any],
+        group: ProcessorGroup[SessionData],
         service: IdleCheckerService,
         action_monitors: list[ActionMonitor],
     ) -> None:

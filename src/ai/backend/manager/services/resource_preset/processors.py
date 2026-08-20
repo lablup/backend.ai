@@ -1,5 +1,3 @@
-from typing import Any
-
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
@@ -58,7 +56,9 @@ class ResourcePresetProcessors:
         SearchResourcePresetsV2Action, SearchResourcePresetsV2ActionResult
     ]
 
-    def __init__(self, group: ProcessorGroup[Any], service: ResourcePresetService) -> None:
+    def __init__(
+        self, group: ProcessorGroup[ResourcePresetData], service: ResourcePresetService
+    ) -> None:
         self.lookup = group.public_lookup_ops(LookupResourcePresetAction)
         self.create_preset = group.global_scope(CreateResourcePresetAction, service.create_preset)
         self.update_preset = group.single_entity(UpdateResourcePresetAction, service.update_preset)

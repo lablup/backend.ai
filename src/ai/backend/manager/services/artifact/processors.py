@@ -1,8 +1,7 @@
-from typing import Any
-
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.artifact.types import ArtifactData
 from ai.backend.manager.services.artifact.actions.delegate_scan import (
     DelegateScanArtifactsAction,
     DelegateScanArtifactsActionResult,
@@ -78,7 +77,7 @@ class ArtifactProcessors:
         DelegateScanArtifactsAction, DelegateScanArtifactsActionResult
     ]
 
-    def __init__(self, group: ProcessorGroup[Any], service: ArtifactService) -> None:
+    def __init__(self, group: ProcessorGroup[ArtifactData], service: ArtifactService) -> None:
         # TODO: Move scan action to ArtifactRegistryService
         self.scan = group.global_scope(ScanArtifactsAction, service.scan)
         self.get = group.single_entity(GetArtifactAction, service.get)

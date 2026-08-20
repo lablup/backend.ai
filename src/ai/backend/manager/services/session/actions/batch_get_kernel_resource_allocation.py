@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.types import KernelId
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
-from ai.backend.manager.actions.v2.bulk.result import BaseBulkActionResult, BulkEntityResult
+from ai.backend.manager.actions.v2.bulk.result import BasePartialBulkActionResult, BulkEntityResult
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 
 
@@ -38,7 +38,7 @@ class BatchGetKernelResourceAllocationAction(BaseBulkAction):
 
 
 @dataclass
-class BatchGetKernelResourceAllocationActionResult(BaseBulkActionResult):
+class BatchGetKernelResourceAllocationActionResult(BasePartialBulkActionResult):
     data: dict[KernelId, ResourceAllocationAggregate]
 
     @override

@@ -1,5 +1,3 @@
-from typing import Any
-
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
@@ -137,7 +135,9 @@ class ArtifactRegistryProcessors:
         SearchArtifactRegistriesAction, SearchArtifactRegistriesActionResult
     ]
 
-    def __init__(self, group: ProcessorGroup[Any], service: ArtifactRegistryService) -> None:
+    def __init__(
+        self, group: ProcessorGroup[ArtifactRegistryData], service: ArtifactRegistryService
+    ) -> None:
         self.lookup = group.public_lookup_ops(LookupArtifactRegistryAction)
         # Scope actions with RBAC validator
         self.create_huggingface_registry = group.global_scope(

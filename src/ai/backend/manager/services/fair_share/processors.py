@@ -103,6 +103,8 @@ class FairShareProcessors:
 
     def __init__(
         self,
+        # A fair share is keyed by a resource group and a domain, project or user
+        # together, so no one entity's data type names these rows.
         domain: ProcessorGroup[Any],
         project: ProcessorGroup[Any],
         user: ProcessorGroup[Any],

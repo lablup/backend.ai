@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.types import SessionId
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
-from ai.backend.manager.actions.v2.bulk.result import BaseBulkActionResult, BulkEntityResult
+from ai.backend.manager.actions.v2.bulk.result import BasePartialBulkActionResult, BulkEntityResult
 
 
 @dataclass
@@ -39,7 +39,7 @@ class TerminateSessionsAction(BaseBulkAction):
 
 
 @dataclass
-class TerminateSessionsActionResult(BaseBulkActionResult):
+class TerminateSessionsActionResult(BasePartialBulkActionResult):
     """Result of bulk session termination."""
 
     cancelled: list[SessionId] = field(default_factory=list)

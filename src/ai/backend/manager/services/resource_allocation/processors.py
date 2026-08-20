@@ -1,11 +1,15 @@
 """Processors for resource allocation operations."""
 
-from typing import Any
-
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.data.resource_preset.types import ResourcePresetData
+from ai.backend.manager.data.scaling_group.types import ScalingGroupData
+from ai.backend.manager.data.session.types import SessionData
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.services.resource_allocation.actions.check_preset_availability import (
     CheckPresetAvailabilityAction,
     CheckPresetAvailabilityActionResult,
@@ -60,12 +64,12 @@ class ResourceAllocationProcessors:
 
     def __init__(
         self,
-        user: ProcessorGroup[Any],
-        project: ProcessorGroup[Any],
-        domain: ProcessorGroup[Any],
-        resource_group: ProcessorGroup[Any],
-        session: ProcessorGroup[Any],
-        resource_preset: ProcessorGroup[Any],
+        user: ProcessorGroup[UserData],
+        project: ProcessorGroup[GroupData],
+        domain: ProcessorGroup[DomainData],
+        resource_group: ProcessorGroup[ScalingGroupData],
+        session: ProcessorGroup[SessionData],
+        resource_preset: ProcessorGroup[ResourcePresetData],
         service: ResourceAllocationService,
     ) -> None:
         self.resolve_keypair_context = user.single_entity(

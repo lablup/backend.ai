@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
-
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.data.deployment.types import ModelDeploymentData
+from ai.backend.manager.data.session.types import SessionData
 
 from .actions import (
     GlobalSearchReplicaGroupHistoryAction,
@@ -70,9 +70,9 @@ class SchedulingHistoryProcessors:
 
     def __init__(
         self,
-        session: ProcessorGroup[Any],
-        deployment: ProcessorGroup[Any],
-        replica_group: ProcessorGroup[Any],
+        session: ProcessorGroup[SessionData],
+        deployment: ProcessorGroup[ModelDeploymentData],
+        replica_group: ProcessorGroup[ModelDeploymentData],
         service: SchedulingHistoryService,
     ) -> None:
         # Admin processors
