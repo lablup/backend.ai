@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 from ai.backend.manager.actions.registry import ProcessorGroup
-from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     CreatedEntityOpsResult,
     EntityOpsResult,
 )
 from ai.backend.manager.actions.v2.single_entity.processor import (
+    PublicSingleEntityActionProcessor,
     SingleEntityActionProcessor,
 )
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
@@ -36,10 +40,10 @@ class PrometheusQueryPresetProcessors:
     """The catalog CRUD runs against ops; what reads before writing or calls Prometheus stays."""
 
     global_create_preset: GlobalActionProcessor[CreatePresetAction, CreatePresetActionResult]
-    get_preset: SingleEntityActionProcessor[
+    public_get_preset: PublicSingleEntityActionProcessor[
         GetPresetAction, EntityOpsResult[PrometheusQueryPresetData]
     ]
-    global_search_presets: GlobalActionProcessor[
+    public_search_presets: PublicActionProcessor[
         SearchPresetsAction, BatchOpsResult[PrometheusQueryPresetData]
     ]
     purge_preset: SingleEntityActionProcessor[
@@ -55,7 +59,6 @@ class PrometheusQueryPresetProcessors:
         group: ProcessorGroup[PrometheusQueryPresetData],
     ) -> None:
             CreatePresetAction, service.create_preset
-        self.global_search_presets = group.global_search_ops(SearchPresetsAction)
         self.purge_preset = group.entity_purge_ops(PurgePresetAction)
         self.update_preset = group.single_entity(UpdatePresetAction, service.update_preset)
         self.global_preview_preset = group.global_scope(PreviewPresetAction, service.preview_preset)

@@ -4,10 +4,10 @@ from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.sharing import (
-    GlobalListSharedVFoldersAction,
-    GlobalListSharedVFoldersActionResult,
     ListSharedVFoldersAction,
     ListSharedVFoldersActionResult,
+    PublicListSharedVFoldersAction,
+    PublicListSharedVFoldersActionResult,
     ShareVFolderAction,
     ShareVFolderActionResult,
     UnshareVFolderAction,
@@ -110,9 +110,9 @@ class VFolderSharingService:
             )
         return ListSharedVFoldersActionResult(shared=shared_info)
 
-    async def global_list_shared_vfolders(
-        self, action: GlobalListSharedVFoldersAction
-    ) -> GlobalListSharedVFoldersActionResult:
+    async def public_list_shared_vfolders(
+        self, action: PublicListSharedVFoldersAction
+    ) -> PublicListSharedVFoldersActionResult:
         raw_list = await self._vfolder_repository.list_shared_vfolder_permissions(None)
         shared_info = []
         for row in raw_list:
@@ -130,7 +130,7 @@ class VFolderSharingService:
                     permission=row["permission"],
                 )
             )
-        return GlobalListSharedVFoldersActionResult(shared=shared_info)
+        return PublicListSharedVFoldersActionResult(shared=shared_info)
 
     async def update_sharing_status(
         self, action: UpdateVFolderSharingStatusAction

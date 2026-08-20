@@ -118,8 +118,11 @@ class UpdateVFolderSharingStatusActionResult:
 
 
 @dataclass
-class GlobalListSharedVFoldersAction(VFolderGlobalAction):
-    """List the sharing permissions granted across every vfolder."""
+class PublicListSharedVFoldersAction(VFolderGlobalAction):
+    """List the sharing permissions granted across every vfolder.
+
+    Read-only and open to any authenticated caller, as the legacy route was.
+    """
 
     @override
     @classmethod
@@ -129,9 +132,9 @@ class GlobalListSharedVFoldersAction(VFolderGlobalAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "global_list_shared_vfolders"
+        return "public_list_shared_vfolders"
 
 
 @dataclass
-class GlobalListSharedVFoldersActionResult:
+class PublicListSharedVFoldersActionResult:
     shared: list[VFolderSharedInfo] = field(default_factory=list)

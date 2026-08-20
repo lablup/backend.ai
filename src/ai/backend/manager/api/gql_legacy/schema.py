@@ -34,7 +34,13 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
+from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
+    LookupKeypairResourcePolicyAction,
+)
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.user_resource_policy.actions.lookup import (
+    LookupUserResourcePolicyAction,
+)
 
 from .audit_log import (
     AuditLogConnection,
@@ -2116,16 +2122,17 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     ) -> KeyPairResourcePolicy:
         ctx: GraphQueryContext = info.context
         client_access_key = ctx.access_key
-        # Naming a policy reads someone else's tier, so it stays with the roles that
-        # may already list them all. Omitting the name reads one's own, as before.
-        if name is not None and ctx.user["role"] not in (UserRole.SUPERADMIN, UserRole.ADMIN):
-            raise InsufficientPrivilege("Only admins may read a keypair resource policy by name.")
         if name is None:
             loader = ctx.dataloader_manager.get_loader(
                 ctx,
                 "KeyPairResourcePolicy.by_ak",
             )
             return cast(KeyPairResourcePolicy, await loader.load(client_access_key))
+        # The lookup answers for the policy the name resolves to, so reading someone
+        # else's tier is a read permission on that policy rather than a role check.
+        await ctx.processors.keypair_resource_policy.lookup.run(
+            LookupKeypairResourcePolicyAction(name=name)
+        )
         loader = ctx.dataloader_manager.get_loader(
             ctx,
             "KeyPairResourcePolicy.by_name",
@@ -2160,9 +2167,11 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     ) -> UserResourcePolicy:
         ctx: GraphQueryContext = info.context
         user_uuid = ctx.user["uuid"]
-        # Same rule as the keypair policy: a name reads someone else's tier.
-        if name is not None and ctx.user["role"] not in (UserRole.SUPERADMIN, UserRole.ADMIN):
-            raise InsufficientPrivilege("Only admins may read a user resource policy by name.")
+        if name is not None:
+            # Same rule as the keypair policy: the resolved policy answers for the read.
+            await ctx.processors.user_resource_policy.lookup.run(
+                LookupUserResourcePolicyAction(name=name)
+            )
         if name is None:
             loader = ctx.dataloader_manager.get_loader(
                 ctx,

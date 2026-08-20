@@ -70,7 +70,7 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
             conditions=[PrometheusQueryPresetCategoryConditions.by_ids(ids)],
         )
         action_result = (
-            await self._processors.prometheus_query_preset_category.global_search_categories.run(
+            await self._processors.prometheus_query_preset_category.public_search_categories.run(
                 SearchCategoriesAction(searcher=searcher)
             )
         )
@@ -103,7 +103,7 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
         searcher = self.build_searcher(input)
 
         action_result = (
-            await self._processors.prometheus_query_preset_category.global_search_categories.run(
+            await self._processors.prometheus_query_preset_category.public_search_categories.run(
                 SearchCategoriesAction(searcher=searcher)
             )
         )
@@ -117,8 +117,10 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
 
     async def get(self, category_id: UUID) -> GetCategoryPayload:
         """Get a single category by ID."""
-        action_result = await self._processors.prometheus_query_preset_category.get_category.run(
-            GetCategoryAction(category_id=PrometheusQueryPresetCategoryID(category_id))
+        action_result = (
+            await self._processors.prometheus_query_preset_category.public_get_category.run(
+                GetCategoryAction(category_id=PrometheusQueryPresetCategoryID(category_id))
+            )
         )
 
         return GetCategoryPayload(item=self._data_to_dto(action_result.data))

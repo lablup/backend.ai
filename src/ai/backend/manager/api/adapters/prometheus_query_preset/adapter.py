@@ -90,7 +90,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[PrometheusQueryPresetConditions.by_ids(ids)],
         )
-        action_result = await self._processors.prometheus_query_preset.global_search_presets.run(
+        action_result = await self._processors.prometheus_query_preset.public_search_presets.run(
             SearchPresetsAction(searcher=searcher)
         )
         preset_map = {item.id: self._data_to_dto(item) for item in action_result.items}
@@ -128,7 +128,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         """
         searcher = self.build_searcher(input)
 
-        action_result = await self._processors.prometheus_query_preset.global_search_presets.run(
+        action_result = await self._processors.prometheus_query_preset.public_search_presets.run(
             SearchPresetsAction(searcher=searcher)
         )
 
@@ -141,7 +141,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
     async def get(self, preset_id: UUID) -> GetQueryDefinitionPayload:
         """Get a single query definition by ID."""
-        action_result = await self._processors.prometheus_query_preset.get_preset.run(
+        action_result = await self._processors.prometheus_query_preset.public_get_preset.run(
             GetPresetAction(preset_id=PrometheusQueryPresetID(preset_id))
         )
 

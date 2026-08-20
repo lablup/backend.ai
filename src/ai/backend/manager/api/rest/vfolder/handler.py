@@ -169,8 +169,8 @@ from ai.backend.manager.services.vfolder.actions.invite import (
     UpdateInvitedVFolderMountPermissionAction,
 )
 from ai.backend.manager.services.vfolder.actions.sharing import (
-    GlobalListSharedVFoldersAction,
     ListSharedVFoldersAction,
+    PublicListSharedVFoldersAction,
     ShareVFolderAction,
     UnshareVFolderAction,
     UpdateVFolderSharingStatusAction,
@@ -1660,7 +1660,7 @@ class VFolderHandler:
         )
         shared_rows = (
             (
-                await self._vfolder_sharing.global_list_shared.run(GlobalListSharedVFoldersAction())
+                await self._vfolder_sharing.public_list_shared.run(PublicListSharedVFoldersAction())
             ).shared
             if target_vfid is None
             else (
