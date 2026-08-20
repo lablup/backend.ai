@@ -3,15 +3,14 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator
-from typing import cast
-from unittest.mock import MagicMock
+from typing import Any, cast
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.rest.group.handler import GroupHandler
 from ai.backend.manager.api.rest.group.registry import register_group_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -30,6 +29,7 @@ from ai.backend.manager.repositories.container_registry.repository import (
 )
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.service.container_registry.harbor import (
     AbstractPerProjectContainerRegistryQuotaService,
 )
@@ -67,13 +67,12 @@ class InMemoryQuotaService:
 @pytest.fixture()
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine)
     quota_service = cast(AbstractPerProjectContainerRegistryQuotaService, InMemoryQuotaService())
     service = ContainerRegistryService(database_engine, repo, quota_service=quota_service)
-    return ContainerRegistryProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
-    )
+    return ContainerRegistryProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()
@@ -100,6 +99,7 @@ def group_repository(
     """Provide a GroupRepository backed by the real test database."""
     return GroupRepository(
         db=database_engine,
+        v2_ops_provider=V2DBOpsProvider(database_engine),
         config_provider=config_provider,
         valkey_stat_client=valkey_clients.stat,
         storage_manager=storage_manager,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -12,13 +13,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.auto_scaling_rule.handler import AutoScalingRuleHandler
@@ -33,12 +28,9 @@ from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
-)
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -67,10 +59,12 @@ def deployment_processors(
     storage_manager: AsyncMock,
     valkey_clients: ValkeyClients,
     mock_appproxy_client_pool: MagicMock,
+    processor_registry: ProcessorRegistry[Any],
 ) -> DeploymentProcessors:
     """Real DeploymentProcessors for auto-scaling-rule tests."""
     repo = DeploymentRepository(
         database_engine,
+        V2DBOpsProvider(database_engine),
         storage_manager,
         valkey_clients.stat,
         valkey_clients.live,
@@ -82,21 +76,7 @@ def deployment_processors(
         repo,
         appproxy_client_pool=mock_appproxy_client_pool,
     )
-    permission_controller_repo = PermissionControllerRepository(database_engine)
-    return DeploymentProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
-                single_entity=SingleEntityActionRBACValidator(
-                    permission_controller_repo, MagicMock()
-                ),
-                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
-            ),
-        ),
-    )
+    return DeploymentProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()

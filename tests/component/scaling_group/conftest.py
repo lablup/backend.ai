@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from typing import Any
 
 import pytest
 
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.scaling_group.handler import ScalingGroupHandler
 from ai.backend.manager.api.rest.scaling_group.registry import register_scaling_group_routes
@@ -16,12 +16,12 @@ from ai.backend.manager.services.scaling_group.service import ScalingGroupServic
 
 
 @pytest.fixture()
-def scaling_group_processors(database_engine: ExtendedAsyncSAEngine) -> ScalingGroupProcessors:
+def scaling_group_processors(
+    database_engine: ExtendedAsyncSAEngine, processor_registry: ProcessorRegistry[Any]
+) -> ScalingGroupProcessors:
     repo = ScalingGroupRepository(database_engine)
     service = ScalingGroupService(repo)
-    return ScalingGroupProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
-    )
+    return ScalingGroupProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()

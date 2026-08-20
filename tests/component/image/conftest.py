@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator, Callable
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -9,8 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
@@ -35,7 +35,6 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 
 @pytest.fixture()
@@ -44,6 +43,7 @@ def image_processors(
     valkey_clients: ValkeyClients,
     config_provider: ManagerConfigProvider,
     agent_registry: AgentRegistry,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ImageProcessors:
     repo = ImageRepository(database_engine, valkey_clients.image, config_provider)
     service = ImageService(agent_registry, repo, config_provider)
@@ -53,11 +53,7 @@ def image_processors(
     mock_single_entity.validate = AsyncMock()
     mock_bulk = MagicMock(spec=BulkActionRBACValidator)
     mock_bulk.validate = AsyncMock()
-    validators = ActionValidators(
-        virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-        rbac=RBACValidators(scope=mock_scope, single_entity=mock_single_entity, bulk=mock_bulk),
-    )
-    return ImageProcessors(service=service, action_monitors=[], validators=validators)
+    return ImageProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()

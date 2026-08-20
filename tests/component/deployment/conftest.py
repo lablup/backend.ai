@@ -17,13 +17,7 @@ from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.api.rest.deployment.handler import DeploymentAPIHandler
 from ai.backend.manager.api.rest.deployment.registry import register_deployment_routes
@@ -49,9 +43,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
-)
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
@@ -67,7 +59,6 @@ from ai.backend.manager.sokovan.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
 )
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 # Type aliases for fixture factories
@@ -104,10 +95,12 @@ def deployment_processors(
     network_plugin_ctx: NetworkPluginContext,
     hook_plugin_ctx: HookPluginContext,
     mock_appproxy_client_pool: MagicMock,
+    processor_registry: ProcessorRegistry[Any],
 ) -> DeploymentProcessors:
     """Real DeploymentProcessors with real DeploymentService and DeploymentRepository."""
     repo = DeploymentRepository(
         database_engine,
+        V2DBOpsProvider(database_engine),
         storage_manager,
         valkey_clients.stat,
         valkey_clients.live,
@@ -152,21 +145,7 @@ def deployment_processors(
         repo,
         appproxy_client_pool=mock_appproxy_client_pool,
     )
-    permission_controller_repo = PermissionControllerRepository(database_engine)
-    return DeploymentProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
-                single_entity=SingleEntityActionRBACValidator(
-                    permission_controller_repo, MagicMock()
-                ),
-                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
-            ),
-        ),
-    )
+    return DeploymentProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()

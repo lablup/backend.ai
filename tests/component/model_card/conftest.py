@@ -19,6 +19,7 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.permission.types import EntityType, OperationType, Permission, ScopeType
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
@@ -56,6 +57,7 @@ from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRo
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.model_card.repository import ModelCardRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -95,15 +97,12 @@ def model_card_processors(
     database_engine: ExtendedAsyncSAEngine,
     storage_manager: AsyncMock,
     config_provider: ManagerConfigProvider,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ModelCardProcessors:
     """Real ModelCardProcessors with real RBAC enforcement."""
     repo = ModelCardRepository(database_engine)
     service = ModelCardService(repo, storage_manager)
-    return ModelCardProcessors(
-        service=service,
-        action_monitors=[],
-        validators=_build_validators(database_engine, config_provider),
-    )
+    return ModelCardProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()
@@ -112,10 +111,12 @@ def group_processors(
     storage_manager: AsyncMock,
     config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
+    processor_registry: ProcessorRegistry[Any],
 ) -> GroupProcessors:
     """Real GroupProcessors with real RBAC enforcement."""
     repo = GroupRepository(
         database_engine,
+        V2DBOpsProvider(database_engine),
         config_provider,
         valkey_clients.stat,
         storage_manager,
@@ -127,11 +128,7 @@ def group_processors(
         valkey_stat_client=valkey_clients.stat,
         group_repositories=repositories,
     )
-    return GroupProcessors(
-        group_service=service,
-        action_monitors=[],
-        validators=_build_validators(database_engine, config_provider),
-    )
+    return GroupProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()
@@ -144,7 +141,11 @@ def permission_controller_processors(
     """Real PermissionControllerProcessors for role assign/revoke SDK calls."""
     perm_repo = PermissionControllerRepository(database_engine)
     group_repo = GroupRepository(
-        database_engine, config_provider, valkey_clients.stat, storage_manager
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        config_provider,
+        valkey_clients.stat,
+        storage_manager,
     )
     service = PermissionControllerService(
         perm_repo, group_repository=group_repo, rbac_action_registry=[]

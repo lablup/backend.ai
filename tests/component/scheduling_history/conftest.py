@@ -5,8 +5,8 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock
+from typing import TYPE_CHECKING, Any
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -25,8 +25,7 @@ from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import KernelId, ResourceSlot
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.adapters.scheduling_history.adapter import SchedulingHistoryAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
@@ -62,7 +61,6 @@ from ai.backend.manager.repositories.scheduling_history.repository import (
 )
 from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
 from ai.backend.manager.services.scheduling_history.service import SchedulingHistoryService
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
@@ -72,17 +70,11 @@ if TYPE_CHECKING:
 @pytest.fixture()
 def scheduling_history_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
 ) -> SchedulingHistoryProcessors:
     repo = SchedulingHistoryRepository(database_engine)
     service = SchedulingHistoryService(repo)
-    return SchedulingHistoryProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
-        ),
-    )
+    return SchedulingHistoryProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()

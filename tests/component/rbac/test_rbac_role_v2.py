@@ -22,6 +22,8 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     RoleAssignmentNode,
     SearchRoleAssignmentsPayload,
 )
+from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -39,6 +41,7 @@ from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
 from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
@@ -55,8 +58,10 @@ def permission_controller_processors(
     service = PermissionControllerService(
         repo, group_repository=MagicMock(), rbac_action_registry=[]
     )
-    validators = MagicMock()
-    validators.rbac.scope.validate = AsyncMock()
+    validators = ActionValidators(
+        virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
+        rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
+    )
     return PermissionControllerProcessors(
         service=service, action_monitors=[], validators=validators
     )

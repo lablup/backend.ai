@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.entity.vfs_storage import VFSStorageID
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -20,7 +21,6 @@ from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
-from ai.backend.testutils.processors import ops_processor_group
 
 # Statically imported so that Pants includes these modules in the test PEX.
 _VFS_STORAGE_SERVER_SUBAPP_MODULES = (_auth_api,)
@@ -33,13 +33,14 @@ VFSStorageFactory = Callable[..., Coroutine[Any, Any, VFSStorageFixtureData]]
 def vfs_storage_processors(
     database_engine: ExtendedAsyncSAEngine,
     storage_manager: StorageSessionManager,
+    processor_registry: ProcessorRegistry[Any],
 ) -> VFSStorageProcessors:
     vfs_storage_repository = VFSStorageRepository(database_engine)
     service = VFSStorageService(
         vfs_storage_repository=vfs_storage_repository,
         storage_manager=storage_manager,
     )
-    return VFSStorageProcessors(service=service, group=ops_processor_group(database_engine))
+    return VFSStorageProcessors(service, processor_registry.group())
 
 
 @pytest.fixture()

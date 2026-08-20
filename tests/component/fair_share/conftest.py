@@ -3,6 +3,7 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
@@ -10,16 +11,50 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.rest.fair_share.handler import FairShareAPIHandler
 from ai.backend.manager.api.rest.fair_share.registry import register_fair_share_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.scaling_group import sgroups_for_groups
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
+from ai.backend.manager.repositories.scaling_group.repository import ScalingGroupRepository
+from ai.backend.manager.services.fair_share.processors import FairShareProcessors
+from ai.backend.manager.services.fair_share.service import FairShareService
+from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
+from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
+from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 from ai.backend.testutils.fixtures import DomainFixtureData
+
+
+@pytest.fixture()
+def fair_share_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> FairShareProcessors:
+    service = FairShareService(FairShareRepository(database_engine))
+    return FairShareProcessors(processor_registry.group(), service)
+
+
+@pytest.fixture()
+def resource_usage_processors(
+    processor_registry: ProcessorRegistry[Any],
+) -> ResourceUsageProcessors:
+    return ResourceUsageProcessors(processor_registry.group())
+
+
+@pytest.fixture()
+def scaling_group_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> ScalingGroupProcessors:
+    service = ScalingGroupService(ScalingGroupRepository(database_engine))
+    return ScalingGroupProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()

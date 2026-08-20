@@ -12,7 +12,7 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -26,6 +26,7 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
@@ -71,6 +72,7 @@ from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRo
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -117,10 +119,12 @@ def group_processors(
     storage_manager: AsyncMock,
     config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
+    processor_registry: ProcessorRegistry[Any],
 ) -> GroupProcessors:
     """Real DB-backed GroupProcessors with real RBAC validators."""
     repo = GroupRepository(
         database_engine,
+        V2DBOpsProvider(database_engine),
         config_provider,
         valkey_clients.stat,
         storage_manager,
@@ -132,11 +136,7 @@ def group_processors(
         valkey_stat_client=valkey_clients.stat,
         group_repositories=repositories,
     )
-    return GroupProcessors(
-        group_service=service,
-        action_monitors=[],
-        validators=_build_validators(database_engine, config_provider),
-    )
+    return GroupProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()
@@ -145,9 +145,10 @@ def user_processors(
     agent_registry: AgentRegistry,
     valkey_clients: ValkeyClients,
     config_provider: ManagerConfigProvider,
+    processor_registry: ProcessorRegistry[Any],
 ) -> UserProcessors:
     """Real UserProcessors for user.search_by_project SDK calls."""
-    repo = UserRepository(database_engine)
+    repo = UserRepository(database_engine, V2DBOpsProvider(database_engine))
     service = UserService(
         storage_manager=AsyncMock(),
         valkey_stat_client=valkey_clients.stat,
@@ -155,11 +156,7 @@ def user_processors(
         user_repository=repo,
         scheduling_controller=AsyncMock(),
     )
-    return UserProcessors(
-        user_service=service,
-        action_monitors=[],
-        validators=_build_validators(database_engine, config_provider),
-    )
+    return UserProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()
@@ -172,7 +169,11 @@ def permission_controller_processors(
     perm_repo = PermissionControllerRepository(database_engine)
     storage_mock = AsyncMock()
     group_repo = GroupRepository(
-        database_engine, config_provider, valkey_clients.stat, storage_mock
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        config_provider,
+        valkey_clients.stat,
+        storage_mock,
     )
     service = PermissionControllerService(
         perm_repo, group_repository=group_repo, rbac_action_registry=[]

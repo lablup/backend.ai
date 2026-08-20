@@ -17,6 +17,7 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID, Resour
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.stream.handler import StreamHandler
@@ -63,6 +64,7 @@ def stream_processors(
     database_engine: ExtendedAsyncSAEngine,
     valkey_clients: ValkeyClients,
     async_etcd: AsyncEtcd,
+    processor_registry: ProcessorRegistry[Any],
 ) -> StreamProcessors:
     """Real StreamProcessors with real StreamService and StreamRepository."""
     repo = StreamRepository(database_engine)
@@ -72,7 +74,7 @@ def stream_processors(
         valkey_live=valkey_clients.live,
         etcd=async_etcd,
     )
-    return StreamProcessors(service=service, action_monitors=[])
+    return StreamProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()

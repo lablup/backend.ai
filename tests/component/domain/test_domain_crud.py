@@ -230,20 +230,12 @@ class TestDomainCreateCRUD:
         with pytest.raises(PydanticValidationError):
             CreateDomainRequest(name="a" * 65, description="Long name attempt")
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="Server returns 500 for 64-char domain name — likely server-side validation issue",
-    )
     async def test_f_val2b_domain_name_at_exactly_64_chars_is_valid(
         self,
         admin_registry: BackendAIClientRegistry,
         domain_factory: DomainFactory,
     ) -> None:
-        """F-VAL-2b: Domain name with exactly 64 chars is accepted (boundary check).
-
-        NOTE: The server currently returns 500 for 64-char domain names.
-        This appears to be a server-side validation issue. Marked xfail until fixed.
-        """
+        """F-VAL-2b: Domain name with exactly 64 chars is accepted (boundary check)."""
         name_64 = "a" * 64
         result = await domain_factory(name=name_64)
         assert result.domain.name == name_64

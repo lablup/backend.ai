@@ -14,7 +14,9 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair, ResourceSlot
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.api.rest.agent.handler import AgentHandler
 from ai.backend.manager.api.rest.agent.registry import register_agent_routes
@@ -29,6 +31,7 @@ from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 
 @pytest.fixture()
@@ -64,6 +67,7 @@ def agent_processors(
     event_producer: EventProducer,
     async_etcd: AsyncEtcd,
     valkey_clients: Any,
+    processor_registry: ProcessorRegistry[Any],
 ) -> AgentProcessors:
     agent_repository = AgentRepository(
         database_engine,
@@ -91,7 +95,13 @@ def agent_processors(
         agent_cache=agent_cache,
     )
     return AgentProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        processor_registry.group(),
+        service,
+        [],
+        ActionValidators(
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
+        ),
     )
 
 

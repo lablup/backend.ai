@@ -10,7 +10,7 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -30,13 +30,7 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderUsageMode,
 )
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -60,6 +54,7 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -68,7 +63,6 @@ from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
@@ -96,6 +90,7 @@ def rbac_permission_repo(
 def vfolder_processors(
     database_engine: ExtendedAsyncSAEngine,
     rbac_permission_repo: PermissionControllerRepository,
+    processor_registry: ProcessorRegistry[Any],
 ) -> VFolderProcessors:
     """Override: real scope + single-entity RBAC validators.
 
@@ -104,7 +99,7 @@ def vfolder_processors(
     service-layer create paths can complete without external dependencies.
     """
     vfolder_repository = VfolderRepository(database_engine)
-    user_repository = UserRepository(database_engine)
+    user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
     config_provider = MagicMock()
     config_provider.legacy_etcd_config_loader.get_vfolder_types = AsyncMock(
         return_value=["user", "group"]
@@ -123,18 +118,7 @@ def vfolder_processors(
         user_repository=user_repository,
         valkey_stat_client=MagicMock(),
     )
-    return VFolderProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(rbac_permission_repo, MagicMock()),
-                single_entity=SingleEntityActionRBACValidator(rbac_permission_repo, MagicMock()),
-                bulk=BulkActionRBACValidator(rbac_permission_repo, MagicMock()),
-            ),
-        ),
-    )
+    return VFolderProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()

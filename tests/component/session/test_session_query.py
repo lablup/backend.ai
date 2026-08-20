@@ -7,6 +7,7 @@ import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
 import sqlalchemy as sa
@@ -34,6 +35,7 @@ from ai.backend.common.dto.manager.session.response import (
     MatchSessionsResponse,
 )
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.rest.compute_sessions.handler import ComputeSessionsHandler
 from ai.backend.manager.api.rest.compute_sessions.registry import (
     register_compute_sessions_routes,
@@ -53,7 +55,9 @@ from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
+from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -68,6 +72,7 @@ def server_module_registries(
     session_processors: SessionProcessors,
     agent_processors_mock: AgentProcessors,
     vfolder_processors_mock: VFolderProcessors,
+    processor_registry: ProcessorRegistry[Any],
 ) -> list[RouteRegistry]:
     """Extended module registries including session and compute-sessions routes.
 
@@ -77,6 +82,8 @@ def server_module_registries(
     return [
         register_session_routes(
             SessionHandler(
+                group=GroupProcessors(processor_registry.group(), AsyncMock()),
+                user=UserProcessors(processor_registry.group(), AsyncMock()),
                 auth=auth_processors,
                 session=session_processors,
                 agent=agent_processors_mock,

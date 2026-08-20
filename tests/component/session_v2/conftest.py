@@ -35,12 +35,7 @@ from ai.backend.common.data.permission.types import (
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -67,6 +62,7 @@ from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -83,7 +79,6 @@ from ai.backend.manager.sokovan.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
 )
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
@@ -135,6 +130,7 @@ async def session_processors(
     error_monitor: ErrorPluginContext,
     rbac_permission_repo: PermissionControllerRepository,
     scheduling_controller_mock: AsyncMock,
+    processor_registry: ProcessorRegistry[Any],
 ) -> SessionProcessors:
     """SessionProcessors with real SingleEntityActionRBACValidator.
 
@@ -154,22 +150,7 @@ async def session_processors(
         user_repository=AsyncMock(),
     )
     service = SessionService(args)
-    real_single_entity_validator = SingleEntityActionRBACValidator(
-        rbac_permission_repo, MagicMock()
-    )
-    real_bulk_validator = BulkActionRBACValidator(rbac_permission_repo, MagicMock())
-    return SessionProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(
-                scope=AsyncMock(),
-                single_entity=real_single_entity_validator,
-                bulk=real_bulk_validator,
-            ),
-        ),
-    )
+    return SessionProcessors(processor_registry.group(), service)
 
 
 def build_session_registries(
@@ -657,6 +638,7 @@ async def compute_session_processors(
     network_plugin_ctx: NetworkPluginContext,
     hook_plugin_ctx: HookPluginContext,
     resource_slot_types_seed: None,
+    processor_registry: ProcessorRegistry[Any],
 ) -> SessionProcessors:
     """SessionProcessors wired with a real SchedulingController and UserRepository.
 
@@ -701,22 +683,7 @@ async def compute_session_processors(
         scheduler_repository=scheduler_repository,
         scheduling_controller=scheduling_controller,
         appproxy_client_pool=AsyncMock(),
-        user_repository=UserRepository(database_engine),
+        user_repository=UserRepository(database_engine, V2DBOpsProvider(database_engine)),
     )
     service = SessionService(args)
-    real_single_entity_validator = SingleEntityActionRBACValidator(
-        rbac_permission_repo, MagicMock()
-    )
-    real_bulk_validator = BulkActionRBACValidator(rbac_permission_repo, MagicMock())
-    return SessionProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(
-                scope=AsyncMock(),
-                single_entity=real_single_entity_validator,
-                bulk=real_bulk_validator,
-            ),
-        ),
-    )
+    return SessionProcessors(processor_registry.group(), service)

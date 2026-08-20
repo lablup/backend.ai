@@ -17,6 +17,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import AgentId, ResourceSlot, SessionId, SessionTypes
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 
@@ -37,8 +38,10 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -90,6 +93,7 @@ async def session_processors(
     error_monitor: ErrorPluginContext,
     appproxy_client_pool: AsyncMock,
     scheduling_controller_mock: AsyncMock,
+    processor_registry: ProcessorRegistry[Any],
 ) -> SessionProcessors:
     """Real SessionProcessors with real SessionService and SessionRepository."""
     args = SessionServiceArgs(
@@ -106,23 +110,17 @@ async def session_processors(
         user_repository=AsyncMock(),
     )
     service = SessionService(args)
-    return SessionProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
-        ),
-    )
+    return SessionProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()
-def agent_processors_mock() -> AgentProcessors:
+def agent_processors_mock(processor_registry: ProcessorRegistry[Any]) -> AgentProcessors:
     """AgentProcessors with a mocked AgentService."""
     return AgentProcessors(
-        service=AsyncMock(),
-        action_monitors=[],
-        validators=ActionValidators(
+        processor_registry.group(),
+        AsyncMock(),
+        [],
+        ActionValidators(
             virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
             rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
         ),
@@ -130,16 +128,9 @@ def agent_processors_mock() -> AgentProcessors:
 
 
 @pytest.fixture()
-def vfolder_processors_mock() -> VFolderProcessors:
+def vfolder_processors_mock(processor_registry: ProcessorRegistry[Any]) -> VFolderProcessors:
     """VFolderProcessors with a mocked VFolderService."""
-    return VFolderProcessors(
-        service=AsyncMock(),
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
-        ),
-    )
+    return VFolderProcessors(processor_registry.group(), AsyncMock())
 
 
 @pytest.fixture()
@@ -150,11 +141,14 @@ def server_module_registries(
     session_processors: SessionProcessors,
     agent_processors_mock: AgentProcessors,
     vfolder_processors_mock: VFolderProcessors,
+    processor_registry: ProcessorRegistry[Any],
 ) -> list[RouteRegistry]:
     """Load only the modules required for session component tests."""
     return [
         register_session_routes(
             SessionHandler(
+                group=GroupProcessors(processor_registry.group(), AsyncMock()),
+                user=UserProcessors(processor_registry.group(), AsyncMock()),
                 auth=auth_processors,
                 session=session_processors,
                 agent=agent_processors_mock,

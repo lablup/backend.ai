@@ -4,7 +4,6 @@ import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import AsyncMock
 
 import pytest
 import sqlalchemy as sa
@@ -12,8 +11,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.rest.artifact.handler import ArtifactHandler
 from ai.backend.manager.api.rest.artifact.registry import register_artifact_routes
 from ai.backend.manager.api.rest.artifact_registry.handler import ArtifactRegistryHandler
@@ -49,7 +47,6 @@ from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 
 @dataclass
@@ -67,6 +64,7 @@ def artifact_processors(
     database_engine: ExtendedAsyncSAEngine,
     storage_manager: StorageSessionManager,
     config_provider: ManagerConfigProvider,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ArtifactProcessors:
     artifact_repository = ArtifactRepository(database_engine)
     artifact_registry_repository = ArtifactRegistryRepository(database_engine)
@@ -84,14 +82,7 @@ def artifact_processors(
         storage_manager=storage_manager,
         config_provider=config_provider,
     )
-    return ArtifactProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
-        ),
-    )
+    return ArtifactProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()
@@ -101,6 +92,7 @@ def artifact_revision_processors(
     config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
     background_task_manager: BackgroundTaskManager,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ArtifactRevisionProcessors:
     artifact_repository = ArtifactRepository(database_engine)
     artifact_registry_repository = ArtifactRegistryRepository(database_engine)
@@ -124,14 +116,7 @@ def artifact_revision_processors(
         valkey_artifact_client=valkey_clients.artifact,
         background_task_manager=background_task_manager,
     )
-    return ArtifactRevisionProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
-        ),
-    )
+    return ArtifactRevisionProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()

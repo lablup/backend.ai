@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.cluster_template.handler import ClusterTemplateHandler
@@ -23,6 +25,7 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.template.repository import TemplateRepository
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.group.service import GroupService
@@ -40,12 +43,12 @@ def _mock_action_validators() -> MagicMock:
 
 
 @pytest.fixture()
-def template_processors(database_engine: ExtendedAsyncSAEngine) -> TemplateProcessors:
+def template_processors(
+    database_engine: ExtendedAsyncSAEngine, processor_registry: ProcessorRegistry[Any]
+) -> TemplateProcessors:
     repo = TemplateRepository(database_engine)
     service = TemplateService(repository=repo)
-    return TemplateProcessors(
-        service=service, action_monitors=[], validators=_mock_action_validators()
-    )
+    return TemplateProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()
@@ -54,15 +57,18 @@ def group_processors(
     config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
     storage_manager: StorageSessionManager,
+    processor_registry: ProcessorRegistry[Any],
 ) -> GroupProcessors:
     group_repo = GroupRepository(
-        database_engine, config_provider, valkey_clients.stat, storage_manager
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        config_provider,
+        valkey_clients.stat,
+        storage_manager,
     )
     group_repos = GroupRepositories(repository=group_repo)
     service = GroupService(storage_manager, config_provider, valkey_clients.stat, group_repos)
-    return GroupProcessors(
-        group_service=service, action_monitors=[], validators=_mock_action_validators()
-    )
+    return GroupProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()

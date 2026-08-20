@@ -12,6 +12,7 @@ import uuid
 from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -80,6 +81,9 @@ from ai.backend.common.types import (
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
+from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry import ProcessorDependencies, ProcessorRegistry
+from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
@@ -148,6 +152,8 @@ from ai.backend.manager.repositories.db.engine import (
     create_async_engine,
 )
 from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -1430,9 +1436,10 @@ def auth_processors(
     """Real AuthProcessors wired with real AuthService and AuthRepository."""
     repo = AuthRepository(database_engine)
     user_resource_policy_repository = UserResourcePolicyRepository(database_engine)
-    user_repository = UserRepository(database_engine)
+    user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
     group_repository = GroupRepository(
         database_engine,
+        V2DBOpsProvider(database_engine),
         config_provider,
         valkey_clients.stat,
         storage_manager,
@@ -1458,6 +1465,18 @@ def auth_processors(
                 bulk=MagicMock(spec=BulkActionRBACValidator),
             ),
         ),
+    )
+
+
+@pytest.fixture()
+def processor_registry(database_engine: ExtendedAsyncSAEngine) -> ProcessorRegistry[Any]:
+    """The registry every v2-wired processor group is built from."""
+    return ProcessorRegistry(
+        ProcessorDependencies(
+            monitors=ActionMonitors(),
+            validators=V2ActionValidators(),
+            repository=OpsRepository(V2DBOpsProvider(database_engine)),
+        )
     )
 
 

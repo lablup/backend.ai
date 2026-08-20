@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -16,7 +16,7 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -34,14 +34,11 @@ from ai.backend.manager.services.scaling_group.service import ScalingGroupServic
 @pytest.fixture()
 def scaling_group_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ScalingGroupProcessors:
     repo = ScalingGroupRepository(database_engine)
     service = ScalingGroupService(repo)
-    return ScalingGroupProcessors(
-        service=service,
-        action_monitors=[],
-        validators=MagicMock(spec=ActionValidators),
-    )
+    return ScalingGroupProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()

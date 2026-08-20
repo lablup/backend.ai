@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -12,6 +13,7 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.etcd.handler import EtcdHandler
@@ -34,6 +36,7 @@ from ai.backend.manager.repositories.container_registry.repository import (
 from ai.backend.manager.repositories.etcd_config.repository import EtcdConfigRepository
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.manager.repositories.scaling_group.repository import ScalingGroupRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -52,6 +55,7 @@ from ai.backend.manager.services.scaling_group.processors import ScalingGroupPro
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 
 def _create_mock_validators() -> MagicMock:
@@ -66,12 +70,11 @@ def _create_mock_validators() -> MagicMock:
 @pytest.fixture()
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine)
     service = ContainerRegistryService(database_engine, repo)
-    return ContainerRegistryProcessors(
-        service=service, action_monitors=[], validators=_create_mock_validators()
-    )
+    return ContainerRegistryProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()
@@ -80,6 +83,7 @@ def etcd_config_processors(
     config_provider: ManagerConfigProvider,
     async_etcd: AsyncEtcd,
     valkey_clients: ValkeyClients,
+    processor_registry: ProcessorRegistry[Any],
 ) -> EtcdConfigProcessors:
     repo = EtcdConfigRepository(database_engine)
     service = EtcdConfigService(
@@ -88,9 +92,7 @@ def etcd_config_processors(
         etcd=async_etcd,
         valkey_stat=valkey_clients.stat,
     )
-    return EtcdConfigProcessors(
-        service=service, action_monitors=[], validators=_create_mock_validators()
-    )
+    return EtcdConfigProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()
@@ -98,12 +100,11 @@ def resource_preset_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ResourcePresetProcessors:
     repo = ResourcePresetRepository(database_engine, valkey_clients.stat, config_provider)
     service = ResourcePresetService(repo)
-    return ResourcePresetProcessors(
-        service=service, action_monitors=[], validators=_create_mock_validators()
-    )
+    return ResourcePresetProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()
@@ -114,6 +115,7 @@ def agent_processors(
     hook_plugin_ctx: HookPluginContext,
     event_producer: EventProducer,
     valkey_clients: ValkeyClients,
+    processor_registry: ProcessorRegistry[Any],
 ) -> AgentProcessors:
     agent_repo = AgentRepository(
         database_engine,
@@ -141,7 +143,13 @@ def agent_processors(
         agent_cache=AsyncMock(),
     )
     return AgentProcessors(
-        service=service, action_monitors=[], validators=_create_mock_validators()
+        processor_registry.group(),
+        service,
+        [],
+        ActionValidators(
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
+        ),
     )
 
 
@@ -151,15 +159,18 @@ def group_processors(
     config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
     storage_manager: AsyncMock,
+    processor_registry: ProcessorRegistry[Any],
 ) -> GroupProcessors:
     group_repo = GroupRepository(
-        database_engine, config_provider, valkey_clients.stat, storage_manager
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        config_provider,
+        valkey_clients.stat,
+        storage_manager,
     )
     group_repos = GroupRepositories(repository=group_repo)
     service = GroupService(storage_manager, config_provider, valkey_clients.stat, group_repos)
-    return GroupProcessors(
-        group_service=service, action_monitors=[], validators=_create_mock_validators()
-    )
+    return GroupProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()
@@ -167,23 +178,21 @@ def user_processors(
     database_engine: ExtendedAsyncSAEngine,
     valkey_clients: ValkeyClients,
     storage_manager: AsyncMock,
+    processor_registry: ProcessorRegistry[Any],
 ) -> UserProcessors:
-    user_repo = UserRepository(database_engine)
+    user_repo = UserRepository(database_engine, V2DBOpsProvider(database_engine))
     service = UserService(storage_manager, valkey_clients.stat, AsyncMock(), user_repo, AsyncMock())
-    return UserProcessors(
-        user_service=service, action_monitors=[], validators=_create_mock_validators()
-    )
+    return UserProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()
 def scaling_group_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ScalingGroupProcessors:
     repo = ScalingGroupRepository(database_engine)
     service = ScalingGroupService(repo, appproxy_client_pool=AsyncMock())
-    return ScalingGroupProcessors(
-        service=service, action_monitors=[], validators=_create_mock_validators()
-    )
+    return ScalingGroupProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()

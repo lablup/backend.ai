@@ -9,6 +9,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.object_storage.handler import ObjectStorageHandler
 from ai.backend.manager.api.rest.object_storage.registry import register_object_storage_routes
@@ -43,6 +44,7 @@ def object_storage_processors(
     database_engine: ExtendedAsyncSAEngine,
     storage_manager: StorageSessionManager,
     config_provider: ManagerConfigProvider,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ObjectStorageProcessors:
     artifact_repository = ArtifactRepository(database_engine)
     object_storage_repository = ObjectStorageRepository(database_engine)
@@ -54,7 +56,7 @@ def object_storage_processors(
         storage_manager=storage_manager,
         config_provider=config_provider,
     )
-    return ObjectStorageProcessors(service=service, group=ops_processor_group(database_engine))
+    return ObjectStorageProcessors(service, processor_registry.group())
 
 
 @pytest.fixture()

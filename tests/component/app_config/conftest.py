@@ -56,7 +56,7 @@ if TYPE_CHECKING:
 @pytest.fixture()
 def app_config_processors(database_engine: ExtendedAsyncSAEngine) -> AppConfigProcessors:
     """The real read path: no RBAC validator, since the adapter fills the principal itself."""
-    registry = ProcessorRegistry(
+    registry: ProcessorRegistry[Any] = ProcessorRegistry(
         ProcessorDependencies(
             monitors=ActionMonitors(),
             validators=ActionValidators(),

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -16,7 +16,7 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.adapters.resource_allocation.adapter import ResourceAllocationAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -49,6 +49,7 @@ def resource_allocation_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ResourceAllocationProcessors:
     """Build real resource allocation processors with real DB and config."""
     ra_repo = ResourceAllocationRepository(
@@ -64,11 +65,7 @@ def resource_allocation_processors(
         resource_allocation_repository=ra_repo,
         resource_preset_repository=rp_repo,
     )
-    return ResourceAllocationProcessors(
-        service=service,
-        action_monitors=[],
-        validators=MagicMock(spec=ActionValidators),
-    )
+    return ResourceAllocationProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()

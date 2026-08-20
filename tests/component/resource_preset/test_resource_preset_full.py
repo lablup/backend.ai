@@ -22,6 +22,7 @@ from typing import Any
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.dto.manager.infra import (
     CheckPresetsRequest,
     CheckPresetsResponse,
@@ -85,7 +86,7 @@ class TestPresetCRUD:
                 )
             )
         )
-        result = await processors.create_preset.wait_for_complete(action)
+        result = await processors.create_preset.run(action)
         return result.resource_preset
 
     async def _list_presets_via_processor(
@@ -99,7 +100,7 @@ class TestPresetCRUD:
             access_key=access_key,
             scaling_group=scaling_group,
         )
-        result = await processors.list_presets.wait_for_complete(action)
+        result = await processors.list_presets.run(action)
         return result.presets
 
     # ------------------------------------------------------------------
@@ -205,18 +206,15 @@ class TestPresetCRUD:
         )
 
         modify_action = UpdateResourcePresetAction(
+            preset_id=ResourcePresetID(preset.id),
             updater=Updater(
                 spec=ResourcePresetUpdaterSpec(
                     name=OptionalState.update("crud-modify-s5-new"),
                 ),
                 pk_value=preset.id,
             ),
-            id=preset.id,
-            name=None,
         )
-        modify_result = await resource_preset_processors.update_preset.wait_for_complete(
-            modify_action
-        )
+        modify_result = await resource_preset_processors.update_preset.run(modify_action)
         assert isinstance(modify_result, UpdateResourcePresetActionResult)
         assert modify_result.resource_preset.name == "crud-modify-s5-new"
 
@@ -240,6 +238,7 @@ class TestPresetCRUD:
         )
 
         modify_action = UpdateResourcePresetAction(
+            preset_id=ResourcePresetID(preset.id),
             updater=Updater(
                 spec=ResourcePresetUpdaterSpec(
                     resource_slots=OptionalState.update(
@@ -248,12 +247,8 @@ class TestPresetCRUD:
                 ),
                 pk_value=preset.id,
             ),
-            id=preset.id,
-            name=None,
         )
-        modify_result = await resource_preset_processors.update_preset.wait_for_complete(
-            modify_action
-        )
+        modify_result = await resource_preset_processors.update_preset.run(modify_action)
         assert modify_result.resource_preset.resource_slots["cpu"] is not None
 
         # Verify via SDK
@@ -277,13 +272,8 @@ class TestPresetCRUD:
             name="crud-delete-s7",
         )
 
-        delete_action = DeleteResourcePresetAction(
-            id=preset.id,
-            name=None,
-        )
-        delete_result = await resource_preset_processors.delete_preset.wait_for_complete(
-            delete_action
-        )
+        delete_action = DeleteResourcePresetAction(preset_id=ResourcePresetID(preset.id))
+        delete_result = await resource_preset_processors.delete_preset.run(delete_action)
         assert isinstance(delete_result, DeleteResourcePresetActionResult)
         assert delete_result.resource_preset.name == "crud-delete-s7"
 
@@ -299,18 +289,13 @@ class TestPresetCRUD:
         database_fixture: None,
     ) -> None:
         """S-8: Delete preset by name → removed from list."""
-        await self._create_preset(
+        preset = await self._create_preset(
             resource_preset_processors,
             name="crud-delete-s8",
         )
 
-        delete_action = DeleteResourcePresetAction(
-            id=None,
-            name="crud-delete-s8",
-        )
-        delete_result = await resource_preset_processors.delete_preset.wait_for_complete(
-            delete_action
-        )
+        delete_action = DeleteResourcePresetAction(preset_id=ResourcePresetID(preset.id))
+        delete_result = await resource_preset_processors.delete_preset.run(delete_action)
         assert delete_result.resource_preset.name == "crud-delete-s8"
 
         # Verify removal via SDK
@@ -354,7 +339,7 @@ class TestCheckPresets:
                 )
             )
         )
-        result = await processors.create_preset.wait_for_complete(action)
+        result = await processors.create_preset.run(action)
         return result.resource_preset
 
     # ------------------------------------------------------------------

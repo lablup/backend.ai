@@ -6,7 +6,7 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -16,6 +16,7 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
     PrometheusQueryPresetAdapter,
 )
@@ -45,7 +46,6 @@ from ai.backend.manager.services.prometheus_query_preset.processors import (
 from ai.backend.manager.services.prometheus_query_preset.service import (
     PrometheusQueryPresetService,
 )
-from ai.backend.testutils.processors import ops_processor_group
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
@@ -76,6 +76,7 @@ def prometheus_client_mock() -> MagicMock:
 def prometheus_query_preset_processors(
     database_engine: ExtendedAsyncSAEngine,
     prometheus_client_mock: MagicMock,
+    processor_registry: ProcessorRegistry[Any],
 ) -> PrometheusQueryPresetProcessors:
     repo = PrometheusQueryPresetRepository(database_engine, prometheus_client_mock)
     service = PrometheusQueryPresetService(
@@ -84,9 +85,7 @@ def prometheus_query_preset_processors(
         default_timewindow="5m",
         template_renderer=PromQLTemplateRenderer(),
     )
-    return PrometheusQueryPresetProcessors(
-        service=service, group=ops_processor_group(database_engine)
-    )
+    return PrometheusQueryPresetProcessors(service, processor_registry.group())
 
 
 @pytest.fixture()

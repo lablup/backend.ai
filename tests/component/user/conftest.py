@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.user import (
     PurgeUserRequest,
     UserStatus,
 )
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
@@ -40,6 +41,7 @@ from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
@@ -69,8 +71,9 @@ def user_processors(
     storage_manager: StorageSessionManager,
     agent_registry: AgentRegistry,
     valkey_clients: Any,
+    processor_registry: ProcessorRegistry[Any],
 ) -> UserProcessors:
-    user_repository = UserRepository(database_engine)
+    user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
     service = UserService(
         storage_manager=storage_manager,
         valkey_stat_client=valkey_clients.stat,
@@ -78,19 +81,18 @@ def user_processors(
         user_repository=user_repository,
         scheduling_controller=AsyncMock(),
     )
-    return UserProcessors(
-        user_service=service, action_monitors=[], validators=_create_mock_validators()
-    )
+    return UserProcessors(processor_registry.group(), service)
 
 
 @pytest.fixture()
 def domain_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
 ) -> DomainProcessors:
-    service = DomainService(repository=DomainRepository(database_engine))
-    return DomainProcessors(
-        service=service, action_monitors=[], validators=_create_mock_validators()
+    service = DomainService(
+        repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
     )
+    return DomainProcessors(processor_registry.group(), service, [])
 
 
 @pytest.fixture()

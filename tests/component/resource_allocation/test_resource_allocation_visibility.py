@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator, Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -25,7 +25,7 @@ from ai.backend.common.dto.manager.v2.resource_allocation.request import (
 from ai.backend.common.dto.manager.v2.resource_allocation.response import (
     EffectiveResourceAllocationPayload,
 )
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.api.adapters.resource_allocation.adapter import ResourceAllocationAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -123,6 +123,7 @@ class TestHideAgentsVisibility:
         self,
         config_provider: ManagerConfigProvider,
         config_provider_factory: Callable[[ManagerUnifiedConfig], ManagerConfigProvider],
+        processor_registry: ProcessorRegistry[Any],
     ) -> ManagerConfigProvider:
         return _make_config_provider(config_provider, config_provider_factory, hide_agents=True)
 
@@ -132,6 +133,7 @@ class TestHideAgentsVisibility:
         database_engine: ExtendedAsyncSAEngine,
         config_provider_hide_agents: ManagerConfigProvider,
         valkey_clients: ValkeyClients,
+        processor_registry: ProcessorRegistry[Any],
     ) -> ResourceAllocationProcessors:
         ra_repo = ResourceAllocationRepository(
             db=database_engine,
@@ -146,11 +148,7 @@ class TestHideAgentsVisibility:
             resource_allocation_repository=ra_repo,
             resource_preset_repository=rp_repo,
         )
-        return ResourceAllocationProcessors(
-            service=service,
-            action_monitors=[],
-            validators=MagicMock(spec=ActionValidators),
-        )
+        return ResourceAllocationProcessors(processor_registry.group(), service)
 
     @pytest.fixture()
     def server_module_registries(
@@ -262,6 +260,7 @@ class TestGroupResourceVisibility:
         database_engine: ExtendedAsyncSAEngine,
         config_provider_no_grv: ManagerConfigProvider,
         valkey_clients: ValkeyClients,
+        processor_registry: ProcessorRegistry[Any],
     ) -> ResourceAllocationProcessors:
         ra_repo = ResourceAllocationRepository(
             db=database_engine,
@@ -276,11 +275,7 @@ class TestGroupResourceVisibility:
             resource_allocation_repository=ra_repo,
             resource_preset_repository=rp_repo,
         )
-        return ResourceAllocationProcessors(
-            service=service,
-            action_monitors=[],
-            validators=MagicMock(spec=ActionValidators),
-        )
+        return ResourceAllocationProcessors(processor_registry.group(), service)
 
     @pytest.fixture()
     def server_module_registries(
