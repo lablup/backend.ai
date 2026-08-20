@@ -15,6 +15,7 @@ import sqlalchemy as sa
 from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
@@ -1417,7 +1418,7 @@ class TestVfolderRepositoryDeleteForever:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 ContainerRegistryRow(
-                    id=registry_id,
+                    id=ContainerRegistryID(registry_id),
                     url="https://docker.io",
                     registry_name=f"reg-{uuid.uuid4().hex[:8]}",
                     type=ContainerRegistryType.DOCKER,

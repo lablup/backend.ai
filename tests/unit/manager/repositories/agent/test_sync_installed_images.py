@@ -13,6 +13,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.types import AgentId, ImageID, ValkeyTarget
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -221,7 +222,7 @@ class TestSyncInstalledImagesIntegration:
         async with db_with_cleanup.begin_session() as db_session:
             # Create container registry first
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://cr.backend.ai",
                 registry_name="test-registry",
                 type=ContainerRegistryType.HARBOR2,

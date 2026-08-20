@@ -232,7 +232,7 @@ class TestVFolderFileServiceCreateArchiveDownload:
     def sample_action(self, sample_vfolder_uuid: uuid.UUID) -> CreateArchiveDownloadSessionAction:
         return CreateArchiveDownloadSessionAction(
             keypair_resource_policy={"default": {}},
-            vfolder_uuid=sample_vfolder_uuid,
+            vfolder_uuid=VFolderUUID(sample_vfolder_uuid),
             files=self.SAMPLE_FILES,
         )
 
@@ -295,7 +295,7 @@ class TestVFolderFileServiceCreateArchiveDownload:
         """Test that custom filename is forwarded to storage proxy client."""
         action_with_filename = CreateArchiveDownloadSessionAction(
             keypair_resource_policy={"default": {}},
-            vfolder_uuid=sample_vfolder_uuid,
+            vfolder_uuid=VFolderUUID(sample_vfolder_uuid),
             files=self.SAMPLE_FILES,
             filename="my-export.zip",
         )

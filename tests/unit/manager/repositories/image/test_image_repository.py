@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.filter_specs import StringMatchSpec
@@ -74,7 +75,7 @@ class TestImageRepositorySearch:
 
         async with db_with_cleanup.begin_session() as db_sess:
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://registry.example.com",
                 registry_name="registry.example.com",
                 type=ContainerRegistryType.DOCKER,
@@ -594,7 +595,7 @@ class TestImageRepositoryLastUsedAt:
         registry_id = uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://registry.example.com",
                 registry_name="registry.example.com",
                 type=ContainerRegistryType.DOCKER,

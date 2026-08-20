@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import PerProjectContainerRegistryInfo
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
@@ -154,7 +155,7 @@ class TestPerProjectRegistryQuotaRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=registry_type,
@@ -283,7 +284,7 @@ class TestPerProjectRegistryQuotaRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=registry_type,

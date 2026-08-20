@@ -17,6 +17,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
@@ -26,6 +27,7 @@ from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
@@ -670,7 +672,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         async with db_with_cleanup.begin_session() as db_sess:
             # Create container registry for image FK
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://test-registry.example.com",
                 registry_name="test-registry",
                 type=ContainerRegistryType.DOCKER,
@@ -909,7 +911,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             registry_id = uuid.uuid4()
             image_id = uuid.uuid4()
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://multi-test-registry.example.com",
                 registry_name="multi-test-registry",
                 type=ContainerRegistryType.DOCKER,
@@ -1630,7 +1632,7 @@ class TestDeploymentRevisionOperations:
         registry_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://test-registry.example.com",
                 registry_name=f"test-registry-{registry_id.hex[:8]}",
                 type=ContainerRegistryType.DOCKER,
@@ -3402,7 +3404,7 @@ class TestDeploymentRepositoryDuplicateName:
         registry_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://test-registry.example.com",
                 registry_name=f"test-registry-{registry_id.hex[:8]}",
                 type=ContainerRegistryType.DOCKER,
@@ -4054,7 +4056,7 @@ class TestDeploymentRepositoryDuplicateName:
                     endpoint=endpoint_id,
                     domain=test_domain.name,
                     project=test_group.id,
-                    session_owner=user_id,
+                    session_owner=UserID(user_id),
                 ),
                 EndpointTokenRow(
                     id=target_token_ids[1],
@@ -4062,7 +4064,7 @@ class TestDeploymentRepositoryDuplicateName:
                     endpoint=endpoint_id,
                     domain=test_domain.name,
                     project=test_group.id,
-                    session_owner=user_id,
+                    session_owner=UserID(user_id),
                 ),
                 EndpointTokenRow(
                     id=sibling_token_id,
@@ -4070,7 +4072,7 @@ class TestDeploymentRepositoryDuplicateName:
                     endpoint=sibling_id,
                     domain=test_domain.name,
                     project=test_group.id,
-                    session_owner=user_id,
+                    session_owner=UserID(user_id),
                 ),
             ])
             await db_sess.commit()

@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot, ValkeyTarget
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
@@ -192,7 +193,7 @@ class TestResourcePresetCacheInvalidation:
         cache_source = resource_preset_repository._cache_source
         # Create some cache entries before creating preset
         dummy_preset = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="dummy-preset",
             resource_slots=ResourceSlot({"cpu": "1", "mem": "1G"}),
             shared_memory=int(BinarySize.from_str("512M")),
@@ -228,14 +229,14 @@ class TestResourcePresetCacheInvalidation:
         cache_source = resource_preset_repository._cache_source
         # Create multiple cache entries of different types
         preset1 = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="preset-1",
             resource_slots=ResourceSlot({"cpu": "2", "mem": "2G"}),
             shared_memory=int(BinarySize.from_str("1G")),
             scaling_group_name=None,
         )
         preset2 = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="preset-2",
             resource_slots=ResourceSlot({"cpu": "4", "mem": "4G"}),
             shared_memory=int(BinarySize.from_str("2G")),

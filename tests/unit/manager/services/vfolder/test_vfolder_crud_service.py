@@ -496,7 +496,7 @@ class TestGetVFolderAction:
 
         action = GetVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         result = await vfolder_service.get(action)
@@ -519,7 +519,7 @@ class TestGetVFolderAction:
 
         action = GetVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         with pytest.raises(VFolderNotFound):
@@ -548,7 +548,7 @@ class TestGetVFolderAction:
 
         action = GetVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         result = await vfolder_service.get(action)
@@ -672,7 +672,7 @@ class TestUpdateVFolderAttributeAction:
 
         action = UpdateVFolderAttributeAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             updater=updater,
         )
 
@@ -711,7 +711,7 @@ class TestUpdateVFolderAttributeAction:
 
         action = UpdateVFolderAttributeAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             updater=updater,
         )
 
@@ -736,7 +736,7 @@ class TestUpdateVFolderAttributeAction:
 
         action = UpdateVFolderAttributeAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             updater=updater,
         )
 
@@ -759,7 +759,7 @@ class TestMoveToTrashVFolderAction:
         action = MoveToTrashVFolderAction(
             user_uuid=user_uuid,
             keypair_resource_policy={"default": {}},
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         result = await vfolder_service.move_to_trash(action)
@@ -780,7 +780,7 @@ class TestMoveToTrashVFolderAction:
         action = MoveToTrashVFolderAction(
             user_uuid=user_uuid,
             keypair_resource_policy={"default": {}},
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         with pytest.raises(VFolderNotFound):
@@ -803,7 +803,7 @@ class TestRestoreVFolderFromTrashAction:
 
         action = RestoreVFolderFromTrashAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         result = await vfolder_service.restore(action)
@@ -823,7 +823,7 @@ class TestRestoreVFolderFromTrashAction:
 
         action = RestoreVFolderFromTrashAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         with pytest.raises(VFolderNotFound):
@@ -849,7 +849,7 @@ class TestDeleteForeverVFolderAction:
 
         action = DeleteForeverVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         result = await vfolder_service.delete_forever(action)
@@ -879,7 +879,7 @@ class TestDeleteForeverVFolderAction:
 
         action = DeleteForeverVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         result = await vfolder_service.delete_forever(action)
@@ -905,7 +905,7 @@ class TestDeleteForeverVFolderAction:
 
         action = DeleteForeverVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         result = await vfolder_service.delete_forever(action)
@@ -933,7 +933,7 @@ class TestForceDeleteVFolderAction:
 
         action = ForceDeleteVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         result = await vfolder_service.force_delete(action)

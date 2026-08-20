@@ -34,8 +34,10 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.events.types import EventDomain
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
@@ -1015,9 +1017,9 @@ class TestDeploymentsRetention:
                     id=uuid.uuid4(),
                     token=f"tok-{uuid.uuid4()}",
                     endpoint=endpoint_id,
-                    session_owner=scope.user_uuid,
+                    session_owner=UserID(scope.user_uuid),
                     domain=scope.domain_name,
-                    project=scope.group_id,
+                    project=ProjectID(scope.group_id),
                     expires_at=expires_at,
                 )
             )

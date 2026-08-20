@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.errors.resource import DBOperationFailed, TaskTemplateNotFound
 from ai.backend.manager.exceptions import InvalidArgument
 from ai.backend.manager.models.session_template import TemplateType
@@ -662,7 +663,7 @@ class TestListClusterTemplatesAction:
         mock_repo.list_cluster_templates_all = AsyncMock(return_value=entries)
 
         action = ListClusterTemplatesAction(
-            user_uuid=user_uuid,
+            user_uuid=UserID(user_uuid),
             user_role=UserRole.SUPERADMIN,
             domain_name="default",
             is_superadmin=True,
@@ -684,7 +685,7 @@ class TestListClusterTemplatesAction:
         mock_repo.list_accessible_cluster_templates = AsyncMock(return_value=entries)
 
         action = ListClusterTemplatesAction(
-            user_uuid=user_uuid,
+            user_uuid=UserID(user_uuid),
             user_role=UserRole.USER,
             domain_name="default",
             is_superadmin=False,
@@ -712,7 +713,7 @@ class TestListClusterTemplatesAction:
         mock_repo.list_accessible_cluster_templates = AsyncMock(return_value=[])
 
         action = ListClusterTemplatesAction(
-            user_uuid=user_uuid,
+            user_uuid=UserID(user_uuid),
             user_role=UserRole.USER,
             domain_name="default",
             is_superadmin=False,

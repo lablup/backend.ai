@@ -11,6 +11,7 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
@@ -208,7 +209,7 @@ class TestEndpointSearchInProject:
             # Container registry + image
             db_sess.add(
                 ContainerRegistryRow(
-                    id=registry_id,
+                    id=ContainerRegistryID(registry_id),
                     url="http://test-registry.local",
                     registry_name=f"test-registry-{uuid.uuid4().hex[:8]}",
                     type=ContainerRegistryType.DOCKER,

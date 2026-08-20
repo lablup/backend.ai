@@ -121,7 +121,7 @@ class TestArtifactRegistryService:
     @pytest.fixture
     def sample_registry_data(self) -> ArtifactRegistryData:
         return ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=uuid4(),
             name="test-huggingface-registry",
             type=ArtifactRegistryType.HUGGINGFACE,
@@ -842,7 +842,7 @@ class TestGetArtifactRegistryMetaAction:
     ) -> None:
         registry_id = uuid4()
         expected = ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=registry_id,
             name="test-registry",
             type=ArtifactRegistryType.HUGGINGFACE,

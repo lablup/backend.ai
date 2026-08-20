@@ -21,6 +21,7 @@ import sqlalchemy as sa
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.config import DefaultModelDefinition, ModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
@@ -228,7 +229,7 @@ async def test_image_id(db_with_cleanup: ExtendedAsyncSAEngine) -> uuid.UUID:
     async with db_with_cleanup.begin_session() as sess:
         sess.add(
             ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="http://test.local",
                 registry_name=f"test-reg-{uuid.uuid4().hex[:8]}",
                 type=ContainerRegistryType.DOCKER,

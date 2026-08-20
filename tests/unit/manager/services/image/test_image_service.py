@@ -16,6 +16,7 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserData
@@ -133,7 +134,7 @@ class ImageServiceBaseFixtures:
     def container_registry_data(self, container_registry_id: uuid.UUID) -> ContainerRegistryData:
         """Sample container registry data."""
         return ContainerRegistryData(
-            id=container_registry_id,
+            id=ContainerRegistryID(container_registry_id),
             url="https://registry.example.com",
             registry_name="registry.example.com",
             type=ContainerRegistryType.DOCKER,

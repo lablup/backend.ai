@@ -12,6 +12,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
 from ai.backend.manager.data.artifact.types import (
@@ -177,7 +178,7 @@ class TestObjectStorageService:
         mock_storage_manager.get_manager_facing_client.return_value = mock_client
 
         action = GetDownloadPresignedURLAction(
-            artifact_revision_id=sample_revision_data.id,
+            artifact_revision_id=ArtifactRevisionID(sample_revision_data.id),
             key="model.bin",
         )
         result = await object_storage_service.get_presigned_download_url(action)
@@ -228,7 +229,7 @@ class TestObjectStorageService:
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=sample_artifact_data)
 
         action = GetDownloadPresignedURLAction(
-            artifact_revision_id=not_available_revision.id,
+            artifact_revision_id=ArtifactRevisionID(not_available_revision.id),
             key="model.bin",
         )
 
@@ -243,7 +244,7 @@ class TestObjectStorageService:
         mock_config_provider.config.reservoir = None
 
         action = GetDownloadPresignedURLAction(
-            artifact_revision_id=uuid4(),
+            artifact_revision_id=ArtifactRevisionID(uuid4()),
             key="model.bin",
         )
 
@@ -260,7 +261,7 @@ class TestObjectStorageService:
         mock_config_provider.config.reservoir = reservoir_config
 
         action = GetDownloadPresignedURLAction(
-            artifact_revision_id=uuid4(),
+            artifact_revision_id=ArtifactRevisionID(uuid4()),
             key="model.bin",
         )
 
@@ -309,7 +310,7 @@ class TestObjectStorageService:
         mock_storage_manager.get_manager_facing_client.return_value = mock_client
 
         action = GetUploadPresignedURLAction(
-            artifact_revision_id=sample_revision_data.id,
+            artifact_revision_id=ArtifactRevisionID(sample_revision_data.id),
             key="model.bin",
         )
         result = await object_storage_service.get_presigned_upload_url(action)
@@ -326,7 +327,7 @@ class TestObjectStorageService:
         mock_config_provider.config.reservoir = None
 
         action = GetUploadPresignedURLAction(
-            artifact_revision_id=uuid4(),
+            artifact_revision_id=ArtifactRevisionID(uuid4()),
             key="model.bin",
         )
 
@@ -378,7 +379,7 @@ class TestObjectStorageService:
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=readonly_artifact)
 
         action = GetUploadPresignedURLAction(
-            artifact_revision_id=sample_revision_data.id,
+            artifact_revision_id=ArtifactRevisionID(sample_revision_data.id),
             key="model.bin",
         )
 

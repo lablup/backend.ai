@@ -112,7 +112,7 @@ class TestResourcePresetServiceCompatibility:
         """Test that CreateResourcePresetAction has the expected structure from test scenarios."""
         # Mock successful preset creation
         mock_preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="cpu-small",
             resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
             shared_memory=BinarySize(BinarySize.from_str("1G")),
@@ -149,7 +149,7 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test GPU preset creation with scaling group."""
         mock_preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="gpu-standard",
             resource_slots=ResourceSlot({
                 "cpu": Decimal("4"),
@@ -236,7 +236,7 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test that UpdateResourcePresetAction supports the expected modifications."""
         mock_preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="cpu-small",
             resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")}),
             shared_memory=BinarySize(BinarySize.from_str("1G")),
@@ -272,7 +272,7 @@ class TestResourcePresetServiceCompatibility:
         """Test preset name modification."""
         preset_id = uuid.uuid4()
         mock_preset_data = ResourcePresetData(
-            id=preset_id,
+            id=ResourcePresetID(preset_id),
             name="cpu-medium",
             resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
             shared_memory=BinarySize(BinarySize.from_str("1G")),
@@ -302,7 +302,7 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test that DeleteResourcePresetAction works as expected."""
         mock_preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="unused-preset",
             resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
             shared_memory=None,
@@ -344,14 +344,14 @@ class TestResourcePresetServiceCompatibility:
         """Test that ListResourcePresetsAction returns expected structure."""
         mock_presets = [
             ResourcePresetData(
-                id=uuid.uuid4(),
+                id=ResourcePresetID(uuid.uuid4()),
                 name="cpu-small",
                 resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
                 shared_memory=BinarySize(BinarySize.from_str("1G")),
                 scaling_group_name=None,
             ),
             ResourcePresetData(
-                id=uuid.uuid4(),
+                id=ResourcePresetID(uuid.uuid4()),
                 name="gpu-standard",
                 resource_slots=ResourceSlot({
                     "cpu": Decimal("4"),
@@ -439,7 +439,7 @@ class TestResourcePresetServiceCompatibility:
         # Mock scaling group query - this is now handled by repository
         # Create mock preset data
         preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="test-preset",
             resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
             shared_memory=None,
@@ -496,7 +496,7 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test support for custom resource types like NPU/TPU."""
         mock_preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="custom-preset",
             resource_slots=ResourceSlot({
                 "cpu": Decimal("4"),
@@ -535,7 +535,7 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test shared memory adjustment in preset modification."""
         mock_preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="gpu-standard",
             resource_slots=ResourceSlot({
                 "cpu": Decimal("4"),
@@ -591,7 +591,7 @@ class TestResourcePresetServiceCompatibility:
         """Test delete by id returns ResourcePresetData."""
         preset_id = uuid.uuid4()
         mock_preset_data = ResourcePresetData(
-            id=preset_id,
+            id=ResourcePresetID(preset_id),
             name="to-delete",
             resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
             shared_memory=None,
@@ -616,7 +616,7 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test list presets filters by specific scaling_group."""
         gpu_preset = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="gpu-standard",
             resource_slots=ResourceSlot({
                 "cpu": Decimal("4"),
@@ -651,7 +651,7 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test check presets returns keypair/group limits/using/remaining details."""
         preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="test-preset",
             resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
             shared_memory=None,

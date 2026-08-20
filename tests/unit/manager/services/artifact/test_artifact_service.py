@@ -16,6 +16,7 @@ from aiohttp.client_exceptions import ClientConnectorError
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -608,7 +609,7 @@ class TestScanArtifactsAction:
     @pytest.fixture
     def hf_registry_meta(self, registry_id: UUID) -> ArtifactRegistryData:
         return ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=registry_id,
             name="huggingface-default",
             type=ArtifactRegistryType.HUGGINGFACE,
@@ -721,7 +722,7 @@ class TestScanArtifactsAction:
         """Reservoir timeout raises ReservoirConnectionError (MAX_RETRIES=3)"""
         reservoir_registry_id = uuid4()
         reservoir_meta = ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=reservoir_registry_id,
             name="reservoir-default",
             type=ArtifactRegistryType.RESERVOIR,
@@ -868,7 +869,7 @@ class TestDelegateScanArtifactsAction:
         target_registry_id = uuid4()
 
         hf_meta = ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=target_registry_id,
             name="hf-default",
             type=ArtifactRegistryType.HUGGINGFACE,
@@ -1054,7 +1055,7 @@ class TestRetrieveModelAction:
         now = datetime.now(UTC)
         registry_id = uuid4()
         hf_meta = ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=registry_id,
             name="hf-registry",
             type=ArtifactRegistryType.HUGGINGFACE,
@@ -1110,7 +1111,7 @@ class TestRetrieveModelAction:
         """Reservoir raises NotImplementedError"""
         registry_id = uuid4()
         reservoir_meta = ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=registry_id,
             name="reservoir-reg",
             type=ArtifactRegistryType.RESERVOIR,
@@ -1136,7 +1137,7 @@ class TestRetrieveModelAction:
 
         registry_id = uuid4()
         hf_meta = ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=registry_id,
             name="hf-reg",
             type=ArtifactRegistryType.HUGGINGFACE,
@@ -1217,7 +1218,7 @@ class TestRetrieveModelsAction:
         now = datetime.now(UTC)
         registry_id = uuid4()
         hf_meta = ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=registry_id,
             name="hf-registry",
             type=ArtifactRegistryType.HUGGINGFACE,

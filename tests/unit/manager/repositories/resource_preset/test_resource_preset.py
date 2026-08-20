@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.exception import ResourcePresetConflict
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
@@ -79,7 +80,7 @@ class TestResourcePresetRepository:
     def sample_preset_row(self) -> MagicMock:
         """Create sample resource preset row for testing"""
         preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="test-preset",
             resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")}),
             shared_memory=BinarySize(BinarySize.from_str("2G")),
@@ -430,7 +431,7 @@ class TestResourcePresetRepository:
         """Test listing all presets"""
         preset_list = [
             ResourcePresetData(
-                id=uuid.uuid4(),
+                id=ResourcePresetID(uuid.uuid4()),
                 name=f"preset-{i}",
                 resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
                 shared_memory=None,
@@ -462,7 +463,7 @@ class TestResourcePresetRepository:
         scaling_group = "gpu-cluster"
         preset_list = [
             ResourcePresetData(
-                id=uuid.uuid4(),
+                id=ResourcePresetID(uuid.uuid4()),
                 name="gpu-preset",
                 resource_slots=ResourceSlot({"cpu": "4", "mem": "8G", "cuda.device": "1"}),
                 shared_memory=None,
@@ -529,7 +530,7 @@ class TestResourcePresetDataModels:
     def test_resource_preset_data_conversion(self) -> None:
         """Test ResourcePresetData to/from dataclass conversion"""
         preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="test-preset",
             resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")}),
             shared_memory=BinarySize(1073741824),  # 1 GiB
@@ -576,7 +577,7 @@ class TestResourcePresetDataModels:
     def test_scaling_group_name_validation(self) -> None:
         """Test scaling group name validation"""
         preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="test-preset",
             resource_slots=ResourceSlot({"cpu": "4", "mem": "8G"}),
             shared_memory=None,
@@ -585,7 +586,7 @@ class TestResourcePresetDataModels:
         assert preset_data.scaling_group_name is None
 
         preset_data_with_group = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="test-preset",
             resource_slots=ResourceSlot({"cpu": "4", "mem": "8G"}),
             shared_memory=None,

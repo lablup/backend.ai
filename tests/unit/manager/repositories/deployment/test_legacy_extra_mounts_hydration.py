@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
@@ -216,7 +217,7 @@ class TestLegacyExtraMountsHydration:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 ContainerRegistryRow(
-                    id=registry_uuid,
+                    id=ContainerRegistryID(registry_uuid),
                     url="https://test-registry.example.com",
                     registry_name=f"reg-{suffix}",
                     type=ContainerRegistryType.DOCKER,

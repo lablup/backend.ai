@@ -165,7 +165,7 @@ class TestShareVFolderAction:
 
         action = ShareVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             permission=VFolderMountPermission.READ_WRITE,
             emails=emails,
@@ -190,7 +190,7 @@ class TestShareVFolderAction:
 
         action = ShareVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             permission=VFolderMountPermission.READ_WRITE,
             emails=["a@test.com"],
@@ -212,7 +212,7 @@ class TestShareVFolderAction:
 
         action = ShareVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             permission=VFolderMountPermission.READ_WRITE,
             emails=["a@test.com"],
@@ -234,7 +234,7 @@ class TestShareVFolderAction:
 
         action = ShareVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             permission=VFolderMountPermission.READ_WRITE,
             emails=["a@test.com"],
@@ -267,7 +267,7 @@ class TestUnshareVFolderAction:
 
         action = UnshareVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             emails=emails,
         )
@@ -290,7 +290,7 @@ class TestUnshareVFolderAction:
 
         action = UnshareVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             emails=["a@test.com"],
         )
@@ -463,7 +463,7 @@ class TestInviteVFolderAction:
         action = InviteVFolderAction(
             keypair_resource_policy={},
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             mount_permission=VFolderMountPermission.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
@@ -488,7 +488,7 @@ class TestInviteVFolderAction:
         action = InviteVFolderAction(
             keypair_resource_policy={},
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             mount_permission=VFolderMountPermission.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
@@ -514,7 +514,7 @@ class TestInviteVFolderAction:
         action = InviteVFolderAction(
             keypair_resource_policy={},
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             mount_permission=VFolderMountPermission.READ_ONLY,
             invitee_emails=["nobody@test.com"],
         )
@@ -543,7 +543,7 @@ class TestInviteVFolderAction:
         action = InviteVFolderAction(
             keypair_resource_policy={},
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             mount_permission=VFolderMountPermission.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
@@ -573,7 +573,7 @@ class TestInviteVFolderAction:
         action = InviteVFolderAction(
             keypair_resource_policy={},
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             mount_permission=VFolderMountPermission.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
@@ -900,7 +900,7 @@ class TestLeaveInvitedVFolderAction:
         mock_vfolder_repo.delete_vfolder_permission = AsyncMock()
 
         action = LeaveInvitedVFolderAction(
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             requester_user_uuid=requester_uuid,
         )
         result = await invite_service.leave_invited_vfolder(action)
@@ -925,7 +925,7 @@ class TestLeaveInvitedVFolderAction:
         )
 
         action = LeaveInvitedVFolderAction(
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             requester_user_uuid=requester_uuid,
         )
 
@@ -952,7 +952,7 @@ class TestLeaveInvitedVFolderAction:
         mock_vfolder_repo.delete_vfolder_permission = AsyncMock()
 
         action = LeaveInvitedVFolderAction(
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             requester_user_uuid=admin_uuid,
             shared_user_uuid=shared_user_uuid,
         )
@@ -980,7 +980,7 @@ class TestLeaveInvitedVFolderAction:
         mock_vfolder_repo.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
 
         action = LeaveInvitedVFolderAction(
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             requester_user_uuid=requester_uuid,
             shared_user_uuid=other_uuid,
         )
@@ -1115,7 +1115,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         return InviteVFolderAction(
             keypair_resource_policy={},
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             mount_permission=VFolderMountPermission.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
@@ -1300,7 +1300,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         mock_vfolder_repo.delete_vfolder_permission = AsyncMock()
         return LeaveInvitedVFolderAction(
             requester_user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             shared_user_uuid=None,
         )
 

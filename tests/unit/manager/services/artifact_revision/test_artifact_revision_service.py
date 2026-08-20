@@ -16,6 +16,8 @@ from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     ArtifactRevisionDownloadProgress,
 )
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -239,7 +241,7 @@ class TestArtifactRevisionService:
         )
 
         action = GetArtifactRevisionReadmeAction(
-            artifact_revision_id=sample_artifact_revision_data.id
+            artifact_revision_id=ArtifactRevisionID(sample_artifact_revision_data.id)
         )
         result = await artifact_revision_service.get_readme(action)
 
@@ -355,7 +357,7 @@ class TestArtifactRevisionService:
         mock_artifact_repository.approve_artifact = AsyncMock(return_value=approved_revision)
 
         action = ApproveArtifactRevisionAction(
-            artifact_revision_id=sample_artifact_revision_data.id
+            artifact_revision_id=ArtifactRevisionID(sample_artifact_revision_data.id)
         )
         result = await artifact_revision_service.approve(action)
 
@@ -991,7 +993,7 @@ class TestDelegateImportArtifactRevisionBatchAction:
         mock_config_provider.config.reservoir = reservoir_cfg
 
         registry_meta = ArtifactRegistryData(
-            id=uuid.uuid4(),
+            id=ArtifactRegistryID(uuid.uuid4()),
             registry_id=uuid.uuid4(),
             name="test-registry",
             type=ArtifactRegistryType.RESERVOIR,
@@ -1048,7 +1050,7 @@ class TestDelegateImportArtifactRevisionBatchAction:
 
         registry_id = uuid.uuid4()
         registry_meta = ArtifactRegistryData(
-            id=uuid.uuid4(),
+            id=ArtifactRegistryID(uuid.uuid4()),
             registry_id=registry_id,
             name="reservoir-registry",
             type=ArtifactRegistryType.RESERVOIR,
@@ -1119,7 +1121,7 @@ class TestDelegateImportArtifactRevisionBatchAction:
         mock_config_provider.config.reservoir = reservoir_cfg
 
         registry_meta = ArtifactRegistryData(
-            id=uuid.uuid4(),
+            id=ArtifactRegistryID(uuid.uuid4()),
             registry_id=uuid.uuid4(),
             name="hf-registry",
             type=ArtifactRegistryType.HUGGINGFACE,
@@ -1151,7 +1153,7 @@ class TestDelegateImportArtifactRevisionBatchAction:
         mock_config_provider.config.reservoir = reservoir_cfg
 
         registry_meta = ArtifactRegistryData(
-            id=uuid.uuid4(),
+            id=ArtifactRegistryID(uuid.uuid4()),
             registry_id=uuid.uuid4(),
             name="test-registry",
             type=ArtifactRegistryType.RESERVOIR,
@@ -1322,7 +1324,7 @@ class TestAssociateWithStorageAction:
         )
 
         action = AssociateWithStorageAction(
-            artifact_revision_id=revision_id,
+            artifact_revision_id=ArtifactRevisionID(revision_id),
             storage_namespace_id=namespace_id,
             storage_type=ArtifactStorageType.OBJECT_STORAGE,
         )
@@ -1351,7 +1353,7 @@ class TestAssociateWithStorageAction:
         )
 
         action = AssociateWithStorageAction(
-            artifact_revision_id=revision_id,
+            artifact_revision_id=ArtifactRevisionID(revision_id),
             storage_namespace_id=namespace_id,
             storage_type=ArtifactStorageType.VFS_STORAGE,
         )
@@ -1405,7 +1407,7 @@ class TestDisassociateWithStorageAction:
         )
 
         action = DisassociateWithStorageAction(
-            artifact_revision_id=revision_id,
+            artifact_revision_id=ArtifactRevisionID(revision_id),
             storage_namespace_id=namespace_id,
         )
         result = await service.disassociate_with_storage(action)

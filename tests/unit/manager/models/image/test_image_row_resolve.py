@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import ImageAlias
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus, ImageType
@@ -57,7 +58,7 @@ class TestImageRowResolve:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 ContainerRegistryRow(
-                    id=registry_id,
+                    id=ContainerRegistryID(registry_id),
                     url="https://cr.example.com",
                     registry_name="cr.example.com",
                     type=ContainerRegistryType.DOCKER,

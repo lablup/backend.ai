@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
@@ -234,7 +235,7 @@ class TestImagePermissionContextNonGlobalRegistry:
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 ContainerRegistryRow(
-                    id=registry_id,
+                    id=ContainerRegistryID(registry_id),
                     url=REGISTRY_URL,
                     registry_name=REGISTRY_NAME,
                     type=ContainerRegistryType.HARBOR2,
@@ -257,7 +258,7 @@ class TestImagePermissionContextNonGlobalRegistry:
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 ContainerRegistryRow(
-                    id=registry_id,
+                    id=ContainerRegistryID(registry_id),
                     url=REGISTRY_URL,
                     registry_name=REGISTRY_NAME,
                     type=ContainerRegistryType.HARBOR2,

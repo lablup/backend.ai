@@ -230,7 +230,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -251,7 +251,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -276,7 +276,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -319,14 +319,14 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry1 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
                 project="project-" + str(uuid.uuid4())[:8],
             )
             registry2 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -367,14 +367,14 @@ class TestContainerRegistryRepository:
             registry2_name = str(uuid.uuid4())[:8] + ".example.com"
 
             registry1 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry1_name}",
                 registry_name=registry1_name,
                 type=ContainerRegistryType.HARBOR2,
                 project="project-" + str(uuid.uuid4())[:8],
             )
             registry2 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry2_name}",
                 registry_name=registry2_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -530,7 +530,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -622,14 +622,14 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry1 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
                 project=project1,
             )
             registry2 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -740,7 +740,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -838,7 +838,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -919,7 +919,7 @@ class TestContainerRegistryRepository:
         async with db_with_cleanup.begin_session() as session:
             # Create registry
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -1046,7 +1046,7 @@ class TestContainerRegistryRepository:
         async with db_with_cleanup.begin_session() as session:
             # Create registry
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -1395,7 +1395,7 @@ class TestSearchContainerRegistries:
         async with db_with_cleanup.begin_session() as session:
             for reg_type, reg_name, project in configs:
                 row = ContainerRegistryRow(
-                    id=uuid.uuid4(),
+                    id=ContainerRegistryID(uuid.uuid4()),
                     url=f"https://{reg_name}.example.com",
                     registry_name=reg_name,
                     type=reg_type,

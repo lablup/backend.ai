@@ -11,6 +11,7 @@ from pytest_mock import MockerFixture
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     ClusterMode,
@@ -205,7 +206,7 @@ def sample_endpoint_creator_spec(
         cluster_size=1,
         extra_mounts=[],
         created_user=sample_user.uuid,
-        project=uuid.uuid4(),
+        project=ProjectID(uuid.uuid4()),
         domain="default",
         resource_group="default",
     )
