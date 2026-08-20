@@ -10,7 +10,10 @@ from ai.backend.accelerator.cuda_open.plugin import (
     CDIInjector,
     CUDADevice,
     CUDAPlugin,
+    DeviceConfig,
+    DeviceRequest,
     EngineVersion,
+    HostConfig,
     LegacyRuntimeInjector,
     NvidiaDriverInjector,
 )
@@ -165,37 +168,51 @@ class TestCDIInjector:
         # The alloc map keys devices by the CUDA runtime index, which is not guaranteed to
         # match the index CDI assigns, so the UUID is what must reach the engine.
         device_config = CDIInjector().build_device_config(_alloc("1"), devices)
-        assert device_config == {
-            "HostConfig": {
-                "DeviceRequests": [
-                    {"Driver": "cdi", "DeviceIDs": [f"nvidia.com/gpu=GPU-{DEVICE_1_UUID}"]},
+        assert device_config == DeviceConfig(
+            host_config=HostConfig(
+                device_requests=[
+                    DeviceRequest(
+                        driver="cdi",
+                        device_ids=[f"nvidia.com/gpu=GPU-{DEVICE_1_UUID}"],
+                    ),
                 ],
-            },
-        }
+            ),
+        )
 
     def test_names_every_allocated_device(self, devices: list[CUDADevice]) -> None:
         device_config = CDIInjector().build_device_config(_alloc("0", "1"), devices)
-        assert device_config["HostConfig"]["DeviceRequests"][0]["DeviceIDs"] == [
-            f"nvidia.com/gpu=GPU-{DEVICE_0_UUID}",
-            f"nvidia.com/gpu=GPU-{DEVICE_1_UUID}",
-        ]
-
-    def test_omits_the_legacy_runtime_fields(self, devices: list[CUDADevice]) -> None:
-        device_config = CDIInjector().build_device_config(_alloc("0"), devices)
-        assert "Env" not in device_config
-        assert "Runtime" not in device_config["HostConfig"]
+        assert device_config == DeviceConfig(
+            host_config=HostConfig(
+                device_requests=[
+                    DeviceRequest(
+                        driver="cdi",
+                        device_ids=[
+                            f"nvidia.com/gpu=GPU-{DEVICE_0_UUID}",
+                            f"nvidia.com/gpu=GPU-{DEVICE_1_UUID}",
+                        ],
+                    ),
+                ],
+            ),
+        )
 
     def test_skips_devices_without_an_allocation(self, devices: list[CUDADevice]) -> None:
         allocation = DeviceAllocation.from_device_alloc({
             SlotName("cuda.device"): {DeviceId("0"): Decimal(0), DeviceId("1"): Decimal(1)},
         })
         device_config = CDIInjector().build_device_config(allocation, devices)
-        assert device_config["HostConfig"]["DeviceRequests"][0]["DeviceIDs"] == [
-            f"nvidia.com/gpu=GPU-{DEVICE_1_UUID}",
-        ]
+        assert device_config == DeviceConfig(
+            host_config=HostConfig(
+                device_requests=[
+                    DeviceRequest(
+                        driver="cdi",
+                        device_ids=[f"nvidia.com/gpu=GPU-{DEVICE_1_UUID}"],
+                    ),
+                ],
+            ),
+        )
 
-    def test_emits_nothing_for_an_empty_allocation(self, devices: list[CUDADevice]) -> None:
-        assert CDIInjector().build_device_config(_alloc(), devices) == {}
+    def test_requests_nothing_for_an_empty_allocation(self, devices: list[CUDADevice]) -> None:
+        assert CDIInjector().build_device_config(_alloc(), devices) == DeviceConfig()
 
     def test_rejects_an_allocation_of_an_unknown_device(self, devices: list[CUDADevice]) -> None:
         # Skipping the device would charge the slot while the container runs without a GPU.
@@ -206,28 +223,40 @@ class TestCDIInjector:
 class TestNvidiaDriverInjector:
     def test_names_devices_by_the_runtime_index(self) -> None:
         device_config = NvidiaDriverInjector().build_device_config(_alloc("0"), [])
-        device_request = device_config["HostConfig"]["DeviceRequests"][0]
-        assert device_request["Driver"] == "nvidia"
-        assert device_request["DeviceIDs"] == ["0"]
+        assert device_config == DeviceConfig(
+            host_config=HostConfig(
+                device_requests=[
+                    DeviceRequest(
+                        driver="nvidia",
+                        device_ids=["0"],
+                        capabilities=[["utility", "compute", "video", "graphics", "display"]],
+                    ),
+                ],
+            ),
+        )
 
-    def test_emits_nothing_for_an_empty_allocation(self) -> None:
-        assert NvidiaDriverInjector().build_device_config(_alloc(), []) == {}
+    def test_requests_nothing_for_an_empty_allocation(self) -> None:
+        assert NvidiaDriverInjector().build_device_config(_alloc(), []) == DeviceConfig()
 
 
 class TestLegacyRuntimeInjector:
     def test_selects_the_nvidia_runtime_and_lists_devices_in_the_environment(self) -> None:
         device_config = LegacyRuntimeInjector().build_device_config(_alloc("0", "1"), [])
-        assert device_config["HostConfig"]["Runtime"] == "nvidia"
-        assert "NVIDIA_VISIBLE_DEVICES=0,1" in device_config["Env"]
+        assert device_config == DeviceConfig(
+            host_config=HostConfig(runtime="nvidia"),
+            environ=[
+                "NVIDIA_DRIVER_CAPABILITIES=all",
+                "NVIDIA_VISIBLE_DEVICES=0,1",
+            ],
+        )
 
     def test_still_selects_the_nvidia_runtime_for_an_empty_allocation(self) -> None:
         device_config = LegacyRuntimeInjector().build_device_config(_alloc(), [])
-        assert device_config["HostConfig"]["Runtime"] == "nvidia"
-        assert "NVIDIA_VISIBLE_DEVICES=" in device_config["Env"]
+        assert device_config.host_config == HostConfig(runtime="nvidia")
 
 
 class TestGenerateDockerArgs:
-    """Tests for the plugin delegating to the mechanism it detected."""
+    """Tests for rendering an injector's output into the container creation API's keys."""
 
     @pytest.fixture
     def cuda_plugin(self) -> CUDAPlugin:
@@ -242,13 +271,54 @@ class TestGenerateDockerArgs:
         )
         return plugin
 
-    async def test_passes_the_allocation_and_the_devices_to_the_mechanism(
+    async def test_renders_a_device_request(self, cuda_plugin: CUDAPlugin) -> None:
+        docker_args = await cuda_plugin.generate_docker_args(AsyncMock(), _device_alloc("1"))
+        assert docker_args == {
+            "HostConfig": {
+                "DeviceRequests": [
+                    {
+                        "Driver": "cdi",
+                        "DeviceIDs": [f"nvidia.com/gpu=GPU-{DEVICE_1_UUID}"],
+                    },
+                ],
+            },
+        }
+
+    async def test_renders_the_capabilities_only_when_the_request_carries_them(
         self, cuda_plugin: CUDAPlugin
     ) -> None:
-        docker_args = await cuda_plugin.generate_docker_args(AsyncMock(), _device_alloc("1"))
-        assert docker_args["HostConfig"]["DeviceRequests"][0]["DeviceIDs"] == [
-            f"nvidia.com/gpu=GPU-{DEVICE_1_UUID}",
-        ]
+        cuda_plugin._device_injector = NvidiaDriverInjector()
+        docker_args = await cuda_plugin.generate_docker_args(AsyncMock(), _device_alloc("0"))
+        assert docker_args == {
+            "HostConfig": {
+                "DeviceRequests": [
+                    {
+                        "Driver": "nvidia",
+                        "DeviceIDs": ["0"],
+                        "Capabilities": [
+                            ["utility", "compute", "video", "graphics", "display"],
+                        ],
+                    },
+                ],
+            },
+        }
+
+    async def test_renders_the_runtime_and_the_environment(self, cuda_plugin: CUDAPlugin) -> None:
+        cuda_plugin._device_injector = LegacyRuntimeInjector()
+        docker_args = await cuda_plugin.generate_docker_args(AsyncMock(), _device_alloc("0"))
+        assert docker_args == {
+            "HostConfig": {"Runtime": "nvidia"},
+            "Env": [
+                "NVIDIA_DRIVER_CAPABILITIES=all",
+                "NVIDIA_VISIBLE_DEVICES=0",
+            ],
+        }
+
+    async def test_renders_nothing_for_an_empty_device_config(
+        self, cuda_plugin: CUDAPlugin
+    ) -> None:
+        docker_args = await cuda_plugin.generate_docker_args(AsyncMock(), {})
+        assert docker_args == {}
 
     async def test_a_disabled_plugin_emits_nothing(self, cuda_plugin: CUDAPlugin) -> None:
         cuda_plugin.enabled = False

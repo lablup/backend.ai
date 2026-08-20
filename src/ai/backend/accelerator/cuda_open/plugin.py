@@ -128,6 +128,45 @@ class CUDADevice(AbstractComputeDevice):
         return str(self)
 
 
+class DeviceRequest(BaseModel):
+    """
+    One entry of the container creation API's device request list.
+
+    Keyed in PascalCase as the API expects, so that dumping by alias is the whole of
+    the rendering.
+    """
+
+    driver: str = Field(serialization_alias="Driver")
+    device_ids: Sequence[str] = Field(serialization_alias="DeviceIDs")
+    # The nvidia driver rejects "all" here, so the capabilities are always spelled out.
+    capabilities: Sequence[Sequence[str]] | None = Field(
+        default=None,
+        serialization_alias="Capabilities",
+    )
+
+
+class HostConfig(BaseModel):
+    """The `HostConfig` fields an injector sets, mirroring where the API nests them."""
+
+    device_requests: Sequence[DeviceRequest] | None = Field(
+        default=None,
+        serialization_alias="DeviceRequests",
+    )
+    runtime: str | None = Field(default=None, serialization_alias="Runtime")
+
+
+class DeviceConfig(BaseModel):
+    """
+    What an injector adds to a container creation request.
+
+    Every field defaults to null and is dropped when it stays that way, so an injector
+    that attaches nothing renders to an empty payload.
+    """
+
+    host_config: HostConfig | None = Field(default=None, serialization_alias="HostConfig")
+    environ: Sequence[str] | None = Field(default=None, serialization_alias="Env")
+
+
 class DeviceInjector(ABC):
     """How the container engine is told to attach GPUs to a container."""
 
@@ -141,8 +180,8 @@ class DeviceInjector(ABC):
         self,
         allocation: DeviceAllocation,
         devices: Collection[CUDADevice],
-    ) -> Mapping[str, Any]:
-        """The container creation config that attaches the allocated devices."""
+    ) -> DeviceConfig:
+        """What to add to the container creation request to attach the allocated devices."""
         raise NotImplementedError
 
 
@@ -159,17 +198,15 @@ class LegacyRuntimeInjector(DeviceInjector):
         self,
         allocation: DeviceAllocation,
         devices: Collection[CUDADevice],
-    ) -> Mapping[str, Any]:
+    ) -> DeviceConfig:
         device_ids = allocation.attached_device_ids
-        return {
-            "HostConfig": {
-                "Runtime": "nvidia",
-            },
-            "Env": [
+        return DeviceConfig(
+            host_config=HostConfig(runtime="nvidia"),
+            environ=[
                 "NVIDIA_DRIVER_CAPABILITIES=all",
                 "NVIDIA_VISIBLE_DEVICES={}".format(",".join(device_ids)),
             ],
-        }
+        )
 
 
 class NvidiaDriverInjector(DeviceInjector):
@@ -185,31 +222,21 @@ class NvidiaDriverInjector(DeviceInjector):
         self,
         allocation: DeviceAllocation,
         devices: Collection[CUDADevice],
-    ) -> Mapping[str, Any]:
+    ) -> DeviceConfig:
         device_ids = allocation.attached_device_ids
         if not device_ids:
-            return {}
-        # NOTE: You may put additional Docker container creation API params here.
-        return {
-            "HostConfig": {
-                "DeviceRequests": [
-                    {
-                        "Driver": "nvidia",
-                        "DeviceIDs": device_ids,
-                        # "all" does not work here
-                        "Capabilities": [
-                            [
-                                "utility",
-                                "compute",
-                                "video",
-                                "graphics",
-                                "display",
-                            ],
-                        ],
-                    },
+            return DeviceConfig()
+        return DeviceConfig(
+            host_config=HostConfig(
+                device_requests=[
+                    DeviceRequest(
+                        driver="nvidia",
+                        device_ids=device_ids,
+                        capabilities=[["utility", "compute", "video", "graphics", "display"]],
+                    ),
                 ],
-            },
-        }
+            ),
+        )
 
 
 class CDIInjector(DeviceInjector):
@@ -229,10 +256,10 @@ class CDIInjector(DeviceInjector):
         self,
         allocation: DeviceAllocation,
         devices: Collection[CUDADevice],
-    ) -> Mapping[str, Any]:
+    ) -> DeviceConfig:
         device_ids = allocation.attached_device_ids
         if not device_ids:
-            return {}
+            return DeviceConfig()
         device_uuids = {dev.device_id: dev.uuid for dev in devices}
         cdi_device_ids = []
         for device_id in device_ids:
@@ -240,16 +267,11 @@ class CDIInjector(DeviceInjector):
             if device_uuid is None:
                 raise InvalidResourceArgument(f"no CUDA device with the ID {device_id}")
             cdi_device_ids.append(f"{CDI_KIND}=GPU-{device_uuid}")
-        return {
-            "HostConfig": {
-                "DeviceRequests": [
-                    {
-                        "Driver": "cdi",
-                        "DeviceIDs": cdi_device_ids,
-                    },
-                ],
-            },
-        }
+        return DeviceConfig(
+            host_config=HostConfig(
+                device_requests=[DeviceRequest(driver="cdi", device_ids=cdi_device_ids)],
+            ),
+        )
 
 
 class CUDAPlugin(AbstractComputePlugin):
@@ -591,10 +613,11 @@ class CUDAPlugin(AbstractComputePlugin):
     ) -> Mapping[str, Any]:
         if not self.enabled:
             return {}
-        return self._device_injector.build_device_config(
+        device_config = self._device_injector.build_device_config(
             DeviceAllocation.from_device_alloc(device_alloc),
             await self.list_devices(),
         )
+        return device_config.model_dump(by_alias=True, exclude_none=True)
 
     async def get_attached_devices(
         self,
