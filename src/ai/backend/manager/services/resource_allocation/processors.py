@@ -58,23 +58,32 @@ class ResourceAllocationProcessors:
         CheckPresetAvailabilityAction, CheckPresetAvailabilityActionResult
     ]
 
-    def __init__(self, group: ProcessorGroup[Any], service: ResourceAllocationService) -> None:
-        self.resolve_keypair_context = group.single_entity(
+    def __init__(
+        self,
+        user: ProcessorGroup[Any],
+        project: ProcessorGroup[Any],
+        domain: ProcessorGroup[Any],
+        resource_group: ProcessorGroup[Any],
+        session: ProcessorGroup[Any],
+        resource_preset: ProcessorGroup[Any],
+        service: ResourceAllocationService,
+    ) -> None:
+        self.resolve_keypair_context = user.single_entity(
             ResolveKeypairContextAction, service.resolve_keypair_context
         )
-        self.get_keypair_usage = group.single_entity(
+        self.get_keypair_usage = user.single_entity(
             GetKeypairUsageAction, service.get_keypair_usage
         )
-        self.get_project_usage = group.single_entity(
+        self.get_project_usage = project.single_entity(
             GetProjectUsageAction, service.get_project_usage
         )
-        self.get_domain_usage = group.single_entity(GetDomainUsageAction, service.get_domain_usage)
-        self.get_resource_group_usage = group.global_scope(
+        self.get_domain_usage = domain.single_entity(GetDomainUsageAction, service.get_domain_usage)
+        self.get_resource_group_usage = resource_group.global_scope(
             GetResourceGroupUsageAction, service.get_resource_group_usage
         )
-        self.get_effective_allocation = group.scope(
+        self.get_effective_allocation = session.scope(
             GetEffectiveAllocationAction, service.get_effective_allocation
         )
-        self.check_preset_availability = group.scope(
+        self.check_preset_availability = resource_preset.scope(
             CheckPresetAvailabilityAction, service.check_preset_availability
         )

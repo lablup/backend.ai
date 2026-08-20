@@ -9,7 +9,11 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.data.entity.fair_share import DOMAIN_FAIR_SHARE_ENTITY_TYPE
+from ai.backend.common.data.entity.fair_share import (
+    DOMAIN_FAIR_SHARE_ENTITY_TYPE,
+    PROJECT_FAIR_SHARE_ENTITY_TYPE,
+    USER_FAIR_SHARE_ENTITY_TYPE,
+)
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE, ResourceGroupID
 from ai.backend.common.data.entity.usage_bucket import (
     DOMAIN_USAGE_BUCKET_ENTITY_TYPE,
@@ -17,7 +21,12 @@ from ai.backend.common.data.entity.usage_bucket import (
     USER_USAGE_BUCKET_ENTITY_TYPE,
 )
 from ai.backend.common.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry, SidecarGroupMeta
+from ai.backend.manager.actions.registry import (
+    ConcernMeta,
+    GroupMeta,
+    ProcessorRegistry,
+    SidecarGroupMeta,
+)
 from ai.backend.manager.api.rest.fair_share.handler import FairShareAPIHandler
 from ai.backend.manager.api.rest.fair_share.registry import register_fair_share_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -49,8 +58,12 @@ def fair_share_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> FairShareProcessors:
     service = FairShareService(FairShareRepository(database_engine))
+    fair_share_groups = processor_registry.concern(ConcernMeta("fair_share"))
     return FairShareProcessors(
-        processor_registry.group(GroupMeta(DOMAIN_FAIR_SHARE_ENTITY_TYPE)), service
+        fair_share_groups.group(GroupMeta(DOMAIN_FAIR_SHARE_ENTITY_TYPE)),
+        fair_share_groups.group(GroupMeta(PROJECT_FAIR_SHARE_ENTITY_TYPE)),
+        fair_share_groups.group(GroupMeta(USER_FAIR_SHARE_ENTITY_TYPE)),
+        service,
     )
 
 

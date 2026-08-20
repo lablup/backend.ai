@@ -68,37 +68,43 @@ class SchedulingHistoryProcessors:
         SearchRouteScopedHistoryAction, SearchRouteScopedHistoryActionResult
     ]
 
-    def __init__(self, group: ProcessorGroup[Any], service: SchedulingHistoryService) -> None:
+    def __init__(
+        self,
+        session: ProcessorGroup[Any],
+        deployment: ProcessorGroup[Any],
+        replica_group: ProcessorGroup[Any],
+        service: SchedulingHistoryService,
+    ) -> None:
         # Admin processors
-        self.search_session_history = group.global_scope(
+        self.search_session_history = session.global_scope(
             SearchSessionHistoryAction, service.search_session_history
         )
-        self.search_kernel_history = group.global_scope(
+        self.search_kernel_history = session.global_scope(
             SearchKernelHistoryAction, service.search_kernel_history
         )
-        self.search_deployment_history = group.global_scope(
+        self.search_deployment_history = deployment.global_scope(
             SearchDeploymentHistoryAction, service.search_deployment_history
         )
-        self.global_search_replica_group_history = group.global_scope(
+        self.global_search_replica_group_history = replica_group.global_scope(
             GlobalSearchReplicaGroupHistoryAction, service.global_search_replica_group_history
         )
-        self.search_route_history = group.global_scope(
+        self.search_route_history = deployment.global_scope(
             SearchRouteHistoryAction, service.search_route_history
         )
 
         # Scoped processors (added in 26.2.0)
-        self.search_session_scoped_history = group.scope(
+        self.search_session_scoped_history = session.scope(
             SearchSessionScopedHistoryAction, service.search_session_scoped_history
         )
-        self.search_kernel_scoped_history = group.scope(
+        self.search_kernel_scoped_history = session.scope(
             SearchKernelScopedHistoryAction, service.search_kernel_scoped_history
         )
-        self.search_deployment_scoped_history = group.scope(
+        self.search_deployment_scoped_history = deployment.scope(
             SearchDeploymentScopedHistoryAction, service.search_deployment_scoped_history
         )
-        self.scoped_search_replica_group_history = group.scope(
+        self.scoped_search_replica_group_history = replica_group.scope(
             ScopedSearchReplicaGroupHistoryAction, service.scoped_search_replica_group_history
         )
-        self.search_route_scoped_history = group.global_scope(
+        self.search_route_scoped_history = deployment.global_scope(
             SearchRouteScopedHistoryAction, service.search_route_scoped_history
         )

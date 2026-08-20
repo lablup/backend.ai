@@ -171,6 +171,8 @@ from ai.backend.manager.services.ops.service import (
 
 __all__ = (
     "ProcessorDependencies",
+    "ConcernMeta",
+    "ConcernGroups",
     "GroupMeta",
     "FieldGroupMeta",
     "SidecarGroupMeta",
@@ -187,6 +189,17 @@ class ProcessorDependencies[TData: EntityData]:
     monitors: ActionMonitors
     validators: ActionValidators
     repository: OpsRepository[TData]
+
+
+@dataclass(frozen=True)
+class ConcernMeta:
+    """The area a group's operations belong to, for listing them.
+
+    Declared where several entities share one area; a domain that is its own area
+    takes its entity type's name.
+    """
+
+    name: str
 
 
 @dataclass(frozen=True)
@@ -221,6 +234,7 @@ class WiredProcessor:
     it runs against ops. What only the wiring knows is here.
     """
 
+    concern: str
     entity_type: EntityType
     # Set when the operation is over a field row, whose owner ``entity_type`` names.
     field_type: FieldType | None
@@ -232,22 +246,30 @@ class WiredProcessor:
 class ProcessorGroup[TData: EntityData]:
     _deps: ProcessorDependencies[TData]
     _records: list[WiredProcessor]
+    _concern: str
     _meta: GroupMeta
 
     def __init__(
         self,
         deps: ProcessorDependencies[TData],
         records: list[WiredProcessor],
+        concern: str,
         meta: GroupMeta,
     ) -> None:
         self._deps = deps
         self._records = records
+        self._concern = concern
         self._meta = meta
 
     @property
     def deps(self) -> ProcessorDependencies[TData]:
         """Read by :class:`FieldProcessorGroup`, which builds processors of this group."""
         return self._deps
+
+    @property
+    def concern(self) -> str:
+        """Read by :class:`FieldProcessorGroup`, whose rows sit in the same area."""
+        return self._concern
 
     @property
     def meta(self) -> GroupMeta:
@@ -261,6 +283,7 @@ class ProcessorGroup[TData: EntityData]:
     def _record(self, action_cls: type[Any], kind: ActionKind, gate: ActionGate) -> None:
         self._records.append(
             WiredProcessor(
+                concern=self._concern,
                 entity_type=self._meta.entity_type,
                 field_type=None,
                 action_cls=action_cls,
@@ -470,7 +493,13 @@ class ProcessorGroup[TData: EntityData]:
             post_validators=self._deps.validators.bulk,
         )
         return FieldProcessorGroup(
-            self._deps, self._records, meta, self._meta.entity_type, owner_lookup, bulk_owner_lookup
+            self._deps,
+            self._records,
+            self._concern,
+            meta,
+            self._meta.entity_type,
+            owner_lookup,
+            bulk_owner_lookup,
         )
 
     def single_get_ops[TAction: GetSingleEntityOpsAction[Any, Any]](
@@ -920,21 +949,25 @@ class SidecarProcessorGroup[TSidecarData]:
 
     _deps: ProcessorDependencies[Any]
     _records: list[WiredProcessor]
+    _concern: str
     _meta: SidecarGroupMeta
 
     def __init__(
         self,
         deps: ProcessorDependencies[Any],
         records: list[WiredProcessor],
+        concern: str,
         meta: SidecarGroupMeta,
     ) -> None:
         self._deps = deps
         self._records = records
+        self._concern = concern
         self._meta = meta
 
     def _record(self, action_cls: type[Any], kind: ActionKind, gate: ActionGate) -> None:
         self._records.append(
             WiredProcessor(
+                concern=self._concern,
                 entity_type=self._meta.entity_type,
                 field_type=None,
                 action_cls=action_cls,
@@ -980,6 +1013,29 @@ class SidecarProcessorGroup[TSidecarData]:
         )
 
 
+class ConcernGroups[TData: EntityData]:
+    """Every group of one area, handing out one group per entity it covers."""
+
+    _deps: ProcessorDependencies[TData]
+    _records: list[WiredProcessor]
+    _concern: str
+
+    def __init__(
+        self, deps: ProcessorDependencies[TData], records: list[WiredProcessor], concern: str
+    ) -> None:
+        self._deps = deps
+        self._records = records
+        self._concern = concern
+
+    def group(self, meta: GroupMeta) -> ProcessorGroup[TData]:
+        return ProcessorGroup(self._deps, self._records, self._concern, meta)
+
+    def sidecar_group[TSidecarData](
+        self, meta: SidecarGroupMeta, data_cls: type[TSidecarData]
+    ) -> SidecarProcessorGroup[TSidecarData]:
+        return SidecarProcessorGroup(self._deps, self._records, self._concern, meta)
+
+
 class ProcessorRegistry[TData: EntityData]:
     _deps: ProcessorDependencies[TData]
     _records: list[WiredProcessor]
@@ -988,8 +1044,13 @@ class ProcessorRegistry[TData: EntityData]:
         self._deps = deps
         self._records = []
 
+    def concern(self, meta: ConcernMeta) -> ConcernGroups[TData]:
+        """The groups of one area, so every wiring made through them names it."""
+        return ConcernGroups(self._deps, self._records, meta.name)
+
     def group(self, meta: GroupMeta) -> ProcessorGroup[TData]:
-        return ProcessorGroup(self._deps, self._records, meta)
+        """A group for a domain that is its own area, which its entity type names."""
+        return ProcessorGroup(self._deps, self._records, meta.entity_type, meta)
 
     def sidecar_group[TSidecarData](
         self, meta: SidecarGroupMeta, data_cls: type[TSidecarData]
@@ -999,7 +1060,7 @@ class ProcessorRegistry[TData: EntityData]:
         Reached from the registry rather than an entity group, unlike
         :meth:`ProcessorGroup.field_group`: a sidecar belongs to no entity.
         """
-        return SidecarProcessorGroup(self._deps, self._records, meta)
+        return SidecarProcessorGroup(self._deps, self._records, meta.entity_type, meta)
 
     def wired_processors(self) -> Sequence[WiredProcessor]:
         """Every wiring made through this registry's groups, in wiring order."""
@@ -1020,6 +1081,7 @@ class FieldProcessorGroup[TFieldData: FieldData]:
 
     _deps: ProcessorDependencies[Any]
     _records: list[WiredProcessor]
+    _concern: str
     _meta: FieldGroupMeta
     _owner_entity_type: EntityType
     _owner_lookup: OwnerLookupProcessor
@@ -1029,6 +1091,7 @@ class FieldProcessorGroup[TFieldData: FieldData]:
         self,
         deps: ProcessorDependencies[Any],
         records: list[WiredProcessor],
+        concern: str,
         meta: FieldGroupMeta,
         owner_entity_type: EntityType,
         owner_lookup: OwnerLookupProcessor,
@@ -1036,6 +1099,7 @@ class FieldProcessorGroup[TFieldData: FieldData]:
     ) -> None:
         self._deps = deps
         self._records = records
+        self._concern = concern
         self._meta = meta
         self._owner_entity_type = owner_entity_type
         self._owner_lookup = owner_lookup
@@ -1044,6 +1108,7 @@ class FieldProcessorGroup[TFieldData: FieldData]:
     def _record(self, action_cls: type[Any], kind: ActionKind, gate: ActionGate) -> None:
         self._records.append(
             WiredProcessor(
+                concern=self._concern,
                 entity_type=self._owner_entity_type,
                 field_type=self._meta.field_type,
                 action_cls=action_cls,

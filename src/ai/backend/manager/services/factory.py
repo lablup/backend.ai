@@ -18,7 +18,11 @@ from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
 from ai.backend.common.data.entity.error_log import ERROR_LOG_FIELD_TYPE
 from ai.backend.common.data.entity.etcd_config import ETCD_CONFIG_ENTITY_TYPE
 from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
-from ai.backend.common.data.entity.fair_share import DOMAIN_FAIR_SHARE_ENTITY_TYPE
+from ai.backend.common.data.entity.fair_share import (
+    DOMAIN_FAIR_SHARE_ENTITY_TYPE,
+    PROJECT_FAIR_SHARE_ENTITY_TYPE,
+    USER_FAIR_SHARE_ENTITY_TYPE,
+)
 from ai.backend.common.data.entity.image import IMAGE_ENTITY_TYPE
 from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
 from ai.backend.common.data.entity.login_client_type import LOGIN_CLIENT_TYPE_ENTITY_TYPE
@@ -39,6 +43,7 @@ from ai.backend.common.data.entity.prometheus_query_preset import (
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE,
 )
+from ai.backend.common.data.entity.replica_group_history import REPLICA_GROUP_HISTORY_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_policy import (
     KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
@@ -67,6 +72,7 @@ from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
 from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry import (
+    ConcernMeta,
     FieldGroupMeta,
     GroupMeta,
     ProcessorDependencies,
@@ -506,6 +512,10 @@ def create_processors(
             repository=OpsRepository(repositories.v2_ops_provider),
         )
     )
+    # Areas covering several entities: every group made here names the area.
+    fair_share_groups = registry.concern(ConcernMeta("fair_share"))
+    scheduling_history_groups = registry.concern(ConcernMeta("scheduling_history"))
+    resource_allocation_groups = registry.concern(ConcernMeta("resource_allocation"))
     processors = Processors(
         event_hub=args.event_hub,
         event_fetcher=args.event_fetcher,
@@ -539,7 +549,10 @@ def create_processors(
         ),
         export=ExportProcessors(registry.group(GroupMeta(EXPORT_ENTITY_TYPE)), services.export),
         fair_share=FairShareProcessors(
-            registry.group(GroupMeta(DOMAIN_FAIR_SHARE_ENTITY_TYPE)), services.fair_share
+            fair_share_groups.group(GroupMeta(DOMAIN_FAIR_SHARE_ENTITY_TYPE)),
+            fair_share_groups.group(GroupMeta(PROJECT_FAIR_SHARE_ENTITY_TYPE)),
+            fair_share_groups.group(GroupMeta(USER_FAIR_SHARE_ENTITY_TYPE)),
+            services.fair_share,
         ),
         group=GroupProcessors(registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), services.group),
         user=UserProcessors(
@@ -692,7 +705,10 @@ def create_processors(
             services.idle_checker_assignment, action_monitors, validators
         ),
         scheduling_history=SchedulingHistoryProcessors(
-            registry.group(GroupMeta(SESSION_ENTITY_TYPE)), services.scheduling_history
+            scheduling_history_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            scheduling_history_groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
+            scheduling_history_groups.group(GroupMeta(REPLICA_GROUP_HISTORY_ENTITY_TYPE)),
+            services.scheduling_history,
         ),
         service_catalog=ServiceCatalogProcessors(
             registry.group(GroupMeta(SERVICE_CATALOG_ENTITY_TYPE))
@@ -701,7 +717,13 @@ def create_processors(
             registry.group(GroupMeta(SESSION_TEMPLATE_ENTITY_TYPE)), services.template
         ),
         resource_allocation=ResourceAllocationProcessors(
-            registry.group(GroupMeta(USER_ENTITY_TYPE)), services.resource_allocation
+            resource_allocation_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+            resource_allocation_groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
+            resource_allocation_groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
+            resource_allocation_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+            resource_allocation_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            resource_allocation_groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            services.resource_allocation,
         ),
         stream=StreamProcessors(registry.group(GroupMeta(SESSION_ENTITY_TYPE)), services.stream),
     )

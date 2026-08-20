@@ -35,7 +35,11 @@ from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_EN
 from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
 from ai.backend.common.data.entity.error_log import ERROR_LOG_FIELD_TYPE
 from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
-from ai.backend.common.data.entity.fair_share import DOMAIN_FAIR_SHARE_ENTITY_TYPE
+from ai.backend.common.data.entity.fair_share import (
+    DOMAIN_FAIR_SHARE_ENTITY_TYPE,
+    PROJECT_FAIR_SHARE_ENTITY_TYPE,
+    USER_FAIR_SHARE_ENTITY_TYPE,
+)
 from ai.backend.common.data.entity.image import IMAGE_ENTITY_TYPE
 from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
 from ai.backend.common.data.entity.login_client_type import LOGIN_CLIENT_TYPE_ENTITY_TYPE
@@ -55,6 +59,7 @@ from ai.backend.common.data.entity.prometheus_query_preset import (
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE,
 )
+from ai.backend.common.data.entity.replica_group_history import REPLICA_GROUP_HISTORY_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_policy import (
     KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
@@ -77,6 +82,7 @@ from ai.backend.common.data.entity.vfolder_invitation import VFOLDER_INVITATION_
 from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry import (
+    ConcernMeta,
     FieldGroupMeta,
     GroupMeta,
     ProcessorDependencies,
@@ -234,6 +240,9 @@ def test_every_defined_v2_action_is_wired() -> None:
     # One shared registry, as in the production wiring: every v2 package registers
     # through it, so its wired_actions() is the complete catalog of registered actions.
     registry = _ops_registry()
+    fair_share_groups = registry.concern(ConcernMeta("fair_share"))
+    scheduling_history_groups = registry.concern(ConcernMeta("scheduling_history"))
+    resource_allocation_groups = registry.concern(ConcernMeta("resource_allocation"))
     AppConfigProcessors(
         registry.group(GroupMeta(APP_CONFIG_ENTITY_TYPE)),
         registry.group(GroupMeta(APP_CONFIG_DEFINITION_ENTITY_TYPE)),
@@ -310,9 +319,22 @@ def test_every_defined_v2_action_is_wired() -> None:
         ),
         MagicMock(),
     )
-    FairShareProcessors(registry.group(GroupMeta(DOMAIN_FAIR_SHARE_ENTITY_TYPE)), MagicMock())
+    FairShareProcessors(
+        fair_share_groups.group(GroupMeta(DOMAIN_FAIR_SHARE_ENTITY_TYPE)),
+        fair_share_groups.group(GroupMeta(PROJECT_FAIR_SHARE_ENTITY_TYPE)),
+        fair_share_groups.group(GroupMeta(USER_FAIR_SHARE_ENTITY_TYPE)),
+        MagicMock(),
+    )
     ResourcePresetProcessors(registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)), MagicMock())
-    ResourceAllocationProcessors(registry.group(GroupMeta(USER_ENTITY_TYPE)), MagicMock())
+    ResourceAllocationProcessors(
+        resource_allocation_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+        resource_allocation_groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
+        resource_allocation_groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
+        resource_allocation_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+        resource_allocation_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        resource_allocation_groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+        MagicMock(),
+    )
     ScalingGroupProcessors(registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), MagicMock())
     ArtifactProcessors(registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)), MagicMock())
     ArtifactRegistryProcessors(
@@ -328,7 +350,12 @@ def test_every_defined_v2_action_is_wired() -> None:
     ImageProcessors(registry.group(GroupMeta(IMAGE_ENTITY_TYPE)), MagicMock())
     ExportProcessors(registry.group(GroupMeta(EXPORT_ENTITY_TYPE)), MagicMock())
     TemplateProcessors(registry.group(GroupMeta(SESSION_TEMPLATE_ENTITY_TYPE)), MagicMock())
-    SchedulingHistoryProcessors(registry.group(GroupMeta(SESSION_ENTITY_TYPE)), MagicMock())
+    SchedulingHistoryProcessors(
+        scheduling_history_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        scheduling_history_groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
+        scheduling_history_groups.group(GroupMeta(REPLICA_GROUP_HISTORY_ENTITY_TYPE)),
+        MagicMock(),
+    )
     SessionProcessors(registry.group(GroupMeta(SESSION_ENTITY_TYPE)), MagicMock())
     DeploymentProcessors(registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), MagicMock())
     VFolderProcessors(registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), MagicMock())

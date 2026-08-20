@@ -16,16 +16,19 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
-from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
+from ai.backend.common.data.entity.replica_group_history import (
+    REPLICA_GROUP_HISTORY_ENTITY_TYPE,
+    ReplicaGroupHistoryID,
+)
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import KernelId, ResourceSlot
-from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
+from ai.backend.manager.actions.registry import ConcernMeta, GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.adapters.scheduling_history.adapter import SchedulingHistoryAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
@@ -74,8 +77,12 @@ def scheduling_history_processors(
 ) -> SchedulingHistoryProcessors:
     repo = SchedulingHistoryRepository(database_engine)
     service = SchedulingHistoryService(repo)
+    groups = processor_registry.concern(ConcernMeta("scheduling_history"))
     return SchedulingHistoryProcessors(
-        processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)), service
+        groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
+        groups.group(GroupMeta(REPLICA_GROUP_HISTORY_ENTITY_TYPE)),
+        service,
     )
 
 

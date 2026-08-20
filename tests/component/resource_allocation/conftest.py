@@ -16,8 +16,13 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
-from ai.backend.manager.actions.registry import GroupMeta, ProcessorRegistry
+from ai.backend.manager.actions.registry import ConcernMeta, GroupMeta, ProcessorRegistry
 from ai.backend.manager.api.adapters.resource_allocation.adapter import ResourceAllocationAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -66,8 +71,15 @@ def resource_allocation_processors(
         resource_allocation_repository=ra_repo,
         resource_preset_repository=rp_repo,
     )
+    groups = processor_registry.concern(ConcernMeta("resource_allocation"))
     return ResourceAllocationProcessors(
-        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)), service
+        groups.group(GroupMeta(USER_ENTITY_TYPE)),
+        groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
+        groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
+        groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+        groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+        service,
     )
 
 
