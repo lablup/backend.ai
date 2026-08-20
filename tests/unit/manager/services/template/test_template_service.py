@@ -493,7 +493,7 @@ class TestDeleteTaskTemplateAction:
 
         assert result is not None
         mock_repo.soft_delete_template.assert_called_once_with(
-            _template_id("tmpl-to-delete"), TemplateType.TASK
+            str(_template_id("tmpl-to-delete")), TemplateType.TASK
         )
 
     async def test_nonexistent_raises_not_found(
@@ -836,7 +836,7 @@ class TestDeleteClusterTemplateAction:
 
         assert result is not None
         mock_repo.soft_delete_template.assert_called_once_with(
-            "cluster-to-delete", TemplateType.CLUSTER
+            str(_template_id("cluster-to-delete")), TemplateType.CLUSTER
         )
 
     async def test_nonexistent_raises_not_found(

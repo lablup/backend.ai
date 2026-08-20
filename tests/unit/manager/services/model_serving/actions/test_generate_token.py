@@ -216,7 +216,7 @@ class TestGenerateToken:
             AsyncMock,
             mocker.patch.object(
                 mock_repositories.repository,
-                "get_scaling_group_info",
+                "get_resource_group_info",
                 new_callable=AsyncMock,
             ),
         )

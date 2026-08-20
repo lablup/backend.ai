@@ -162,7 +162,7 @@ class TemplateService:
                 item_input.user_uuid if item_input.user_uuid is not None else default_user_uuid
             )
             rowcount = await self._repository.update_task_template(
-                str(str(action.template_id)), group_id, user_uuid, name, template_data
+                str(action.template_id), group_id, user_uuid, name, template_data
             )
             if rowcount != 1:
                 raise DBOperationFailed(f"Failed to update session template: {action.template_id}")
@@ -176,7 +176,7 @@ class TemplateService:
         if not exists:
             raise TaskTemplateNotFound
         rowcount = await self._repository.soft_delete_template(
-            str(str(action.template_id)), TemplateType.TASK
+            str(action.template_id), TemplateType.TASK
         )
         if rowcount != 1:
             raise DBOperationFailed(f"Failed to delete session template: {action.template_id}")
@@ -245,7 +245,7 @@ class TemplateService:
         template_data = check_cluster_template(action.template_data)
         name = template_data["metadata"]["name"]
         rowcount = await self._repository.update_cluster_template(
-            str(str(action.template_id)), template_data, name
+            str(action.template_id), template_data, name
         )
         if rowcount != 1:
             raise DBOperationFailed(f"Failed to update cluster template: {action.template_id}")
@@ -259,7 +259,7 @@ class TemplateService:
         if not exists:
             raise TaskTemplateNotFound
         rowcount = await self._repository.soft_delete_template(
-            str(str(action.template_id)), TemplateType.CLUSTER
+            str(action.template_id), TemplateType.CLUSTER
         )
         if rowcount != 1:
             raise DBOperationFailed(f"Failed to delete cluster template: {action.template_id}")

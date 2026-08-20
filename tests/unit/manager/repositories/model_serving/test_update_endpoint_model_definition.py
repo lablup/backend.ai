@@ -397,7 +397,7 @@ class TestModifyEndpointModelDefinitionRefresh:
             with_user(user_context),
             patch.object(
                 repository,
-                "_check_inference_scaling_group",
+                "_check_inference_resource_group",
                 AsyncMock(),
             ),
         ):
