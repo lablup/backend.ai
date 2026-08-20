@@ -359,7 +359,7 @@ class ResourcePresetDBSource:
         per_sgroup_occupancy: dict[str, list[SlotQuantity]] = {sg: [] for sg in sgroup_names}
         for row in result:
             if row.total is not None:
-                per_sgroup_occupancy[row.resource_group_name].append(
+                per_sgroup_occupancy[row.scaling_group_name].append(
                     SlotQuantity(row.slot_name, row.total)
                 )
 
@@ -425,7 +425,7 @@ class ResourcePresetDBSource:
         for row in rows:
             aid = row.agent_id
             if aid not in agent_data:
-                agent_data[aid] = (row.resource_group, [])
+                agent_data[aid] = (row.scaling_group, [])
             agent_data[aid][1].append(SlotQuantity(row.slot_name, row.capacity - row.used))
 
         # Aggregate per scaling group

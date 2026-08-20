@@ -89,6 +89,7 @@ def _rule_dto_data() -> dict[str, object]:
         "name": "test-rule",
         "description": "Test rule",
         "rule_type": "session.started",
+        "channel_id": str(_CHANNEL_ID),
         "channel": _channel_dto_data(),
         "message_template": "Session {{ session_id }} started",
         "enabled": True,

@@ -289,7 +289,7 @@ class TestAgentRepositoryDB:
                 status=AgentStatus.ALIVE,
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
-                resource_group=resource_group.name,
+                scaling_group=resource_group.name,
                 resource_group_id=resource_group.id,
                 available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
                 occupied_slots=ResourceSlot({}),
@@ -321,7 +321,7 @@ class TestAgentRepositoryDB:
                 status=AgentStatus.LOST,
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
-                resource_group=resource_group.name,
+                scaling_group=resource_group.name,
                 resource_group_id=resource_group.id,
                 available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
                 occupied_slots=ResourceSlot({}),
@@ -471,7 +471,7 @@ class TestAgentRepositoryDB:
                     )
                 )
             ).one()
-        assert row.resource_group == resource_group.name
+        assert row.scaling_group == resource_group.name
         assert row.resource_group_id == resource_group.id
 
     async def test_sync_agent_heartbeat_unresolvable_group_no_default(
@@ -590,7 +590,7 @@ class TestAgentRepositoryDB:
                 )
             ).one()
         assert row.status == AgentStatus.ALIVE
-        assert row.resource_group == resource_group.name
+        assert row.scaling_group == resource_group.name
         assert row.resource_group_id == resource_group.id
 
     async def test_upsert_new_agent_prefers_named_group_over_default(
@@ -620,7 +620,7 @@ class TestAgentRepositoryDB:
                     )
                 )
             ).one()
-        assert row.resource_group == resource_group.name
+        assert row.scaling_group == resource_group.name
         assert row.resource_group_id == resource_group.id
         assert row.resource_group_id != default_scaling_group.id
 
@@ -650,7 +650,7 @@ class TestAgentRepositoryDB:
                     )
                 )
             ).one()
-        assert row.resource_group == default_scaling_group.name
+        assert row.scaling_group == default_scaling_group.name
         assert row.resource_group_id == default_scaling_group.id
 
     async def test_upsert_new_agent_empty_name_uses_default(
@@ -791,7 +791,7 @@ class TestAgentRepositoryDB:
                     )
                 )
             ).one()
-        assert row.resource_group == resource_group.name
+        assert row.scaling_group == resource_group.name
         assert row.resource_group_id == resource_group.id
 
     async def test_upsert_revived_agent_keeps_group(
@@ -821,7 +821,7 @@ class TestAgentRepositoryDB:
                 )
             ).one()
         assert row.status == AgentStatus.ALIVE
-        assert row.resource_group == resource_group.name
+        assert row.scaling_group == resource_group.name
         assert row.resource_group_id == resource_group.id
 
     async def test_upsert_existing_agent_unresolvable_report_keeps_group(
@@ -851,7 +851,7 @@ class TestAgentRepositoryDB:
                     )
                 )
             ).one()
-        assert row.resource_group == resource_group.name
+        assert row.scaling_group == resource_group.name
         assert row.resource_group_id == resource_group.id
 
     async def test_upsert_existing_agent_unresolvable_report_no_default_still_updates(
@@ -890,7 +890,7 @@ class TestAgentRepositoryDB:
             ).one()
         assert row.status == AgentStatus.ALIVE
         assert row.addr == new_addr  # the heartbeat update actually ran
-        assert row.resource_group == resource_group.name  # group unchanged
+        assert row.scaling_group == resource_group.name  # group unchanged
         assert row.resource_group_id == resource_group.id
 
 
@@ -1196,7 +1196,7 @@ class TestAgentDBSourceKernelFiltering:
                 status=AgentStatus.ALIVE,
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
-                resource_group=resource_group,
+                scaling_group=resource_group,
                 resource_group_id=test_scaling_group_id,
                 available_slots=ResourceSlot({SlotName("cpu"): 16.0}),
                 occupied_slots=ResourceSlot({}),
@@ -1235,7 +1235,7 @@ class TestAgentDBSourceKernelFiltering:
                 domain_name=domain_name,
                 group_id=UUID(group_id_str),
                 resource_group_id=test_scaling_group_id,
-                resource_group_name=resource_group,
+                scaling_group_name=resource_group,
                 status=SessionStatus.RUNNING,
                 status_info="test",
                 cluster_mode=ClusterMode.SINGLE_NODE,
@@ -1262,7 +1262,7 @@ class TestAgentDBSourceKernelFiltering:
                     session_id=session_id,
                     agent=actual_agent_id,
                     agent_addr=f"{random_ip}:6001",
-                    resource_group=resource_group,
+                    scaling_group=resource_group,
                     resource_group_id=test_scaling_group_id,
                     cluster_idx=i,
                     cluster_role="main",
@@ -1301,7 +1301,7 @@ class TestAgentDBSourceKernelFiltering:
                     session_id=session_id,
                     agent=actual_agent_id,
                     agent_addr=f"{random_ip}:6001",
-                    resource_group=resource_group,
+                    scaling_group=resource_group,
                     resource_group_id=test_scaling_group_id,
                     cluster_idx=test_case.occupied_kernel_count + i,
                     cluster_role="main",
@@ -1419,7 +1419,7 @@ class TestAgentDBSourceKernelFiltering:
                     status=AgentStatus.ALIVE,
                     status_changed=datetime.now(tzutc()),
                     region="us-west-1",
-                    resource_group=resource_group_name,
+                    scaling_group=resource_group_name,
                     resource_group_id=resource_group_id,
                     available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
                     occupied_slots=ResourceSlot({}),
@@ -1477,7 +1477,7 @@ class TestAgentDBSourceKernelFiltering:
                     domain_name=domain_name,
                     group_id=group_id,
                     resource_group_id=resource_group_id,
-                    resource_group_name=resource_group_name,
+                    scaling_group_name=resource_group_name,
                     status=SessionStatus.RUNNING,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
@@ -1496,7 +1496,7 @@ class TestAgentDBSourceKernelFiltering:
                     session_id=session_id,
                     agent=agent_id,
                     agent_addr="192.168.1.100:6001",
-                    resource_group=resource_group_name,
+                    scaling_group=resource_group_name,
                     resource_group_id=resource_group_id,
                     cluster_idx=0,
                     cluster_role="main",
@@ -1535,7 +1535,7 @@ class TestAgentDBSourceKernelFiltering:
                     )
                 )
             ).one()
-        return row.resource_group, row.resource_group_id
+        return row.scaling_group, row.resource_group_id
 
     async def test_update_resource_group_no_active_kernels_commits(
         self,

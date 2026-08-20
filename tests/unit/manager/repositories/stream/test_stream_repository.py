@@ -97,7 +97,7 @@ def _make_session_row(
         bootstrap_script=None,
         use_host_network=False,
         resource_group_id=resource_group_id,
-        resource_group_name="default",
+        scaling_group_name="default",
     )
 
 
@@ -121,7 +121,7 @@ def _make_kernel_row(
         domain_name=domain_name,
         group_id=group_id,
         user_uuid=user_uuid,
-        resource_group="default",
+        scaling_group="default",
         resource_group_id=resource_group_id,
         access_key=access_key,
         cluster_mode=ClusterMode.SINGLE_NODE.value,

@@ -68,7 +68,7 @@ def _create_kernel(
         domain_name=domain_name,
         group_id=group_id,
         user_uuid=user_uuid,
-        resource_group=resource_group,
+        scaling_group=resource_group,
         resource_group_id=resource_group_id,
         agent=agent_id,
         status=status,
@@ -214,7 +214,7 @@ class TestResourceInfo:
                 agent = AgentRow(
                     id=agent_id,
                     status=AgentStatus.ALIVE,
-                    resource_group=base_scaling_group,
+                    scaling_group=base_scaling_group,
                     resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=slots,
@@ -259,7 +259,7 @@ class TestResourceInfo:
                 AgentRow(
                     id=alive_id,
                     status=AgentStatus.ALIVE,
-                    resource_group=base_scaling_group,
+                    scaling_group=base_scaling_group,
                     resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=alive_slots,
@@ -280,7 +280,7 @@ class TestResourceInfo:
                 AgentRow(
                     id=lost_id,
                     status=AgentStatus.LOST,
-                    resource_group=base_scaling_group,
+                    scaling_group=base_scaling_group,
                     resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=lost_slots,
@@ -301,7 +301,7 @@ class TestResourceInfo:
                 AgentRow(
                     id=terminated_id,
                     status=AgentStatus.TERMINATED,
-                    resource_group=base_scaling_group,
+                    scaling_group=base_scaling_group,
                     resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=terminated_slots,
@@ -352,7 +352,7 @@ class TestResourceInfo:
                 AgentRow(
                     id=sched_id,
                     status=AgentStatus.ALIVE,
-                    resource_group=base_scaling_group,
+                    scaling_group=base_scaling_group,
                     resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=schedulable_slots,
@@ -373,7 +373,7 @@ class TestResourceInfo:
                 AgentRow(
                     id=non_sched_id,
                     status=AgentStatus.ALIVE,
-                    resource_group=base_scaling_group,
+                    scaling_group=base_scaling_group,
                     resource_group_id=base_scaling_group_id,
                     schedulable=False,
                     available_slots=non_schedulable_slots,
@@ -512,7 +512,7 @@ class TestResourceInfo:
                 AgentRow(
                     id=agent_id,
                     status=AgentStatus.ALIVE,
-                    resource_group=base_scaling_group,
+                    scaling_group=base_scaling_group,
                     resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=agent_capacity,
@@ -541,7 +541,7 @@ class TestResourceInfo:
                     domain_id=test_domain_id,
                     group_id=group_id,
                     user_uuid=user_uuid,
-                    resource_group_name=base_scaling_group,
+                    scaling_group_name=base_scaling_group,
                     resource_group_id=base_scaling_group_id,
                     cluster_size=2,
                     vfolder_mounts={},
@@ -619,7 +619,7 @@ class TestResourceInfo:
                 AgentRow(
                     id=agent_id,
                     status=AgentStatus.ALIVE,
-                    resource_group=base_scaling_group,
+                    scaling_group=base_scaling_group,
                     resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=agent_capacity,
@@ -648,7 +648,7 @@ class TestResourceInfo:
                     domain_id=test_domain_id,
                     group_id=group_id,
                     user_uuid=user_uuid,
-                    resource_group_name=base_scaling_group,
+                    scaling_group_name=base_scaling_group,
                     resource_group_id=base_scaling_group_id,
                     cluster_size=4,
                     vfolder_mounts={},

@@ -663,7 +663,7 @@ class TestImageRepositoryLastUsedAt:
                     user_uuid=user.uuid,
                     group_id=group.id,
                     domain_name=domain.name,
-                    resource_group_name=resource_group,
+                    scaling_group_name=resource_group,
                     occupying_slots=ResourceSlot(),
                     requested_slots=ResourceSlot(),
                     vfolder_mounts=[],

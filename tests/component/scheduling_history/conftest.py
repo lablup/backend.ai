@@ -244,7 +244,7 @@ async def kernel_history_seed(
                 domain_id=domain_fixture.domain_id,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
-                resource_group_name=resource_group_name,
+                scaling_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 occupying_slots=slots,
                 requested_slots=slots,
@@ -264,7 +264,7 @@ async def kernel_history_seed(
                 repl_out_port=0,
                 stdin_port=0,
                 stdout_port=0,
-                resource_group=resource_group_name,
+                scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
             )
             for kid in (kernel_id, other_kernel_id)

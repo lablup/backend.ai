@@ -307,7 +307,7 @@ class TestResourceSlotTypePurger:
                     status=AgentStatus.ALIVE,
                     region="local",
                     version="26.9.0",
-                    resource_group="conflict-sgroup",
+                    scaling_group="conflict-sgroup",
                     resource_group_id=resource_group_id,
                     available_slots=ResourceSlot(),
                     occupied_slots=ResourceSlot(),

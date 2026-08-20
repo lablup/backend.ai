@@ -617,7 +617,7 @@ class ResourceGroupDBSource:
                     )
                 )
                 .where(
-                    ag.c.resource_group == resource_group,
+                    ag.c.scaling_group == resource_group,
                     ag.c.status == AgentStatus.ALIVE,
                     ag.c.schedulable == sa.true(),
                 )
@@ -636,7 +636,7 @@ class ResourceGroupDBSource:
                     )
                 )
                 .where(
-                    ag.c.resource_group == resource_group,
+                    ag.c.scaling_group == resource_group,
                     ag.c.status == AgentStatus.ALIVE,
                 )
                 .group_by(ar.c.slot_name, rst.c.rank)

@@ -270,7 +270,7 @@ class TestSessionRepository:
                 bootstrap_script=None,
                 use_host_network=False,
                 resource_group_id=test_scaling_group_id,
-                resource_group_name="default",
+                scaling_group_name="default",
             )
             db_sess.add(session)
 
@@ -291,7 +291,7 @@ class TestSessionRepository:
                 cluster_idx=0,
                 local_rank=0,
                 cluster_hostname="main",
-                resource_group="default",
+                scaling_group="default",
                 resource_group_id=test_scaling_group_id,
                 image="cr.backend.ai/stable/python:latest",
                 architecture="x86_64",
@@ -476,7 +476,7 @@ class TestSessionRepository:
                     bootstrap_script=None,
                     use_host_network=False,
                     resource_group_id=base.resource_group_id,
-                    resource_group_name="default",
+                    scaling_group_name="default",
                 )
             )
             await db_sess.commit()
@@ -766,7 +766,7 @@ class TestBatchPopulateSessionOccupiedSlots:
                 bootstrap_script=None,
                 use_host_network=False,
                 resource_group_id=test_scaling_group_id,
-                resource_group_name="default",
+                scaling_group_name="default",
             )
             db_sess.add(session)
             await db_sess.flush()
@@ -785,7 +785,7 @@ class TestBatchPopulateSessionOccupiedSlots:
                 cluster_idx=0,
                 local_rank=0,
                 cluster_hostname="main",
-                resource_group="default",
+                scaling_group="default",
                 resource_group_id=test_scaling_group_id,
                 image="cr.backend.ai/stable/python:latest",
                 architecture="x86_64",

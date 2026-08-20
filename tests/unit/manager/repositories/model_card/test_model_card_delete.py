@@ -341,7 +341,7 @@ class TestModelCardDelete:
                 domain_id=test_domain_id,
                 domain_name=test_domain.name,
                 resource_group_id=test_scaling_group_id,
-                resource_group_name=test_scaling_group.name,
+                scaling_group_name=test_scaling_group.name,
                 group_id=test_group.id,
                 user_uuid=test_user.uuid,
                 occupying_slots=ResourceSlot(),

@@ -257,7 +257,7 @@ def _make_session(
         domain_id=scope.domain_id,
         domain_name=scope.domain_name,
         resource_group_id=scope.resource_group_id,
-        resource_group_name=scope.resource_group_name,
+        scaling_group_name=scope.resource_group_name,
         status=SessionStatus.PENDING,
         occupying_slots=ResourceSlot(),
         requested_slots=ResourceSlot(),

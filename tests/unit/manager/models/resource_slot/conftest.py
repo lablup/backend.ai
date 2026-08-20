@@ -203,7 +203,7 @@ async def agent_id(
         db_sess.add(
             AgentRow(
                 id=aid,
-                resource_group=resource_group,
+                scaling_group=resource_group,
                 resource_group_id=resource_group_id,
                 region="local",
                 addr="tcp://127.0.0.1:6001",
@@ -239,7 +239,7 @@ async def kernel_id(
                 domain_name=domain_fixture.domain_name,
                 group_id=project_id,
                 resource_group_id=resource_group_id,
-                resource_group_name=resource_group,
+                scaling_group_name=resource_group,
                 user_uuid=user_uuid,
                 occupying_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),
                 requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),
@@ -259,7 +259,7 @@ async def kernel_id(
                 repl_out_port=0,
                 stdin_port=0,
                 stdout_port=0,
-                resource_group=resource_group,
+                scaling_group=resource_group,
                 resource_group_id=resource_group_id,
                 agent=agent_id,
             )

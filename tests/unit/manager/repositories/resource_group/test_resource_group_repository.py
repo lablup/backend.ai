@@ -470,7 +470,7 @@ class TestScalingGroupRepositoryDB:
                     group_id=test_group_id,
                     user_uuid=test_user_uuid,
                     resource_group_id=sgroup.id,
-                    resource_group_name=sgroup_name,
+                    scaling_group_name=sgroup_name,
                     cluster_size=1,
                     vfolder_mounts={},
                 )
@@ -1472,7 +1472,7 @@ class TestScalingGroupRepositoryDB:
                     group_id=test_group_id,
                     user_uuid=test_user_uuid,
                     resource_group_id=resource_group_id,
-                    resource_group_name=sample_scaling_group_for_hierarchy,
+                    scaling_group_name=sample_scaling_group_for_hierarchy,
                     cluster_size=1,
                     vfolder_mounts={},
                 )
@@ -1505,7 +1505,7 @@ class TestScalingGroupRepositoryDB:
                     domain_name=test_domain,
                     group_id=test_group_id,
                     user_uuid=test_user_uuid,
-                    resource_group=sample_scaling_group_for_hierarchy,
+                    scaling_group=sample_scaling_group_for_hierarchy,
                     resource_group_id=resource_group_id,
                     cluster_role=DEFAULT_ROLE,
                     occupied_slots=ResourceSlot(),

@@ -246,7 +246,7 @@ class AgentDBSource:
                 .where(agents.c.id == agent_id)
                 .values(
                     resource_group_id=resource_group_id,
-                    resource_group=resource_group_name,
+                    scaling_group=resource_group_name,
                 )
             )
             if cast(CursorResult[Any], result).rowcount == 0:

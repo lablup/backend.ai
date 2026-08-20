@@ -89,7 +89,7 @@ async def _create_extra_agent(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 region="local",
-                resource_group=resource_group_name,
+                scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
                 occupied_slots=ResourceSlot(),

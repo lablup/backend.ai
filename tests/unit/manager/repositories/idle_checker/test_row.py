@@ -150,7 +150,7 @@ class TestSessionIdleCheckRow:
                     environ=None,
                     bootstrap_script=None,
                     use_host_network=False,
-                    resource_group_name="session-idle-check-resource-group",
+                    scaling_group_name="session-idle-check-resource-group",
                 )
             )
             db_sess.add(

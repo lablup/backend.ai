@@ -69,7 +69,7 @@ async def _make_agent(
                 id=agent_id,
                 status=status,
                 region="local",
-                resource_group=resource_group,
+                scaling_group=resource_group,
                 resource_group_id=resource_group_id,
                 available_slots=ResourceSlot({
                     "cpu": Decimal("10"),

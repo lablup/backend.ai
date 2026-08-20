@@ -252,10 +252,10 @@ class TestErrorLogOps:
         assert created_logs[1].meta.request_status is None
         assert created_logs[1].content.traceback is None
 
-        # Verify third log (WARNING, no user)
+        # Verify third log (WARNING)
         assert created_logs[2].content.severity == ErrorLogSeverity.WARNING
         assert created_logs[2].meta.source == "storage"
-        assert created_logs[2].meta.user is None
+        assert created_logs[2].meta.user == test_user_id
         assert created_logs[2].content.message == "Storage warning"
         assert created_logs[2].meta.context_lang == "ko"
 

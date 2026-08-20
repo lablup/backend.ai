@@ -166,7 +166,7 @@ def _expired_check_session_row(
         environ=None,
         bootstrap_script=None,
         use_host_network=False,
-        resource_group_name=scope.resource_group_name,
+        scaling_group_name=scope.resource_group_name,
     )
 
 

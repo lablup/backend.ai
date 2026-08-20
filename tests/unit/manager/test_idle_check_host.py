@@ -380,7 +380,7 @@ class TestDoIdleCheck:
                     user_uuid=user_uuid,
                     access_key=access_key,
                     resource_group_id=sg_id,
-                    resource_group_name=sg_name,
+                    scaling_group_name=sg_name,
                     status=SessionStatus.RUNNING,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
@@ -398,7 +398,7 @@ class TestDoIdleCheck:
                 KernelRow(
                     id=kernel_id,
                     session_id=session_id,
-                    resource_group=sg_name,
+                    scaling_group=sg_name,
                     resource_group_id=sg_id,
                     cluster_idx=0,
                     cluster_role="main",
