@@ -9,7 +9,6 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.error_log.types import ErrorLogData
-from ai.backend.manager.models.error_log.creators import ErrorLogCreator
 
 from .db_source import ErrorLogDBSource
 
@@ -40,15 +39,6 @@ class ErrorLogRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = ErrorLogDBSource(db)
-
-    @error_log_repository_resilience.apply()
-    async def create(self, creator: ErrorLogCreator) -> ErrorLogData:
-        """Record an error from an internal path.
-
-        The API records through the action, which runs against ops; this stays for the
-        error-monitor plugin, which has no caller identity to audit.
-        """
-        return await self._db_source.create(creator)
 
     @error_log_repository_resilience.apply()
     @error_log_repository_resilience.apply()

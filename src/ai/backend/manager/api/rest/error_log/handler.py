@@ -58,7 +58,6 @@ class ErrorLogHandler:
         creator = ErrorLogCreator(
             severity=severity,
             source=params.source,
-            user=ctx.user_uuid,
             message=params.message,
             context_lang=params.context_lang,
             context_env=params.context_env,

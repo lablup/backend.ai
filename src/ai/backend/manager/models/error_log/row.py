@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from typing import Any
 
 import sqlalchemy as sa
@@ -8,6 +7,7 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.error_log import ErrorLogID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.error_log.types import (
     ErrorLogContent,
     ErrorLogData,
@@ -28,8 +28,8 @@ class ErrorLogRow(CreatedAtMixin, Base):
     # and pages, so the index is declared here rather than lost to the move.
     __table_args__ = (sa.Index("ix_error_logs_created_at", "created_at"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ErrorLogID] = mapped_column(
+        "id", GUID(ErrorLogID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     # Columns keep the historical nullable=True of the imperative table definition;
     # the annotations stay non-Optional because every writer supplies them.
@@ -40,8 +40,8 @@ class ErrorLogRow(CreatedAtMixin, Base):
         index=True,
     )
     source: Mapped[str] = mapped_column("source", sa.String, nullable=True)
-    user: Mapped[uuid.UUID | None] = mapped_column(
-        "user", GUID, sa.ForeignKey("users.uuid"), nullable=True, index=True
+    user: Mapped[UserID | None] = mapped_column(
+        "user", GUID(UserID), sa.ForeignKey("users.uuid"), nullable=True, index=True
     )
     is_read: Mapped[bool] = mapped_column(
         "is_read", sa.Boolean, default=False, nullable=True, index=True

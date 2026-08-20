@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import enum
-import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, override
 
 from ai.backend.common.data.entity.error_log import ErrorLogID
-from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.errors.common import ObjectNotFound
 
 
 class ErrorLogSeverity(enum.StrEnum):
@@ -19,7 +20,7 @@ class ErrorLogSeverity(enum.StrEnum):
 @dataclass
 class ErrorLogMeta:
     created_at: datetime
-    user: uuid.UUID | None
+    user: UserID | None
     source: str
     is_read: bool
     is_cleared: bool
@@ -37,14 +38,23 @@ class ErrorLogContent:
 
 
 @dataclass
-class ErrorLogData(EntityData):
+class ErrorLogData(FieldData):
+    """One recorded error, read through the user it happened to."""
+
     id: ErrorLogID
     meta: ErrorLogMeta
     content: ErrorLogContent
 
     @override
-    def entity_id(self) -> EntityIdentifier:
-        return self.id
+    def owner_entity_id(self) -> EntityIdentifier:
+        """The user the error was recorded against.
+
+        Rows written before logs became a user's field carry no user; the column
+        stays nullable for them, and they have no owner to be read through.
+        """
+        if self.meta.user is None:
+            raise ObjectNotFound(object_name="error log owner")
+        return self.meta.user
 
 
 @dataclass

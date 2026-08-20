@@ -6,34 +6,26 @@ holds only what the v2 lineage requires to sit under ``models/``.
 
 from __future__ import annotations
 
-import uuid
-from collections.abc import Collection, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.error_log import ErrorLogID
-from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.error_log.types import ErrorLogData, ErrorLogSeverity
 from ai.backend.manager.models.error_log.row import ErrorLogRow
-from ai.backend.manager.models.specs.creator import EntityCreator
+from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
-class ErrorLogCreator(EntityCreator[ErrorLogRow, ErrorLogData]):
-    """Creator for one recorded error.
-
-    The row joins the owning user's scope. The column is nullable because the manager
-    and the agents record their own failures with no user to own the row.
-    """
+class ErrorLogCreator(FieldCreator[UserID, ErrorLogRow, ErrorLogData]):
+    """Creator for one recorded error, written under the user it happened to."""
 
     severity: ErrorLogSeverity
     source: str
     message: str
     context_lang: str
     context_env: dict[str, Any]
-    user: uuid.UUID | None = None
     is_read: bool = False
     is_cleared: bool = False
     request_url: str | None = None
@@ -41,28 +33,18 @@ class ErrorLogCreator(EntityCreator[ErrorLogRow, ErrorLogData]):
     traceback: str | None = None
 
     @override
-    def entity_id(self, row: ErrorLogRow) -> ErrorLogID:
-        return ErrorLogID(row.id)
-
-    @override
-    def member_of(self, row: ErrorLogRow) -> Collection[EntityIdentifier]:
-        if row.user is None:
-            return ()
-        return (UserID(row.user),)
-
-    @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return ()
 
     @override
-    def build_row(self) -> ErrorLogRow:
+    def build_row(self, owner_id: UserID) -> ErrorLogRow:
         return ErrorLogRow(
             severity=self.severity.value,
             source=self.source,
             message=self.message,
             context_lang=self.context_lang,
             context_env=self.context_env,
-            user=self.user,
+            user=owner_id,
             is_read=self.is_read,
             is_cleared=self.is_cleared,
             request_url=self.request_url,
