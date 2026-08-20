@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: fatpod-agent, namespace: bai}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: fatpod-agent}}
+  strategy: {type: Recreate}
+  template:
+    metadata: {labels: {app: fatpod-agent}}
+    spec:
+      hostNetwork: true
+      hostPID: true
+      dnsPolicy: Default
+      nodeName: charsyam-nvidia
+      tolerations:
+      - {key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule}
+      containers:
+      - name: agent
+        image: 192.168.0.156:5000/backend.ai-agent:dev
+        imagePullPolicy: IfNotPresent
+        securityContext: {privileged: true}
+        env:
+        - {name: PYTHONPATH, value: /home/charsyam/develop/lablup/backend.ai/src}
+        - {name: PATH, value: "/opt/hostbin:/opt/backend.ai/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
+        - {name: LD_LIBRARY_PATH, value: "/opt/nvidia-libs"}
+        workingDir: /home/charsyam/develop/lablup/backend.ai
+        # Run with the HOST dev venv python (shared via repo + .pyenv mounts) so sys.executable is a
+        # host-valid path: containerd (on the host) execs the binary:// log-writer launcher, whose
+        # interpreter is sys.executable. The image python (/opt/backend.ai/venv) exists only in the
+        # pod, which silently broke every container's stdout and stalled kernel startup.
+        command: ["/home/charsyam/develop/lablup/backend.ai/dist/export/python/virtualenvs/python-default/3.13.7/bin/python","-c","from ai.backend.agent.cli.start_server import main; main()","--config","/etc/backend.ai/agent.toml"]
+        volumeMounts:
+        - {name: cfg, mountPath: /etc/backend.ai/agent.toml, subPath: agent.toml}
+        - {name: containerd-sock, mountPath: /run/containerd/containerd.sock}
+        - {name: repo, mountPath: /home/charsyam/develop/lablup/backend.ai}
+        - {name: baitmp, mountPath: /tmp/backend.ai}
+        - {name: hostbin, mountPath: /opt/hostbin}
+        - {name: pyenv, mountPath: /home/charsyam/.pyenv}
+        - {name: nv-ml, mountPath: /opt/nvidia-libs/libnvidia-ml.so.1}
+        - {name: nv-cuda, mountPath: /opt/nvidia-libs/libcuda.so.1}
+        - {name: nv-cudart, mountPath: /opt/nvidia-libs/libcudart.so.13}
+        - {name: docker-sock, mountPath: /var/run/docker.sock}
+      volumes:
+      - {name: cfg, configMap: {name: fatpod-agent-config}}
+      - {name: containerd-sock, hostPath: {path: /run/containerd/containerd.sock, type: Socket}}
+      - {name: repo, hostPath: {path: /home/charsyam/develop/lablup/backend.ai, type: Directory}}
+      - {name: baitmp, hostPath: {path: /tmp/backend.ai, type: DirectoryOrCreate}}
+      - {name: hostbin, configMap: {name: hostbin-wrappers, defaultMode: 0755}}
+      - {name: pyenv, hostPath: {path: /home/charsyam/.pyenv, type: Directory}}
+      - {name: nv-ml, hostPath: {path: /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.580.65.06, type: File}}
+      - {name: nv-cuda, hostPath: {path: /usr/lib/x86_64-linux-gnu/libcuda.so.580.65.06, type: File}}
+      - {name: nv-cudart, hostPath: {path: /usr/local/cuda-13.0/targets/x86_64-linux/lib/libcudart.so.13.0.48, type: File}}
+      - {name: docker-sock, hostPath: {path: /var/run/docker.sock, type: Socket}}

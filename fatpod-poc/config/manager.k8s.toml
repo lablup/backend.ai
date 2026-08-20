@@ -1,0 +1,107 @@
+[etcd]
+namespace = "local"
+addr = { host = "10.105.143.220", port = 2379 }
+user = ""
+password = ""
+
+
+[db]
+type = "postgresql"
+addr = { host = "10.104.28.211", port = 5432 }
+name = "backend"
+user = "postgres"
+password = "develove"
+pool-recycle = 50
+pool-pre-ping = false
+
+
+[manager]
+rpc-auth-manager-keypair = "/etc/backend.ai/keys/manager.key_secret"
+num-proc = 1
+service-addr = { host = "0.0.0.0", port = 8091 }
+internal-addr = { host = "0.0.0.0", port = 18080 }
+#user = "nobody"
+#group = "nobody"
+ssl-enabled = false
+#ssl-cert = "/etc/backend.ai/ssl/apiserver-fullchain.pem"   # env: BACKNED_SSL_CERT
+#ssl-privkey = "/etc/backend.ai/ssl/apiserver-privkey.pem"  # env: BACKNED_SSL_KEY
+ipc-base-path = "/tmp/backend.ai/ipc"
+heartbeat-timeout = 40.0
+#id = ""
+pid-file = "./manager.pid"             # env: BACKEND_PID_FILE
+# allowed-plugins = []
+disabled-plugins = ["ai.backend.manager.network.agent_swarm"]
+
+hide-agents = true
+
+# The order of agent selection.
+agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
+
+# BEP-1062: containerd 멀티노드 클러스터 세션은 CNI 드라이버를 씁니다 (기본 'overlay'=Swarm).
+[network.inter-container]
+default-driver = "cni"
+
+[docker-registry]
+ssl-verify = false
+
+[pyroscope]
+enabled = true
+app-name = "backendai-half-manager"
+server-addr = "http://localhost:4040"
+sample-rate = 100
+
+
+[logging]
+level = "INFO"
+drivers = ["console"]
+
+[logging.pkg-ns]
+"" = "WARNING"
+"aiotools" = "INFO"
+"aiohttp" = "INFO"
+"ai.backend" = "INFO"
+"alembic" = "INFO"
+"sqlalchemy" = "WARNING"
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[logging.file]
+path = "./logs"
+filename = "manager.log"
+backup-count = 5
+rotation-size = "10M"
+
+[logging.logstash]
+endpoint = { host = "localhost", port = 9300 }
+protocol = "tcp"
+ssl-enabled = true
+ssl-verify = true
+
+[logging.graylog]
+host = "127.0.0.1"
+port = 12201
+ssl-verify = false
+ca-certs = ""
+keyfile = ""
+certfile = ""
+
+[debug]
+enabled = false
+
+[otel]
+enabled = true
+log-level = "INFO"
+endpoint = "http://127.0.0.1:4317"
+
+[artifact-registry]
+model-registry = "huggingface-hub"
+
+[reservoir]
+storage-name = "minio-storage"
+enable-approve-process = false
+
+[reservoir.config]
+type = "object_storage"
+bucket-name = "backendai-storage"

@@ -1,0 +1,3 @@
+{"session_name":"cinc-filler104","session_type":"interactive","image_id":"b46e2770-7777-486b-8c87-db84a8fb34c5",
+"resource_entries":[{"resource_type":"cpu","quantity":"28"},{"resource_type":"mem","quantity":"28470935552"}],
+"cluster_mode":"single-node","cluster_size":1,"project_id":"2de2b969-1d04-48a6-af16-0bc8adb3c831","agent_list":["i-cinc-104"]}

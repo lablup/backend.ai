@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: fatpod-agent-ser8, namespace: bai}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: fatpod-agent-ser8}}
+  strategy: {type: Recreate}
+  template:
+    metadata: {labels: {app: fatpod-agent-ser8}}
+    spec:
+      hostNetwork: true
+      hostPID: true
+      dnsPolicy: Default
+      nodeName: ser8
+      containers:
+      - name: agent
+        image: 192.168.0.156:5000/backend.ai-agent:dev
+        imagePullPolicy: IfNotPresent
+        securityContext: {privileged: true}
+        env:
+        - {name: PYTHONPATH, value: /home/charsyam/develop/lablup/backend.ai/src}
+        - {name: PATH, value: "/opt/hostbin:/opt/backend.ai/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
+        workingDir: /home/charsyam/develop/lablup/backend.ai
+        command: ["/home/charsyam/develop/lablup/backend.ai/dist/export/python/virtualenvs/python-default/3.13.7/bin/python","-c","from ai.backend.agent.cli.start_server import main; main()","--config","/etc/backend.ai/agent.toml"]
+        volumeMounts:
+        - {name: cfg, mountPath: /etc/backend.ai/agent.toml, subPath: agent.toml}
+        - {name: containerd-sock, mountPath: /run/containerd/containerd.sock}
+        - {name: repo, mountPath: /home/charsyam/develop/lablup/backend.ai}
+        - {name: baitmp, mountPath: /tmp/backend.ai}
+        - {name: hostbin, mountPath: /opt/hostbin}
+        - {name: pyenv, mountPath: /home/charsyam/.pyenv}
+      volumes:
+      - {name: cfg, configMap: {name: fatpod-agent-ser8-config}}
+      - {name: containerd-sock, hostPath: {path: /run/containerd/containerd.sock, type: Socket}}
+      - {name: repo, hostPath: {path: /home/charsyam/develop/lablup/backend.ai, type: Directory}}
+      - {name: baitmp, hostPath: {path: /tmp/backend.ai, type: DirectoryOrCreate}}
+      - {name: hostbin, configMap: {name: hostbin-wrappers, defaultMode: 0755}}
+      - {name: pyenv, hostPath: {path: /home/charsyam/.pyenv, type: Directory}}

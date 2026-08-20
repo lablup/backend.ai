@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: manager, namespace: bai}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: manager}}
+  template:
+    metadata: {labels: {app: manager}}
+    spec:
+      nodeSelector: {node-role.kubernetes.io/control-plane: ""}
+      containers:
+      - name: manager
+        image: 192.168.0.156:5000/backend.ai-manager:dev
+        imagePullPolicy: IfNotPresent
+        ports: [{containerPort: 8091}]
+        env:
+        - {name: PYTHONPATH, value: /home/charsyam/develop/lablup/backend.ai/src}
+        workingDir: /home/charsyam/develop/lablup/backend.ai
+        command: ["python","-c","from ai.backend.manager.cli.start_server import main; main()","--config","/etc/backend.ai/manager.toml"]
+        volumeMounts:
+        - {name: cfg, mountPath: /etc/backend.ai/manager.toml, subPath: manager.toml}
+        - {name: ipc, mountPath: /tmp/backend.ai/ipc}
+        - {name: rpckeys, mountPath: /etc/backend.ai/keys, readOnly: true}
+        - {name: repo, mountPath: /home/charsyam/develop/lablup/backend.ai}
+        - {name: docker-sock, mountPath: /var/run/docker.sock}
+      volumes:
+      - {name: cfg, configMap: {name: manager-config}}
+      - {name: ipc, emptyDir: {}}
+      - {name: rpckeys, secret: {secretName: bai-rpc-keys}}
+      - {name: repo, hostPath: {path: /home/charsyam/develop/lablup/backend.ai, type: Directory}}
+      - {name: docker-sock, hostPath: {path: /var/run/docker.sock, type: Socket}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: manager, namespace: bai}
+spec: {selector: {app: manager}, ports: [{port: 8091, targetPort: 8091}]}

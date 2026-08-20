@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata: {name: appproxy-demo, namespace: bai, labels: {app: appproxy-demo}}
+spec:
+  hostNetwork: true
+  nodeName: charsyam-nvidia
+  restartPolicy: Never
+  tolerations: [{key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule}]
+  containers:
+  - name: proxy
+    image: 192.168.0.156:5000/backend.ai-agent:dev
+    command: ["/opt/backend.ai/venv/bin/python3","-c","import socket,threading\ndef pipe(a,b):\n  try:\n    while True:\n      d=a.recv(4096)\n      if not d: break\n      b.sendall(d)\n  except: pass\n  finally:\n    a.close(); b.close()\nTARGET=('192.168.0.156',30005)\ns=socket.socket(); s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)\ns.bind(('0.0.0.0',18022)); s.listen(5)\nprint('[AppProxy] :18022 -> %s:%d (ser8 session sshd)'%TARGET, flush=True)\nwhile True:\n  c,a=s.accept()\n  u=socket.socket(); u.connect(TARGET)\n  threading.Thread(target=pipe,args=(c,u),daemon=True).start()\n  threading.Thread(target=pipe,args=(u,c),daemon=True).start()\n"]

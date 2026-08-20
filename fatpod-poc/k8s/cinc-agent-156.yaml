@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: cinc-agent-156, namespace: bai}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: cinc-agent-156}}
+  strategy: {type: Recreate}
+  template:
+    metadata: {labels: {app: cinc-agent-156}}
+    spec:
+      hostNetwork: true
+      hostPID: true
+      dnsPolicy: Default
+      nodeName: ser8
+      tolerations:
+      - {key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule}
+      containers:
+      - name: agent
+        image: 192.168.0.156:5000/backend.ai-agent:dev
+        imagePullPolicy: IfNotPresent
+        securityContext: {privileged: true}
+        env:
+        - {name: PYTHONPATH, value: /home/charsyam/develop/lablup/backend.ai/src}
+        - {name: PATH, value: "/usr/local/bin:/opt/hostbin:/hostbin:/opt/backend.ai/venv/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"}
+        workingDir: /home/charsyam/develop/lablup/backend.ai
+        command: ["sh","/entrypoint/entrypoint.sh"]
+        volumeMounts:
+        - {name: cfg, mountPath: /etc/backend.ai/agent.toml, subPath: agent.toml}
+        - {name: entrypoint, mountPath: /entrypoint}
+        - {name: repo, mountPath: /home/charsyam/develop/lablup/backend.ai}
+        - {name: baitmp, mountPath: /tmp/backend.ai}
+        - {name: hostbin, mountPath: /opt/hostbin}
+        - {name: pyenv, mountPath: /home/charsyam/.pyenv}
+        - {name: share, mountPath: /share}
+        - {name: b-containerd, mountPath: /hostbin/containerd}
+        - {name: b-ctr, mountPath: /hostbin/ctr}
+        - {name: b-shim, mountPath: /hostbin/containerd-shim-runc-v2}
+        - {name: b-runc, mountPath: /hostbin/runc}
+        - {name: nested-root, mountPath: /var/lib/nested-cd}
+        - {name: nested-run, mountPath: /run/nested-cd}
+        - {name: run-containerd, mountPath: /run/containerd}
+      volumes:
+      - {name: cfg, configMap: {name: cinc-agent-156-config}}
+      - {name: entrypoint, configMap: {name: cinc-entrypoint}}
+      - {name: repo, hostPath: {path: /home/charsyam/develop/lablup/backend.ai, type: Directory}}
+      - {name: baitmp, hostPath: {path: /tmp/backend.ai, type: DirectoryOrCreate}}
+      - {name: hostbin, configMap: {name: hostbin-wrappers, defaultMode: 0755}}
+      - {name: pyenv, hostPath: {path: /home/charsyam/.pyenv, type: Directory}}
+      - {name: share, hostPath: {path: /var/lib/cinc-share, type: Directory}}
+      - {name: b-containerd, hostPath: {path: /usr/bin/containerd, type: File}}
+      - {name: b-ctr, hostPath: {path: /usr/bin/ctr, type: File}}
+      - {name: b-shim, hostPath: {path: /usr/bin/containerd-shim-runc-v2, type: File}}
+      - {name: b-runc, hostPath: {path: /usr/bin/runc, type: File}}
+      - {name: nested-root, hostPath: {path: /var/lib/cinc-nested, type: DirectoryOrCreate}}
+      - {name: nested-run, emptyDir: {}}
+      - {name: run-containerd, emptyDir: {}}

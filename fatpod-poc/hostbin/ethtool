@@ -1,0 +1,3 @@
+#!/bin/sh
+# fatPod: run host's ethtool in host mount ns (image lacks it). privileged+hostPID required.
+exec nsenter -t 1 -m -- /usr/sbin/ethtool "$@"

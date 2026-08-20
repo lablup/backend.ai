@@ -1,0 +1,119 @@
+[etcd]
+namespace = "local"
+addr = { host = "10.105.143.220", port = 2379 }
+user = ""
+password = ""
+
+
+[agent]
+mode = "containerd"
+# network-privnet-socket omitted -> agent does privileged networking in-process (privileged fatPod)
+rpc-listen-addr = { host = "192.168.0.156", port = 6011 }
+# metric API service address
+service-addr = { host = "0.0.0.0", port = 6003 }
+ssl-enabled = false
+#ssl-cert = ""
+#ssl-key = ""
+agent-sock-port = 6007
+id = "i-cinc-156"
+scaling-group = "default"
+pid-file = "./agent.pid"
+event-loop = "uvloop"
+ipc-base-path = "/tmp/backend.ai/ipc"
+var-base-path = "var/lib/backend.ai"
+allow-compute-plugins = []  # CPU-only CinC multi-node test
+# block-compute-plugins = []
+image-commit-path = "./tmp/backend.ai/commit/"
+mount-path = "/home/charsyam/develop/lablup/backend.ai/vfroot/local"
+cohabiting-storage-proxy = true
+
+
+[container]
+port-range = [30000, 31000]
+kernel-uid = 1000
+kernel-gid = 1000
+# Empty = bind published service ports to every local address (--dst-type LOCAL), so a remote
+# manager/AppProxy can reach them at advertised-host. "127.0.0.1" kept them loopback-only, which
+# made ssh/app to a session on this node fail (the proxy tunnels to advertised-host).
+bind-host = "0.0.0.0"
+# LAN address other nodes reach this host on — the vxlan VTEP. Loopback bind-host alone
+# yields an unusable VTEP and multi-node (vxlan) sessions are refused. (BEP-1062)
+advertised-host = "192.168.0.156"
+sandbox-type = "docker"
+scratch-type = "hostdir"
+scratch-root = "./scratches"
+scratch-size = "1G"
+
+
+[watcher]
+service-addr = { host = "127.0.0.1", port = 6019 }
+ssl-enabled = false
+#ssl-cert = ""
+#ssl-key = ""
+target-service = "backendai-agent.service"
+soft-reset-available = false
+
+
+[pyroscope]
+enabled = false
+app-name = "backendai-half-agent"
+server-addr = "http://localhost:4040"
+sample-rate = 100
+
+
+[logging]
+level = "INFO"
+drivers = ["console"]
+
+[logging.pkg-ns]
+"" = "WARNING"
+"aiodocker" = "INFO"
+"aiotools" = "INFO"
+"aiohttp" = "INFO"
+"ai.backend" = "INFO"
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[logging.file]
+path = "./logs"
+filename = "agent.log"
+rotation-size = "10M"
+
+[logging.logstash]
+endpoint = { host = "localhost", port = 9300 }
+protocol = "tcp"
+ssl-enabled = true
+ssl-verify = false
+
+[logging.graylog]
+host = "127.0.0.1"
+port = 12201
+ssl-verify = false
+ca-certs = ""
+keyfile = ""
+certfile = ""
+
+[resource]
+reserved-cpu = 1
+reserved-mem = "1G"
+reserved-disk = "8G"
+allocation-order = ["cuda", "rocm", "tpu", "cpu", "mem"]
+affinity-policy = "INTERLEAVED"
+
+
+[debug]
+enabled = true
+skip-container-deletion = true
+
+[debug.coredump]
+enabled = false
+path = "./coredumps"
+backup-count = 10
+size-limit = "64M"
+
+[otel]
+enabled = false
+log-level = "INFO"
+endpoint = "http://127.0.0.1:4317"

@@ -1,0 +1,14 @@
+{
+  "session_name": "fatpod-gpu-1",
+  "session_type": "interactive",
+  "image_id": "0e1bd6c6-0a8d-4d2b-9db7-2e7c53c1e151",
+  "resource_entries": [
+    {"resource_type": "cpu", "quantity": "2"},
+    {"resource_type": "mem", "quantity": "4294967296"},
+    {"resource_type": "cuda.device", "quantity": "1"}
+  ],
+  "cluster_mode": "single-node",
+  "cluster_size": 1,
+  "project_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+  "agent_list": ["i-fatpod-104"]
+}
