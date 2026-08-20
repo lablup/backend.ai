@@ -31,6 +31,7 @@ from sqlalchemy.orm import (
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
@@ -885,11 +886,16 @@ class EndpointRow(Base):
 class EndpointTokenRow(Base):
     __tablename__ = "endpoint_tokens"
 
-    id: Mapped[UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[DeploymentTokenID] = mapped_column(
+        "id",
+        GUID(DeploymentTokenID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
     token: Mapped[str] = mapped_column("token", sa.String(), nullable=False)
-    endpoint: Mapped[DeploymentID | None] = mapped_column("endpoint", GUID, nullable=True)
+    endpoint: Mapped[DeploymentID | None] = mapped_column(
+        "endpoint", GUID(DeploymentID), nullable=True
+    )
     session_owner: Mapped[UserID] = mapped_column("session_owner", GUID(UserID), nullable=False)
     domain: Mapped[str] = mapped_column(
         "domain",
@@ -919,7 +925,7 @@ class EndpointTokenRow(Base):
 
     def __init__(
         self,
-        id: UUID,
+        id: DeploymentTokenID,
         token: str,
         endpoint: DeploymentID,
         domain: str,

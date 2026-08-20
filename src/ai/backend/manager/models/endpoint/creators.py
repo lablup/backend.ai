@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import override
 
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.deployment.types import ModelDeploymentAccessTokenData
@@ -35,13 +36,17 @@ class EndpointTokenCreator(
     expires_at: datetime | None = None
 
     @override
+    def field_id(self, row: EndpointTokenRow) -> DeploymentTokenID:
+        return row.id
+
+    @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return ()
 
     @override
     def build_row(self, owner_id: DeploymentID) -> EndpointTokenRow:
         return EndpointTokenRow(
-            id=uuid.uuid4(),
+            id=DeploymentTokenID(uuid.uuid4()),
             token=self.token,
             endpoint=owner_id,
             domain=self.domain,

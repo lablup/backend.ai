@@ -12,18 +12,20 @@ from typing import Any
 from ai.backend.common.data.entity.types import (
     EntityData,
     EntityIdentifier,
+    EntityType,
     FieldIdentifier,
 )
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.creator import (
+    DanglingFieldCreator,
     EntityCreator,
     FieldCreator,
+    FieldToCreate,
     GlobalEntityCreator,
+    NestedFieldCreator,
     RoleManagedEntityCreator,
-    SidecarCreator,
-    SidecarFieldCreator,
 )
 from ai.backend.manager.models.specs.lookup import (
     DataLookup,
@@ -175,12 +177,10 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.create_role_managed_entity(creator)
 
-    async def create_field_entity(
-        self, owner_id: Any, creator: FieldCreator[Any, Any, TData]
-    ) -> TData:
+    async def create_field(self, owner_id: Any, creator: FieldCreator[Any, Any, TData]) -> TData:
         """Insert one field row under its owner's identifier."""
         async with self._ops.write_ops() as w:
-            return await w.create_field_entity(owner_id, creator)
+            return await w.create_field(owner_id, creator)
 
     async def atomic_create_global_entities(
         self, creators: Sequence[GlobalEntityCreator[Any, TData]]
@@ -210,23 +210,44 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_create_field_entities(owner_id, creators)
 
-    async def create_sidecar(self, creator: SidecarCreator[Any, TData]) -> TData:
+    async def create_dangling_field(
+        self, entity_type: EntityType, creator: DanglingFieldCreator[Any, TData]
+    ) -> TData:
         async with self._ops.write_ops() as w:
-            return await w.create_sidecar(creator)
+            return await w.create_dangling_field(entity_type, creator)
 
-    async def atomic_create_sidecars(
-        self, creators: Sequence[SidecarCreator[Any, TData]]
+    async def atomic_create_fields[TOwnerID: EntityIdentifier](
+        self, creations: Sequence[FieldToCreate[TOwnerID, Any, TData]]
     ) -> list[TData]:
+        """Insert field rows atomically, each under the owner named beside it."""
         async with self._ops.write_ops() as w:
-            return await w.atomic_create_sidecars(creators)
+            return await w.atomic_create_fields(creations)
 
-    async def atomic_create_sidecars_with_fields[TFieldData](
+    async def atomic_create_fields_with_nested[TOwnerID: EntityIdentifier, TNestedData](
         self,
-        creators: Sequence[SidecarCreator[Any, TData]],
-        field_creators: Sequence[SidecarFieldCreator[Any, Any, TFieldData]],
+        creations: Sequence[FieldToCreate[TOwnerID, Any, TData]],
+        nested_creators: Sequence[NestedFieldCreator[Any, Any, TNestedData]],
+    ) -> list[TData]:
+        """Insert field rows and the rows each of them owns, in one transaction."""
+        async with self._ops.write_ops() as w:
+            return await w.atomic_create_fields_with_nested(creations, nested_creators)
+
+    async def atomic_create_dangling_fields(
+        self, entity_type: EntityType, creators: Sequence[DanglingFieldCreator[Any, TData]]
     ) -> list[TData]:
         async with self._ops.write_ops() as w:
-            return await w.atomic_create_sidecars_with_fields(creators, field_creators)
+            return await w.atomic_create_dangling_fields(entity_type, creators)
+
+    async def atomic_create_dangling_fields_with_nested[TFieldData](
+        self,
+        entity_type: EntityType,
+        creators: Sequence[DanglingFieldCreator[Any, TData]],
+        field_creators: Sequence[NestedFieldCreator[Any, Any, TFieldData]],
+    ) -> list[TData]:
+        async with self._ops.write_ops() as w:
+            return await w.atomic_create_dangling_fields_with_nested(
+                entity_type, creators, field_creators
+            )
 
     async def purge_entity(self, purger: EntityPurger[Any, TData]) -> TData:
         """Hard-delete one entity row, tearing its scope down with it."""

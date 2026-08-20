@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.entity.error_log import ErrorLogID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.error_log.types import ErrorLogData, ErrorLogSeverity
 from ai.backend.manager.models.error_log.row import ErrorLogRow
@@ -31,6 +32,10 @@ class ErrorLogCreator(FieldCreator[UserID, ErrorLogRow, ErrorLogData]):
     request_url: str | None = None
     request_status: int | None = None
     traceback: str | None = None
+
+    @override
+    def field_id(self, row: ErrorLogRow) -> ErrorLogID:
+        return row.id
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

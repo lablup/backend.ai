@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from ai.backend.manager.repositories.ops.v2.batch_write import V2BatchWriteOps
+from ai.backend.manager.repositories.ops.v2.dangling_field_write import V2DanglingFieldWriteOps
 from ai.backend.manager.repositories.ops.v2.entity_write import V2EntityWriteOps
 from ai.backend.manager.repositories.ops.v2.field_write import V2FieldWriteOps
 from ai.backend.manager.repositories.ops.v2.global_write import V2GlobalWriteOps
 from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
-from ai.backend.manager.repositories.ops.v2.sidecar_write import V2SidecarWriteOps
 from ai.backend.manager.repositories.ops.v2.update_write import V2UpdateWriteOps
 
 
@@ -15,7 +15,7 @@ class V2WriteOps(
     V2EntityWriteOps,
     V2GlobalWriteOps,
     V2FieldWriteOps,
-    V2SidecarWriteOps,
+    V2DanglingFieldWriteOps,
     V2UpdateWriteOps,
     V2BatchWriteOps,
     V2ReadOps,

@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.manager.data.permission.types import EntityType, OperationType
 from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
@@ -28,6 +29,10 @@ class RolePermissionPresetCreator(
 
     entity_type: EntityType
     operation: OperationType
+
+    @override
+    def field_id(self, row: RolePermissionPresetRow) -> RolePermissionPresetID:
+        return row.id
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

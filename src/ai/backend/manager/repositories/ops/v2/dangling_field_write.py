@@ -9,37 +9,44 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.specs.creator import SidecarCreator, SidecarFieldCreator
+from ai.backend.manager.models.specs.creator import DanglingFieldCreator, NestedFieldCreator
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 
 
-class V2SidecarWriteOps(V2WriteOpsBase):
+class V2DanglingFieldWriteOps(V2WriteOpsBase):
     """Sidecar writes, bound to a single session."""
 
-    async def create_sidecar[TRow: Base, TData](
-        self, creator: SidecarCreator[TRow, TData]
+    async def create_dangling_field[TRow: Base, TData](
+        self, entity_type: EntityType, creator: DanglingFieldCreator[TRow, TData]
     ) -> TData:
-        """Insert one sidecar row."""
-        row = creator.build_row()
+        """Insert one row that names a kind and no owner."""
+        row = creator.build_row(entity_type)
         await self._insert_row(row, creator.integrity_error_checks())
         return creator.to_data(row)
 
-    async def atomic_create_sidecars[TRow: Base, TData](
-        self, creators: Sequence[SidecarCreator[TRow, TData]]
+    async def atomic_create_dangling_fields[TRow: Base, TData](
+        self, entity_type: EntityType, creators: Sequence[DanglingFieldCreator[TRow, TData]]
     ) -> list[TData]:
-        """Insert sidecar rows atomically in a single flush."""
+        """Insert such rows atomically in a single flush."""
         if not creators:
             return []
-        rows = [creator.build_row() for creator in creators]
+        rows = [creator.build_row(entity_type) for creator in creators]
         # First creator's checks: all specs share the same creator subclass.
         await self._insert_rows(rows, creators[0].integrity_error_checks())
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
-    async def atomic_create_sidecars_with_fields[TRow: Base, TData, TFieldRow: Base, TFieldData](
+    async def atomic_create_dangling_fields_with_nested[
+        TRow: Base,
+        TData,
+        TFieldRow: Base,
+        TFieldData,
+    ](
         self,
-        creators: Sequence[SidecarCreator[TRow, TData]],
-        field_creators: Sequence[SidecarFieldCreator[Any, TFieldRow, TFieldData]],
+        entity_type: EntityType,
+        creators: Sequence[DanglingFieldCreator[TRow, TData]],
+        field_creators: Sequence[NestedFieldCreator[Any, TFieldRow, TFieldData]],
     ) -> list[TData]:
         """Insert sidecar rows and the rows each of them owns, in one transaction.
 
@@ -49,12 +56,10 @@ class V2SidecarWriteOps(V2WriteOpsBase):
         """
         if not creators:
             return []
-        rows = [creator.build_row() for creator in creators]
+        rows = [creator.build_row(entity_type) for creator in creators]
         await self._insert_rows(rows, creators[0].integrity_error_checks())
         if field_creators:
-            owner_ids = [
-                creator.sidecar_id(row) for creator, row in zip(creators, rows, strict=True)
-            ]
+            owner_ids = [creator.field_id(row) for creator, row in zip(creators, rows, strict=True)]
             await self._insert_rows(
                 [
                     field_creator.build_row(owner_id)

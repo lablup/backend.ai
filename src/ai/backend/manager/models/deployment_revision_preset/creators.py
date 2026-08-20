@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from ai.backend.common.config import PresetModelDefinition
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.preset_resource_slot import PresetResourceSlotID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.types import BinarySize
@@ -131,6 +132,10 @@ class PresetResourceSlotCreator(
     """Insert one slot quantity of the preset that owns it."""
 
     entry: ResourceSlotEntryData
+
+    @override
+    def field_id(self, row: PresetResourceSlotRow) -> PresetResourceSlotID:
+        return PresetResourceSlotID(row.id)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

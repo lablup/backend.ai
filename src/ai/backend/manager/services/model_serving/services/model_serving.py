@@ -16,6 +16,7 @@ from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectID
@@ -791,7 +792,7 @@ class ModelServingService:
             token = resp_json["token"]
 
         # Create token in database
-        token_id = uuid.uuid4()
+        token_id = DeploymentTokenID(uuid.uuid4())
         token_creator = Creator(
             spec=EndpointTokenCreatorSpec(
                 id=token_id,

@@ -10,6 +10,7 @@ from typing import Any, override
 import yarl
 
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
@@ -83,7 +84,7 @@ class EndpointCreatorSpec(CreatorSpec[EndpointRow]):
 class EndpointTokenCreatorSpec(CreatorSpec[EndpointTokenRow]):
     """CreatorSpec for endpoint token creation."""
 
-    id: uuid.UUID
+    id: DeploymentTokenID
     token: str
     endpoint: DeploymentID
     domain: str
