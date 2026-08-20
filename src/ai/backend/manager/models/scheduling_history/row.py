@@ -6,8 +6,11 @@ from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
@@ -42,7 +45,9 @@ class SessionSchedulingHistoryRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    session_id: Mapped[uuid.UUID] = mapped_column("session_id", GUID, nullable=False, index=True)
+    session_id: Mapped[SessionID] = mapped_column(
+        "session_id", GUID(SessionID), nullable=False, index=True
+    )
 
     phase: Mapped[str] = mapped_column("phase", sa.String(length=64), nullable=False)
     from_status: Mapped[str | None] = mapped_column(
@@ -128,8 +133,12 @@ class KernelSchedulingHistoryRow(Base):
         primary_key=True,
         server_default=sa.text("uuid_generate_v4()"),
     )
-    kernel_id: Mapped[uuid.UUID] = mapped_column("kernel_id", GUID, nullable=False, index=True)
-    session_id: Mapped[uuid.UUID] = mapped_column("session_id", GUID, nullable=False, index=True)
+    kernel_id: Mapped[KernelID] = mapped_column(
+        "kernel_id", GUID(KernelID), nullable=False, index=True
+    )
+    session_id: Mapped[SessionID] = mapped_column(
+        "session_id", GUID(SessionID), nullable=False, index=True
+    )
 
     phase: Mapped[str] = mapped_column("phase", sa.String(length=64), nullable=False)
     from_status: Mapped[str | None] = mapped_column(
@@ -194,8 +203,8 @@ class DeploymentHistoryRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    deployment_id: Mapped[uuid.UUID] = mapped_column(
-        "deployment_id", GUID, nullable=False, index=True
+    deployment_id: Mapped[DeploymentID] = mapped_column(
+        "deployment_id", GUID(DeploymentID), nullable=False, index=True
     )
 
     handler_category: Mapped[DeploymentHandlerCategory] = mapped_column(
@@ -267,8 +276,8 @@ class RouteHistoryRow(Base):
     route_id: Mapped[ReplicaID] = mapped_column(
         "route_id", GUID(ReplicaID), nullable=False, index=True
     )
-    deployment_id: Mapped[uuid.UUID] = mapped_column(
-        "deployment_id", GUID, nullable=False, index=True
+    deployment_id: Mapped[DeploymentID] = mapped_column(
+        "deployment_id", GUID(DeploymentID), nullable=False, index=True
     )
 
     category: Mapped[RouteHandlerCategory] = mapped_column(

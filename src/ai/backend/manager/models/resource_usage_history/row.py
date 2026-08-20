@@ -23,7 +23,11 @@ from decimal import Decimal
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.resource_usage_history.types import (
     DomainUsageBucketData,
@@ -64,10 +68,14 @@ class KernelUsageRecordRow(Base):
     )
 
     # Foreign keys (no FK constraints - referenced entities can be deleted)
-    kernel_id: Mapped[uuid.UUID] = mapped_column("kernel_id", GUID, nullable=False, index=True)
-    session_id: Mapped[uuid.UUID] = mapped_column("session_id", GUID, nullable=False)
-    user_uuid: Mapped[uuid.UUID] = mapped_column("user_uuid", GUID, nullable=False, index=True)
-    project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)
+    kernel_id: Mapped[KernelID] = mapped_column(
+        "kernel_id", GUID(KernelID), nullable=False, index=True
+    )
+    session_id: Mapped[SessionID] = mapped_column("session_id", GUID(SessionID), nullable=False)
+    user_uuid: Mapped[UserID] = mapped_column("user_uuid", GUID(UserID), nullable=False, index=True)
+    project_id: Mapped[ProjectID] = mapped_column(
+        "project_id", GUID(ProjectID), nullable=False, index=True
+    )
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
     )
@@ -199,7 +207,9 @@ class ProjectUsageBucketRow(LifecycleTimestampsMixin, Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)
+    project_id: Mapped[ProjectID] = mapped_column(
+        "project_id", GUID(ProjectID), nullable=False, index=True
+    )
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
     )
@@ -278,8 +288,10 @@ class UserUsageBucketRow(LifecycleTimestampsMixin, Base):
     )
 
     # User identification (user_uuid + project_id + domain_name combination)
-    user_uuid: Mapped[uuid.UUID] = mapped_column("user_uuid", GUID, nullable=False, index=True)
-    project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)
+    user_uuid: Mapped[UserID] = mapped_column("user_uuid", GUID(UserID), nullable=False, index=True)
+    project_id: Mapped[ProjectID] = mapped_column(
+        "project_id", GUID(ProjectID), nullable=False, index=True
+    )
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
     )

@@ -7,7 +7,6 @@ Database models for the unified service catalog:
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from typing import Any
 
@@ -98,9 +97,9 @@ class ServiceCatalogEndpointRow(Base):
     id: Mapped[ServiceCatalogID] = mapped_column(
         "id", GUID(ServiceCatalogID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    service_id: Mapped[uuid.UUID] = mapped_column(
+    service_id: Mapped[ServiceCatalogID] = mapped_column(
         "service_id",
-        GUID,
+        GUID(ServiceCatalogID),
         sa.ForeignKey("service_catalog.id", ondelete="CASCADE"),
         nullable=False,
     )

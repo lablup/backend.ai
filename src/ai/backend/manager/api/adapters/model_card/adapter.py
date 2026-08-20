@@ -8,6 +8,7 @@ from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
@@ -289,8 +290,8 @@ class ModelCardAdapter(BaseAdapter):
                 name=input.name,
                 vfolder_id=input.vfolder_id,
                 domain=input.domain_name or me.domain_name,
-                project_id=input.model_store_project_id,
-                creator_id=me.user_id,
+                project_id=ProjectID(input.model_store_project_id),
+                creator_id=UserID(me.user_id),
                 author=input.author,
                 title=input.title,
                 model_version=input.model_version,

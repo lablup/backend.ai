@@ -10,6 +10,8 @@ from typing import Any, override
 import yarl
 
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     ClusterMode,
     VFolderMount,
@@ -26,11 +28,11 @@ class EndpointCreatorSpec(CreatorSpec[EndpointRow]):
     name: str
     model_definition_path: str | None
     created_user: uuid.UUID
-    session_owner: uuid.UUID
+    session_owner: UserID
     image: uuid.UUID  # Image row ID
     model: uuid.UUID  # vfolder row ID
     domain: str
-    project: uuid.UUID
+    project: ProjectID
     resource_group: str  # Resource group row ID which is the name
     resource_slots: Mapping[str, Any]
     replicas: int = 0
@@ -85,8 +87,8 @@ class EndpointTokenCreatorSpec(CreatorSpec[EndpointTokenRow]):
     token: str
     endpoint: DeploymentID
     domain: str
-    project: uuid.UUID
-    session_owner: uuid.UUID
+    project: ProjectID
+    session_owner: UserID
 
     @override
     def build_row(self) -> EndpointTokenRow:

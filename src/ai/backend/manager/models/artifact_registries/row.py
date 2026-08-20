@@ -44,8 +44,11 @@ class ArtifactRegistryRow(Base):
 
     __tablename__ = "artifact_registries"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ArtifactRegistryID] = mapped_column(
+        "id",
+        GUID(ArtifactRegistryID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
     name: Mapped[str] = mapped_column("name", sa.String, nullable=False, unique=True)
     registry_id: Mapped[uuid.UUID] = mapped_column("registry_id", GUID, nullable=False, unique=True)

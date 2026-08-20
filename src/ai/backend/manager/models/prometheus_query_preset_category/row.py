@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import uuid
-
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -20,8 +18,11 @@ __all__ = ("PrometheusQueryPresetCategoryRow",)
 class PrometheusQueryPresetCategoryRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "prometheus_query_preset_categories"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[PrometheusQueryPresetCategoryID] = mapped_column(
+        "id",
+        GUID(PrometheusQueryPresetCategoryID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=128), nullable=False, unique=True)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)

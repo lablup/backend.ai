@@ -16,6 +16,7 @@ from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationsh
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.types import ScopeID
 from ai.backend.common.exception import UnknownImageRegistry
 from ai.backend.logging import BraceStyleAdapter
@@ -109,8 +110,11 @@ def _get_association_join_condition() -> sa.ColumnElement[bool]:
 class ContainerRegistryRow(Base):
     __tablename__ = "container_registries"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ContainerRegistryID] = mapped_column(
+        "id",
+        GUID(ContainerRegistryID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
     url: Mapped[str] = mapped_column("url", sa.String(length=512), index=True, nullable=False)
     registry_name: Mapped[str] = mapped_column(
@@ -148,7 +152,7 @@ class ContainerRegistryRow(Base):
 
     def __init__(
         self,
-        id: uuid.UUID,
+        id: ContainerRegistryID,
         url: str,
         registry_name: str,
         type: ContainerRegistryType,

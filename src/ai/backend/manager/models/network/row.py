@@ -10,6 +10,7 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship, selectinload
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.data.network.types import NetworkType
 from ai.backend.manager.models.base import (
     GUID,
@@ -57,9 +58,9 @@ class NetworkRow(LifecycleTimestampsMixin, Base):
         "options", pgsql.JSONB, nullable=False, default="{}", server_default="{}"
     )
 
-    project: Mapped[uuid.UUID] = mapped_column(
+    project: Mapped[ProjectID] = mapped_column(
         "project",
-        GUID,
+        GUID(ProjectID),
         nullable=False,
     )
     domain_name: Mapped[str] = mapped_column(
@@ -83,7 +84,7 @@ class NetworkRow(LifecycleTimestampsMixin, Base):
         ref_name: str,
         driver: str,
         domain: str,
-        project: uuid.UUID,
+        project: ProjectID,
         *,
         options: Mapping[str, Any] | None = None,
     ) -> None:

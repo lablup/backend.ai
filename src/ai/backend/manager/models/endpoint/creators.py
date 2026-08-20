@@ -9,6 +9,8 @@ from datetime import datetime
 from typing import override
 
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.deployment.types import ModelDeploymentAccessTokenData
 from ai.backend.manager.models.endpoint.row import EndpointTokenRow
 from ai.backend.manager.models.specs.creator import FieldCreator
@@ -27,8 +29,8 @@ class EndpointTokenCreator(
     """
 
     domain: str
-    project_id: uuid.UUID
-    session_owner_id: uuid.UUID
+    project_id: ProjectID
+    session_owner_id: UserID
     token: str
     expires_at: datetime | None = None
 

@@ -53,7 +53,7 @@ class ContainerRegistryCreatorSpec(CreatorSpec[ContainerRegistryRow]):
     @override
     def build_row(self) -> ContainerRegistryRow:
         return ContainerRegistryRow(
-            id=uuid.uuid4(),
+            id=ContainerRegistryID(uuid.uuid4()),
             url=self.url,
             type=self.type,
             registry_name=self.registry_name,

@@ -24,7 +24,8 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.defs import (
     MODEL_VFOLDER_LENGTH_LIMIT,
@@ -333,7 +334,7 @@ class VFolderRow(LifecycleTimestampsMixin, Base):
     )
     # creator is always set to the user who created vfolder (regardless user/project types)
     creator: Mapped[str | None] = mapped_column("creator", sa.String(length=128), nullable=True)
-    creator_id: Mapped[uuid.UUID | None] = mapped_column("creator_id", GUID, nullable=True)
+    creator_id: Mapped[UserID | None] = mapped_column("creator_id", GUID(UserID), nullable=True)
     # unmanaged vfolder represents the host-side absolute path instead of storage-based path.
     unmanaged_path: Mapped[str | None] = mapped_column(
         "unmanaged_path", sa.String(length=512), nullable=True
@@ -345,11 +346,11 @@ class VFolderRow(LifecycleTimestampsMixin, Base):
         nullable=False,
         index=True,
     )
-    user: Mapped[uuid.UUID | None] = mapped_column(
-        "user", GUID, nullable=True
+    user: Mapped[UserID | None] = mapped_column(
+        "user", GUID(UserID), nullable=True
     )  # owner if user vfolder
-    group: Mapped[uuid.UUID | None] = mapped_column(
-        "group", GUID, nullable=True
+    group: Mapped[ProjectID | None] = mapped_column(
+        "group", GUID(ProjectID), nullable=True
     )  # owner if project vfolder
     cloneable: Mapped[bool] = mapped_column("cloneable", sa.Boolean, default=False, nullable=False)
     status: Mapped[VFolderOperationStatus] = mapped_column(
@@ -470,8 +471,8 @@ vfolder_attachment = sa.Table(
 class VFolderInvitationRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "vfolder_invitations"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[VFolderUUID] = mapped_column(
+        "id", GUID(VFolderUUID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     permission: Mapped[VFolderPermission | None] = mapped_column(
         "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
@@ -500,8 +501,8 @@ vfolder_invitations = VFolderInvitationRow.__table__
 class VFolderPermissionRow(Base):
     __tablename__ = "vfolder_permissions"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[VFolderUUID] = mapped_column(
+        "id", GUID(VFolderUUID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     permission: Mapped[VFolderPermission | None] = mapped_column(
         "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
@@ -512,8 +513,8 @@ class VFolderPermissionRow(Base):
         sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
-    user: Mapped[uuid.UUID] = mapped_column(
-        "user", GUID, sa.ForeignKey("users.uuid"), nullable=False
+    user: Mapped[UserID] = mapped_column(
+        "user", GUID(UserID), sa.ForeignKey("users.uuid"), nullable=False
     )
 
 

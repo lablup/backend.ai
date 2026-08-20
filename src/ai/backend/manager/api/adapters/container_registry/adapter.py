@@ -276,7 +276,7 @@ class ContainerRegistryAdapter(BaseAdapter):
             SearchContainerRegistriesAction(querier=querier)
         )
         registry_map = {item.id: self._data_to_dto(item) for item in action_result.data}
-        return [registry_map.get(registry_id) for registry_id in ids]
+        return [registry_map.get(ContainerRegistryID(registry_id)) for registry_id in ids]
 
     @staticmethod
     def _data_to_dto(data: ContainerRegistryData) -> ContainerRegistryNode:

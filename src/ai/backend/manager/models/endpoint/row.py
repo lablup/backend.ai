@@ -31,8 +31,11 @@ from sqlalchemy.orm import (
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     AutoScalingMetricComparator,
@@ -169,7 +172,7 @@ class EndpointRow(Base):
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=512), nullable=False)
     created_user: Mapped[UUID] = mapped_column("created_user", GUID, nullable=False)
-    session_owner: Mapped[UUID] = mapped_column("session_owner", GUID, nullable=False)
+    session_owner: Mapped[UserID] = mapped_column("session_owner", GUID(UserID), nullable=False)
     # minus session count means this endpoint is requested for removal
     replicas: Mapped[int] = mapped_column(
         "replicas", sa.Integer, nullable=False, default=0, server_default="0"
@@ -183,9 +186,9 @@ class EndpointRow(Base):
         sa.ForeignKey("domains.name", ondelete="RESTRICT"),
         nullable=False,
     )
-    project: Mapped[UUID] = mapped_column(
+    project: Mapped[ProjectID] = mapped_column(
         "project",
-        GUID,
+        GUID(ProjectID),
         sa.ForeignKey("groups.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -591,7 +594,7 @@ class EndpointRow(Base):
     async def delegate_endpoint_ownership(
         db_session: AsyncSession,
         owner_user_uuid: UUID,
-        target_user_uuid: UUID,
+        target_user_uuid: UserID,
         target_access_key: AccessKey,
     ) -> None:
         from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
@@ -887,16 +890,16 @@ class EndpointTokenRow(Base):
     )
     token: Mapped[str] = mapped_column("token", sa.String(), nullable=False)
     endpoint: Mapped[DeploymentID | None] = mapped_column("endpoint", GUID, nullable=True)
-    session_owner: Mapped[UUID] = mapped_column("session_owner", GUID, nullable=False)
+    session_owner: Mapped[UserID] = mapped_column("session_owner", GUID(UserID), nullable=False)
     domain: Mapped[str] = mapped_column(
         "domain",
         sa.String(length=64),
         sa.ForeignKey("domains.name", ondelete="CASCADE"),
         nullable=False,
     )
-    project: Mapped[UUID] = mapped_column(
+    project: Mapped[ProjectID] = mapped_column(
         "project",
-        GUID,
+        GUID(ProjectID),
         sa.ForeignKey("groups.id", ondelete="CASCADE"),
         nullable=False,
     )
@@ -920,8 +923,8 @@ class EndpointTokenRow(Base):
         token: str,
         endpoint: DeploymentID,
         domain: str,
-        project: UUID,
-        session_owner: UUID,
+        project: ProjectID,
+        session_owner: UserID,
         expires_at: datetime | None = None,
     ) -> None:
         self.id = id
@@ -985,7 +988,7 @@ class EndpointTokenRow(Base):
             raise NoResultFound
         return row
 
-    def delegate_ownership(self, user_uuid: UUID) -> None:
+    def delegate_ownership(self, user_uuid: UserID) -> None:
         self.session_owner = user_uuid
 
     def to_dataclass(self) -> EndpointTokenData:
@@ -1024,9 +1027,9 @@ class EndpointAutoScalingRuleRow(Base):
     min_replicas: Mapped[int | None] = mapped_column("min_replicas", sa.Integer(), nullable=True)
     max_replicas: Mapped[int | None] = mapped_column("max_replicas", sa.Integer(), nullable=True)
 
-    prometheus_query_preset_id: Mapped[UUID | None] = mapped_column(
+    prometheus_query_preset_id: Mapped[PrometheusQueryPresetID | None] = mapped_column(
         "prometheus_query_preset_id",
-        GUID,
+        GUID(PrometheusQueryPresetID),
         sa.ForeignKey("prometheus_query_presets.id", ondelete="SET NULL"),
         nullable=True,
     )

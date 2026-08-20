@@ -23,6 +23,7 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.dispatcher import (
@@ -797,8 +798,8 @@ class ModelServingService:
                 token=token,
                 endpoint=DeploymentID(endpoint_data.id),
                 domain=endpoint_data.domain,
-                project=endpoint_data.project,
-                session_owner=endpoint_data.session_owner_id,
+                project=ProjectID(endpoint_data.project),
+                session_owner=UserID(endpoint_data.session_owner_id),
             )
         )
 

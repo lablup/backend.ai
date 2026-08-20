@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Self
 from uuid import UUID
@@ -45,8 +44,8 @@ type QueryOption = Callable[[WhereableStatement[Any]], WhereableStatement[Any]]
 
 class ResourcePresetRow(Base):
     __tablename__ = "resource_presets"
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ResourcePresetID] = mapped_column(
+        "id", GUID(ResourcePresetID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=256), nullable=False)
     resource_slots: Mapped[ResourceSlot] = mapped_column(

@@ -5,6 +5,8 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.role_invitation.types import (
     RoleInvitationData,
     RoleInvitationState,
@@ -28,21 +30,21 @@ class RoleInvitationRow(LifecycleTimestampsMixin, Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    inviter_user_id: Mapped[uuid.UUID | None] = mapped_column(
+    inviter_user_id: Mapped[UserID | None] = mapped_column(
         "inviter_user_id",
-        GUID,
+        GUID(UserID),
         sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="SET NULL"),
         nullable=True,
     )
-    invitee_user_id: Mapped[uuid.UUID] = mapped_column(
+    invitee_user_id: Mapped[UserID] = mapped_column(
         "invitee_user_id",
-        GUID,
+        GUID(UserID),
         sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
-    role_id: Mapped[uuid.UUID] = mapped_column(
+    role_id: Mapped[RoleID] = mapped_column(
         "role_id",
-        GUID,
+        GUID(RoleID),
         sa.ForeignKey("roles.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )

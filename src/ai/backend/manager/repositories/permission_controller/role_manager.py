@@ -301,7 +301,7 @@ class RoleManager:
                 )
             )
         ).all()
-        existing_role_user_maps = defaultdict(set)
+        existing_role_user_maps: defaultdict[uuid.UUID, set[uuid.UUID]] = defaultdict(set)
         for user_role in user_role_rows:
             existing_role_user_maps[user_role.role_id].add(user_role.user_id)
         return existing_role_user_maps

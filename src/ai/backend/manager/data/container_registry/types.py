@@ -1,13 +1,13 @@
-import uuid
 from dataclasses import dataclass
 from typing import Any
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 
 
 @dataclass
 class ContainerRegistryData:
-    id: uuid.UUID
+    id: ContainerRegistryID
     url: str
     registry_name: str
     type: ContainerRegistryType
@@ -38,7 +38,7 @@ class PerProjectContainerRegistryInfo:
     the data is validated during the lookup process (GroupRow → ContainerRegistryRow).
     """
 
-    id: uuid.UUID
+    id: ContainerRegistryID
     url: str
     registry_name: str
     type: ContainerRegistryType

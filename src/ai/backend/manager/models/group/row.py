@@ -32,7 +32,9 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import ScopeID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.group.types import GroupData, ProjectType
@@ -120,18 +122,18 @@ class AssocGroupUserRow(Base):
         sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ProjectID] = mapped_column(
+        "id", GUID(ProjectID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(
+    user_id: Mapped[UserID] = mapped_column(
         "user_id",
-        GUID,
+        GUID(UserID),
         sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
-    group_id: Mapped[uuid.UUID] = mapped_column(
+    group_id: Mapped[ProjectID] = mapped_column(
         "group_id",
-        GUID,
+        GUID(ProjectID),
         sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
@@ -148,8 +150,8 @@ class GroupRow(LifecycleTimestampsMixin, Base):
         sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ProjectID] = mapped_column(
+        "id", GUID(ProjectID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column(
         "name", SlugType(length=64, allow_unicode=True, allow_dot=True), nullable=False

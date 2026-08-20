@@ -23,7 +23,9 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -217,10 +219,10 @@ class KernelRow(CreatedAtMixin, Base):
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False
     )
-    group_id: Mapped[uuid.UUID] = mapped_column(
-        "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
+    group_id: Mapped[ProjectID] = mapped_column(
+        "group_id", GUID(ProjectID), sa.ForeignKey("groups.id"), nullable=False
     )
-    user_uuid: Mapped[uuid.UUID] = mapped_column("user_uuid", GUID, nullable=False)
+    user_uuid: Mapped[UserID] = mapped_column("user_uuid", GUID(UserID), nullable=False)
     access_key: Mapped[str | None] = mapped_column(
         "access_key", sa.String(length=20), nullable=True
     )
@@ -501,7 +503,7 @@ class KernelRow(CreatedAtMixin, Base):
 
         return await execute_with_retry(_query)
 
-    def delegate_ownership(self, user_uuid: uuid.UUID, access_key: AccessKey) -> None:
+    def delegate_ownership(self, user_uuid: UserID, access_key: AccessKey) -> None:
         self.user_uuid = user_uuid
         self.access_key = access_key
 

@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     CreateRuntimeVariantPresetInput,
@@ -159,7 +160,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
     ) -> CreateRuntimeVariantPresetPayload:
         creator = Creator(
             spec=RuntimeVariantPresetCreatorSpec(
-                runtime_variant_id=input.runtime_variant_id,
+                runtime_variant_id=RuntimeVariantID(input.runtime_variant_id),
                 name=input.name,
                 description=input.description,
                 rank=0,

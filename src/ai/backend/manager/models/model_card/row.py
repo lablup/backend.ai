@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import uuid
-
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.model_card import ModelCardID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.models.base import GUID, Base
@@ -21,8 +22,8 @@ class ModelCardRow(LifecycleTimestampsMixin, Base):
         sa.UniqueConstraint("name", "domain", "project", name="uq_model_cards_name_domain_project"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ModelCardID] = mapped_column(
+        "id", GUID(ModelCardID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=512), nullable=False)
     vfolder: Mapped[VFolderUUID] = mapped_column(
@@ -37,15 +38,15 @@ class ModelCardRow(LifecycleTimestampsMixin, Base):
         sa.ForeignKey("domains.name", ondelete="RESTRICT"),
         nullable=False,
     )
-    project: Mapped[uuid.UUID] = mapped_column(
+    project: Mapped[ProjectID] = mapped_column(
         "project",
-        GUID,
+        GUID(ProjectID),
         sa.ForeignKey("groups.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    creator: Mapped[uuid.UUID] = mapped_column(
+    creator: Mapped[UserID] = mapped_column(
         "creator",
-        GUID,
+        GUID(UserID),
         sa.ForeignKey("users.uuid", ondelete="RESTRICT"),
         nullable=False,
     )

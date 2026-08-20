@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData
@@ -31,8 +32,8 @@ class AuditLogRow(Base):
     __tablename__ = "audit_logs"
     __table_args__ = (sa.Index("ix_audit_logs_lookup", "lookup_kind", "lookup_key"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[AuditLogID] = mapped_column(
+        "id", GUID(AuditLogID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
 
     action_kind: Mapped[ActionKind | None] = mapped_column(
@@ -68,7 +69,7 @@ class AuditLogRow(Base):
     action_id: Mapped[uuid.UUID] = mapped_column("action_id", GUID, nullable=False)
     request_id: Mapped[str | None] = mapped_column("request_id", sa.String, nullable=True)
     triggered_by: Mapped[str | None] = mapped_column("triggered_by", sa.String, nullable=True)
-    acted_as: Mapped[uuid.UUID | None] = mapped_column("acted_as", GUID, nullable=True)
+    acted_as: Mapped[UserID | None] = mapped_column("acted_as", GUID(UserID), nullable=True)
     description: Mapped[str] = mapped_column("description", sa.String, nullable=False)
     duration: Mapped[timedelta | None] = mapped_column("duration", sa.Interval, nullable=True)
 

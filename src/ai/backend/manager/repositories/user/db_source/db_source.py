@@ -580,7 +580,7 @@ class UserDBSource:
                     f"User {target_user_uuid} has no default keypair to delegate endpoints to."
                 )
             await EndpointRow.delegate_endpoint_ownership(
-                session, user_uuid, target_user_uuid, default_access_key
+                session, user_uuid, UserID(target_user_uuid), default_access_key
             )
 
     async def delete_endpoints(

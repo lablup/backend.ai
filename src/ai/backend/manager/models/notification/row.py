@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.notification import (
     NotificationChannelID,
     NotificationRuleID,
 )
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.notification import (
     EmailSpec,
     NotificationChannelType,
@@ -56,7 +57,7 @@ class NotificationChannelRow(Base):
     enabled: Mapped[bool] = mapped_column(
         "enabled", sa.Boolean, nullable=False, default=True, index=True
     )
-    created_by: Mapped[uuid.UUID] = mapped_column("created_by", GUID, nullable=False)
+    created_by: Mapped[UserID] = mapped_column("created_by", GUID(UserID), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
@@ -108,12 +109,14 @@ class NotificationRuleRow(Base):
     rule_type: Mapped[str] = mapped_column(
         "rule_type", sa.String(length=256), nullable=False, index=True
     )
-    channel_id: Mapped[uuid.UUID] = mapped_column("channel_id", GUID, nullable=False)
+    channel_id: Mapped[NotificationChannelID] = mapped_column(
+        "channel_id", GUID(NotificationChannelID), nullable=False
+    )
     message_template: Mapped[str] = mapped_column("message_template", sa.Text, nullable=False)
     enabled: Mapped[bool] = mapped_column(
         "enabled", sa.Boolean, nullable=False, default=True, index=True
     )
-    created_by: Mapped[uuid.UUID] = mapped_column("created_by", GUID, nullable=False)
+    created_by: Mapped[UserID] = mapped_column("created_by", GUID(UserID), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),

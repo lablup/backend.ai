@@ -6,6 +6,7 @@ from typing import Any, Self
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
 from ai.backend.manager.data.permission.types import (
@@ -37,7 +38,7 @@ class ObjectPermissionRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    role_id: Mapped[uuid.UUID] = mapped_column("role_id", GUID, nullable=False)
+    role_id: Mapped[RoleID] = mapped_column("role_id", GUID(RoleID), nullable=False)
     entity_type: Mapped[EntityType] = mapped_column(
         "entity_type", StrEnumType(EntityType, length=32), nullable=False
     )

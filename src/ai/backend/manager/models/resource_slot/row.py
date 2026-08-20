@@ -8,7 +8,6 @@ Database models for normalized resource slot management:
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from decimal import Decimal
 
@@ -17,9 +16,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai.backend.common.data.entity.agent_resource import AgentResourceID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_revision_resource_slot import (
     DeploymentRevisionResourceSlotID,
 )
+from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.model_card_resource_requirement import (
     ModelCardResourceRequirementID,
 )
@@ -213,7 +215,7 @@ class ResourceAllocationRow(CreatedAtMixin, Base):
         nullable=False,
         server_default=sa.text("uuid_generate_v4()"),
     )
-    kernel_id: Mapped[uuid.UUID] = mapped_column("kernel_id", GUID, primary_key=True)
+    kernel_id: Mapped[KernelID] = mapped_column("kernel_id", GUID(KernelID), primary_key=True)
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     requested: Mapped[Decimal] = mapped_column(
         "requested", sa.Numeric(precision=24, scale=6), nullable=False
@@ -292,7 +294,9 @@ class ModelCardResourceRequirementRow(Base):
         nullable=False,
         server_default=sa.text("uuid_generate_v4()"),
     )
-    model_card_id: Mapped[uuid.UUID] = mapped_column("model_card_id", GUID, primary_key=True)
+    model_card_id: Mapped[ModelCardID] = mapped_column(
+        "model_card_id", GUID(ModelCardID), primary_key=True
+    )
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     min_quantity: Mapped[Decimal] = mapped_column(
         "min_quantity", sa.Numeric(precision=24, scale=6), nullable=False
@@ -368,7 +372,9 @@ class DeploymentRevisionResourceSlotRow(Base):
         nullable=False,
         server_default=sa.text("uuid_generate_v4()"),
     )
-    revision_id: Mapped[uuid.UUID] = mapped_column("revision_id", GUID, primary_key=True)
+    revision_id: Mapped[DeploymentRevisionID] = mapped_column(
+        "revision_id", GUID(DeploymentRevisionID), primary_key=True
+    )
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     quantity: Mapped[Decimal] = mapped_column(
         "quantity", sa.Numeric(precision=24, scale=6), nullable=False

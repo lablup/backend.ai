@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.data.model_card.types import ResourceRequirementEntry
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
@@ -20,8 +22,8 @@ class ModelCardCreatorSpec(CreatorSpec[ModelCardRow]):
     name: str
     vfolder_id: VFolderUUID
     domain: str
-    project_id: UUID
-    creator_id: UUID
+    project_id: ProjectID
+    creator_id: UserID
     author: str | None
     title: str | None
     model_version: str | None

@@ -14,8 +14,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
@@ -59,11 +63,14 @@ class RoutingRow(Base):
         sa.ForeignKey("endpoints.id", ondelete="CASCADE"),
         nullable=False,
     )
-    session: Mapped[uuid.UUID | None] = mapped_column(
-        "session", GUID, sa.ForeignKey("sessions.id", ondelete="RESTRICT"), nullable=True
+    session: Mapped[SessionID | None] = mapped_column(
+        "session", GUID(SessionID), sa.ForeignKey("sessions.id", ondelete="RESTRICT"), nullable=True
     )
-    session_owner: Mapped[uuid.UUID] = mapped_column(
-        "session_owner", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
+    session_owner: Mapped[UserID] = mapped_column(
+        "session_owner",
+        GUID(UserID),
+        sa.ForeignKey("users.uuid", ondelete="RESTRICT"),
+        nullable=False,
     )
     domain: Mapped[str] = mapped_column(
         "domain",
@@ -71,9 +78,9 @@ class RoutingRow(Base):
         sa.ForeignKey("domains.name", ondelete="RESTRICT"),
         nullable=False,
     )
-    project: Mapped[uuid.UUID] = mapped_column(
+    project: Mapped[ProjectID] = mapped_column(
         "project",
-        GUID,
+        GUID(ProjectID),
         sa.ForeignKey("groups.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -126,7 +133,9 @@ class RoutingRow(Base):
     )
 
     # Revision reference without FK (relationship only)
-    revision: Mapped[uuid.UUID] = mapped_column("revision", GUID, nullable=False)
+    revision: Mapped[DeploymentRevisionID] = mapped_column(
+        "revision", GUID(DeploymentRevisionID), nullable=False
+    )
     # Replica group this replica belongs to (``NULL`` until assigned). FK is SET NULL on group delete.
     replica_group_id: Mapped[ReplicaGroupID | None] = mapped_column(
         "replica_group_id",
@@ -257,7 +266,7 @@ class RoutingRow(Base):
             raise NoResultFound
         return row
 
-    def delegate_ownership(self, user_uuid: uuid.UUID) -> None:
+    def delegate_ownership(self, user_uuid: UserID) -> None:
         self.session_owner = user_uuid
 
     def to_data(self) -> RoutingData:

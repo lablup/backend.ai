@@ -8,6 +8,8 @@ from uuid import UUID
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
     DeploymentStrategy,
@@ -1058,8 +1060,8 @@ class DeploymentService:
             action.deployment_id,
             EndpointTokenCreator(
                 domain=endpoint_info.metadata.domain,
-                project_id=endpoint_info.metadata.project,
-                session_owner_id=endpoint_info.metadata.session_owner,
+                project_id=ProjectID(endpoint_info.metadata.project),
+                session_owner_id=UserID(endpoint_info.metadata.session_owner),
                 expires_at=expires_at,
                 token=jwt_token,
             ),

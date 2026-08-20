@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import uuid
-
 import sqlalchemy as sa
 from pydantic import ConfigDict
 from sqlalchemy.orm import Mapped, mapped_column
@@ -32,8 +30,11 @@ class PresetOptions(BackendAISchema):
 class PrometheusQueryPresetRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "prometheus_query_presets"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[PrometheusQueryPresetID] = mapped_column(
+        "id",
+        GUID(PrometheusQueryPresetID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=256), nullable=False)
     metric_name: Mapped[str] = mapped_column("metric_name", sa.String(length=256), nullable=False)
@@ -45,9 +46,9 @@ class PrometheusQueryPresetRow(LifecycleTimestampsMixin, Base):
     rank: Mapped[int] = mapped_column(
         "rank", sa.Integer, nullable=False, server_default=sa.text("0")
     )
-    category_id: Mapped[uuid.UUID | None] = mapped_column(
+    category_id: Mapped[PrometheusQueryPresetCategoryID | None] = mapped_column(
         "category_id",
-        GUID,
+        GUID(PrometheusQueryPresetCategoryID),
         sa.ForeignKey("prometheus_query_preset_categories.id", ondelete="SET NULL"),
         nullable=True,
     )

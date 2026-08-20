@@ -34,8 +34,12 @@ from sqlalchemy.orm import (
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
@@ -471,12 +475,12 @@ class SessionRow(CreatedAtMixin, Base):
         index=True,
         nullable=False,
     )
-    group_id: Mapped[UUID] = mapped_column(
-        "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
+    group_id: Mapped[ProjectID] = mapped_column(
+        "group_id", GUID(ProjectID), sa.ForeignKey("groups.id"), nullable=False
     )
     group: Mapped[GroupRow] = relationship("GroupRow")
-    user_uuid: Mapped[UUID] = mapped_column(
-        "user_uuid", GUID, server_default=sa.text("uuid_generate_v4()"), nullable=False
+    user_uuid: Mapped[UserID] = mapped_column(
+        "user_uuid", GUID(UserID), server_default=sa.text("uuid_generate_v4()"), nullable=False
     )
     user: Mapped[UserRow] = relationship(
         "UserRow",
@@ -625,9 +629,9 @@ class SessionRow(CreatedAtMixin, Base):
     # nullable cycle with routings.session -> sessions.id; `use_alter` lets
     # create_all() order the two tables, and the routing/session_row relationship
     # below pins `foreign_keys` so SQLAlchemy can disambiguate the two FK paths.
-    replica_id: Mapped[UUID | None] = mapped_column(
+    replica_id: Mapped[ReplicaID | None] = mapped_column(
         "replica_id",
-        GUID,
+        GUID(ReplicaID),
         sa.ForeignKey(
             "routings.id",
             ondelete="SET NULL",
@@ -907,7 +911,7 @@ class SessionRow(CreatedAtMixin, Base):
         async with db.connect() as db_conn:
             return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
 
-    def delegate_ownership(self, user_uuid: UUID, access_key: AccessKey) -> None:
+    def delegate_ownership(self, user_uuid: UserID, access_key: AccessKey) -> None:
         self.user_uuid = user_uuid
         self.access_key = access_key
         for kernel_row in self.kernels:
@@ -1223,16 +1227,16 @@ def by_raw_filter(filter_spec: FieldSpecType, raw_filter: str) -> QueryCondition
 
 class SessionDependencyRow(Base):
     __tablename__ = "session_dependencies"
-    session_id: Mapped[UUID] = mapped_column(
+    session_id: Mapped[SessionID] = mapped_column(
         "session_id",
-        GUID,
+        GUID(SessionID),
         sa.ForeignKey("sessions.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
-    depends_on: Mapped[UUID] = mapped_column(
+    depends_on: Mapped[SessionID] = mapped_column(
         "depends_on",
-        GUID,
+        GUID(SessionID),
         sa.ForeignKey("sessions.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,

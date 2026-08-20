@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
@@ -350,7 +351,7 @@ class PermissionDBSource:
             spec=UserRoleCreatorSpec(
                 user_id=data.user_id,
                 role_id=data.role_id,
-                granted_by=data.granted_by,
+                granted_by=None if data.granted_by is None else UserID(data.granted_by),
             )
         )
         result = await execute_creator(db_session, creator)
