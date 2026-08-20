@@ -14,12 +14,8 @@ from dataclasses import dataclass, field
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeRef, ScopeType
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.types import EntityID, EntityRef, EntityType, ScopeType
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeRef, ScopeType
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID

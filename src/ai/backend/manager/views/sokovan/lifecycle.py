@@ -11,7 +11,6 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ArchName,
-    BinarySize,
     ClusterMode,
     KernelId,
     ResourceSlot,

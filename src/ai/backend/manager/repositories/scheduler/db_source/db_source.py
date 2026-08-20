@@ -22,11 +22,6 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack
-from ai.backend.common.data.permission.types import (
-    RBACElementType,
-)
-from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
-from ai.backend.common.data.entity.architecture import ArchName
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectID
@@ -40,6 +35,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import (
     RBACElementType,
 )
+from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
