@@ -232,7 +232,7 @@ class ArtifactAdapter(BaseAdapter):
         )
 
         artifact_map = {item.id: self._data_to_dto(item) for item in action_result.data}
-        return [artifact_map.get(artifact_id) for artifact_id in artifact_ids]
+        return [artifact_map.get(ArtifactID(artifact_id)) for artifact_id in artifact_ids]
 
     async def batch_load_revisions_by_ids(
         self, revision_ids: Sequence[UUID]
@@ -254,7 +254,7 @@ class ArtifactAdapter(BaseAdapter):
         )
 
         revision_map = {item.id: self._revision_data_to_dto(item) for item in action_result.data}
-        return [revision_map.get(revision_id) for revision_id in revision_ids]
+        return [revision_map.get(ArtifactRevisionID(revision_id)) for revision_id in revision_ids]
 
     async def get(self, artifact_id: UUID) -> ArtifactNode:
         """Retrieve a single artifact by ID."""

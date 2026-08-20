@@ -16,6 +16,7 @@ from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     ArtifactRevisionDownloadProgress,
 )
+from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.storage.types import ArtifactStorageType
@@ -196,8 +197,8 @@ class TestArtifactRevisionService:
         """Create sample artifact revision data"""
         now = datetime.now(UTC)
         return ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="# DialoGPT-medium\n\nA conversational AI model.",
             size=1024000,
@@ -475,7 +476,7 @@ class TestArtifactServiceRevisionOperations:
         now = datetime.now(UTC)
         registry_id = uuid.uuid4()
         return ArtifactData(
-            id=uuid.uuid4(),
+            id=ArtifactID(uuid.uuid4()),
             name="microsoft/DialoGPT-medium",
             type=ArtifactType.MODEL,
             description="A conversational AI model by Microsoft",
@@ -495,7 +496,7 @@ class TestArtifactServiceRevisionOperations:
         """Create sample artifact revision data"""
         now = datetime.now(UTC)
         return ArtifactRevisionData(
-            id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
             artifact_id=sample_artifact_data.id,
             version="main",
             readme="# DialoGPT-medium\n\nA conversational AI model.",
@@ -653,8 +654,8 @@ class TestImportArtifactRevisionAction:
     def sample_revision(self) -> ArtifactRevisionData:
         now = datetime.now(UTC)
         return ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="# Model",
             size=1024000,
@@ -857,8 +858,8 @@ class TestImportArtifactRevisionAction:
         """Unsupported registry type raises InvalidArtifactRegistryTypeError"""
         now = datetime.now(UTC)
         revision = ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -1004,8 +1005,8 @@ class TestDelegateImportArtifactRevisionBatchAction:
 
         revision_id = uuid.uuid4()
         revision_data = ArtifactRevisionData(
-            id=revision_id,
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(revision_id),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -1067,8 +1068,8 @@ class TestDelegateImportArtifactRevisionBatchAction:
 
         revision_id = uuid.uuid4()
         revision_data = ArtifactRevisionData(
-            id=revision_id,
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(revision_id),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -1163,8 +1164,8 @@ class TestDelegateImportArtifactRevisionBatchAction:
         )
 
         revision_data = ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -1226,8 +1227,8 @@ class TestCancelImportAction:
         now = datetime.now(UTC)
         revision_id = uuid.uuid4()
         reset_revision = ArtifactRevisionData(
-            id=revision_id,
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(revision_id),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -1244,7 +1245,7 @@ class TestCancelImportAction:
             return_value=reset_revision
         )
 
-        action = CancelImportAction(artifact_revision_id=revision_id)
+        action = CancelImportAction(artifact_revision_id=ArtifactRevisionID(revision_id))
         result = await service.cancel_import(action)
 
         assert result.result == reset_revision
@@ -1259,8 +1260,8 @@ class TestCancelImportAction:
         now = datetime.now(UTC)
         revision_id = uuid.uuid4()
         revision = ArtifactRevisionData(
-            id=revision_id,
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(revision_id),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -1275,7 +1276,7 @@ class TestCancelImportAction:
         mock_artifact_repository.reset_artifact_revision_status = AsyncMock()
         mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(return_value=revision)
 
-        action = CancelImportAction(artifact_revision_id=revision_id)
+        action = CancelImportAction(artifact_revision_id=ArtifactRevisionID(revision_id))
         result = await service.cancel_import(action)
 
         assert result.result == revision
@@ -1486,8 +1487,8 @@ class TestCleanupArtifactRevisionAction:
         namespace_id = uuid.uuid4()
 
         revision = ArtifactRevisionData(
-            id=revision_id,
-            artifact_id=artifact_id,
+            id=ArtifactRevisionID(revision_id),
+            artifact_id=ArtifactID(artifact_id),
             version="v1",
             readme="",
             size=100,
@@ -1499,7 +1500,7 @@ class TestCleanupArtifactRevisionAction:
             verification_result=None,
         )
         artifact = ArtifactData(
-            id=artifact_id,
+            id=ArtifactID(artifact_id),
             name="test-model",
             type=ArtifactType.MODEL,
             description="",
@@ -1550,7 +1551,7 @@ class TestCleanupArtifactRevisionAction:
         storage_proxy_client.delete_s3_object = AsyncMock()
         mock_storage_manager.get_manager_facing_client.return_value = storage_proxy_client
 
-        action = CleanupArtifactRevisionAction(artifact_revision_id=revision_id)
+        action = CleanupArtifactRevisionAction(artifact_revision_id=ArtifactRevisionID(revision_id))
         result = await service.cleanup(action)
 
         assert result.result == revision
@@ -1565,8 +1566,8 @@ class TestCleanupArtifactRevisionAction:
         """SCANNED state raises ArtifactDeletionBadRequestError"""
         now = datetime.now(UTC)
         revision = ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="v1",
             readme="",
             size=100,
@@ -1592,8 +1593,8 @@ class TestCleanupArtifactRevisionAction:
         """PULLING state raises ArtifactDeletionBadRequestError"""
         now = datetime.now(UTC)
         revision = ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="v1",
             readme="",
             size=100,
@@ -1628,8 +1629,8 @@ class TestCleanupArtifactRevisionAction:
         namespace_id = uuid.uuid4()
 
         revision = ArtifactRevisionData(
-            id=revision_id,
-            artifact_id=artifact_id,
+            id=ArtifactRevisionID(revision_id),
+            artifact_id=ArtifactID(artifact_id),
             version="v1",
             readme="",
             size=100,
@@ -1641,7 +1642,7 @@ class TestCleanupArtifactRevisionAction:
             verification_result=None,
         )
         artifact = ArtifactData(
-            id=artifact_id,
+            id=ArtifactID(artifact_id),
             name="test-model",
             type=ArtifactType.MODEL,
             description="",
@@ -1694,7 +1695,7 @@ class TestCleanupArtifactRevisionAction:
         storage_proxy_client.delete_s3_object = AsyncMock()
         mock_storage_manager.get_manager_facing_client.return_value = storage_proxy_client
 
-        action = CleanupArtifactRevisionAction(artifact_revision_id=revision_id)
+        action = CleanupArtifactRevisionAction(artifact_revision_id=ArtifactRevisionID(revision_id))
         result = await service.cleanup(action)
 
         assert result.result == revision
@@ -1752,8 +1753,8 @@ class TestGetDownloadProgressAction:
         """HuggingFace returns local progress only (remote=None)"""
         now = datetime.now(UTC)
         revision = ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -1804,8 +1805,8 @@ class TestGetDownloadProgressAction:
         """Reservoir+delegation returns local+remote progress"""
         now = datetime.now(UTC)
         revision = ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -1880,8 +1881,8 @@ class TestGetDownloadProgressAction:
         """Remote query failure logs warning + returns without progress"""
         now = datetime.now(UTC)
         revision = ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,

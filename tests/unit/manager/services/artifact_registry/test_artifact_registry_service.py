@@ -894,10 +894,16 @@ class TestGetArtifactRegistryMetasAction:
         id1, id2 = uuid4(), uuid4()
         items = [
             ArtifactRegistryData(
-                id=uuid4(), registry_id=id1, name="reg-1", type=ArtifactRegistryType.HUGGINGFACE
+                id=ArtifactRegistryID(uuid4()),
+                registry_id=id1,
+                name="reg-1",
+                type=ArtifactRegistryType.HUGGINGFACE,
             ),
             ArtifactRegistryData(
-                id=uuid4(), registry_id=id2, name="reg-2", type=ArtifactRegistryType.RESERVOIR
+                id=ArtifactRegistryID(uuid4()),
+                registry_id=id2,
+                name="reg-2",
+                type=ArtifactRegistryType.RESERVOIR,
             ),
         ]
         mock_artifact_registry_repository.get_artifact_registry_datas = AsyncMock(
@@ -919,7 +925,10 @@ class TestGetArtifactRegistryMetasAction:
         id_missing = uuid4()
         items = [
             ArtifactRegistryData(
-                id=uuid4(), registry_id=id1, name="reg-1", type=ArtifactRegistryType.HUGGINGFACE
+                id=ArtifactRegistryID(uuid4()),
+                registry_id=id1,
+                name="reg-1",
+                type=ArtifactRegistryType.HUGGINGFACE,
             ),
         ]
         mock_artifact_registry_repository.get_artifact_registry_datas = AsyncMock(

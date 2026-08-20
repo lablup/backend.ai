@@ -17,6 +17,7 @@ from aiohttp.client_exceptions import ClientConnectorError
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -164,7 +165,7 @@ class TestArtifactService:
         now = datetime.now(UTC)
         registry_id = uuid4()
         return ArtifactData(
-            id=uuid4(),
+            id=ArtifactID(uuid4()),
             name="microsoft/DialoGPT-medium",
             type=ArtifactType.MODEL,
             description="A conversational AI model by Microsoft",
@@ -396,18 +397,18 @@ class TestUpsertArtifactsAction:
     def _make_artifact_with_revisions(
         self,
         *,
-        artifact_id: None | object = None,
-        registry_id: None | object = None,
+        artifact_id: ArtifactID | None = None,
+        registry_id: UUID | None = None,
         name: str = "test-model",
         num_revisions: int = 1,
     ) -> ArtifactDataWithRevisions:
         now = datetime.now(UTC)
-        _artifact_id = artifact_id if artifact_id is not None else uuid4()
+        _artifact_id = artifact_id if artifact_id is not None else ArtifactID(uuid4())
         _registry_id = registry_id if registry_id is not None else uuid4()
         revisions = [
             ArtifactRevisionData(
-                id=uuid4(),
-                artifact_id=_artifact_id,  # type: ignore[arg-type]
+                id=ArtifactRevisionID(uuid4()),
+                artifact_id=_artifact_id,
                 version=f"v{i + 1}",
                 readme=None,
                 size=1000 * (i + 1),
@@ -421,12 +422,12 @@ class TestUpsertArtifactsAction:
             for i in range(num_revisions)
         ]
         return ArtifactDataWithRevisions(
-            id=_artifact_id,  # type: ignore[arg-type]
+            id=_artifact_id,
             name=name,
             type=ArtifactType.MODEL,
             description=None,
-            registry_id=_registry_id,  # type: ignore[arg-type]
-            source_registry_id=_registry_id,  # type: ignore[arg-type]
+            registry_id=_registry_id,
+            source_registry_id=_registry_id,
             registry_type=ArtifactRegistryType.HUGGINGFACE,
             source_registry_type=ArtifactRegistryType.HUGGINGFACE,
             availability=ArtifactAvailability.ALIVE,
@@ -674,7 +675,7 @@ class TestScanArtifactsAction:
         now = datetime.now(UTC)
         expected_result = [
             ArtifactDataWithRevisions(
-                id=uuid4(),
+                id=ArtifactID(uuid4()),
                 name="model-1",
                 type=ArtifactType.MODEL,
                 description=None,
@@ -882,7 +883,7 @@ class TestDelegateScanArtifactsAction:
         artifact_id = uuid4()
         scan_result_artifacts = [
             ArtifactDataWithRevisions(
-                id=artifact_id,
+                id=ArtifactID(artifact_id),
                 name="test-model",
                 type=ArtifactType.MODEL,
                 description=None,
@@ -897,8 +898,8 @@ class TestDelegateScanArtifactsAction:
                 extra=None,
                 revisions=[
                     ArtifactRevisionData(
-                        id=revision_id,
-                        artifact_id=artifact_id,
+                        id=ArtifactRevisionID(revision_id),
+                        artifact_id=ArtifactID(artifact_id),
                         version="v1",
                         readme="# Test README",
                         size=1000,
@@ -1077,7 +1078,7 @@ class TestRetrieveModelAction:
         mock_storage_manager.get_manager_facing_client = MagicMock(return_value=mock_storage_client)
 
         expected = ArtifactDataWithRevisions(
-            id=uuid4(),
+            id=ArtifactID(uuid4()),
             name="gpt2",
             type=ArtifactType.MODEL,
             description=None,
@@ -1244,7 +1245,7 @@ class TestRetrieveModelsAction:
 
         expected = [
             ArtifactDataWithRevisions(
-                id=uuid4(),
+                id=ArtifactID(uuid4()),
                 name=f"model-{i}",
                 type=ArtifactType.MODEL,
                 description=None,
@@ -1306,8 +1307,8 @@ class TestGetArtifactRevisionsAction:
         artifact_id = uuid4()
         revisions = [
             ArtifactRevisionData(
-                id=uuid4(),
-                artifact_id=artifact_id,
+                id=ArtifactRevisionID(uuid4()),
+                artifact_id=ArtifactID(artifact_id),
                 version=f"v{i}",
                 readme=None,
                 size=1000 * i,
@@ -1322,7 +1323,7 @@ class TestGetArtifactRevisionsAction:
         ]
         mock_artifact_repository.list_artifact_revisions = AsyncMock(return_value=revisions)
 
-        action = GetArtifactRevisionsAction(artifact_id=artifact_id)
+        action = GetArtifactRevisionsAction(artifact_id=ArtifactID(artifact_id))
         result = await artifact_service.get_revisions(action)
 
         assert len(result.revisions) == 3
@@ -1336,7 +1337,7 @@ class TestGetArtifactRevisionsAction:
         """No revisions returns empty list"""
         mock_artifact_repository.list_artifact_revisions = AsyncMock(return_value=[])
 
-        action = GetArtifactRevisionsAction(artifact_id=uuid4())
+        action = GetArtifactRevisionsAction(artifact_id=ArtifactID(uuid4()))
         result = await artifact_service.get_revisions(action)
 
         assert result.revisions == []
@@ -1371,7 +1372,7 @@ class TestSearchArtifactsWithRevisionsAction:
         now = datetime.now(UTC)
         rid = uuid4()
         item = ArtifactDataWithRevisions(
-            id=uuid4(),
+            id=ArtifactID(uuid4()),
             name="test-model",
             type=ArtifactType.MODEL,
             description=None,

@@ -8,6 +8,8 @@ from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     VerificationStepResult,
 )
+from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.manager.data.common.types import StringFilterData
 
 
@@ -55,7 +57,7 @@ class ArtifactAvailability(enum.StrEnum):
 
 @dataclass
 class ArtifactData:
-    id: uuid.UUID
+    id: ArtifactID
     name: str
     type: ArtifactType
     description: str | None
@@ -72,8 +74,8 @@ class ArtifactData:
 
 @dataclass
 class ArtifactRevisionData:
-    id: uuid.UUID
-    artifact_id: uuid.UUID
+    id: ArtifactRevisionID
+    artifact_id: ArtifactID
     version: str
     readme: str | None
     size: int | None
@@ -89,8 +91,8 @@ class ArtifactRevisionData:
 class ArtifactRevisionResponseData:
     """ArtifactRevisionData without readme field for API responses."""
 
-    id: uuid.UUID
-    artifact_id: uuid.UUID
+    id: ArtifactRevisionID
+    artifact_id: ArtifactID
     version: str
     size: int | None
     status: ArtifactStatus
