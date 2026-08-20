@@ -47,8 +47,9 @@ __all__ = (
 class BaseConfigSchema(BackendAISchema):
     """
     Use for a component's config file schema (``configs/``). Unknown fields are
-    warned about and dropped; a schema that takes a wider mapping on purpose opts
-    out with ``ConfigDict(extra="ignore")``.
+    warned about but kept, so that sections consumed by out-of-tree plugins
+    survive validation; a schema that takes a wider mapping on purpose opts out
+    with ``ConfigDict(extra="ignore")``.
     """
 
     @staticmethod
@@ -69,12 +70,10 @@ class BaseConfigSchema(BackendAISchema):
         if extra:
             keys = sorted(extra)
             log.warning(
-                "Ignoring unknown config field(s) in {}: {}",
+                "Unknown config field(s) in {}: {}",
                 type(self).__name__,
                 ", ".join(keys),
             )
-            extra.clear()
-            self.__pydantic_fields_set__.difference_update(keys)
         return self
 
 
