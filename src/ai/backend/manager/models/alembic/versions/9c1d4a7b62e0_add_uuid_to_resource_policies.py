@@ -10,7 +10,7 @@ Existing rows are backfilled by the column default, so the column is NOT NULL
 from the start and no reader handles a missing id.
 
 Revision ID: 9c1d4a7b62e0
-Revises: 37d711158a8c
+Revises: f1a7c3e9b482
 Create Date: 2026-08-10 06:00:00.000000
 
 """
@@ -22,7 +22,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "9c1d4a7b62e0"
-down_revision = "c8d51e7a3b62"
+down_revision = "f1a7c3e9b482"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
