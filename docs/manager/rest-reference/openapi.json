@@ -47620,7 +47620,7 @@
           }
         },
         "parameters": [],
-        "description": "Search prometheus query presets.\n\nAvailable to any authenticated user since presets are a shared\ncatalog of metric query templates.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Search prometheus query presets.\n\nAvailable to any authenticated user since presets are a shared\ncatalog of metric query templates.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/prometheus-query-presets/preview": {
@@ -47678,7 +47678,7 @@
             }
           }
         ],
-        "description": "Get a single query definition by ID.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Get a single query definition by ID.\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "patch": {
         "operationId": "v2/prometheus-query-presets.update",
@@ -47752,7 +47752,7 @@
             }
           }
         ],
-        "description": "Execute a prometheus query definition.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Execute a prometheus query definition.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/prometheus-query-presets/delete": {
@@ -47839,7 +47839,7 @@
           }
         },
         "parameters": [],
-        "description": "Search prometheus query preset categories.\n\nAvailable to any authenticated user since categories are a shared\ncatalog for organizing metric query templates.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Search prometheus query preset categories.\n\nAvailable to any authenticated user since categories are a shared\ncatalog for organizing metric query templates.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/prometheus-query-preset-categories/{category_id}": {
@@ -47868,7 +47868,7 @@
             }
           }
         ],
-        "description": "Get a single category by ID.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Get a single category by ID.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/prometheus-query-preset-categories/delete": {
@@ -64819,7 +64819,7 @@
           }
         },
         "parameters": [],
-        "description": "Search presets with filters, orders, and pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Search presets with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/resource/prometheus-query-definitions/{id}": {
