@@ -957,11 +957,6 @@ class _BulkCreateFieldAction(
 
     @classmethod
     @override
-    def entity_type(cls) -> EntityType:
-        return _ENTITY_TYPE
-
-    @classmethod
-    @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
@@ -998,11 +993,6 @@ class _FieldUpsertAction(
     @override
     def entity_id(self) -> EntityIdentifier:
         return _StubEntityID(self.owner)
-
-    @classmethod
-    @override
-    def entity_type(cls) -> EntityType:
-        return _ENTITY_TYPE
 
     @classmethod
     @override

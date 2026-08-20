@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import final
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.types import ActionOperationType
@@ -26,6 +27,7 @@ class BaseSingleEntityAction(ABC):
         """Return the id of the entity that this action applies to."""
         raise NotImplementedError
 
+    @final
     def entity_type(self) -> EntityType:
         """Derived from the id, which is the only thing that knows it."""
         return self.entity_id().entity_type()

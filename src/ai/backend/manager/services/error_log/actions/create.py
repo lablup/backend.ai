@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.error_log import ERROR_LOG_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.v2.ops.base import CreateFieldOpsAction
 from ai.backend.manager.data.error_log.types import ErrorLogData
@@ -22,11 +21,6 @@ class CreateErrorLogAction(CreateFieldOpsAction[UserID, ErrorLogRow, ErrorLogDat
 
     user_id: UserID
     creator: ErrorLogCreator
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return ERROR_LOG_ENTITY_TYPE
 
     @override
     def entity_id(self) -> EntityIdentifier:
