@@ -51,6 +51,7 @@ from ai.backend.common.data.entity.resource_policy import (
     USER_RESOURCE_POLICY_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_slot import RESOURCE_SLOT_TYPE_ENTITY_TYPE
 from ai.backend.common.data.entity.retention_policy import RETENTION_POLICY_ENTITY_TYPE
 from ai.backend.common.data.entity.role_permission_preset import ROLE_PERMISSION_PRESET_FIELD_TYPE
 from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE
@@ -514,6 +515,7 @@ def create_processors(
     )
     # Areas covering several entities: every group made here names the area.
     fair_share_groups = registry.concern(ConcernMeta("fair_share"))
+    resource_slot_groups = registry.concern(ConcernMeta("resource_slot"))
     scheduling_history_groups = registry.concern(ConcernMeta("scheduling_history"))
     resource_allocation_groups = registry.concern(ConcernMeta("resource_allocation"))
     processors = Processors(
@@ -609,7 +611,10 @@ def create_processors(
             registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)), services.resource_preset
         ),
         resource_slot=ResourceSlotProcessors(
-            registry.group(GroupMeta(SESSION_ENTITY_TYPE)), services.resource_slot
+            resource_slot_groups.group(GroupMeta(RESOURCE_SLOT_TYPE_ENTITY_TYPE)),
+            resource_slot_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            resource_slot_groups.group(GroupMeta(AGENT_ENTITY_TYPE)),
+            services.resource_slot,
         ),
         retention_policy=RetentionPolicyProcessors(
             registry.group(GroupMeta(RETENTION_POLICY_ENTITY_TYPE))
@@ -675,7 +680,9 @@ def create_processors(
             services.notification,
         ),
         object_storage=ObjectStorageProcessors(
-            registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)), services.object_storage
+            registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)),
+            registry.group(GroupMeta(ARTIFACT_REVISION_ENTITY_TYPE)),
+            services.object_storage,
         ),
         permission_controller=PermissionControllerProcessors(
             services.permission_controller, action_monitors, validators

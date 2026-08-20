@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
@@ -98,38 +100,40 @@ class ResourceSlotProcessors:
 
     def __init__(
         self,
-        group: ProcessorGroup[ResourceSlotTypeData],
+        slot_type: ProcessorGroup[ResourceSlotTypeData],
+        session: ProcessorGroup[Any],
+        agent: ProcessorGroup[Any],
         service: ResourceSlotService,
     ) -> None:
-        self.lookup_kernel_owner = group.key_owner_lookup_ops(LookupKernelOwnerAction)
-        self.get_agent_resource_by_slot = group.single_entity(
+        self.lookup_kernel_owner = session.key_owner_lookup_ops(LookupKernelOwnerAction)
+        self.get_agent_resource_by_slot = agent.single_entity(
             GetAgentResourceBySlotAction, service.get_agent_resource_by_slot
         )
-        self.get_kernel_allocation_by_slot = group.single_entity(
+        self.get_kernel_allocation_by_slot = session.single_entity(
             GetKernelAllocationBySlotAction, service.get_kernel_allocation_by_slot
         )
-        self.search_agent_resources = group.global_scope(
+        self.search_agent_resources = agent.global_scope(
             GlobalSearchAgentResourcesAction, service.search_agent_resources
         )
-        self.search_resource_allocations = group.global_scope(
+        self.search_resource_allocations = session.global_scope(
             GlobalSearchResourceAllocationsAction, service.search_resource_allocations
         )
-        self.public_lookup_resource_slot_type = group.public_lookup_ops(
+        self.public_lookup_resource_slot_type = slot_type.public_lookup_ops(
             LookupResourceSlotTypeAction
         )
-        self.public_search_resource_slot_types = group.public_search_ops(
+        self.public_search_resource_slot_types = slot_type.public_search_ops(
             SearchResourceSlotTypesAction
         )
-        self.get_domain_resource_overview = group.scope(
+        self.get_domain_resource_overview = session.scope(
             GetDomainResourceOverviewAction, service.get_domain_resource_overview
         )
-        self.get_project_resource_overview = group.scope(
+        self.get_project_resource_overview = session.scope(
             GetProjectResourceOverviewAction, service.get_project_resource_overview
         )
-        self.global_create_resource_slot_type = group.global_create_ops(
+        self.global_create_resource_slot_type = slot_type.global_create_ops(
             CreateResourceSlotTypeAction
         )
-        self.global_update_resource_slot_type = group.global_update_ops(
+        self.global_update_resource_slot_type = slot_type.global_update_ops(
             UpdateResourceSlotTypeAction
         )
-        self.purge_resource_slot_type = group.entity_purge_ops(PurgeResourceSlotTypeAction)
+        self.purge_resource_slot_type = slot_type.entity_purge_ops(PurgeResourceSlotTypeAction)

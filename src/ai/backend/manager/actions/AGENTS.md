@@ -111,6 +111,8 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   different permission from the write that follows — the lookup asks for read, the
   write for write.
 - `BaseGlobalAction` declares no `entity_id()`.
+- `GLOBAL_ENTITY_TYPE` is what a global operation records when it names no other
+  entity. Wiring only — service and domain code never reference it.
 
 ## Monitors
 

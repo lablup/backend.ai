@@ -161,10 +161,6 @@ class _PresetFieldData(FieldData):
     id: _FieldID
     owner: _EntityID
 
-    @override
-    def owner_entity_id(self) -> EntityIdentifier:
-        return self.owner
-
 
 class _EntityID(EntityIdentifier):
     @override

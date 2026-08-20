@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
@@ -61,6 +63,7 @@ class ObjectStorageProcessors:
     def __init__(
         self,
         group: ProcessorGroup[ObjectStorageData],
+        revision: ProcessorGroup[Any],
         service: ObjectStorageService,
     ) -> None:
         self.global_create = group.global_create_ops(CreateObjectStorageAction)
@@ -69,9 +72,9 @@ class ObjectStorageProcessors:
         self.get = group.single_get_ops(GetObjectStorageAction)
         self.global_list_storages = group.global_search_ops(ListObjectStorageAction)
         self.global_search_object_storages = group.global_search_ops(SearchObjectStoragesAction)
-        self.get_presigned_download_url = group.single_entity(
+        self.get_presigned_download_url = revision.single_entity(
             GetDownloadPresignedURLAction, service.get_presigned_download_url
         )
-        self.get_presigned_upload_url = group.single_entity(
+        self.get_presigned_upload_url = revision.single_entity(
             GetUploadPresignedURLAction, service.get_presigned_upload_url
         )

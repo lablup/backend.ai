@@ -9,6 +9,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_ENTITY_TYPE
 from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
 from ai.backend.common.data.entity.storage_namespace import STORAGE_NAMESPACE_ENTITY_TYPE
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -57,7 +58,9 @@ def object_storage_processors(
         config_provider=config_provider,
     )
     return ObjectStorageProcessors(
-        processor_registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(ARTIFACT_REVISION_ENTITY_TYPE)),
+        service,
     )
 
 

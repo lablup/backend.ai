@@ -19,6 +19,7 @@ import re
 from typing import Any
 from unittest.mock import MagicMock
 
+from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
 from ai.backend.common.data.entity.app_config import (
     APP_CONFIG_ALLOW_LIST_ENTITY_TYPE,
     APP_CONFIG_ENTITY_TYPE,
@@ -67,6 +68,7 @@ from ai.backend.common.data.entity.resource_policy import (
     USER_RESOURCE_POLICY_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_slot import RESOURCE_SLOT_TYPE_ENTITY_TYPE
 from ai.backend.common.data.entity.retention_policy import RETENTION_POLICY_ENTITY_TYPE
 from ai.backend.common.data.entity.role_permission_preset import ROLE_PERMISSION_PRESET_FIELD_TYPE
 from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE
@@ -241,6 +243,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     # through it, so its wired_actions() is the complete catalog of registered actions.
     registry = _ops_registry()
     fair_share_groups = registry.concern(ConcernMeta("fair_share"))
+    resource_slot_groups = registry.concern(ConcernMeta("resource_slot"))
     scheduling_history_groups = registry.concern(ConcernMeta("scheduling_history"))
     resource_allocation_groups = registry.concern(ConcernMeta("resource_allocation"))
     AppConfigProcessors(
@@ -250,7 +253,12 @@ def test_every_defined_v2_action_is_wired() -> None:
         registry.group(GroupMeta(APP_CONFIG_FRAGMENT_ENTITY_TYPE)),
         MagicMock(),
     )
-    ResourceSlotProcessors(registry.group(GroupMeta(SESSION_ENTITY_TYPE)), MagicMock())
+    ResourceSlotProcessors(
+        resource_slot_groups.group(GroupMeta(RESOURCE_SLOT_TYPE_ENTITY_TYPE)),
+        resource_slot_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        resource_slot_groups.group(GroupMeta(AGENT_ENTITY_TYPE)),
+        MagicMock(),
+    )
     IdleCheckerProcessors(registry.group(GroupMeta(SESSION_ENTITY_TYPE)), MagicMock(), [])
     RetentionPolicyProcessors(registry.group(GroupMeta(RETENTION_POLICY_ENTITY_TYPE)))
     LoginClientTypeProcessors(registry.group(GroupMeta(LOGIN_CLIENT_TYPE_ENTITY_TYPE)))
@@ -269,7 +277,11 @@ def test_every_defined_v2_action_is_wired() -> None:
         MagicMock(),
     )
     RuntimeVariantProcessors(registry.group(GroupMeta(RUNTIME_VARIANT_ENTITY_TYPE)))
-    ObjectStorageProcessors(registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)), MagicMock())
+    ObjectStorageProcessors(
+        registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)),
+        registry.group(GroupMeta(ARTIFACT_REVISION_ENTITY_TYPE)),
+        MagicMock(),
+    )
     VFSStorageProcessors(registry.group(GroupMeta(VFS_STORAGE_ENTITY_TYPE)), MagicMock())
     NotificationProcessors(
         registry.group(GroupMeta(NOTIFICATION_CHANNEL_ENTITY_TYPE)),

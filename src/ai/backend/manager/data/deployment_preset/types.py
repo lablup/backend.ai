@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import override
 
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.types import FieldData
@@ -19,7 +18,3 @@ class PresetResourceSlotData(FieldData):
     preset_id: DeploymentPresetID
     slot_name: str
     quantity: Decimal
-
-    @override
-    def owner_entity_id(self) -> DeploymentPresetID:
-        return self.preset_id

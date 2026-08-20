@@ -1,11 +1,9 @@
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import override
 
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.types import FieldData
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey, SecretKey
 
 
@@ -49,10 +47,6 @@ class KeyPairData(FieldData):
 
     last_used: datetime | None = None
     num_queries: int = 0
-
-    @override
-    def owner_entity_id(self) -> UserID:
-        return UserID(self.user_id)
 
 
 @dataclass

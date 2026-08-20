@@ -35,6 +35,10 @@ class EntityType(str):
 # reverse direction stays an explicit declaration (`ScopeType(<entity type>)`).
 ScopeType = NewType("ScopeType", EntityType)
 
+# The installation itself, for a global operation that names nothing else. Wiring
+# only — see `manager/actions/AGENTS.md`.
+GLOBAL_ENTITY_TYPE = EntityType("global")
+
 
 class FieldType(str):
     """The type of a field row.
@@ -192,10 +196,6 @@ class FieldData(ABC):
     """A ``data/`` type describing a field row.
 
     Deliberately not an :class:`EntityData`: a field row carries no membership of its
-    own, so what a result names is the entity owning it, not the row.
+    own, so what a result names is the entity owning it, not the row. The owning entity
+    is read by the lookup every field operation runs first, not off this value.
     """
-
-    @abstractmethod
-    def owner_entity_id(self) -> EntityIdentifier:
-        """Return the id of the entity that owns the row this value describes."""
-        raise NotImplementedError

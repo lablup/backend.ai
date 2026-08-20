@@ -27,10 +27,6 @@ class RolePermissionPresetData(FieldData):
     operation: OperationType
     created_at: datetime
 
-    @override
-    def owner_entity_id(self) -> EntityIdentifier:
-        return self.role_preset_id
-
 
 @dataclass(frozen=True)
 class RolePresetData(EntityData):
