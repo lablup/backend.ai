@@ -191,6 +191,8 @@ _CGROUP_PATH_CACHE_SIZE: Final[int] = 2048
 
 # Docker splits the configured total container-log size across this many files.
 _CONTAINER_LOG_FILE_COUNT: Final[int] = 5
+# Addresses that mean "bind to every interface" rather than a concrete host address.
+_WILDCARD_BIND_HOSTS: Final[frozenset[str]] = frozenset({"", "0.0.0.0", "::", "[::]"})
 # Controllers the intrinsic plugins read, resolved together from a single inspect.
 _TRACKED_CGROUP_CONTROLLERS: Final[tuple[CgroupController, ...]] = (
     CgroupController.CPUACCT,
@@ -307,6 +309,26 @@ async def get_extra_volumes(docker: Docker, lang: str) -> list[VolumeInfo]:
                 lang,
             )
     return mount_list
+
+
+class PortBinding(BaseModel):
+    host_port: str = Field(serialization_alias="HostPort")
+    host_ip: str | None = Field(
+        default=None,
+        serialization_alias="HostIp",
+        description="Host address to bind to; `None` binds to every interface.",
+    )
+
+
+def _make_port_binding(host_port: int, host_ip: str) -> PortBinding:
+    """
+    Drop a wildcard host IP: netavark takes it literally and emits a DNAT rule
+    constrained with `-d 0.0.0.0/32`, which never matches real traffic.
+    """
+    return PortBinding(
+        host_port=str(host_port),
+        host_ip=None if host_ip in _WILDCARD_BIND_HOSTS else host_ip,
+    )
 
 
 def container_from_docker_container(src: DockerContainer) -> Container:
@@ -1288,7 +1310,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "HostConfig": {
                 "Init": True,
                 "PortBindings": {
-                    f"{eport}/tcp": [{"HostPort": str(hport), "HostIp": hip}]
+                    f"{eport}/tcp": [
+                        _make_port_binding(hport, hip).model_dump(
+                            mode="json", by_alias=True, exclude_none=True
+                        )
+                    ]
                     for eport, hport, hip in zip(exposed_ports, host_ports, host_ips, strict=True)
                 },
                 "PublishAllPorts": False,  # we manage port mapping manually!

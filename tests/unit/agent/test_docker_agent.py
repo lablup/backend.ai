@@ -19,7 +19,9 @@ from ai.backend.agent.config.unified import (
 from ai.backend.agent.docker.agent import (
     DockerKernelCreationContext,
     LogDriverOptions,
+    PortBinding,
     _build_log_config,
+    _make_port_binding,
     _parse_distro_from_ldd_output,
 )
 
@@ -347,3 +349,31 @@ class TestBuildLogConfig:
 
         assert dumped == expected
         assert type(dumped["Type"]) is str
+
+
+class TestMakePortBinding:
+    @pytest.mark.parametrize("host_ip", ["", "0.0.0.0", "::", "[::]"])
+    def test_wildcard_address_drops_host_ip(self, host_ip: str) -> None:
+        """netavark turns an explicit wildcard into a DNAT rule that matches nothing."""
+        assert _make_port_binding(30001, host_ip) == PortBinding(host_port="30001", host_ip=None)
+
+    @pytest.mark.parametrize("host_ip", ["127.0.0.1", "10.0.1.5", "::1"])
+    def test_concrete_address_is_kept(self, host_ip: str) -> None:
+        assert _make_port_binding(30001, host_ip) == PortBinding(host_port="30001", host_ip=host_ip)
+
+    @pytest.mark.parametrize(
+        ("host_ip", "expected"),
+        [
+            ("0.0.0.0", {"HostPort": "30001"}),
+            ("127.0.0.1", {"HostPort": "30001", "HostIp": "127.0.0.1"}),
+        ],
+    )
+    def test_dumped_payload_uses_docker_api_keys(
+        self, host_ip: str, expected: dict[str, Any]
+    ) -> None:
+        """The dump is what actually goes into the container creation request."""
+        dumped = _make_port_binding(30001, host_ip).model_dump(
+            mode="json", by_alias=True, exclude_none=True
+        )
+
+        assert dumped == expected
