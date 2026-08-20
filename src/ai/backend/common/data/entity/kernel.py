@@ -7,13 +7,21 @@ field identifier: what a kernel belongs to is knowable only through that session
 from typing import override
 
 from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityType, FieldIdentifier
+from ai.backend.common.data.entity.types import EntityType, FieldIdentifier, FieldType
 
 __all__ = ("KernelID",)
 
 
+KERNEL_FIELD_TYPE = FieldType("kernel")
+
+
 class KernelID(FieldIdentifier):
     """A kernel row's id."""
+
+    @override
+    @classmethod
+    def field_type(cls) -> FieldType:
+        return KERNEL_FIELD_TYPE
 
     @override
     @classmethod

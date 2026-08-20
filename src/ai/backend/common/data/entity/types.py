@@ -36,6 +36,20 @@ class EntityType(str):
 ScopeType = NewType("ScopeType", EntityType)
 
 
+class FieldType(str):
+    """The type of a field row.
+
+    Kept apart from `EntityType` for the same reason that one is a class rather than a
+    `NewType`: a field row is not an entity, and the two must not be interchangeable.
+    """
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        """Validated as the string it is; pydantic builds no schema for a `str`
+        subclass on its own."""
+        return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
+
+
 class NaturalKey(str):
     """A column value that forms part of a key drawn from the data itself.
 
@@ -135,6 +149,12 @@ class FieldIdentifier(UUID):
 
     def __init__(self, value: UUID) -> None:
         super().__init__(int=value.int)
+
+    @classmethod
+    @abstractmethod
+    def field_type(cls) -> FieldType:
+        """Return the type of field row this id names."""
+        raise NotImplementedError
 
     @classmethod
     @abstractmethod

@@ -3,9 +3,12 @@
 from typing import override
 
 from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityType, FieldIdentifier
+from ai.backend.common.data.entity.types import EntityType, FieldIdentifier, FieldType
 
 __all__ = ("DeploymentTokenID",)
+
+
+DEPLOYMENT_TOKEN_FIELD_TYPE = FieldType("deployment_token")
 
 
 class DeploymentTokenID(FieldIdentifier):
@@ -14,6 +17,11 @@ class DeploymentTokenID(FieldIdentifier):
     A token grants access to one deployment and is authorized through it, so the
     deployment owns the row and the token declares no scope of its own.
     """
+
+    @override
+    @classmethod
+    def field_type(cls) -> FieldType:
+        return DEPLOYMENT_TOKEN_FIELD_TYPE
 
     @override
     @classmethod
