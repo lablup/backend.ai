@@ -21,10 +21,17 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DomainID
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_group import (
+    RESOURCE_GROUP_ENTITY_TYPE,
+    ResourceGroupID,
+    ResourceGroupName,
+)
+from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
@@ -73,6 +80,9 @@ from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.session.processors import SessionProcessors
+from ai.backend.manager.services.session.resource_allocation.processors import (
+    ResourceAllocationProcessors,
+)
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
     create_agent_selector,
@@ -152,7 +162,19 @@ async def session_processors(
         user_repository=AsyncMock(),
     )
     service = SessionService(args)
-    return SessionProcessors(processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)), service)
+    return SessionProcessors(
+        processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        ResourceAllocationProcessors(
+            processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+            processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)),
+            processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
+            processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+            processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            processor_registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            MagicMock(),
+        ),
+        service,
+    )
 
 
 def build_session_registries(
@@ -688,4 +710,16 @@ async def compute_session_processors(
         user_repository=UserRepository(database_engine, V2DBOpsProvider(database_engine)),
     )
     service = SessionService(args)
-    return SessionProcessors(processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)), service)
+    return SessionProcessors(
+        processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        ResourceAllocationProcessors(
+            processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+            processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)),
+            processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
+            processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+            processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            processor_registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            MagicMock(),
+        ),
+        service,
+    )

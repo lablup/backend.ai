@@ -29,7 +29,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
-from ai.backend.manager.services.artifact_revision.actions.lookup_owner import (
+from ai.backend.manager.services.artifact.revision.actions.lookup_owner import (
     LookupArtifactRevisionOwnerAction,
     LookupBulkArtifactRevisionOwnerAction,
 )

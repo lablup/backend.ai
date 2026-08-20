@@ -3,7 +3,7 @@ from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
-from ai.backend.manager.services.artifact_revision.actions.base import (
+from ai.backend.manager.services.artifact.revision.actions.base import (
     ArtifactRevisionSingleEntityAction,
 )
 

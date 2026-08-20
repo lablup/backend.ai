@@ -31,11 +31,13 @@ from ai.backend.manager.models.error_log.creators import ErrorLogCreator
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.error_log.searchers import ErrorLogSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.services.error_log.actions.create import CreateErrorLogAction
-from ai.backend.manager.services.error_log.actions.delete import DeleteErrorLogAction
-from ai.backend.manager.services.error_log.actions.global_search import GlobalSearchErrorLogsAction
-from ai.backend.manager.services.error_log.actions.search import SearchErrorLogsAction
-from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
+from ai.backend.manager.services.user.error_log.actions.create import CreateErrorLogAction
+from ai.backend.manager.services.user.error_log.actions.delete import DeleteErrorLogAction
+from ai.backend.manager.services.user.error_log.actions.global_search import (
+    GlobalSearchErrorLogsAction,
+)
+from ai.backend.manager.services.user.error_log.actions.search import SearchErrorLogsAction
+from ai.backend.manager.services.user.error_log.processors import ErrorLogProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

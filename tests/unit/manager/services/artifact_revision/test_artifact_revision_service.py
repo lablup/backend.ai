@@ -57,44 +57,44 @@ from ai.backend.manager.services.artifact.actions.get_revisions import (
 from ai.backend.manager.services.artifact.actions.upsert_multi import (
     UpsertArtifactsAction,
 )
-from ai.backend.manager.services.artifact.service import ArtifactService
-from ai.backend.manager.services.artifact_revision.actions.approve import (
+from ai.backend.manager.services.artifact.revision.actions.approve import (
     ApproveArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.associate_with_storage import (
+from ai.backend.manager.services.artifact.revision.actions.associate_with_storage import (
     AssociateWithStorageAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.cancel_import import (
+from ai.backend.manager.services.artifact.revision.actions.cancel_import import (
     CancelImportAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.cleanup import (
+from ai.backend.manager.services.artifact.revision.actions.cleanup import (
     CleanupArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.delegate_import_revision_batch import (
+from ai.backend.manager.services.artifact.revision.actions.delegate_import_revision_batch import (
     DelegateImportArtifactRevisionBatchAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.disassociate_with_storage import (
+from ai.backend.manager.services.artifact.revision.actions.disassociate_with_storage import (
     DisassociateWithStorageAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.get import (
+from ai.backend.manager.services.artifact.revision.actions.get import (
     GetArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.get_download_progress import (
+from ai.backend.manager.services.artifact.revision.actions.get_download_progress import (
     GetDownloadProgressAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.get_readme import (
+from ai.backend.manager.services.artifact.revision.actions.get_readme import (
     GetArtifactRevisionReadmeAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.import_revision import (
+from ai.backend.manager.services.artifact.revision.actions.import_revision import (
     ImportArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.reject import (
+from ai.backend.manager.services.artifact.revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.search import (
+from ai.backend.manager.services.artifact.revision.actions.search import (
     SearchArtifactRevisionsAction,
 )
-from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
+from ai.backend.manager.services.artifact.revision.service import ArtifactRevisionService
+from ai.backend.manager.services.artifact.service import ArtifactService
 
 
 class TestArtifactRevisionService:
@@ -1089,7 +1089,7 @@ class TestDelegateImportArtifactRevisionBatchAction:
         mock_client_resp.tasks = [mock_task]
 
         with patch(
-            "ai.backend.manager.services.artifact_revision.service.ReservoirRegistryClient"
+            "ai.backend.manager.services.artifact.revision.service.ReservoirRegistryClient"
         ) as MockClient:
             mock_client_instance = MagicMock()
             mock_client_instance.delegate_import_artifacts = AsyncMock(
@@ -1857,7 +1857,7 @@ class TestGetDownloadProgressAction:
         remote_resp.download_progress.local = remote_local_progress
 
         with patch(
-            "ai.backend.manager.services.artifact_revision.service.ReservoirRegistryClient"
+            "ai.backend.manager.services.artifact.revision.service.ReservoirRegistryClient"
         ) as MockClient:
             mock_client = MagicMock()
             mock_client.get_download_progress = AsyncMock(return_value=remote_resp)

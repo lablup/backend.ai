@@ -107,12 +107,12 @@ from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
-from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
-from ai.backend.manager.services.artifact_revision.actions.lookup_owner import (
+from ai.backend.manager.services.artifact.revision.actions.lookup_owner import (
     LookupArtifactRevisionOwnerAction,
     LookupBulkArtifactRevisionOwnerAction,
 )
-from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
+from ai.backend.manager.services.artifact.revision.processors import ArtifactRevisionProcessors
+from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
@@ -124,11 +124,6 @@ from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
-from ai.backend.manager.services.error_log.actions.lookup_owner import (
-    LookupBulkErrorLogOwnerAction,
-    LookupErrorLogOwnerAction,
-)
-from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
 from ai.backend.manager.services.group.processors import GroupProcessors
@@ -158,9 +153,6 @@ from ai.backend.manager.services.prometheus_query_preset.processors import (
 from ai.backend.manager.services.prometheus_query_preset_category.processors import (
     PrometheusQueryPresetCategoryProcessors,
 )
-from ai.backend.manager.services.resource_allocation.processors import (
-    ResourceAllocationProcessors,
-)
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.services.retention_policy.processors import RetentionPolicyProcessors
@@ -179,6 +171,9 @@ from ai.backend.manager.services.scheduling_history.processors import (
 )
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
+from ai.backend.manager.services.session.resource_allocation.processors import (
+    ResourceAllocationProcessors,
+)
 from ai.backend.manager.services.storage_namespace.processors import (
     StorageNamespaceProcessors,
 )
@@ -187,6 +182,11 @@ from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupBulkKeypairOwnerAction,
     LookupKeypairOwnerAction,
 )
+from ai.backend.manager.services.user.error_log.actions.lookup_owner import (
+    LookupBulkErrorLogOwnerAction,
+    LookupErrorLogOwnerAction,
+)
+from ai.backend.manager.services.user.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
@@ -303,14 +303,6 @@ def test_every_defined_v2_action_is_wired() -> None:
     RuntimeVariantPresetProcessors(
         registry.group(GroupMeta(RUNTIME_VARIANT_PRESET_ENTITY_TYPE)), MagicMock()
     )
-    ErrorLogProcessors(
-        registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
-            FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
-            ErrorLogData,
-            LookupErrorLogOwnerAction,
-            LookupBulkErrorLogOwnerAction,
-        )
-    )
     AuditLogProcessors(
         registry.dangling_field_group(FieldGroupMeta(AUDIT_LOG_FIELD_TYPE), AuditLogData)
     )
@@ -338,6 +330,14 @@ def test_every_defined_v2_action_is_wired() -> None:
             LookupKeypairOwnerAction,
             LookupBulkKeypairOwnerAction,
         ),
+        ErrorLogProcessors(
+            registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
+                FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
+                ErrorLogData,
+                LookupErrorLogOwnerAction,
+                LookupBulkErrorLogOwnerAction,
+            )
+        ),
         MagicMock(),
     )
     FairShareProcessors(
@@ -347,24 +347,18 @@ def test_every_defined_v2_action_is_wired() -> None:
         MagicMock(),
     )
     ResourcePresetProcessors(registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)), MagicMock())
-    ResourceAllocationProcessors(
-        resource_allocation_groups.group(GroupMeta(USER_ENTITY_TYPE)),
-        resource_allocation_groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
-        resource_allocation_groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
-        resource_allocation_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
-        resource_allocation_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
-        resource_allocation_groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+    ScalingGroupProcessors(registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), MagicMock())
+    ArtifactProcessors(
+        registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+        ArtifactRevisionProcessors(
+            registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+            artifact_revisions,
+            MagicMock(),
+        ),
         MagicMock(),
     )
-    ScalingGroupProcessors(registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), MagicMock())
-    ArtifactProcessors(registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)), MagicMock())
     ArtifactRegistryProcessors(
         registry.group(GroupMeta(ARTIFACT_REGISTRY_ENTITY_TYPE)), MagicMock()
-    )
-    ArtifactRevisionProcessors(
-        registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
-        artifact_revisions,
-        MagicMock(),
     )
     ModelCardProcessors(registry.group(GroupMeta(MODEL_CARD_ENTITY_TYPE)), MagicMock())
     ContainerRegistryProcessors(
@@ -379,7 +373,19 @@ def test_every_defined_v2_action_is_wired() -> None:
         scheduling_history_groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
         MagicMock(),
     )
-    SessionProcessors(registry.group(GroupMeta(SESSION_ENTITY_TYPE)), MagicMock())
+    SessionProcessors(
+        registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        ResourceAllocationProcessors(
+            resource_allocation_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+            resource_allocation_groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
+            resource_allocation_groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
+            resource_allocation_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+            resource_allocation_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            resource_allocation_groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            MagicMock(),
+        ),
+        MagicMock(),
+    )
     DeploymentProcessors(registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), MagicMock())
     VFolderProcessors(registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), MagicMock())
     VFolderAdminProcessors(registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), MagicMock())

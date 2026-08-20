@@ -20,11 +20,11 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.services.error_log.actions.lookup_owner import (
+from ai.backend.manager.services.user.error_log.actions.lookup_owner import (
     LookupBulkErrorLogOwnerAction,
     LookupErrorLogOwnerAction,
 )
-from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
+from ai.backend.manager.services.user.error_log.processors import ErrorLogProcessors
 from ai.backend.testutils.processors import ops_processor_group
 
 

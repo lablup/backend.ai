@@ -104,6 +104,7 @@ from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
 )
+from ai.backend.manager.services.user.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.user.service import UserService
 
 
@@ -113,6 +114,7 @@ class UserProcessors:
         LookupKeypairOwnerByAccessKeyAction, FieldOwnerLookupOpsResult
     ]
     keypair_group: LookupFieldGroup[KeyPairData]
+    error_log: ErrorLogProcessors
     global_search: GlobalActionProcessor[GlobalSearchUsersAction, BatchOpsResult[UserData]]
     search_users_by_domain: ScopeActionProcessor[
         SearchUsersByDomainAction, ScopedBatchOpsResult[UserData]
@@ -186,8 +188,10 @@ class UserProcessors:
         self,
         group: ProcessorGroup[UserData],
         keypair_group: LookupFieldGroup[KeyPairData],
+        error_log: ErrorLogProcessors,
         user_service: UserService,
     ) -> None:
+        self.error_log = error_log
         self.lookup = group.public_lookup_ops(LookupUserAction)
         self.lookup_keypair_owner = group.key_owner_lookup_ops(LookupKeypairOwnerByAccessKeyAction)
         self.keypair_group = keypair_group

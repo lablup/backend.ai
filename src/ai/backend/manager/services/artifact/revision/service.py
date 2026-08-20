@@ -70,55 +70,55 @@ from ai.backend.manager.repositories.reservoir_registry.repository import (
 from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
-from ai.backend.manager.services.artifact_revision.actions.approve import (
+from ai.backend.manager.services.artifact.revision.actions.approve import (
     ApproveArtifactRevisionAction,
     ApproveArtifactRevisionActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.associate_with_storage import (
+from ai.backend.manager.services.artifact.revision.actions.associate_with_storage import (
     AssociateWithStorageAction,
     AssociateWithStorageActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.cancel_import import (
+from ai.backend.manager.services.artifact.revision.actions.cancel_import import (
     CancelImportAction,
     CancelImportActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.cleanup import (
+from ai.backend.manager.services.artifact.revision.actions.cleanup import (
     CleanupArtifactRevisionAction,
     CleanupArtifactRevisionActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.delegate_import_revision_batch import (
+from ai.backend.manager.services.artifact.revision.actions.delegate_import_revision_batch import (
     DelegateImportArtifactRevisionBatchAction,
     DelegateImportArtifactRevisionBatchActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.disassociate_with_storage import (
+from ai.backend.manager.services.artifact.revision.actions.disassociate_with_storage import (
     DisassociateWithStorageAction,
     DisassociateWithStorageActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.get import (
+from ai.backend.manager.services.artifact.revision.actions.get import (
     GetArtifactRevisionAction,
     GetArtifactRevisionActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.get_download_progress import (
+from ai.backend.manager.services.artifact.revision.actions.get_download_progress import (
     GetDownloadProgressAction,
     GetDownloadProgressActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.get_readme import (
+from ai.backend.manager.services.artifact.revision.actions.get_readme import (
     GetArtifactRevisionReadmeAction,
     GetArtifactRevisionReadmeActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.get_verification_result import (
+from ai.backend.manager.services.artifact.revision.actions.get_verification_result import (
     GetArtifactRevisionVerificationResultAction,
     GetArtifactRevisionVerificationResultActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.import_revision import (
+from ai.backend.manager.services.artifact.revision.actions.import_revision import (
     ImportArtifactRevisionAction,
     ImportArtifactRevisionActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.reject import (
+from ai.backend.manager.services.artifact.revision.actions.reject import (
     RejectArtifactRevisionAction,
     RejectArtifactRevisionActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.search import (
+from ai.backend.manager.services.artifact.revision.actions.search import (
     SearchArtifactRevisionsAction,
     SearchArtifactRevisionsActionResult,
 )

@@ -103,15 +103,15 @@ from ai.backend.manager.services.app_config.service import (
     AppConfigService,
 )
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
-from ai.backend.manager.services.artifact.service import ArtifactService
-from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
-from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
-from ai.backend.manager.services.artifact_revision.actions.lookup_owner import (
+from ai.backend.manager.services.artifact.revision.actions.lookup_owner import (
     LookupArtifactRevisionOwnerAction,
     LookupBulkArtifactRevisionOwnerAction,
 )
-from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
-from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
+from ai.backend.manager.services.artifact.revision.processors import ArtifactRevisionProcessors
+from ai.backend.manager.services.artifact.revision.service import ArtifactRevisionService
+from ai.backend.manager.services.artifact.service import ArtifactService
+from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
+from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
@@ -131,11 +131,6 @@ from ai.backend.manager.services.deployment_revision_preset.service import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
-from ai.backend.manager.services.error_log.actions.lookup_owner import (
-    LookupBulkErrorLogOwnerAction,
-    LookupErrorLogOwnerAction,
-)
-from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
 from ai.backend.manager.services.etcd_config.service import EtcdConfigService
 from ai.backend.manager.services.events.service import EventsService
@@ -202,10 +197,6 @@ from ai.backend.manager.services.prometheus_query_preset.service import (
 from ai.backend.manager.services.prometheus_query_preset_category.processors import (
     PrometheusQueryPresetCategoryProcessors,
 )
-from ai.backend.manager.services.resource_allocation.processors import (
-    ResourceAllocationProcessors,
-)
-from ai.backend.manager.services.resource_allocation.service import ResourceAllocationService
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
@@ -229,6 +220,12 @@ from ai.backend.manager.services.scheduling_history.processors import Scheduling
 from ai.backend.manager.services.scheduling_history.service import SchedulingHistoryService
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
+from ai.backend.manager.services.session.resource_allocation.processors import (
+    ResourceAllocationProcessors,
+)
+from ai.backend.manager.services.session.resource_allocation.service import (
+    ResourceAllocationService,
+)
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
 from ai.backend.manager.services.stream.processors import StreamProcessors
@@ -239,6 +236,11 @@ from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupBulkKeypairOwnerAction,
     LookupKeypairOwnerAction,
 )
+from ai.backend.manager.services.user.error_log.actions.lookup_owner import (
+    LookupBulkErrorLogOwnerAction,
+    LookupErrorLogOwnerAction,
+)
+from ai.backend.manager.services.user.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.services.user_resource_policy.processors import UserResourcePolicyProcessors
@@ -547,14 +549,6 @@ def create_processors(
         domain=DomainProcessors(
             registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), services.domain, action_monitors
         ),
-        error_log=ErrorLogProcessors(
-            registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
-                FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
-                ErrorLogData,
-                LookupErrorLogOwnerAction,
-                LookupBulkErrorLogOwnerAction,
-            )
-        ),
         etcd_config=EtcdConfigProcessors(
             registry.group(GroupMeta(ETCD_CONFIG_ENTITY_TYPE)), services.etcd_config
         ),
@@ -573,6 +567,14 @@ def create_processors(
                 KeyPairData,
                 LookupKeypairOwnerAction,
                 LookupBulkKeypairOwnerAction,
+            ),
+            ErrorLogProcessors(
+                registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
+                    FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
+                    ErrorLogData,
+                    LookupErrorLogOwnerAction,
+                    LookupBulkErrorLogOwnerAction,
+                )
             ),
             services.user,
         ),
@@ -596,7 +598,19 @@ def create_processors(
         vfolder_sharing=VFolderSharingProcessors(
             registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), services.vfolder_sharing
         ),
-        session=SessionProcessors(registry.group(GroupMeta(SESSION_ENTITY_TYPE)), services.session),
+        session=SessionProcessors(
+            registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            ResourceAllocationProcessors(
+                resource_allocation_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+                resource_allocation_groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
+                resource_allocation_groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
+                resource_allocation_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+                resource_allocation_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+                resource_allocation_groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+                services.resource_allocation,
+            ),
+            services.session,
+        ),
         keypair_resource_policy=KeypairResourcePolicyProcessors(
             registry.group(GroupMeta(KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE))
         ),
@@ -700,15 +714,16 @@ def create_processors(
             registry.group(GroupMeta(VFS_STORAGE_ENTITY_TYPE)), services.vfs_storage
         ),
         artifact=ArtifactProcessors(
-            registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)), services.artifact
+            registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+            ArtifactRevisionProcessors(
+                registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+                artifact_revisions,
+                services.artifact_revision,
+            ),
+            services.artifact,
         ),
         artifact_registry=ArtifactRegistryProcessors(
             registry.group(GroupMeta(ARTIFACT_REGISTRY_ENTITY_TYPE)), services.artifact_registry
-        ),
-        artifact_revision=ArtifactRevisionProcessors(
-            registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
-            artifact_revisions,
-            services.artifact_revision,
         ),
         deployment=DeploymentProcessors(
             registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), services.deployment
@@ -733,15 +748,6 @@ def create_processors(
         ),
         template=TemplateProcessors(
             registry.group(GroupMeta(SESSION_TEMPLATE_ENTITY_TYPE)), services.template
-        ),
-        resource_allocation=ResourceAllocationProcessors(
-            resource_allocation_groups.group(GroupMeta(USER_ENTITY_TYPE)),
-            resource_allocation_groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
-            resource_allocation_groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
-            resource_allocation_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
-            resource_allocation_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
-            resource_allocation_groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
-            services.resource_allocation,
         ),
         stream=StreamProcessors(registry.group(GroupMeta(SESSION_ENTITY_TYPE)), services.stream),
     )

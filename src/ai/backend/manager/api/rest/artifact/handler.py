@@ -42,34 +42,34 @@ from ai.backend.manager.dto.response import (
     UpdateArtifactResponse,
 )
 from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
-from ai.backend.manager.services.artifact_revision.actions.approve import (
+from ai.backend.manager.services.artifact.revision.actions.approve import (
     ApproveArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.cancel_import import (
+from ai.backend.manager.services.artifact.revision.actions.cancel_import import (
     CancelImportAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.cleanup import (
+from ai.backend.manager.services.artifact.revision.actions.cleanup import (
     CleanupArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.get_download_progress import (
+from ai.backend.manager.services.artifact.revision.actions.get_download_progress import (
     GetDownloadProgressAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.get_readme import (
+from ai.backend.manager.services.artifact.revision.actions.get_readme import (
     GetArtifactRevisionReadmeAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.get_verification_result import (
+from ai.backend.manager.services.artifact.revision.actions.get_verification_result import (
     GetArtifactRevisionVerificationResultAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.import_revision import (
+from ai.backend.manager.services.artifact.revision.actions.import_revision import (
     ImportArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.reject import (
+from ai.backend.manager.services.artifact.revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.artifact.processors import ArtifactProcessors
-    from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
+    from ai.backend.manager.services.artifact.revision.processors import ArtifactRevisionProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

@@ -12,10 +12,12 @@ from ai.backend.manager.actions.v2.ops.result import (
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.error_log.types import ErrorLogData
-from ai.backend.manager.services.error_log.actions.create import CreateErrorLogAction
-from ai.backend.manager.services.error_log.actions.delete import DeleteErrorLogAction
-from ai.backend.manager.services.error_log.actions.global_search import GlobalSearchErrorLogsAction
-from ai.backend.manager.services.error_log.actions.search import SearchErrorLogsAction
+from ai.backend.manager.services.user.error_log.actions.create import CreateErrorLogAction
+from ai.backend.manager.services.user.error_log.actions.delete import DeleteErrorLogAction
+from ai.backend.manager.services.user.error_log.actions.global_search import (
+    GlobalSearchErrorLogsAction,
+)
+from ai.backend.manager.services.user.error_log.actions.search import SearchErrorLogsAction
 
 
 class ErrorLogProcessors:

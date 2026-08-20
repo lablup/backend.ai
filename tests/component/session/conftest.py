@@ -15,9 +15,16 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.error_log import ERROR_LOG_FIELD_TYPE
 from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.resource_group import (
+    RESOURCE_GROUP_ENTITY_TYPE,
+    ResourceGroupID,
+    ResourceGroupName,
+)
+from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
@@ -25,6 +32,7 @@ from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import AgentId, ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    ConcernMeta,
     FieldGroupMeta,
     GroupMeta,
 )
@@ -39,6 +47,7 @@ from ai.backend.manager.api.rest.session.handler import SessionHandler
 from ai.backend.manager.api.rest.session.registry import register_session_routes
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.session.types import SessionStatus
@@ -51,11 +60,19 @@ from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
+from ai.backend.manager.services.session.resource_allocation.processors import (
+    ResourceAllocationProcessors,
+)
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupBulkKeypairOwnerAction,
     LookupKeypairOwnerAction,
 )
+from ai.backend.manager.services.user.error_log.actions.lookup_owner import (
+    LookupBulkErrorLogOwnerAction,
+    LookupErrorLogOwnerAction,
+)
+from ai.backend.manager.services.user.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
@@ -125,7 +142,20 @@ async def session_processors(
         user_repository=AsyncMock(),
     )
     service = SessionService(args)
-    return SessionProcessors(processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)), service)
+    groups = processor_registry.concern(ConcernMeta("resource_allocation"))
+    return SessionProcessors(
+        processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        ResourceAllocationProcessors(
+            groups.group(GroupMeta(USER_ENTITY_TYPE)),
+            groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
+            groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
+            groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+            groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            AsyncMock(),
+        ),
+        service,
+    )
 
 
 @pytest.fixture()
@@ -172,6 +202,14 @@ def server_module_registries(
                         KeyPairData,
                         LookupKeypairOwnerAction,
                         LookupBulkKeypairOwnerAction,
+                    ),
+                    ErrorLogProcessors(
+                        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
+                            FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
+                            ErrorLogData,
+                            LookupErrorLogOwnerAction,
+                            LookupBulkErrorLogOwnerAction,
+                        )
                     ),
                     AsyncMock(),
                 ),

@@ -46,10 +46,10 @@ from ai.backend.manager.repositories.resource_preset.repository import (
     ResourcePresetRepository,
 )
 from ai.backend.manager.services.processors import Processors
-from ai.backend.manager.services.resource_allocation.processors import (
+from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
 )
-from ai.backend.manager.services.resource_allocation.service import (
+from ai.backend.manager.services.session.resource_allocation.service import (
     ResourceAllocationService,
 )
 
@@ -95,7 +95,7 @@ def server_module_registries(
 ) -> list[RouteRegistry]:
     """Register v2 resource allocation REST routes for testing."""
     processors = MagicMock(spec=Processors)
-    processors.resource_allocation = resource_allocation_processors
+    processors.session.resource_allocation = resource_allocation_processors
 
     adapter = ResourceAllocationAdapter(
         processors=processors,

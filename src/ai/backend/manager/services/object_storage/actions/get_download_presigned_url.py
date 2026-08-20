@@ -6,7 +6,7 @@ from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
-from ai.backend.manager.services.artifact_revision.actions.lookup_owner import (
+from ai.backend.manager.services.artifact.revision.actions.lookup_owner import (
     LookupArtifactRevisionOwnerAction,
 )
 

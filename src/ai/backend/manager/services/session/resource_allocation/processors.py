@@ -10,35 +10,37 @@ from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.services.resource_allocation.actions.check_preset_availability import (
+from ai.backend.manager.services.session.resource_allocation.actions.check_preset_availability import (
     CheckPresetAvailabilityAction,
     CheckPresetAvailabilityActionResult,
 )
-from ai.backend.manager.services.resource_allocation.actions.get_domain_usage import (
+from ai.backend.manager.services.session.resource_allocation.actions.get_domain_usage import (
     GetDomainUsageAction,
     GetDomainUsageActionResult,
 )
-from ai.backend.manager.services.resource_allocation.actions.get_effective_allocation import (
+from ai.backend.manager.services.session.resource_allocation.actions.get_effective_allocation import (
     GetEffectiveAllocationAction,
     GetEffectiveAllocationActionResult,
 )
-from ai.backend.manager.services.resource_allocation.actions.get_keypair_usage import (
+from ai.backend.manager.services.session.resource_allocation.actions.get_keypair_usage import (
     GetKeypairUsageAction,
     GetKeypairUsageActionResult,
 )
-from ai.backend.manager.services.resource_allocation.actions.get_project_usage import (
+from ai.backend.manager.services.session.resource_allocation.actions.get_project_usage import (
     GetProjectUsageAction,
     GetProjectUsageActionResult,
 )
-from ai.backend.manager.services.resource_allocation.actions.get_resource_group_usage import (
+from ai.backend.manager.services.session.resource_allocation.actions.get_resource_group_usage import (
     GetResourceGroupUsageAction,
     GetResourceGroupUsageActionResult,
 )
-from ai.backend.manager.services.resource_allocation.actions.resolve_keypair_context import (
+from ai.backend.manager.services.session.resource_allocation.actions.resolve_keypair_context import (
     ResolveKeypairContextAction,
     ResolveKeypairContextActionResult,
 )
-from ai.backend.manager.services.resource_allocation.service import ResourceAllocationService
+from ai.backend.manager.services.session.resource_allocation.service import (
+    ResourceAllocationService,
+)
 
 
 class ResourceAllocationProcessors:

@@ -58,10 +58,10 @@ from ai.backend.manager.repositories.resource_preset.repository import (
     ResourcePresetRepository,
 )
 from ai.backend.manager.services.processors import Processors
-from ai.backend.manager.services.resource_allocation.processors import (
+from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
 )
-from ai.backend.manager.services.resource_allocation.service import (
+from ai.backend.manager.services.session.resource_allocation.service import (
     ResourceAllocationService,
 )
 
@@ -111,7 +111,7 @@ def _build_registries(
 ) -> list[RouteRegistry]:
     """Build route registries with the given config provider."""
     processors = MagicMock(spec=Processors)
-    processors.resource_allocation = ra_processors
+    processors.session.resource_allocation = ra_processors
     adapter = ResourceAllocationAdapter(
         processors=processors,
         config_provider=config_provider,

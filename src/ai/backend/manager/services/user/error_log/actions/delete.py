@@ -9,7 +9,9 @@ from ai.backend.manager.actions.v2.field.ops import DeleteFieldOpsAction
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.error_log.updaters import ErrorLogSoftDeleteUpdater
-from ai.backend.manager.services.error_log.actions.lookup_owner import LookupErrorLogOwnerAction
+from ai.backend.manager.services.user.error_log.actions.lookup_owner import (
+    LookupErrorLogOwnerAction,
+)
 
 
 @dataclass

@@ -3,24 +3,24 @@ from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
-from ai.backend.manager.services.artifact_revision.actions.base import (
+from ai.backend.manager.services.artifact.revision.actions.base import (
     ArtifactRevisionSingleEntityAction,
 )
 
 
 @dataclass
-class CancelImportAction(ArtifactRevisionSingleEntityAction):
+class GetArtifactRevisionAction(ArtifactRevisionSingleEntityAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "cancel_import"
+        return "get_artifact_revision"
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
+        return ActionOperationType.GET
 
 
 @dataclass
-class CancelImportActionResult:
-    result: ArtifactRevisionData
+class GetArtifactRevisionActionResult:
+    revision: ArtifactRevisionData

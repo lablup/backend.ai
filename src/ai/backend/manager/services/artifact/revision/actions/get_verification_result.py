@@ -5,7 +5,7 @@ from typing import override
 
 from ai.backend.common.data.artifact.types import VerificationStepResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.artifact_revision.actions.base import (
+from ai.backend.manager.services.artifact.revision.actions.base import (
     ArtifactRevisionSingleEntityAction,
 )
 

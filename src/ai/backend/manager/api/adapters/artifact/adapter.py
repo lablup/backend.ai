@@ -106,24 +106,24 @@ from ai.backend.manager.services.artifact.actions.scan import (
 )
 from ai.backend.manager.services.artifact.actions.search import SearchArtifactsAction
 from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
-from ai.backend.manager.services.artifact_revision.actions.approve import (
+from ai.backend.manager.services.artifact.revision.actions.approve import (
     ApproveArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.cancel_import import CancelImportAction
-from ai.backend.manager.services.artifact_revision.actions.cleanup import (
+from ai.backend.manager.services.artifact.revision.actions.cancel_import import CancelImportAction
+from ai.backend.manager.services.artifact.revision.actions.cleanup import (
     CleanupArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.delegate_import_revision_batch import (
+from ai.backend.manager.services.artifact.revision.actions.delegate_import_revision_batch import (
     DelegateImportArtifactRevisionBatchAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
-from ai.backend.manager.services.artifact_revision.actions.import_revision import (
+from ai.backend.manager.services.artifact.revision.actions.get import GetArtifactRevisionAction
+from ai.backend.manager.services.artifact.revision.actions.import_revision import (
     ImportArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.reject import (
+from ai.backend.manager.services.artifact.revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.search import (
+from ai.backend.manager.services.artifact.revision.actions.search import (
     SearchArtifactRevisionsAction,
 )
 from ai.backend.manager.types import TriState
@@ -203,7 +203,7 @@ class ArtifactAdapter(BaseAdapter):
         pagination = self._build_gql_pagination_revisions(input)
         querier = BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
-        action_result = await self._processors.artifact_revision.search_revision.run(
+        action_result = await self._processors.artifact.revision.search_revision.run(
             SearchArtifactRevisionsAction(querier=querier)
         )
 
@@ -249,7 +249,7 @@ class ArtifactAdapter(BaseAdapter):
             conditions=[ArtifactRevisionConditions.by_ids(revision_ids)],
         )
 
-        action_result = await self._processors.artifact_revision.search_revision.run(
+        action_result = await self._processors.artifact.revision.search_revision.run(
             SearchArtifactRevisionsAction(querier=querier)
         )
 
@@ -298,7 +298,7 @@ class ArtifactAdapter(BaseAdapter):
 
     async def get_revision(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
         """Retrieve a single artifact revision by ID."""
-        action_result = await self._processors.artifact_revision.get.run(
+        action_result = await self._processors.artifact.revision.get.run(
             GetArtifactRevisionAction(artifact_revision_id=ArtifactRevisionID(artifact_revision_id))
         )
         return self._revision_data_to_dto(action_result.revision)
@@ -331,7 +331,7 @@ class ArtifactAdapter(BaseAdapter):
         force: bool,
     ) -> tuple[ArtifactRevisionNode, UUID | None]:
         """Import a single artifact revision and return (revision_node, task_id)."""
-        action_result = await self._processors.artifact_revision.import_revision.run(
+        action_result = await self._processors.artifact.revision.import_revision.run(
             ImportArtifactRevisionAction(
                 artifact_revision_id=ArtifactRevisionID(artifact_revision_id),
                 vfolder_id=vfolder_id,
@@ -397,7 +397,7 @@ class ArtifactAdapter(BaseAdapter):
             if delegatee_target is not None
             else None
         )
-        action_result = await self._processors.artifact_revision.delegate_import_revision_batch.run(
+        action_result = await self._processors.artifact.revision.delegate_import_revision_batch.run(
             DelegateImportArtifactRevisionBatchAction(
                 delegator_reservoir_id=delegator_reservoir_id,
                 delegatee_target=service_target,
@@ -411,7 +411,7 @@ class ArtifactAdapter(BaseAdapter):
 
     async def cleanup_revision(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
         """Clean up stored artifact revision data and revert to SCANNED status."""
-        action_result = await self._processors.artifact_revision.cleanup.run(
+        action_result = await self._processors.artifact.revision.cleanup.run(
             CleanupArtifactRevisionAction(
                 artifact_revision_id=ArtifactRevisionID(artifact_revision_id)
             )
@@ -429,14 +429,14 @@ class ArtifactAdapter(BaseAdapter):
 
     async def cancel_import(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
         """Cancel an in-progress artifact import and revert to SCANNED status."""
-        action_result = await self._processors.artifact_revision.cancel_import.run(
+        action_result = await self._processors.artifact.revision.cancel_import.run(
             CancelImportAction(artifact_revision_id=ArtifactRevisionID(artifact_revision_id))
         )
         return self._revision_data_to_dto(action_result.result)
 
     async def approve_revision(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
         """Approve an artifact revision for general use."""
-        action_result = await self._processors.artifact_revision.approve.run(
+        action_result = await self._processors.artifact.revision.approve.run(
             ApproveArtifactRevisionAction(
                 artifact_revision_id=ArtifactRevisionID(artifact_revision_id)
             )
@@ -445,7 +445,7 @@ class ArtifactAdapter(BaseAdapter):
 
     async def reject_revision(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
         """Reject an artifact revision, preventing its use."""
-        action_result = await self._processors.artifact_revision.reject.run(
+        action_result = await self._processors.artifact.revision.reject.run(
             RejectArtifactRevisionAction(
                 artifact_revision_id=ArtifactRevisionID(artifact_revision_id)
             )

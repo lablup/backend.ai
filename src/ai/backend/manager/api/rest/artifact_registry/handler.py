@@ -56,13 +56,13 @@ from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsActio
 from ai.backend.manager.services.artifact.actions.search_with_revisions import (
     SearchArtifactsWithRevisionsAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.delegate_import_revision_batch import (
+from ai.backend.manager.services.artifact.revision.actions.delegate_import_revision_batch import (
     DelegateImportArtifactRevisionBatchAction,
 )
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.artifact.processors import ArtifactProcessors
-    from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
+    from ai.backend.manager.services.artifact.revision.processors import ArtifactRevisionProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

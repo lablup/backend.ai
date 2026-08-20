@@ -50,6 +50,9 @@ from ai.backend.manager.services.artifact.actions.upsert_multi import (
     UpsertArtifactsAction,
     UpsertArtifactsActionResult,
 )
+from ai.backend.manager.services.artifact.revision.processors import (
+    ArtifactRevisionProcessors,
+)
 
 from .service import ArtifactService
 
@@ -77,7 +80,15 @@ class ArtifactProcessors:
         DelegateScanArtifactsAction, DelegateScanArtifactsActionResult
     ]
 
-    def __init__(self, group: ProcessorGroup[ArtifactData], service: ArtifactService) -> None:
+    revision: ArtifactRevisionProcessors
+
+    def __init__(
+        self,
+        group: ProcessorGroup[ArtifactData],
+        revision: ArtifactRevisionProcessors,
+        service: ArtifactService,
+    ) -> None:
+        self.revision = revision
         # TODO: Move scan action to ArtifactRegistryService
         self.scan = group.global_scope(ScanArtifactsAction, service.scan)
         self.get = group.single_entity(GetArtifactAction, service.get)

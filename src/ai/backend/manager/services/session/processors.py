@@ -147,6 +147,9 @@ from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
     UploadFilesActionResult,
 )
+from ai.backend.manager.services.session.resource_allocation.processors import (
+    ResourceAllocationProcessors,
+)
 from ai.backend.manager.services.session.service import SessionService
 
 
@@ -218,7 +221,15 @@ class SessionProcessors:
     update_session: SingleEntityActionProcessor[UpdateSessionAction, UpdateSessionActionResult]
     lookup: LookupActionProcessor[LookupSessionAction, LookupOpsResult[SessionData]]
 
-    def __init__(self, group: ProcessorGroup[SessionData], service: SessionService) -> None:
+    resource_allocation: ResourceAllocationProcessors
+
+    def __init__(
+        self,
+        group: ProcessorGroup[SessionData],
+        resource_allocation: ResourceAllocationProcessors,
+        service: SessionService,
+    ) -> None:
+        self.resource_allocation = resource_allocation
         # Actions without RBAC validation (internal/legacy)
         self.lookup = group.public_lookup_ops(LookupSessionAction)
         self.commit_session = group.single_entity(CommitSessionAction, service.commit_session)

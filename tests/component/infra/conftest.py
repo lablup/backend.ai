@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
 from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
+from ai.backend.common.data.entity.error_log import ERROR_LOG_FIELD_TYPE
 from ai.backend.common.data.entity.etcd_config import ETCD_CONFIG_ENTITY_TYPE
 from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
@@ -37,6 +38,7 @@ from ai.backend.manager.api.rest.scaling_group.handler import ScalingGroupHandle
 from ai.backend.manager.api.rest.scaling_group.registry import register_scaling_group_routes
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.group import GroupRow
@@ -70,6 +72,11 @@ from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupBulkKeypairOwnerAction,
     LookupKeypairOwnerAction,
 )
+from ai.backend.manager.services.user.error_log.actions.lookup_owner import (
+    LookupBulkErrorLogOwnerAction,
+    LookupErrorLogOwnerAction,
+)
+from ai.backend.manager.services.user.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
@@ -212,6 +219,14 @@ def user_processors(
             KeyPairData,
             LookupKeypairOwnerAction,
             LookupBulkKeypairOwnerAction,
+        ),
+        ErrorLogProcessors(
+            processor_registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
+                FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
+                ErrorLogData,
+                LookupErrorLogOwnerAction,
+                LookupBulkErrorLogOwnerAction,
+            )
         ),
         service,
     )

@@ -4,6 +4,7 @@ import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from dataclasses import dataclass
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -43,13 +44,13 @@ from ai.backend.manager.repositories.storage_namespace.repository import Storage
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
-from ai.backend.manager.services.artifact.service import ArtifactService
-from ai.backend.manager.services.artifact_revision.actions.lookup_owner import (
+from ai.backend.manager.services.artifact.revision.actions.lookup_owner import (
     LookupArtifactRevisionOwnerAction,
     LookupBulkArtifactRevisionOwnerAction,
 )
-from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
-from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
+from ai.backend.manager.services.artifact.revision.processors import ArtifactRevisionProcessors
+from ai.backend.manager.services.artifact.revision.service import ArtifactRevisionService
+from ai.backend.manager.services.artifact.service import ArtifactService
 
 
 @dataclass
@@ -85,7 +86,20 @@ def artifact_processors(
         storage_manager=storage_manager,
         config_provider=config_provider,
     )
-    return ArtifactProcessors(processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)), service)
+    return ArtifactProcessors(
+        processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+        ArtifactRevisionProcessors(
+            processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+            processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
+                FieldGroupMeta(ARTIFACT_REVISION_FIELD_TYPE),
+                ArtifactRevisionData,
+                LookupArtifactRevisionOwnerAction,
+                LookupBulkArtifactRevisionOwnerAction,
+            ),
+            MagicMock(),
+        ),
+        service,
+    )
 
 
 @pytest.fixture()

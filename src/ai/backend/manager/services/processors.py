@@ -55,18 +55,15 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.artifact.processors import (
         ArtifactProcessors,
     )
+    from ai.backend.manager.services.artifact.revision.service import (
+        ArtifactRevisionService,
+    )
     from ai.backend.manager.services.artifact.service import ArtifactService
     from ai.backend.manager.services.artifact_registry.processors import (
         ArtifactRegistryProcessors,
     )
     from ai.backend.manager.services.artifact_registry.service import (
         ArtifactRegistryService,
-    )
-    from ai.backend.manager.services.artifact_revision.processors import (
-        ArtifactRevisionProcessors,
-    )
-    from ai.backend.manager.services.artifact_revision.service import (
-        ArtifactRevisionService,
     )
     from ai.backend.manager.services.audit_log.processors import (
         AuditLogProcessors,
@@ -95,9 +92,6 @@ if TYPE_CHECKING:
         DomainProcessors,
     )
     from ai.backend.manager.services.domain.service import DomainService
-    from ai.backend.manager.services.error_log.processors import (
-        ErrorLogProcessors,
-    )
     from ai.backend.manager.services.etcd_config.processors import (
         EtcdConfigProcessors,
     )
@@ -193,12 +187,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.prometheus_query_preset_category.processors import (
         PrometheusQueryPresetCategoryProcessors,
     )
-    from ai.backend.manager.services.resource_allocation.processors import (
-        ResourceAllocationProcessors,
-    )
-    from ai.backend.manager.services.resource_allocation.service import (
-        ResourceAllocationService,
-    )
     from ai.backend.manager.services.resource_preset.processors import (
         ResourcePresetProcessors,
     )
@@ -247,6 +235,9 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.session.processors import (
         SessionProcessors,
+    )
+    from ai.backend.manager.services.session.resource_allocation.service import (
+        ResourceAllocationService,
     )
     from ai.backend.manager.services.session.service import SessionService
     from ai.backend.manager.services.storage_namespace.processors import (
@@ -400,7 +391,6 @@ class Processors:
     agent: AgentProcessors
     app_config: AppConfigProcessors
     domain: DomainProcessors
-    error_log: ErrorLogProcessors
     etcd_config: EtcdConfigProcessors
     export: ExportProcessors
     fair_share: FairShareProcessors
@@ -441,7 +431,6 @@ class Processors:
     vfs_storage: VFSStorageProcessors
     artifact: ArtifactProcessors
     artifact_registry: ArtifactRegistryProcessors
-    artifact_revision: ArtifactRevisionProcessors
     deployment: DeploymentProcessors
     storage_namespace: StorageNamespaceProcessors
     audit_log: AuditLogProcessors
@@ -449,7 +438,6 @@ class Processors:
     scheduling_history: SchedulingHistoryProcessors
     service_catalog: ServiceCatalogProcessors
     template: TemplateProcessors
-    resource_allocation: ResourceAllocationProcessors
     stream: StreamProcessors
     login_client_type: LoginClientTypeProcessors
 

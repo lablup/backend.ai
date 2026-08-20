@@ -157,11 +157,11 @@ def build_api_routes(
     resource_slot_handler = ResourceSlotHandler(resource_slot=processors.resource_slot)
     artifact_handler = ArtifactHandler(
         artifact=processors.artifact,
-        artifact_revision=processors.artifact_revision,
+        artifact_revision=processors.artifact.revision,
     )
     artifact_registry_handler = ArtifactRegistryHandler(
         artifact=processors.artifact,
-        artifact_revision=processors.artifact_revision,
+        artifact_revision=processors.artifact.revision,
     )
     compute_sessions_handler = ComputeSessionsHandler(session=processors.session)
     container_registry_handler = ContainerRegistryHandler(
@@ -172,7 +172,7 @@ def build_api_routes(
         runtime_variant_adapter=adapters.runtime_variant,
     )
     domainconfig_handler = DomainConfigHandler(domain=processors.domain)
-    error_log_handler = ErrorLogHandler(error_log=processors.error_log)
+    error_log_handler = ErrorLogHandler(error_log=processors.user.error_log)
     etcd_handler = EtcdHandler(
         container_registry=processors.container_registry,
         etcd_config=processors.etcd_config,

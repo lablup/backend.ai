@@ -26,7 +26,7 @@ from ai.backend.manager.repositories.artifact.repository import ArtifactReposito
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
-from ai.backend.manager.services.artifact_revision.actions.lookup_owner import (
+from ai.backend.manager.services.artifact.revision.actions.lookup_owner import (
     LookupArtifactRevisionOwnerAction,
     LookupBulkArtifactRevisionOwnerAction,
 )
