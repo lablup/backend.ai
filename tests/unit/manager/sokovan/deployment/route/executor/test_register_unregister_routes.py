@@ -87,7 +87,7 @@ def _wire_proxy_target(
 ) -> None:
     deployments = [_make_deployment_mock(UUID(str(eid)), resource_group) for eid in endpoint_ids]
     mock_deployment_repo.get_deployments_by_ids.return_value = deployments
-    mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = {
+    mock_deployment_repo.fetch_resource_group_proxy_targets.return_value = {
         resource_group: ResourceGroupProxyTarget(addr=addr, api_token=token),
     }
 

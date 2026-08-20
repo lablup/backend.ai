@@ -230,7 +230,8 @@ sgroups_for_keypairs = ResourceGroupForKeypairsRow.__table__
 
 
 class ResourceGroupRow(CreatedAtMixin, Base):
-    __tablename__ = "resource_groups"
+    # The table keeps its original name; the rename stopped at the Python identifiers.
+    __tablename__ = "scaling_groups"
     __table_args__ = (
         # Partial unique index: at most one row may have is_default = true.
         sa.Index(

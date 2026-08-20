@@ -1,14 +1,13 @@
 ---
 name: error-log-service-shapes
 type: decision-table
-description: error log processor fields and their entity/operation/scope, why recording is user-scoped rather than global, why clearing is a soft delete addressed by id, which writes bypass the action layer
-scope: src/ai/backend/manager/services/error_log
+description: error log processor fields and their entity/operation/scope, why recording is user-scoped rather than global, why clearing is a soft delete addressed by id
+scope: src/ai/backend/manager/services/user/error_log
 keywords: [CreateErrorLogAction, DeleteErrorLogAction, SearchErrorLogsAction, AdminSearchErrorLogsAction, ErrorLogSoftDeleteUpdater, UserErrorLogOperationScope, entity_create_ops, scope_search_ops, single_delete_ops, is_cleared]
 sources:
-  - src/ai/backend/manager/services/error_log
+  - src/ai/backend/manager/services/user/error_log
   - src/ai/backend/manager/models/error_log
   - src/ai/backend/manager/repositories/error_log
-  - src/ai/backend/manager/plugin/error_monitor.py
 generated:
   by: claude-code/opus-5
   at: 2026-08-14
@@ -59,13 +58,6 @@ the action layer.
   passed backwards.
 - The action is single-entity because by then the row exists to name; the scope
   shape would authorize the caller's own scope rather than the row being cleared.
-
-## The plugin writes bypass the action layer
-
-- `plugin/error_monitor.py` records the manager's own failures and the agents'
-  through the repository directly, because there is no caller to audit.
-- Those rows have no owner, join no scope, and stay visible only to the admin
-  read. This is why the `user` column is nullable.
 
 ## Authorization moved to the permission layer and the rows are not seeded yet
 

@@ -6,7 +6,7 @@ scope: src/ai/backend/manager/services
 keywords: [action, spec, entity, field, global, scope, ops-direct, lookup, public, rbac, migration]
 sources:
   - src/ai/backend/manager/actions/v2
-  - src/ai/backend/manager/actions/registry.py
+  - src/ai/backend/manager/actions/registry
   - src/ai/backend/manager/models/specs
   - src/ai/backend/manager/repositories/ops
 generated:

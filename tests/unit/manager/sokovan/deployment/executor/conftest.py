@@ -42,7 +42,7 @@ from ai.backend.manager.sokovan.deployment.types import DeploymentWithHistory
 def mock_deployment_repo() -> AsyncMock:
     """Mock DeploymentRepository."""
     repo = AsyncMock()
-    repo.fetch_scaling_group_proxy_targets = AsyncMock(return_value={})
+    repo.fetch_resource_group_proxy_targets = AsyncMock(return_value={})
     repo.fetch_active_routes_by_endpoint_ids = AsyncMock(return_value={})
     repo.update_endpoint_url = AsyncMock(return_value=None)
     repo.update_desired_replicas_bulk = AsyncMock(return_value=None)

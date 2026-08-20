@@ -48,7 +48,7 @@ class TestDestroyDeployment:
         Then: Routes terminated, endpoint unregistered
         """
         # Arrange
-        mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
+        mock_deployment_repo.fetch_resource_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group
         )
 
@@ -93,7 +93,7 @@ class TestDestroyDeployment:
         Then: All destroyed successfully
         """
         # Arrange
-        mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
+        mock_deployment_repo.fetch_resource_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group
         )
 
@@ -134,7 +134,7 @@ class TestDestroyDeployment:
         Then: Error captured in result
         """
         # Arrange
-        mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
+        mock_deployment_repo.fetch_resource_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group
         )
 

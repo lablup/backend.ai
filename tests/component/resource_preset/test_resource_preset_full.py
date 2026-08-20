@@ -420,7 +420,7 @@ class TestCheckPresets:
         )
         assert isinstance(result.group_limits, dict)
         assert isinstance(result.group_using, dict)
-        assert isinstance(result.group_remaining, dict)
+        assert isinstance(result.scaling_group_remaining, dict)
 
     async def test_s5_check_presets_scaling_group_data(
         self,
@@ -432,7 +432,7 @@ class TestCheckPresets:
         result = await admin_registry.infra.check_presets(
             CheckPresetsRequest(group=group_name_fixture)
         )
-        assert isinstance(result.group_remaining, dict)
+        assert isinstance(result.scaling_group_remaining, dict)
         assert isinstance(result.scaling_groups, dict)
 
     async def test_s6_check_presets_with_scaling_group_filter(

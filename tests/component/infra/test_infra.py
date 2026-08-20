@@ -224,17 +224,17 @@ class TestResourcePresets:
         assert isinstance(result.group_limits, dict)
         assert isinstance(result.group_using, dict)
         assert isinstance(result.group_remaining, dict)
-        assert isinstance(result.group_remaining, dict)
+        assert isinstance(result.scaling_group_remaining, dict)
         assert isinstance(result.scaling_groups, dict)
 
     async def test_list_presets_with_scaling_group_filter(
         self,
         admin_registry: BackendAIClientRegistry,
-        resource_group_name: ResourceGroupName,
+        scaling_group_name: ResourceGroupName,
     ) -> None:
         """Filtering presets by scaling group."""
         await admin_registry.infra.list_presets(
-            ListPresetsRequest(scaling_group=resource_group_name)
+            ListPresetsRequest(scaling_group=scaling_group_name)
         )
 
 

@@ -544,7 +544,7 @@ class TestCleanupRoutesByConfig:
         deployment.current_revision = current_revision_mock
         deployment.deploying_revision = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
-        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+        mock_deployment_repo.get_resource_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
         }
 
@@ -580,7 +580,7 @@ class TestCleanupRoutesByConfig:
         deployment.current_revision = current_revision_mock
         deployment.deploying_revision = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
-        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+        mock_deployment_repo.get_resource_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
         }
 
@@ -653,7 +653,7 @@ class TestCleanupRoutesByConfig:
         deployment.current_revision = current_revision_mock
         deployment.deploying_revision = deploying_revision_mock
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
-        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+        mock_deployment_repo.get_resource_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
         }
 
@@ -702,7 +702,7 @@ class TestCleanupRoutesByConfig:
         deployment.current_revision = None
         deployment.deploying_revision = deploying_revision_mock
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
-        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+        mock_deployment_repo.get_resource_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
         }
 
@@ -748,7 +748,7 @@ class TestCleanupRoutesByConfig:
         deployment.current_revision = None
         deployment.deploying_revision = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
-        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+        mock_deployment_repo.get_resource_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
         }
 
@@ -1021,7 +1021,7 @@ def _wire_proxy_target(
     """
     deployments = [_make_deployment_mock(UUID(str(eid)), resource_group) for eid in endpoint_ids]
     mock_deployment_repo.get_deployments_by_ids.return_value = deployments
-    mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = {
+    mock_deployment_repo.fetch_resource_group_proxy_targets.return_value = {
         resource_group: ResourceGroupProxyTarget(addr=addr, api_token=token),
     }
     mock_deployment_repo.fetch_route_connection_infos.return_value = {

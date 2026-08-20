@@ -54,12 +54,12 @@ class TestResourcePresetList:
     async def test_admin_lists_presets_with_scaling_group_filter(
         self,
         admin_registry: BackendAIClientRegistry,
-        resource_group_name: ResourceGroupName,
+        scaling_group_name: ResourceGroupName,
         target_preset: PresetFixtureData,
     ) -> None:
         """Filtering by scaling group still returns system presets."""
         result = await admin_registry.infra.list_presets(
-            ListPresetsRequest(scaling_group=resource_group_name)
+            ListPresetsRequest(scaling_group=scaling_group_name)
         )
         assert isinstance(result, ListPresetsResponse)
         assert isinstance(result.presets, list)
@@ -86,7 +86,7 @@ class TestResourcePresetCheck:
         assert isinstance(result.group_limits, dict)
         assert isinstance(result.group_using, dict)
         assert isinstance(result.group_remaining, dict)
-        assert isinstance(result.group_remaining, dict)
+        assert isinstance(result.scaling_group_remaining, dict)
         assert isinstance(result.scaling_groups, dict)
 
     async def test_admin_checks_presets_with_scaling_group(
@@ -94,13 +94,13 @@ class TestResourcePresetCheck:
         admin_registry: BackendAIClientRegistry,
         target_preset: PresetFixtureData,
         group_name_fixture: str,
-        resource_group_name: ResourceGroupName,
+        scaling_group_name: ResourceGroupName,
     ) -> None:
         """Admin checks presets filtered by scaling group."""
         result = await admin_registry.infra.check_presets(
             CheckPresetsRequest(
                 group=group_name_fixture,
-                scaling_group=resource_group_name,
+                scaling_group=scaling_group_name,
             )
         )
         assert isinstance(result, CheckPresetsResponse)

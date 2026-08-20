@@ -100,7 +100,7 @@ def mock_storage_manager() -> MagicMock:
             ),
         ]
     )
-    manager.get_sftp_scaling_groups = AsyncMock(return_value=[])
+    manager.get_sftp_resource_groups = AsyncMock(return_value=[])
     return manager
 
 

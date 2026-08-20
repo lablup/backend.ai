@@ -6,7 +6,7 @@ scope: src/ai/backend/manager/actions
 keywords: [BaseSingleEntityAction, BaseScopeAction, BaseGlobalAction, BaseLookupAction, BaseBulkLookupAction, BaseSingleFieldAction, BaseBulkFieldAction, FieldOwnerLookup, PublicActionProcessor, anonymous_scope, AuditLogPolicy, ProcessorRegistry, wired_actions, RESTORE, soft-delete]
 sources:
   - src/ai/backend/manager/actions/v2
-  - src/ai/backend/manager/actions/registry.py
+  - src/ai/backend/manager/actions/registry
   - src/ai/backend/manager/actions/audit_policy.py
 generated:
   by: claude-code/opus-5

@@ -138,18 +138,18 @@ class TestValidation:
         action_add_mem_weight: UpdateFairShareSpecAction,
         expected_weights_cpu_mem: ResourceSlot,
     ) -> None:
-        mock_repository.get_scaling_group_by_name = AsyncMock(
+        mock_repository.get_resource_group_by_name = AsyncMock(
             return_value=existing_scaling_group_with_cpu
         )
         mock_repository.get_resource_info = AsyncMock(return_value=capacity_cpu_mem_cuda)
-        mock_repository.update_scaling_group = AsyncMock(
+        mock_repository.update_resource_group = AsyncMock(
             return_value=existing_scaling_group_with_cpu
         )
 
         result = await service.update_fair_share_spec(action_add_mem_weight)
 
         # Verify repository called with correct spec
-        call_args = mock_repository.update_scaling_group.call_args
+        call_args = mock_repository.update_resource_group.call_args
         saved_spec: FairShareResourceGroupSpec = call_args[0][
             0
         ].spec.fair_share.fair_share_spec.value()
@@ -179,7 +179,7 @@ class TestValidation:
         capacity_cpu_mem_cuda: ResourceInfo,
         action_add_tpu_weight: UpdateFairShareSpecAction,
     ) -> None:
-        mock_repository.get_scaling_group_by_name = AsyncMock(
+        mock_repository.get_resource_group_by_name = AsyncMock(
             return_value=existing_scaling_group_with_cpu
         )
         mock_repository.get_resource_info = AsyncMock(return_value=capacity_cpu_mem_cuda)
@@ -188,7 +188,7 @@ class TestValidation:
             await service.update_fair_share_spec(action_add_tpu_weight)
 
         assert "tpu.device" in str(exc.value)
-        mock_repository.update_scaling_group.assert_not_called()
+        mock_repository.update_resource_group.assert_not_called()
 
     # --- V3: Partial invalid types ---
 
@@ -213,7 +213,7 @@ class TestValidation:
         capacity_cpu_mem_cuda: ResourceInfo,
         action_mixed_valid_invalid: UpdateFairShareSpecAction,
     ) -> None:
-        mock_repository.get_scaling_group_by_name = AsyncMock(
+        mock_repository.get_resource_group_by_name = AsyncMock(
             return_value=existing_scaling_group_with_cpu
         )
         mock_repository.get_resource_info = AsyncMock(return_value=capacity_cpu_mem_cuda)
@@ -224,7 +224,7 @@ class TestValidation:
         error_msg = str(exc.value)
         assert "tpu.device" in error_msg
         assert "rocm.device" in error_msg
-        mock_repository.update_scaling_group.assert_not_called()
+        mock_repository.update_resource_group.assert_not_called()
 
     # --- V4: Delete existing type (weight=None) ---
 
@@ -245,18 +245,18 @@ class TestValidation:
         capacity_cpu_mem_cuda: ResourceInfo,
         action_delete_cuda: UpdateFairShareSpecAction,
     ) -> None:
-        mock_repository.get_scaling_group_by_name = AsyncMock(
+        mock_repository.get_resource_group_by_name = AsyncMock(
             return_value=existing_scaling_group_with_cpu
         )
         mock_repository.get_resource_info = AsyncMock(return_value=capacity_cpu_mem_cuda)
-        mock_repository.update_scaling_group = AsyncMock(
+        mock_repository.update_resource_group = AsyncMock(
             return_value=existing_scaling_group_with_cpu
         )
 
         result = await service.update_fair_share_spec(action_delete_cuda)
 
         assert result is not None
-        mock_repository.update_scaling_group.assert_called_once()
+        mock_repository.update_resource_group.assert_called_once()
 
     # --- V5: Delete non-existent type ---
 
@@ -277,18 +277,18 @@ class TestValidation:
         capacity_cpu_mem_cuda: ResourceInfo,
         action_delete_nonexistent_tpu: UpdateFairShareSpecAction,
     ) -> None:
-        mock_repository.get_scaling_group_by_name = AsyncMock(
+        mock_repository.get_resource_group_by_name = AsyncMock(
             return_value=existing_scaling_group_with_cpu
         )
         mock_repository.get_resource_info = AsyncMock(return_value=capacity_cpu_mem_cuda)
-        mock_repository.update_scaling_group = AsyncMock(
+        mock_repository.update_resource_group = AsyncMock(
             return_value=existing_scaling_group_with_cpu
         )
 
         result = await service.update_fair_share_spec(action_delete_nonexistent_tpu)
 
         assert result is not None
-        mock_repository.update_scaling_group.assert_called_once()
+        mock_repository.update_resource_group.assert_called_once()
 
 
 # =============================================================================
@@ -333,18 +333,18 @@ class TestFiltering:
         capacity_cpu_mem_only: ResourceInfo,
         action_update_half_life: UpdateFairShareSpecAction,
     ) -> None:
-        mock_repository.get_scaling_group_by_name = AsyncMock(
+        mock_repository.get_resource_group_by_name = AsyncMock(
             return_value=existing_scaling_group_cpu_cuda
         )
         mock_repository.get_resource_info = AsyncMock(return_value=capacity_cpu_mem_only)
-        mock_repository.update_scaling_group = AsyncMock(
+        mock_repository.update_resource_group = AsyncMock(
             return_value=existing_scaling_group_cpu_cuda
         )
 
         result = await service.update_fair_share_spec(action_update_half_life)
 
         # Verify repository called with filtered weights
-        call_args = mock_repository.update_scaling_group.call_args
+        call_args = mock_repository.update_resource_group.call_args
         saved_spec: FairShareResourceGroupSpec = call_args[0][
             0
         ].spec.fair_share.fair_share_spec.value()
@@ -382,18 +382,18 @@ class TestFiltering:
         capacity_cpu_mem_cuda: ResourceInfo,
         action_update_half_life: UpdateFairShareSpecAction,
     ) -> None:
-        mock_repository.get_scaling_group_by_name = AsyncMock(
+        mock_repository.get_resource_group_by_name = AsyncMock(
             return_value=existing_scaling_group_cpu_mem
         )
         mock_repository.get_resource_info = AsyncMock(return_value=capacity_cpu_mem_cuda)
-        mock_repository.update_scaling_group = AsyncMock(
+        mock_repository.update_resource_group = AsyncMock(
             return_value=existing_scaling_group_cpu_mem
         )
 
         result = await service.update_fair_share_spec(action_update_half_life)
 
         # Verify all weights preserved
-        call_args = mock_repository.update_scaling_group.call_args
+        call_args = mock_repository.update_resource_group.call_args
         saved_spec: FairShareResourceGroupSpec = call_args[0][
             0
         ].spec.fair_share.fair_share_spec.value()
@@ -417,18 +417,18 @@ class TestFiltering:
         empty_capacity: ResourceInfo,
         action_update_half_life: UpdateFairShareSpecAction,
     ) -> None:
-        mock_repository.get_scaling_group_by_name = AsyncMock(
+        mock_repository.get_resource_group_by_name = AsyncMock(
             return_value=existing_scaling_group_cpu_mem
         )
         mock_repository.get_resource_info = AsyncMock(return_value=empty_capacity)
-        mock_repository.update_scaling_group = AsyncMock(
+        mock_repository.update_resource_group = AsyncMock(
             return_value=existing_scaling_group_cpu_mem
         )
 
         result = await service.update_fair_share_spec(action_update_half_life)
 
         # Verify all weights cleared
-        call_args = mock_repository.update_scaling_group.call_args
+        call_args = mock_repository.update_resource_group.call_args
         saved_spec: FairShareResourceGroupSpec = call_args[0][
             0
         ].spec.fair_share.fair_share_spec.value()
@@ -484,18 +484,18 @@ class TestMerge:
         full_capacity: ResourceInfo,
         action_add_mem: UpdateFairShareSpecAction,
     ) -> None:
-        mock_repository.get_scaling_group_by_name = AsyncMock(
+        mock_repository.get_resource_group_by_name = AsyncMock(
             return_value=existing_scaling_group_cpu_only
         )
         mock_repository.get_resource_info = AsyncMock(return_value=full_capacity)
-        mock_repository.update_scaling_group = AsyncMock(
+        mock_repository.update_resource_group = AsyncMock(
             return_value=existing_scaling_group_cpu_only
         )
 
         result = await service.update_fair_share_spec(action_add_mem)
 
         # Verify merged weights
-        call_args = mock_repository.update_scaling_group.call_args
+        call_args = mock_repository.update_resource_group.call_args
         saved_spec: FairShareResourceGroupSpec = call_args[0][
             0
         ].spec.fair_share.fair_share_spec.value()
@@ -522,18 +522,18 @@ class TestMerge:
         full_capacity: ResourceInfo,
         action_update_cpu: UpdateFairShareSpecAction,
     ) -> None:
-        mock_repository.get_scaling_group_by_name = AsyncMock(
+        mock_repository.get_resource_group_by_name = AsyncMock(
             return_value=existing_scaling_group_cpu_only
         )
         mock_repository.get_resource_info = AsyncMock(return_value=full_capacity)
-        mock_repository.update_scaling_group = AsyncMock(
+        mock_repository.update_resource_group = AsyncMock(
             return_value=existing_scaling_group_cpu_only
         )
 
         result = await service.update_fair_share_spec(action_update_cpu)
 
         # Verify updated weight
-        call_args = mock_repository.update_scaling_group.call_args
+        call_args = mock_repository.update_resource_group.call_args
         saved_spec: FairShareResourceGroupSpec = call_args[0][
             0
         ].spec.fair_share.fair_share_spec.value()
@@ -559,18 +559,18 @@ class TestMerge:
         full_capacity: ResourceInfo,
         action_delete_cpu: UpdateFairShareSpecAction,
     ) -> None:
-        mock_repository.get_scaling_group_by_name = AsyncMock(
+        mock_repository.get_resource_group_by_name = AsyncMock(
             return_value=existing_scaling_group_cpu_mem
         )
         mock_repository.get_resource_info = AsyncMock(return_value=full_capacity)
-        mock_repository.update_scaling_group = AsyncMock(
+        mock_repository.update_resource_group = AsyncMock(
             return_value=existing_scaling_group_cpu_mem
         )
 
         result = await service.update_fair_share_spec(action_delete_cpu)
 
         # Verify cpu deleted, mem preserved
-        call_args = mock_repository.update_scaling_group.call_args
+        call_args = mock_repository.update_resource_group.call_args
         saved_spec: FairShareResourceGroupSpec = call_args[0][
             0
         ].spec.fair_share.fair_share_spec.value()
@@ -598,18 +598,18 @@ class TestMerge:
         full_capacity: ResourceInfo,
         action_update_half_life_only: UpdateFairShareSpecAction,
     ) -> None:
-        mock_repository.get_scaling_group_by_name = AsyncMock(
+        mock_repository.get_resource_group_by_name = AsyncMock(
             return_value=existing_scaling_group_cpu_only
         )
         mock_repository.get_resource_info = AsyncMock(return_value=full_capacity)
-        mock_repository.update_scaling_group = AsyncMock(
+        mock_repository.update_resource_group = AsyncMock(
             return_value=existing_scaling_group_cpu_only
         )
 
         result = await service.update_fair_share_spec(action_update_half_life_only)
 
         # Verify weights preserved, half_life updated
-        call_args = mock_repository.update_scaling_group.call_args
+        call_args = mock_repository.update_resource_group.call_args
         saved_spec: FairShareResourceGroupSpec = call_args[0][
             0
         ].spec.fair_share.fair_share_spec.value()
@@ -663,18 +663,18 @@ class TestIntegration:
         capacity_without_cuda: ResourceInfo,
         action_update_cpu_add_mem: UpdateFairShareSpecAction,
     ) -> None:
-        mock_repository.get_scaling_group_by_name = AsyncMock(
+        mock_repository.get_resource_group_by_name = AsyncMock(
             return_value=existing_scaling_group_cpu_cuda
         )
         mock_repository.get_resource_info = AsyncMock(return_value=capacity_without_cuda)
-        mock_repository.update_scaling_group = AsyncMock(
+        mock_repository.update_resource_group = AsyncMock(
             return_value=existing_scaling_group_cpu_cuda
         )
 
         result = await service.update_fair_share_spec(action_update_cpu_add_mem)
 
         # Verify full flow: validate -> merge -> filter
-        call_args = mock_repository.update_scaling_group.call_args
+        call_args = mock_repository.update_resource_group.call_args
         saved_spec: FairShareResourceGroupSpec = call_args[0][
             0
         ].spec.fair_share.fair_share_spec.value()
@@ -702,18 +702,18 @@ class TestIntegration:
         capacity_without_cuda: ResourceInfo,
         action_half_life_only: UpdateFairShareSpecAction,
     ) -> None:
-        mock_repository.get_scaling_group_by_name = AsyncMock(
+        mock_repository.get_resource_group_by_name = AsyncMock(
             return_value=existing_scaling_group_cpu_cuda
         )
         mock_repository.get_resource_info = AsyncMock(return_value=capacity_without_cuda)
-        mock_repository.update_scaling_group = AsyncMock(
+        mock_repository.update_resource_group = AsyncMock(
             return_value=existing_scaling_group_cpu_cuda
         )
 
         result = await service.update_fair_share_spec(action_half_life_only)
 
         # Verify cuda cleaned up during unrelated update
-        call_args = mock_repository.update_scaling_group.call_args
+        call_args = mock_repository.update_resource_group.call_args
         saved_spec: FairShareResourceGroupSpec = call_args[0][
             0
         ].spec.fair_share.fair_share_spec.value()
@@ -748,14 +748,14 @@ class TestEdgeCases:
         mock_repository: MagicMock,
         action_nonexistent_group: UpdateFairShareSpecAction,
     ) -> None:
-        mock_repository.get_scaling_group_by_name = AsyncMock(
+        mock_repository.get_resource_group_by_name = AsyncMock(
             side_effect=ResourceGroupNotFound("nonexistent")
         )
 
         with pytest.raises(ResourceGroupNotFound):
             await service.update_fair_share_spec(action_nonexistent_group)
 
-        mock_repository.update_scaling_group.assert_not_called()
+        mock_repository.update_resource_group.assert_not_called()
 
     # --- E2: Empty list preserves existing ---
 
@@ -784,16 +784,16 @@ class TestEdgeCases:
         capacity_cpu: ResourceInfo,
         action_empty_weights_list: UpdateFairShareSpecAction,
     ) -> None:
-        mock_repository.get_scaling_group_by_name = AsyncMock(
+        mock_repository.get_resource_group_by_name = AsyncMock(
             return_value=existing_scaling_group_cpu
         )
         mock_repository.get_resource_info = AsyncMock(return_value=capacity_cpu)
-        mock_repository.update_scaling_group = AsyncMock(return_value=existing_scaling_group_cpu)
+        mock_repository.update_resource_group = AsyncMock(return_value=existing_scaling_group_cpu)
 
         result = await service.update_fair_share_spec(action_empty_weights_list)
 
         # Verify weights preserved with empty list input
-        call_args = mock_repository.update_scaling_group.call_args
+        call_args = mock_repository.update_resource_group.call_args
         saved_spec: FairShareResourceGroupSpec = call_args[0][
             0
         ].spec.fair_share.fair_share_spec.value()

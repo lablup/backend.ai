@@ -205,7 +205,7 @@ class TestScalingGroupService:
         sample_scaling_group: ResourceGroupData,
     ) -> None:
         """Test searching scaling groups with default querier"""
-        mock_repository.search_scaling_groups = AsyncMock(
+        mock_repository.search_resource_groups = AsyncMock(
             return_value=ResourceGroupListResult(
                 items=[sample_scaling_group],
                 total_count=1,
@@ -224,7 +224,7 @@ class TestScalingGroupService:
 
         assert result.resource_groups == [sample_scaling_group]
         assert result.total_count == 1
-        mock_repository.search_scaling_groups.assert_called_once_with(querier=querier)
+        mock_repository.search_resource_groups.assert_called_once_with(querier=querier)
 
     async def test_search_scaling_groups_with_querier(
         self,
@@ -238,7 +238,7 @@ class TestScalingGroupService:
             conditions=[],
             orders=[],
         )
-        mock_repository.search_scaling_groups = AsyncMock(
+        mock_repository.search_resource_groups = AsyncMock(
             return_value=ResourceGroupListResult(
                 items=[sample_scaling_group],
                 total_count=1,
@@ -252,7 +252,7 @@ class TestScalingGroupService:
 
         assert result.resource_groups == [sample_scaling_group]
         assert result.total_count == 1
-        mock_repository.search_scaling_groups.assert_called_once_with(querier=querier)
+        mock_repository.search_resource_groups.assert_called_once_with(querier=querier)
 
     async def test_search_scaling_groups_with_multiple_results(
         self,
@@ -311,7 +311,7 @@ class TestScalingGroupService:
             for i in range(3)
         ]
 
-        mock_repository.search_scaling_groups = AsyncMock(
+        mock_repository.search_resource_groups = AsyncMock(
             return_value=ResourceGroupListResult(
                 items=resource_groups,
                 total_count=3,
@@ -338,7 +338,7 @@ class TestScalingGroupService:
         mock_repository: MagicMock,
     ) -> None:
         """Test searching scaling groups with empty result"""
-        mock_repository.search_scaling_groups = AsyncMock(
+        mock_repository.search_resource_groups = AsyncMock(
             return_value=ResourceGroupListResult(
                 items=[],
                 total_count=0,
@@ -368,13 +368,13 @@ class TestScalingGroupService:
         resource_group_creator_full: Creator[ResourceGroupRow],
     ) -> None:
         """Test creating a scaling group successfully"""
-        mock_repository.create_scaling_group = AsyncMock(return_value=sample_scaling_group)
+        mock_repository.create_resource_group = AsyncMock(return_value=sample_scaling_group)
 
         action = CreateResourceGroupAction(creator=resource_group_creator_full)
         result = await resource_group_service.create_resource_group(action)
 
         assert result.resource_group == sample_scaling_group
-        mock_repository.create_scaling_group.assert_called_once_with(resource_group_creator_full)
+        mock_repository.create_resource_group.assert_called_once_with(resource_group_creator_full)
 
     async def test_create_scaling_group_conflict(
         self,
@@ -383,7 +383,7 @@ class TestScalingGroupService:
         resource_group_creator_full: Creator[ResourceGroupRow],
     ) -> None:
         """Test that ScalingGroupConflict propagates through the service"""
-        mock_repository.create_scaling_group = AsyncMock(
+        mock_repository.create_resource_group = AsyncMock(
             side_effect=ResourceGroupConflict("Scaling group already exists: test-sgroup-full")
         )
 
@@ -401,7 +401,7 @@ class TestScalingGroupService:
         sample_scaling_group: ResourceGroupData,
     ) -> None:
         """Test modifying a scaling group successfully"""
-        mock_repository.update_scaling_group = AsyncMock(return_value=sample_scaling_group)
+        mock_repository.update_resource_group = AsyncMock(return_value=sample_scaling_group)
 
         spec = ResourceGroupUpdaterSpec(
             status=ResourceGroupStatusUpdaterSpec(
@@ -418,7 +418,7 @@ class TestScalingGroupService:
         result = await resource_group_service.update_resource_group(action)
 
         assert result.resource_group == sample_scaling_group
-        mock_repository.update_scaling_group.assert_called_once_with(updater)
+        mock_repository.update_resource_group.assert_called_once_with(updater)
 
     async def test_modify_scaling_group_not_found(
         self,
@@ -426,7 +426,7 @@ class TestScalingGroupService:
         mock_repository: MagicMock,
     ) -> None:
         """Test that ScalingGroupNotFound propagates through the service"""
-        mock_repository.update_scaling_group = AsyncMock(
+        mock_repository.update_resource_group = AsyncMock(
             side_effect=ResourceGroupNotFound("Scaling group not found: nonexistent")
         )
 
@@ -451,7 +451,7 @@ class TestScalingGroupService:
         mock_repository: MagicMock,
     ) -> None:
         """Test associating a scaling group with domains"""
-        mock_repository.associate_scaling_group_with_domains = AsyncMock(return_value=None)
+        mock_repository.associate_resource_group_with_domains = AsyncMock(return_value=None)
 
         resource_group_id = ResourceGroupID(uuid.uuid4())
         domain_id = DomainID(uuid.uuid4())
@@ -476,7 +476,7 @@ class TestScalingGroupService:
         result = await resource_group_service.associate_resource_group_with_domains(action)
 
         assert result is not None
-        mock_repository.associate_scaling_group_with_domains.assert_called_once_with(binder)
+        mock_repository.associate_resource_group_with_domains.assert_called_once_with(binder)
 
     # Disassociate with Domain Tests
 
@@ -486,7 +486,7 @@ class TestScalingGroupService:
         mock_repository: MagicMock,
     ) -> None:
         """Test disassociating a scaling group from domains"""
-        mock_repository.disassociate_scaling_group_with_domains = AsyncMock(return_value=None)
+        mock_repository.disassociate_resource_group_with_domains = AsyncMock(return_value=None)
 
         unbinder = ResourceGroupDomainEntityUnbinder(
             resource_group_ids=[ResourceGroupID(uuid.uuid4())],
@@ -498,7 +498,7 @@ class TestScalingGroupService:
         result = await resource_group_service.disassociate_resource_group_with_domains(action)
 
         assert result is not None
-        mock_repository.disassociate_scaling_group_with_domains.assert_called_once_with(unbinder)
+        mock_repository.disassociate_resource_group_with_domains.assert_called_once_with(unbinder)
 
     # Associate/Disassociate with Keypair Tests
 
@@ -508,7 +508,7 @@ class TestScalingGroupService:
         mock_repository: MagicMock,
     ) -> None:
         """Test associating a scaling group with keypairs"""
-        mock_repository.associate_scaling_group_with_keypairs = AsyncMock(return_value=None)
+        mock_repository.associate_resource_group_with_keypairs = AsyncMock(return_value=None)
 
         resource_group_id = ResourceGroupID(uuid.uuid4())
         access_key = AccessKey("AKTEST1234567890")
@@ -527,7 +527,7 @@ class TestScalingGroupService:
         result = await resource_group_service.associate_resource_group_with_keypairs(action)
 
         assert result is not None
-        mock_repository.associate_scaling_group_with_keypairs.assert_called_once_with(bulk_creator)
+        mock_repository.associate_resource_group_with_keypairs.assert_called_once_with(bulk_creator)
 
     async def test_disassociate_scaling_group_with_keypairs_success(
         self,
@@ -535,7 +535,7 @@ class TestScalingGroupService:
         mock_repository: MagicMock,
     ) -> None:
         """Test disassociating a scaling group from keypairs"""
-        mock_repository.disassociate_scaling_group_with_keypairs = AsyncMock(return_value=None)
+        mock_repository.disassociate_resource_group_with_keypairs = AsyncMock(return_value=None)
 
         resource_group_id = ResourceGroupID(uuid.uuid4())
         access_key = AccessKey("AKTEST1234567890")
@@ -552,7 +552,7 @@ class TestScalingGroupService:
         result = await resource_group_service.disassociate_resource_group_with_keypairs(action)
 
         assert result is not None
-        mock_repository.disassociate_scaling_group_with_keypairs.assert_called_once_with(purger)
+        mock_repository.disassociate_resource_group_with_keypairs.assert_called_once_with(purger)
 
     # Associate/Disassociate with User Group (Project) Tests
 
@@ -562,7 +562,7 @@ class TestScalingGroupService:
         mock_repository: MagicMock,
     ) -> None:
         """Test associating a scaling group with user groups (projects)"""
-        mock_repository.associate_scaling_group_with_user_groups = AsyncMock(return_value=None)
+        mock_repository.associate_resource_group_with_user_groups = AsyncMock(return_value=None)
 
         resource_group_id = ResourceGroupID(uuid.uuid4())
         project_id = uuid.uuid4()
@@ -587,7 +587,7 @@ class TestScalingGroupService:
         result = await resource_group_service.associate_resource_group_with_user_groups(action)
 
         assert result is not None
-        mock_repository.associate_scaling_group_with_user_groups.assert_called_once_with(binder)
+        mock_repository.associate_resource_group_with_user_groups.assert_called_once_with(binder)
 
     async def test_disassociate_scaling_group_with_user_group_success(
         self,
@@ -595,7 +595,7 @@ class TestScalingGroupService:
         mock_repository: MagicMock,
     ) -> None:
         """Test disassociating a scaling group from a user group (project)"""
-        mock_repository.disassociate_scaling_group_with_user_groups = AsyncMock(return_value=None)
+        mock_repository.disassociate_resource_group_with_user_groups = AsyncMock(return_value=None)
 
         resource_group_id = ResourceGroupID(uuid.uuid4())
         project_id = uuid.uuid4()
@@ -610,7 +610,7 @@ class TestScalingGroupService:
         result = await resource_group_service.disassociate_resource_group_with_user_groups(action)
 
         assert result is not None
-        mock_repository.disassociate_scaling_group_with_user_groups.assert_called_once_with(
+        mock_repository.disassociate_resource_group_with_user_groups.assert_called_once_with(
             unbinder
         )
 

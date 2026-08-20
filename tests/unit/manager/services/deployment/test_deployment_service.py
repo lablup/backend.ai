@@ -608,7 +608,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         sample_token_row: MagicMock,
     ) -> MagicMock:
         mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=deployment_info)
-        mock_deployment_repository.fetch_scaling_group_proxy_targets = AsyncMock(
+        mock_deployment_repository.fetch_resource_group_proxy_targets = AsyncMock(
             return_value={deployment_info.metadata.resource_group: sample_proxy_target}
         )
         mock_deployment_repository.create_access_token = AsyncMock(return_value=sample_token_row)

@@ -120,7 +120,7 @@ class ModelServingCRUDBaseFixtures:
     @pytest.fixture
     def mock_deployment_repository(self) -> MagicMock:
         mock = MagicMock()
-        mock.get_default_architecture_from_scaling_group = AsyncMock(return_value=None)
+        mock.get_default_architecture_from_resource_group = AsyncMock(return_value=None)
         mock.get_endpoint_info = AsyncMock(return_value=MagicMock(current_revision_id=None))
         mock.fetch_model_definition = AsyncMock(return_value=None)
         return mock
