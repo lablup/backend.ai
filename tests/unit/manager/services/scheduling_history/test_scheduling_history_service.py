@@ -17,7 +17,7 @@ from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedu
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SESSION_SCOPE_TYPE
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SESSION_SCOPE_TYPE, SessionID
 from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
@@ -285,7 +285,7 @@ class TestSearchDeploymentScopedHistoryAction:
         scope = DeploymentHistoryOperationScope(deployment_id=deployment_id)
 
         action = SearchDeploymentScopedHistoryAction(
-            deployment_id=deployment_id, scope=scope, querier=querier
+            deployment_id=DeploymentID(deployment_id), scope=scope, querier=querier
         )
         result = await service.search_deployment_scoped_history(action)
 
@@ -315,7 +315,7 @@ class TestSearchSessionScopedHistoryAction:
         scope = SessionSchedulingHistoryOperationScope(session_id=session_id)
 
         action = SearchSessionScopedHistoryAction(
-            session_id=session_id, scope=scope, querier=querier
+            session_id=SessionID(session_id), scope=scope, querier=querier
         )
         result = await service.search_session_scoped_history(action)
 

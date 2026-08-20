@@ -12,6 +12,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
@@ -96,7 +97,7 @@ class TestObjectStorageService:
     @pytest.fixture
     def sample_artifact_data(self) -> ArtifactData:
         return ArtifactData(
-            id=uuid4(),
+            id=ArtifactID(uuid4()),
             name="test-artifact",
             type=ArtifactType.MODEL,
             description="test artifact",
@@ -114,7 +115,7 @@ class TestObjectStorageService:
     @pytest.fixture
     def sample_revision_data(self, sample_artifact_data: ArtifactData) -> ArtifactRevisionData:
         return ArtifactRevisionData(
-            id=uuid4(),
+            id=ArtifactRevisionID(uuid4()),
             artifact_id=sample_artifact_data.id,
             version="1.0.0",
             readme=None,
@@ -204,7 +205,7 @@ class TestObjectStorageService:
         mock_config_provider.config.reservoir = reservoir_config
 
         not_available_revision = ArtifactRevisionData(
-            id=uuid4(),
+            id=ArtifactRevisionID(uuid4()),
             artifact_id=sample_artifact_data.id,
             version="1.0.0",
             readme=None,

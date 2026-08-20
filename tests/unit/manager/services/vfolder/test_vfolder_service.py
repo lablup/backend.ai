@@ -358,7 +358,7 @@ class TestVFolderServiceGetFolderUsage:
 
     @pytest.fixture
     def sample_action(self, sample_vfolder_uuid: uuid.UUID) -> GetVFolderUsageAction:
-        return GetVFolderUsageAction(vfolder_uuid=sample_vfolder_uuid)
+        return GetVFolderUsageAction(vfolder_uuid=VFolderUUID(sample_vfolder_uuid))
 
     async def test_managed_vfolder_returns_storage_proxy_measurements(
         self,

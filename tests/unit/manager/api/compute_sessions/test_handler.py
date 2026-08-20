@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.compute_session import (
     ComputeSessionFilter,
     ComputeSessionOrder,
@@ -505,12 +506,12 @@ class TestComputeSessionsHandler:
     ) -> None:
         """Handler should call both search_sessions and search_kernels."""
         await mock_processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=MagicMock(), user_id=uuid4())
+            SearchSessionsAction(querier=MagicMock(), user_id=UserID(uuid4()))
         )
         mock_processors.session.search_sessions.wait_for_complete.assert_called_once()
 
         await mock_processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=MagicMock(), user_id=uuid4())
+            SearchKernelsAction(querier=MagicMock(), user_id=UserID(uuid4()))
         )
         mock_processors.session.search_kernels.wait_for_complete.assert_called_once()
 
@@ -525,7 +526,7 @@ class TestComputeSessionsHandler:
         )
 
         result = await processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=MagicMock(), user_id=uuid4())
+            SearchSessionsAction(querier=MagicMock(), user_id=UserID(uuid4()))
         )
 
         assert result.data == []
@@ -539,10 +540,10 @@ class TestComputeSessionsHandler:
     ) -> None:
         """Kernels should be correctly grouped by session ID."""
         session_result = await mock_processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=MagicMock(), user_id=uuid4())
+            SearchSessionsAction(querier=MagicMock(), user_id=UserID(uuid4()))
         )
         kernel_result = await mock_processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=MagicMock(), user_id=uuid4())
+            SearchKernelsAction(querier=MagicMock(), user_id=UserID(uuid4()))
         )
 
         adapter = ComputeSessionsAdapter()
@@ -564,7 +565,7 @@ class TestComputeSessionsHandler:
     ) -> None:
         """Pagination info should reflect the session search result."""
         session_result = await mock_processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=MagicMock(), user_id=uuid4())
+            SearchSessionsAction(querier=MagicMock(), user_id=UserID(uuid4()))
         )
 
         assert session_result.total_count == 2

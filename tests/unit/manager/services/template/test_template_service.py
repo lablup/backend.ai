@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session_template import SessionTemplateID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.errors.resource import DBOperationFailed, TaskTemplateNotFound
 from ai.backend.manager.exceptions import InvalidArgument
@@ -51,6 +52,11 @@ from ai.backend.manager.services.template.actions.update_task_template import (
     UpdateTaskTemplateAction,
 )
 from ai.backend.manager.services.template.service import TemplateService
+
+
+def _template_id(name: str) -> SessionTemplateID:
+    """The same name always names the same template, so an assertion can restate it."""
+    return SessionTemplateID(uuid.uuid5(uuid.NAMESPACE_OID, name))
 
 
 def _make_valid_task_template(name: str = "my-task") -> dict[str, Any]:
@@ -291,7 +297,7 @@ class TestGetTaskTemplateAction:
             }
         )
 
-        action = GetTaskTemplateAction(template_id="tmpl-123")
+        action = GetTaskTemplateAction(template_id=_template_id("tmpl-123"))
         result = await service.get_task_template(action)
 
         assert result.template == template_data
@@ -314,7 +320,7 @@ class TestGetTaskTemplateAction:
             }
         )
 
-        action = GetTaskTemplateAction(template_id="tmpl-123")
+        action = GetTaskTemplateAction(template_id=_template_id("tmpl-123"))
         result = await service.get_task_template(action)
 
         assert isinstance(result.template, dict)
@@ -327,7 +333,7 @@ class TestGetTaskTemplateAction:
     ) -> None:
         mock_repo.get_task_template = AsyncMock(return_value=None)
 
-        action = GetTaskTemplateAction(template_id="nonexistent")
+        action = GetTaskTemplateAction(template_id=_template_id("nonexistent"))
         with pytest.raises(TaskTemplateNotFound):
             await service.get_task_template(action)
 
@@ -346,7 +352,7 @@ class TestListTaskTemplatesAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        user_uuid = uuid.uuid4()
+        user_uuid = UserID(uuid.uuid4())
         entries = [
             {"name": "t1", "id": "id1", "user_uuid": user_uuid},
             {"name": "t2", "id": "id2", "user_uuid": user_uuid},
@@ -366,7 +372,7 @@ class TestListTaskTemplatesAction:
     ) -> None:
         mock_repo.list_task_templates = AsyncMock(return_value=[])
 
-        action = ListTaskTemplatesAction(user_uuid=uuid.uuid4())
+        action = ListTaskTemplatesAction(user_uuid=UserID(uuid.uuid4()))
         result = await service.list_task_templates(action)
 
         assert result.entries == []
@@ -384,7 +390,7 @@ class TestUpdateTaskTemplateAction:
     @pytest.fixture
     def base_action_kwargs(self) -> dict[str, Any]:
         return {
-            "template_id": "tmpl-existing",
+            "template_id": _template_id("tmpl-existing"),
             "domain_name": "default",
             "requesting_project": ProjectID(uuid.uuid4()),
             "requester_uuid": uuid.uuid4(),
@@ -482,11 +488,13 @@ class TestDeleteTaskTemplateAction:
         mock_repo.task_template_exists = AsyncMock(return_value=True)
         mock_repo.soft_delete_template = AsyncMock(return_value=1)
 
-        action = DeleteTaskTemplateAction(template_id="tmpl-to-delete")
+        action = DeleteTaskTemplateAction(template_id=_template_id("tmpl-to-delete"))
         result = await service.delete_task_template(action)
 
         assert result is not None
-        mock_repo.soft_delete_template.assert_called_once_with("tmpl-to-delete", TemplateType.TASK)
+        mock_repo.soft_delete_template.assert_called_once_with(
+            _template_id("tmpl-to-delete"), TemplateType.TASK
+        )
 
     async def test_nonexistent_raises_not_found(
         self,
@@ -495,7 +503,7 @@ class TestDeleteTaskTemplateAction:
     ) -> None:
         mock_repo.task_template_exists = AsyncMock(return_value=False)
 
-        action = DeleteTaskTemplateAction(template_id="nonexistent")
+        action = DeleteTaskTemplateAction(template_id=_template_id("nonexistent"))
         with pytest.raises(TaskTemplateNotFound):
             await service.delete_task_template(action)
 
@@ -507,7 +515,7 @@ class TestDeleteTaskTemplateAction:
         mock_repo.task_template_exists = AsyncMock(return_value=True)
         mock_repo.soft_delete_template = AsyncMock(return_value=0)
 
-        action = DeleteTaskTemplateAction(template_id="tmpl-x")
+        action = DeleteTaskTemplateAction(template_id=_template_id("tmpl-x"))
         with pytest.raises(DBOperationFailed):
             await service.delete_task_template(action)
 
@@ -627,7 +635,7 @@ class TestGetClusterTemplateAction:
         template_data = {"spec": {"nodes": []}, "metadata": {"name": "test"}}
         mock_repo.get_cluster_template = AsyncMock(return_value=template_data)
 
-        action = GetClusterTemplateAction(template_id="cluster-1")
+        action = GetClusterTemplateAction(template_id=_template_id("cluster-1"))
         result = await service.get_cluster_template(action)
 
         assert result.template == template_data
@@ -639,7 +647,7 @@ class TestGetClusterTemplateAction:
     ) -> None:
         mock_repo.get_cluster_template = AsyncMock(return_value=None)
 
-        action = GetClusterTemplateAction(template_id="nonexistent")
+        action = GetClusterTemplateAction(template_id=_template_id("nonexistent"))
         with pytest.raises(TaskTemplateNotFound):
             await service.get_cluster_template(action)
 
@@ -749,7 +757,7 @@ class TestUpdateClusterTemplateAction:
         mock_repo.update_cluster_template = AsyncMock(return_value=1)
 
         action = UpdateClusterTemplateAction(
-            template_id="cluster-1",
+            template_id=_template_id("cluster-1"),
             template_data=_make_valid_cluster_template("updated-cluster"),
         )
         result = await service.update_cluster_template(action)
@@ -765,7 +773,7 @@ class TestUpdateClusterTemplateAction:
         mock_repo.cluster_template_exists = AsyncMock(return_value=False)
 
         action = UpdateClusterTemplateAction(
-            template_id="nonexistent",
+            template_id=_template_id("nonexistent"),
             template_data=_make_valid_cluster_template(),
         )
         with pytest.raises(TaskTemplateNotFound):
@@ -784,7 +792,7 @@ class TestUpdateClusterTemplateAction:
         ]
 
         action = UpdateClusterTemplateAction(
-            template_id="cluster-1",
+            template_id=_template_id("cluster-1"),
             template_data=template,
         )
         with pytest.raises(InvalidArgument, match="main"):
@@ -799,7 +807,7 @@ class TestUpdateClusterTemplateAction:
         mock_repo.update_cluster_template = AsyncMock(return_value=0)
 
         action = UpdateClusterTemplateAction(
-            template_id="cluster-1",
+            template_id=_template_id("cluster-1"),
             template_data=_make_valid_cluster_template(),
         )
         with pytest.raises(DBOperationFailed):
@@ -823,7 +831,7 @@ class TestDeleteClusterTemplateAction:
         mock_repo.cluster_template_exists = AsyncMock(return_value=True)
         mock_repo.soft_delete_template = AsyncMock(return_value=1)
 
-        action = DeleteClusterTemplateAction(template_id="cluster-to-delete")
+        action = DeleteClusterTemplateAction(template_id=_template_id("cluster-to-delete"))
         result = await service.delete_cluster_template(action)
 
         assert result is not None
@@ -838,7 +846,7 @@ class TestDeleteClusterTemplateAction:
     ) -> None:
         mock_repo.cluster_template_exists = AsyncMock(return_value=False)
 
-        action = DeleteClusterTemplateAction(template_id="nonexistent")
+        action = DeleteClusterTemplateAction(template_id=_template_id("nonexistent"))
         with pytest.raises(TaskTemplateNotFound):
             await service.delete_cluster_template(action)
 
@@ -850,6 +858,6 @@ class TestDeleteClusterTemplateAction:
         mock_repo.cluster_template_exists = AsyncMock(return_value=True)
         mock_repo.soft_delete_template = AsyncMock(return_value=0)
 
-        action = DeleteClusterTemplateAction(template_id="cluster-x")
+        action = DeleteClusterTemplateAction(template_id=_template_id("cluster-x"))
         with pytest.raises(DBOperationFailed):
             await service.delete_cluster_template(action)

@@ -11,7 +11,9 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.fair_share import (
@@ -63,8 +65,8 @@ class ProjectFairShareTestContext:
     scaling_group: str
     resource_group_id: ResourceGroupID
     domain_name: str
-    project_ids: list[uuid.UUID]
-    existing_weights: dict[uuid.UUID, Decimal]
+    project_ids: list[ProjectID]
+    existing_weights: dict[ProjectID, Decimal]
 
 
 @dataclass
@@ -75,8 +77,8 @@ class UserFairShareTestContext:
     resource_group_id: ResourceGroupID
     domain_name: str
     project_id: uuid.UUID
-    user_uuids: list[uuid.UUID]
-    existing_weights: dict[uuid.UUID, Decimal]
+    user_uuids: list[UserID]
+    existing_weights: dict[UserID, Decimal]
 
 
 class TestBulkUpsertDomainFairShare:
@@ -434,7 +436,7 @@ class TestBulkUpsertProjectFairShare:
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
         rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        project_ids = [uuid.uuid4() for _ in range(3)]
+        project_ids = [ProjectID(uuid.uuid4()) for _ in range(3)]
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(
@@ -500,7 +502,7 @@ class TestBulkUpsertProjectFairShare:
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
         rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        project_ids = [uuid.uuid4() for _ in range(3)]
+        project_ids = [ProjectID(uuid.uuid4()) for _ in range(3)]
         existing_weights = {pid: Decimal("1.0") for pid in project_ids}
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -690,7 +692,7 @@ class TestBulkUpsertUserFairShare:
         rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         project_id = uuid.uuid4()
-        user_uuids = [uuid.uuid4() for _ in range(3)]
+        user_uuids = [UserID(uuid.uuid4()) for _ in range(3)]
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(
@@ -790,7 +792,7 @@ class TestBulkUpsertUserFairShare:
         rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         project_id = uuid.uuid4()
-        user_uuids = [uuid.uuid4() for _ in range(3)]
+        user_uuids = [UserID(uuid.uuid4()) for _ in range(3)]
         existing_weights = {uid: Decimal("1.0") for uid in user_uuids}
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -904,7 +906,7 @@ class TestBulkUpsertUserFairShare:
         rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         project_id = uuid.uuid4()
-        user_uuids = [uuid.uuid4() for _ in range(3)]
+        user_uuids = [UserID(uuid.uuid4()) for _ in range(3)]
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(

@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
@@ -113,7 +114,7 @@ class _RegistryWithGroups:
     """Registry with associated group IDs."""
 
     registry: ContainerRegistryData
-    group_ids: list[UUID]
+    group_ids: list[ProjectID]
 
 
 class TestContainerRegistryRepository:
@@ -183,10 +184,10 @@ class TestContainerRegistryRepository:
     @pytest.fixture
     async def sample_groups(
         self, db_with_cleanup: ExtendedAsyncSAEngine, sample_domain: DomainFixtureData
-    ) -> list[UUID]:
+    ) -> list[ProjectID]:
         """Pre-created 2 groups with required policies. Depends on sample_domain.domain_name."""
         resource_policy_name = f"test-policy-{sample_domain.domain_name}"
-        group_ids: list[UUID] = []
+        group_ids: list[ProjectID] = []
 
         async with db_with_cleanup.begin_session() as session:
             # Create resource policies
@@ -826,11 +827,11 @@ class TestContainerRegistryRepository:
         """Registry with available groups for adding."""
 
         registry: ContainerRegistryData
-        group_ids: list[UUID]
+        group_ids: list[ProjectID]
 
     @pytest.fixture
     async def registry_and_groups_for_adding(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_groups: list[UUID]
+        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_groups: list[ProjectID]
     ) -> _RegistryWithAvailableGroups:
         """Pre-created registry and 2 groups for testing adding allowed_groups."""
         registry_name = str(uuid.uuid4())[:8] + ".example.com"
@@ -914,7 +915,7 @@ class TestContainerRegistryRepository:
         registry_name = str(uuid.uuid4())[:8] + ".example.com"
         project = "project-" + str(uuid.uuid4())[:8]
         resource_policy_name = f"test-policy-{sample_domain.domain_name}-3groups"
-        group_ids: list[UUID] = []
+        group_ids: list[ProjectID] = []
 
         async with db_with_cleanup.begin_session() as session:
             # Create registry
@@ -1029,9 +1030,9 @@ class TestContainerRegistryRepository:
         """Registry with 2 groups associated out of 4 available."""
 
         registry: ContainerRegistryData
-        all_group_ids: list[UUID]
-        initially_associated_group_ids: list[UUID]
-        available_group_ids: list[UUID]
+        all_group_ids: list[ProjectID]
+        initially_associated_group_ids: list[ProjectID]
+        available_group_ids: list[ProjectID]
 
     @pytest.fixture
     async def registry_with_partial_groups(
@@ -1041,7 +1042,7 @@ class TestContainerRegistryRepository:
         registry_name = str(uuid.uuid4())[:8] + ".example.com"
         project = "project-" + str(uuid.uuid4())[:8]
         resource_policy_name = f"test-policy-{sample_domain.domain_name}-4groups"
-        group_ids: list[UUID] = []
+        group_ids: list[ProjectID] = []
 
         async with db_with_cleanup.begin_session() as session:
             # Create registry

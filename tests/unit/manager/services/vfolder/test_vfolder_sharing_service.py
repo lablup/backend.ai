@@ -614,7 +614,7 @@ class TestAcceptInvitationAction:
         mock_vfolder_repo.create_vfolder_permission = AsyncMock()
         mock_vfolder_repo.update_invitation_state = AsyncMock()
 
-        action = AcceptInvitationAction(invitation_id=invitation_id)
+        action = AcceptInvitationAction(invitation_id=VFolderInvitationID(invitation_id))
         result = await invite_service.accept_invitation(action)
 
         assert result.invitation_id == invitation_id
@@ -630,7 +630,7 @@ class TestAcceptInvitationAction:
     ) -> None:
         mock_vfolder_repo.get_invitation_by_id = AsyncMock(return_value=None)
 
-        action = AcceptInvitationAction(invitation_id=uuid.uuid4())
+        action = AcceptInvitationAction(invitation_id=VFolderInvitationID(uuid.uuid4()))
 
         with pytest.raises(VFolderInvitationNotFound):
             await invite_service.accept_invitation(action)
@@ -657,7 +657,7 @@ class TestAcceptInvitationAction:
         )
         mock_vfolder_repo.count_vfolder_with_name_for_user = AsyncMock(return_value=1)
 
-        action = AcceptInvitationAction(invitation_id=invitation_id)
+        action = AcceptInvitationAction(invitation_id=VFolderInvitationID(invitation_id))
 
         with pytest.raises(VFolderAlreadyExists):
             await invite_service.accept_invitation(action)
@@ -1153,7 +1153,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         mock_vfolder_repo.count_vfolder_with_name_for_user = AsyncMock(return_value=0)
         mock_vfolder_repo.create_vfolder_permission = AsyncMock()
         mock_vfolder_repo.update_invitation_state = AsyncMock()
-        return AcceptInvitationAction(invitation_id=invitation_uuid)
+        return AcceptInvitationAction(invitation_id=VFolderInvitationID(invitation_uuid))
 
     async def test_invitee_with_empty_email_can_accept_invitation(
         self,

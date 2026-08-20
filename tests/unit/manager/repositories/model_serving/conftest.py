@@ -12,6 +12,7 @@ from pytest_mock import MockerFixture
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     ClusterMode,
@@ -165,7 +166,7 @@ def sample_vfolder() -> VFolderRow:
     vfolder = VFolderRow()
     vfolder.id = VFolderUUID(uuid.uuid4())
     vfolder.name = "model-vfolder"
-    vfolder.user = uuid.uuid4()
+    vfolder.user = UserID(uuid.uuid4())
     vfolder.group = None
     vfolder.host = "storage-host"
     vfolder.domain_name = "default"

@@ -12,6 +12,7 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.types import ImageCanonical, ImageID
 from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.data.container_registry.types import (
@@ -90,7 +91,7 @@ def container_registry_service(
 def sample_registry_data() -> ContainerRegistryData:
     """Create sample container registry data."""
     return ContainerRegistryData(
-        id=UUID("12345678-1234-5678-1234-567812345678"),
+        id=ContainerRegistryID(UUID("12345678-1234-5678-1234-567812345678")),
         url="https://registry.example.com",
         registry_name="registry.example.com",
         type=ContainerRegistryType.DOCKER,
@@ -107,7 +108,7 @@ def sample_registry_data() -> ContainerRegistryData:
 def sample_registry_data_2() -> ContainerRegistryData:
     """Create another sample container registry data."""
     return ContainerRegistryData(
-        id=UUID("87654321-4321-8765-4321-876543218765"),
+        id=ContainerRegistryID(UUID("87654321-4321-8765-4321-876543218765")),
         url="https://registry.example.com",
         registry_name="registry.example.com",
         type=ContainerRegistryType.DOCKER,
@@ -125,7 +126,7 @@ def sample_registries() -> list[ContainerRegistryData]:
     """Create sample container registry data list."""
     return [
         ContainerRegistryData(
-            id=UUID("12345678-1234-5678-1234-567812345678"),
+            id=ContainerRegistryID(UUID("12345678-1234-5678-1234-567812345678")),
             url="https://registry1.example.com",
             registry_name="registry1.example.com",
             type=ContainerRegistryType.DOCKER,
@@ -137,7 +138,7 @@ def sample_registries() -> list[ContainerRegistryData]:
             extra=None,
         ),
         ContainerRegistryData(
-            id=UUID("87654321-4321-8765-4321-876543218765"),
+            id=ContainerRegistryID(UUID("87654321-4321-8765-4321-876543218765")),
             url="https://registry2.example.com",
             registry_name="registry2.example.com",
             type=ContainerRegistryType.DOCKER,
@@ -149,7 +150,7 @@ def sample_registries() -> list[ContainerRegistryData]:
             extra={"custom": "data"},
         ),
         ContainerRegistryData(
-            id=UUID("11111111-2222-3333-4444-555555555555"),
+            id=ContainerRegistryID(UUID("11111111-2222-3333-4444-555555555555")),
             url="https://global-registry.example.com",
             registry_name="global-registry.example.com",
             type=ContainerRegistryType.HARBOR2,
