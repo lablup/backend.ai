@@ -56,6 +56,5 @@ class VirtualScopeBulkActionRBACValidator(BulkActionValidator):
         denied = [key.entity for key in keys if not permission_map.get(key, False)]
         if denied:
             raise NotEnoughPermission(
-                f"User {user.user_id} lacks permission {permission!r} "
-                f"on {meta.entity_type} entities {denied}"
+                f"User {user.user_id} lacks permission {permission!r} on entities {denied}"
             )

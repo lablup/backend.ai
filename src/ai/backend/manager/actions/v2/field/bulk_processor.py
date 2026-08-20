@@ -90,7 +90,6 @@ class BulkFieldActionProcessor[TAction: BaseBulkFieldAction[Any, Any], TData]:
         trigger_meta = BulkActionTriggerMeta(
             action_id=action_id,
             started_at=started_at,
-            entity_type=distinct[0].entity_type(),
             entity_ids=distinct,
             operation_type=action.operation_type(),
             action_name=action.action_name(),

@@ -28,11 +28,6 @@ class BaseSingleFieldAction[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifie
         raise NotImplementedError
 
     @abstractmethod
-    def field_id(self) -> TFieldID:
-        """Return the id of the field row that this action applies to."""
-        raise NotImplementedError
-
-    @abstractmethod
     def to_owner_lookup_action(self) -> LookupFieldOwnerOpsAction[TFieldID, TOwnerID]:
         """Return the lookup that reads the entity owning this row."""
         raise NotImplementedError

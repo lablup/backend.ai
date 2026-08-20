@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from ai.backend.common.data.entity.action import ActionID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 
 __all__ = ("BulkActionTriggerMeta",)
@@ -20,7 +20,6 @@ class BulkActionTriggerMeta:
 
     action_id: ActionID
     started_at: datetime
-    entity_type: EntityType
     entity_ids: Sequence[EntityIdentifier]
     operation_type: ActionOperationType
     action_name: str

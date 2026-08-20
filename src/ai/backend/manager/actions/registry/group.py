@@ -21,9 +21,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
 from ai.backend.common.data.entity.types import EntityData, FieldData
-from ai.backend.manager.actions.registry.field import (
-    FieldProcessorGroup,
-)
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.types import (
     FieldGroupMeta,
     GroupMeta,
@@ -38,7 +36,10 @@ from ai.backend.manager.actions.types import (
 )
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
-from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
+from ai.backend.manager.actions.v2.bulk.processor import (
+    BulkActionProcessor,
+    PartialEntityResultJudge,
+)
 from ai.backend.manager.actions.v2.bulk.result import BaseBulkActionResult
 from ai.backend.manager.actions.v2.bulk.validator import BulkActionValidator
 from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
@@ -177,17 +178,17 @@ class ProcessorGroup[TData: EntityData]:
 
     @property
     def deps(self) -> ProcessorDependencies[TData]:
-        """Read by :class:`FieldProcessorGroup`, which builds processors of this group."""
+        """Read by :class:`LookupFieldGroup`, which builds processors of this group."""
         return self._deps
 
     @property
     def concern(self) -> str:
-        """Read by :class:`FieldProcessorGroup`, whose rows sit in the same area."""
+        """Read by :class:`LookupFieldGroup`, whose rows sit in the same area."""
         return self._concern
 
     @property
     def meta(self) -> GroupMeta:
-        """Read by :class:`FieldProcessorGroup`, whose rows name this group as the owner."""
+        """Read by :class:`LookupFieldGroup`, whose rows name this group as the owner."""
         return self._meta
 
     def record(
@@ -290,6 +291,7 @@ class ProcessorGroup[TData: EntityData]:
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.SERVICE)
         return BulkActionProcessor(
             func,
+            PartialEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.bulk, *validators),
         )
@@ -402,11 +404,11 @@ class ProcessorGroup[TData: EntityData]:
         data_cls: type[TFieldData],
         owner_lookup_action_cls: type[LookupFieldOwnerOpsAction[Any, Any]],
         bulk_owner_lookup_action_cls: type[LookupBulkFieldOwnerOpsAction[Any, Any]],
-    ) -> FieldProcessorGroup[TFieldData]:
+    ) -> LookupFieldGroup[TFieldData]:
         """The operations over one kind of field row.
 
         Builds the owner lookups itself: they are not operations a domain wires, only
-        the step every field operation runs first — one row at a time or many.
+        the step every field operation runs first — one row at a time or many. A kind
         """
         self._record(
             owner_lookup_action_cls, ActionKind.LOOKUP, ActionGate.PERMISSION, ActionBacking.OPS
@@ -428,7 +430,7 @@ class ProcessorGroup[TData: EntityData]:
             monitors=self._deps.monitors.bulk_lookup,
             post_validators=self._deps.validators.bulk,
         )
-        return FieldProcessorGroup(
+        return LookupFieldGroup(
             self._deps,
             self._records,
             self._concern,
@@ -646,6 +648,7 @@ class ProcessorGroup[TData: EntityData]:
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.OPS)
         return BulkActionProcessor(
             GlobalPartialBulkPurgeService(self._deps.repository).execute,
+            PartialEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.bulk, *validators),
         )
@@ -660,6 +663,7 @@ class ProcessorGroup[TData: EntityData]:
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.OPS)
         return BulkActionProcessor(
             EntityPartialBulkPurgeService(self._deps.repository).execute,
+            PartialEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.bulk, *validators),
         )
@@ -786,6 +790,7 @@ class ProcessorGroup[TData: EntityData]:
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.OPS)
         return BulkActionProcessor(
             PartialBulkUpdateService(self._deps.repository).execute,
+            PartialEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.bulk, *validators),
         )
@@ -800,6 +805,7 @@ class ProcessorGroup[TData: EntityData]:
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.OPS)
         return BulkActionProcessor(
             PartialBulkDeleteService(self._deps.repository).execute,
+            PartialEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.bulk, *validators),
         )
@@ -814,6 +820,7 @@ class ProcessorGroup[TData: EntityData]:
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.OPS)
         return BulkActionProcessor(
             PartialBulkRestoreService(self._deps.repository).execute,
+            PartialEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.bulk, *validators),
         )

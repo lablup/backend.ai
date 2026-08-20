@@ -11,6 +11,7 @@ from ai.backend.manager.actions.v2.bulk.result import BulkActionProcessResult
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.audit_log.creators import BulkAuditLogCreator
+from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = ("BulkActionAuditLogMonitor",)
@@ -41,22 +42,23 @@ class BulkActionAuditLogMonitor(BulkActionMonitor):
         trigger = triggered_user()
         acting = current_user()
         request_id = current_request_id() or BLANK_ID
-        creators = [
-            BulkAuditLogCreator(
-                action_id=result.meta.action_id,
-                entity_type=meta.entity_type,
-                operation=meta.operation_type,
-                action_name=meta.action_name,
-                created_at=result.meta.started_at,
-                description=entity_result.description,
-                status=entity_result.status,
-                entity_id=entity_result.entity_id,
-                request_id=request_id,
-                triggered_by=str(trigger.user_id) if trigger else None,
-                acted_as=acting.user_id if acting else None,
-                duration=result.meta.duration,
+        creations = [
+            FieldToCreate(
+                owner_id=entity_result.entity_id,
+                creator=BulkAuditLogCreator(
+                    action_id=result.meta.action_id,
+                    operation=meta.operation_type,
+                    action_name=meta.action_name,
+                    created_at=result.meta.started_at,
+                    description=entity_result.description,
+                    status=entity_result.status,
+                    request_id=request_id,
+                    triggered_by=str(trigger.user_id) if trigger else None,
+                    acted_as=acting.user_id if acting else None,
+                    duration=result.meta.duration,
+                ),
             )
             for entity_result in result.meta.entity_results
             if self._policy.should_record(meta.operation_type, entity_result.status)
         ]
-        await self._repository.atomic_create_sidecars(creators)
+        await self._repository.atomic_create_fields(creations)

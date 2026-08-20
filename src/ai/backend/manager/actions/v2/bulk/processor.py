@@ -1,10 +1,13 @@
 import logging
 import uuid
+from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
+from typing import override
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.run_status import ActionRunStatus
+from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.result import (
@@ -21,7 +24,49 @@ __all__ = ("BulkActionProcessor",)
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class BulkActionProcessor[TAction: BaseBulkAction, TResult: BaseBulkActionResult]:
+class EntityResultJudge[TResult](ABC):
+    """Decides what a run that returned means for each entity the caller named."""
+
+    @abstractmethod
+    def judge(
+        self, trigger_meta: BulkActionTriggerMeta, result: TResult
+    ) -> Sequence[BulkEntityResult]:
+        raise NotImplementedError
+
+
+class PartialEntityResultJudge[TResult: BaseBulkActionResult](EntityResultJudge[TResult]):
+    """Some entities may go through while others fail, so the result says which."""
+
+    @override
+    def judge(
+        self, trigger_meta: BulkActionTriggerMeta, result: TResult
+    ) -> Sequence[BulkEntityResult]:
+        return result.entity_results()
+
+
+class AtomicEntityResultJudge[TResult](EntityResultJudge[TResult]):
+    """The run stood or fell as one, so every named entity shares its outcome.
+
+    The result is never read, so a run whose answer is not per entity — a page, say —
+    is judged the same way as one that writes.
+    """
+
+    @override
+    def judge(
+        self, trigger_meta: BulkActionTriggerMeta, result: TResult
+    ) -> Sequence[BulkEntityResult]:
+        return [
+            BulkEntityResult(
+                entity_id=entity_id,
+                status=OperationStatus.SUCCESS,
+                description="",
+                error_code=None,
+            )
+            for entity_id in trigger_meta.entity_ids
+        ]
+
+
+class BulkActionProcessor[TAction: BaseBulkAction, TResult]:
     """Validate, run monitors around, then execute a bulk action.
 
     Each registered validator runs first. The action function then executes within a
@@ -32,16 +77,19 @@ class BulkActionProcessor[TAction: BaseBulkAction, TResult: BaseBulkActionResult
     """
 
     _func: Callable[[TAction], Awaitable[TResult]]
+    _judge: EntityResultJudge[TResult]
     _monitors: Sequence[BulkActionMonitor]
     _validators: Sequence[BulkActionValidator]
 
     def __init__(
         self,
         func: Callable[[TAction], Awaitable[TResult]],
+        judge: EntityResultJudge[TResult],
         monitors: Sequence[BulkActionMonitor] | None = None,
         validators: Sequence[BulkActionValidator] | None = None,
     ) -> None:
         self._func = func
+        self._judge = judge
         self._monitors = monitors or []
         self._validators = validators or []
 
@@ -68,7 +116,6 @@ class BulkActionProcessor[TAction: BaseBulkAction, TResult: BaseBulkActionResult
         trigger_meta = BulkActionTriggerMeta(
             action_id=action_id,
             started_at=started_at,
-            entity_type=action.entity_type(),
             entity_ids=action.entity_ids(),
             operation_type=action.operation_type(),
             action_name=action.action_name(),
@@ -94,7 +141,7 @@ class BulkActionProcessor[TAction: BaseBulkAction, TResult: BaseBulkActionResult
                 entity_results = self._same_result_for_every_entity(trigger_meta, run_status)
                 raise
             else:
-                entity_results = result.entity_results()
+                entity_results = self._judge.judge(trigger_meta, result)
                 return result
         finally:
             ended_at = datetime.now(UTC)

@@ -66,6 +66,7 @@ __all__ = (
     "LookupEntityOpsAction",
     "GetSingleEntityOpsAction",
     "OperationScopeOpsAction",
+    "BulkScopedSearchOpsAction",
     "SearchGlobalOpsAction",
     "CreateGlobalOpsAction",
     "CreateGlobalWithFieldsOpsAction",
@@ -493,6 +494,22 @@ class OperationScopeOpsAction[TRow: Base, TData](
     BaseScopeAction, SearchOpsAction[TRow, TData], ABC
 ):
     """A page read from within the scopes the action names."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
+class BulkScopedSearchOpsAction[TRow: Base, TData](
+    BaseBulkAction, SearchOpsAction[TRow, TData], ABC
+):
+    """A page of the field rows owned by the entities the caller named.
+
+    Bulk-shaped for the check and the record — every named owner is answered for — while
+    the result is a page, since a read reports what it found rather than each owner's
+    fate. A caller reaching for one owner they cannot see is refused the whole read.
+    """
 
     @override
     @classmethod

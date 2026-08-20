@@ -138,7 +138,6 @@ class BulkLookupActionProcessor[TAction: BaseBulkLookupAction, TResult: BaseBulk
         meta = BulkActionTriggerMeta(
             action_id=action_id,
             started_at=started_at,
-            entity_type=action.entity_type(),
             entity_ids=entity_ids,
             operation_type=action.operation_type(),
             action_name=action.action_name(),
