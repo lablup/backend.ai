@@ -34,7 +34,7 @@ class KernelBindingData:
     kernel_id: KernelId
     agent_id: AgentId | None
     agent_addr: str | None
-    scaling_group: str
+    resource_group: str
     image: str
     image_id: UUID | None
     architecture: ArchName
@@ -137,7 +137,7 @@ class KernelStartData:
     kernel_id: UUID
     agent_id: AgentId
     agent_addr: str
-    scaling_group: str
+    resource_group: str
     image: str
     image_id: UUID | None
     architecture: ArchName

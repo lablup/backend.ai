@@ -267,8 +267,8 @@ class TestCheckPresets:
         mock_result.group_limits = slot_quantities
         mock_result.group_using = slot_quantities
         mock_result.group_remaining = slot_quantities
-        mock_result.scaling_group_remaining = slot_quantities
-        mock_result.scaling_groups = {
+        mock_result.resource_group_remaining = slot_quantities
+        mock_result.resource_groups = {
             "sg-test": {
                 ResourceSlotState.OCCUPIED: slot_quantities,
                 ResourceSlotState.AVAILABLE: slot_quantities,
@@ -312,7 +312,7 @@ class TestCheckPresets:
         assert action.domain_name == "default"
         assert action.user_id == user_uuid
         assert action.group == "test-group"
-        assert action.scaling_group == "sg-test"
+        assert action.resource_group == "sg-test"
         assert response.status_code == HTTPStatus.OK
         response_body = response.to_json
         assert response_body is not None

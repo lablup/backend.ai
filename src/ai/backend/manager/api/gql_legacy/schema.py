@@ -132,8 +132,8 @@ from ai.backend.manager.models.image.row import (
     PublicImageLoadFilter,
 )
 from ai.backend.manager.models.rbac import ProjectScope, ScopeType, SystemScope
-from ai.backend.manager.models.scaling_group.row import (
-    ScalingGroupRow,
+from ai.backend.manager.models.resource_group.row import (
+    ResourceGroupRow,
     and_names,
     query_allowed_sgroups,
 )
@@ -2302,7 +2302,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
                 db_conn, domain_name, ProjectID(project_id), access_key
             )
         conditions = [and_names([sgroup.name for sgroup in sgroup_rows])]
-        sgroup_orm_rows = await ScalingGroupRow.list_by_condition(conditions, db=ctx.db)
+        sgroup_orm_rows = await ResourceGroupRow.list_by_condition(conditions, db=ctx.db)
         return [ScalingGroup.from_orm_row(row).masked for row in sgroup_orm_rows]
 
     @staticmethod

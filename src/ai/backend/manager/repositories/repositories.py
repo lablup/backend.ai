@@ -44,6 +44,7 @@ from ai.backend.manager.repositories.replica_group.repositories import ReplicaGr
 from ai.backend.manager.repositories.reservoir_registry.repositories import (
     ReservoirRegistryRepositories,
 )
+from ai.backend.manager.repositories.resource_group.repositories import ResourceGroupRepositories
 from ai.backend.manager.repositories.resource_preset.repositories import ResourcePresetRepositories
 from ai.backend.manager.repositories.resource_slot.repositories import ResourceSlotRepositories
 from ai.backend.manager.repositories.resource_usage_history.repositories import (
@@ -54,7 +55,6 @@ from ai.backend.manager.repositories.runtime_variant.repositories import Runtime
 from ai.backend.manager.repositories.runtime_variant_preset.repositories import (
     RuntimeVariantPresetRepositories,
 )
-from ai.backend.manager.repositories.scaling_group.repositories import ScalingGroupRepositories
 from ai.backend.manager.repositories.scheduler.repositories import SchedulerRepositories
 from ai.backend.manager.repositories.scheduling_history.repositories import (
     SchedulingHistoryRepositories,
@@ -105,7 +105,7 @@ class Repositories:
     deployment_revision_preset: DeploymentPresetRepositories
     model_card: ModelCardRepositories
     resource_usage_history: ResourceUsageHistoryRepositories
-    scaling_group: ScalingGroupRepositories
+    resource_group: ResourceGroupRepositories
     scheduler: SchedulerRepositories
     scheduling_history: SchedulingHistoryRepositories
     session: SessionRepositories
@@ -152,7 +152,7 @@ class Repositories:
         deployment_revision_preset_repositories = DeploymentPresetRepositories.create(args)
         model_card_repositories = ModelCardRepositories.create(args)
         resource_usage_history_repositories = ResourceUsageHistoryRepositories.create(args)
-        scaling_group_repositories = ScalingGroupRepositories.create(args)
+        resource_group_repositories = ResourceGroupRepositories.create(args)
         scheduler_repositories = SchedulerRepositories.create(args)
         scheduling_history_repositories = SchedulingHistoryRepositories.create(args)
         session_repositories = SessionRepositories.create(args)
@@ -200,7 +200,7 @@ class Repositories:
             deployment_revision_preset=deployment_revision_preset_repositories,
             model_card=model_card_repositories,
             resource_usage_history=resource_usage_history_repositories,
-            scaling_group=scaling_group_repositories,
+            resource_group=resource_group_repositories,
             scheduler=scheduler_repositories,
             scheduling_history=scheduling_history_repositories,
             session=session_repositories,

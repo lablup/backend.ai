@@ -25,8 +25,8 @@ from ai.backend.common.types import AccessKey, PreemptionMode, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
@@ -75,10 +75,10 @@ async def set_preemption_mode(
     async def _set(mode: PreemptionMode) -> None:
         async with db_with_cleanup.begin_session() as db_sess:
             await db_sess.execute(
-                sa.update(ScalingGroupRow)
-                .where(ScalingGroupRow.id == test_scaling_group_id)
+                sa.update(ResourceGroupRow)
+                .where(ResourceGroupRow.id == test_scaling_group_id)
                 .values(
-                    scheduler_opts=ScalingGroupOpts(
+                    scheduler_opts=ResourceGroupOpts(
                         allowed_session_types=[],
                         pending_timeout=timedelta(hours=1),
                         config={},
@@ -112,7 +112,7 @@ class TestMarkSessionsPreempted:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -154,7 +154,7 @@ class TestMarkSessionsPreempted:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -193,7 +193,7 @@ class TestMarkSessionsRescheduling:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -239,7 +239,7 @@ class TestTerminatePreemptedVictim:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -295,7 +295,7 @@ class TestRequeueSessionsToPending:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -359,7 +359,7 @@ class TestRequeueSessionsToPending:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -415,7 +415,7 @@ class TestRequeueSessionsToPending:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,

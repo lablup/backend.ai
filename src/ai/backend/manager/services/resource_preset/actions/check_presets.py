@@ -21,7 +21,7 @@ class CheckResourcePresetsAction(ResourcePresetAction):
     domain_name: str
     user_id: uuid.UUID
     group: str
-    scaling_group: str | None
+    resource_group: str | None
 
     @override
     @classmethod
@@ -43,7 +43,7 @@ class CheckResourcePresetsActionResult:
     group_limits: list[SlotQuantity]
     group_using: list[SlotQuantity]
     group_remaining: list[SlotQuantity]
-    scaling_group_remaining: list[SlotQuantity]
-    scaling_groups: Mapping[str, Mapping[ResourceSlotState, list[SlotQuantity]]]
+    resource_group_remaining: list[SlotQuantity]
+    resource_groups: Mapping[str, Mapping[ResourceSlotState, list[SlotQuantity]]]
 
     # TODO: Should return preset row ids after changing to batching.

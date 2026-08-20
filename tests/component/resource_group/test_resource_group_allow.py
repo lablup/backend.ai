@@ -24,7 +24,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 )
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -57,20 +57,20 @@ async def extra_scaling_group(
     name = f"test-sg-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(ScalingGroupRow.__table__).values(
+            sa.insert(ResourceGroupRow.__table__).values(
                 name=name,
                 description="Test scaling group for allow/disallow",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
         )
     yield name
     async with db_engine.begin() as conn:
         await conn.execute(
-            ScalingGroupRow.__table__.delete().where(ScalingGroupRow.__table__.c.name == name)
+            ResourceGroupRow.__table__.delete().where(ResourceGroupRow.__table__.c.name == name)
         )
 
 
@@ -82,20 +82,20 @@ async def second_scaling_group(
     name = f"test-sg2-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(ScalingGroupRow.__table__).values(
+            sa.insert(ResourceGroupRow.__table__).values(
                 name=name,
                 description="Second test scaling group",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
         )
     yield name
     async with db_engine.begin() as conn:
         await conn.execute(
-            ScalingGroupRow.__table__.delete().where(ScalingGroupRow.__table__.c.name == name)
+            ResourceGroupRow.__table__.delete().where(ResourceGroupRow.__table__.c.name == name)
         )
 
 

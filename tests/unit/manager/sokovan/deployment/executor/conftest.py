@@ -28,7 +28,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
+from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.types import DeploymentWithHistory
@@ -325,9 +325,9 @@ def destroying_deployments_multiple() -> list[DeploymentWithHistory]:
 
 
 @pytest.fixture
-def proxy_target_default() -> ScalingGroupProxyTarget:
+def proxy_target_default() -> ResourceGroupProxyTarget:
     """Default proxy target for tests."""
-    return ScalingGroupProxyTarget(
+    return ResourceGroupProxyTarget(
         addr="http://proxy:8080",
         api_token="test-token",
     )
@@ -335,8 +335,8 @@ def proxy_target_default() -> ScalingGroupProxyTarget:
 
 @pytest.fixture
 def proxy_targets_by_scaling_group(
-    proxy_target_default: ScalingGroupProxyTarget,
-) -> dict[str, ScalingGroupProxyTarget]:
+    proxy_target_default: ResourceGroupProxyTarget,
+) -> dict[str, ResourceGroupProxyTarget]:
     """Proxy targets mapped by scaling group."""
     return {
         "default": proxy_target_default,

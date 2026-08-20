@@ -66,6 +66,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -73,7 +74,6 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -85,7 +85,7 @@ IDLE_LOGGER_NAME = "ai.backend.manager.idle"
 
 _IDLE_ROWS: list[TableOrORM] = [
     DomainRow,
-    ScalingGroupRow,
+    ResourceGroupRow,
     UserResourcePolicyRow,
     ProjectResourcePolicyRow,
     KeyPairResourcePolicyRow,
@@ -205,17 +205,17 @@ class TestDoIdleCheck:
         return domain_id, name
 
     @pytest.fixture
-    async def scaling_group(self, db: ExtendedAsyncSAEngine) -> tuple[ResourceGroupID, str]:
+    async def resource_group(self, db: ExtendedAsyncSAEngine) -> tuple[ResourceGroupID, str]:
         sg_id = ResourceGroupID(uuid.uuid4())
         name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=sg_id,
                     name=name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(
+                    scheduler_opts=ResourceGroupOpts(
                         allowed_session_types=[],
                         config={},
                     ),
@@ -357,13 +357,13 @@ class TestDoIdleCheck:
         db: ExtendedAsyncSAEngine,
         *,
         domain: tuple[DomainID, str],
-        scaling_group: tuple[ResourceGroupID, str],
+        resource_group: tuple[ResourceGroupID, str],
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
         access_key: AccessKey,
     ) -> KernelId:
         domain_id, domain_name = domain
-        sg_id, sg_name = scaling_group
+        sg_id, sg_name = resource_group
         session_id = SessionId(uuid.uuid4())
         kernel_id = KernelId(uuid.uuid4())
         now = datetime.now(tzutc())
@@ -380,7 +380,7 @@ class TestDoIdleCheck:
                     user_uuid=user_uuid,
                     access_key=access_key,
                     resource_group_id=sg_id,
-                    scaling_group_name=sg_name,
+                    resource_group_name=sg_name,
                     status=SessionStatus.RUNNING,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
@@ -398,7 +398,7 @@ class TestDoIdleCheck:
                 KernelRow(
                     id=kernel_id,
                     session_id=session_id,
-                    scaling_group=sg_name,
+                    resource_group=sg_name,
                     resource_group_id=sg_id,
                     cluster_idx=0,
                     cluster_role="main",
@@ -446,7 +446,7 @@ class TestDoIdleCheck:
         self,
         db: ExtendedAsyncSAEngine,
         domain: tuple[DomainID, str],
-        scaling_group: tuple[ResourceGroupID, str],
+        resource_group: tuple[ResourceGroupID, str],
         group_id: uuid.UUID,
         user_resource_policy_name: str,
     ) -> None:
@@ -463,7 +463,7 @@ class TestDoIdleCheck:
         kernel_id = await self._create_running_kernel(
             db,
             domain=domain,
-            scaling_group=scaling_group,
+            resource_group=resource_group,
             group_id=group_id,
             user_uuid=user_uuid,
             access_key=secondary_access_key,
@@ -479,7 +479,7 @@ class TestDoIdleCheck:
         self,
         db: ExtendedAsyncSAEngine,
         domain: tuple[DomainID, str],
-        scaling_group: tuple[ResourceGroupID, str],
+        resource_group: tuple[ResourceGroupID, str],
         group_id: uuid.UUID,
         user_resource_policy_name: str,
     ) -> None:
@@ -494,7 +494,7 @@ class TestDoIdleCheck:
         kernel_id = await self._create_running_kernel(
             db,
             domain=domain,
-            scaling_group=scaling_group,
+            resource_group=resource_group,
             group_id=group_id,
             user_uuid=user_uuid,
             access_key=AccessKey(f"AKDELETED{uuid.uuid4().hex[:11]}"),
@@ -510,7 +510,7 @@ class TestDoIdleCheck:
         self,
         db: ExtendedAsyncSAEngine,
         domain: tuple[DomainID, str],
-        scaling_group: tuple[ResourceGroupID, str],
+        resource_group: tuple[ResourceGroupID, str],
         group_id: uuid.UUID,
         user_resource_policy_name: str,
         caplog: pytest.LogCaptureFixture,
@@ -537,7 +537,7 @@ class TestDoIdleCheck:
             await self._create_running_kernel(
                 db,
                 domain=domain,
-                scaling_group=scaling_group,
+                resource_group=resource_group,
                 group_id=group_id,
                 user_uuid=policyless_uuid,
                 access_key=orphan_access_key,
@@ -546,7 +546,7 @@ class TestDoIdleCheck:
             await self._create_running_kernel(
                 db,
                 domain=domain,
-                scaling_group=scaling_group,
+                resource_group=resource_group,
                 group_id=group_id,
                 user_uuid=normal_uuid,
                 access_key=normal_access_key,
@@ -570,7 +570,7 @@ class TestDoIdleCheck:
         self,
         db: ExtendedAsyncSAEngine,
         domain: tuple[DomainID, str],
-        scaling_group: tuple[ResourceGroupID, str],
+        resource_group: tuple[ResourceGroupID, str],
         group_id: uuid.UUID,
         user_resource_policy_name: str,
     ) -> None:
@@ -587,7 +587,7 @@ class TestDoIdleCheck:
             await self._create_running_kernel(
                 db,
                 domain=domain,
-                scaling_group=scaling_group,
+                resource_group=resource_group,
                 group_id=group_id,
                 user_uuid=user_uuid,
                 access_key=access_key,

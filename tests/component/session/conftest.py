@@ -227,7 +227,7 @@ def server_module_registries(
 @pytest.fixture()
 async def agent_fixture(
     db_engine: SAEngine,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[AgentId]:
     """Insert a test agent record and yield its ID."""
@@ -237,7 +237,7 @@ async def agent_fixture(
             sa.insert(AgentRow).values(
                 id=agent_id,
                 region="local",
-                scaling_group=scaling_group_name,
+                resource_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 available_slots=ResourceSlot(),
                 occupied_slots=ResourceSlot(),
@@ -257,7 +257,7 @@ async def session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
     agent_fixture: AgentId,
 ) -> AsyncIterator[SessionSeedData]:
@@ -293,7 +293,7 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
@@ -319,7 +319,7 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_name,
+                resource_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 agent=agent_fixture,
                 status=KernelStatus.RUNNING,
@@ -356,7 +356,7 @@ async def terminated_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a TERMINATED session with container_log in the kernel.
@@ -390,7 +390,7 @@ async def terminated_session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.TERMINATED,
                 status_info="user-requested",
@@ -417,7 +417,7 @@ async def terminated_session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_name,
+                resource_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=KernelStatus.TERMINATED,
                 status_info="user-requested",
@@ -455,7 +455,7 @@ async def user_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     regular_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session owned by the regular user."""
@@ -484,7 +484,7 @@ async def user_session_seed(
                 group_id=group_fixture,
                 user_uuid=regular_user_fixture.user_uuid,
                 access_key=regular_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
@@ -510,7 +510,7 @@ async def user_session_seed(
                 group_id=group_fixture,
                 user_uuid=regular_user_fixture.user_uuid,
                 access_key=regular_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_name,
+                resource_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",

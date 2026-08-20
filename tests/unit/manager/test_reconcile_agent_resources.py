@@ -29,13 +29,13 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
@@ -84,7 +84,7 @@ class TestReconcileAgentResources:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 GroupRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -157,13 +157,13 @@ class TestReconcileAgentResources:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=resource_group_id,
                     name=sg_name,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
         async with db.begin_session() as db_sess:
@@ -182,7 +182,7 @@ class TestReconcileAgentResources:
                     status=AgentStatus.ALIVE,
                     status_changed=datetime.now(tzutc()),
                     region="test-region",
-                    scaling_group=sg_name,
+                    resource_group=sg_name,
                     resource_group_id=resource_group_id,
                     available_slots=ResourceSlot({SlotName("cpu"): "8", SlotName("mem"): "32768"}),
                     occupied_slots=ResourceSlot({}),
@@ -240,7 +240,7 @@ class TestReconcileAgentResources:
                     group_id=infra.project_id,
                     user_uuid=uuid4(),
                     resource_group_id=infra.resource_group_id,
-                    scaling_group_name=infra.sg_name,
+                    resource_group_name=infra.sg_name,
                     occupying_slots=empty_slots,
                     requested_slots=empty_slots,
                 )
@@ -260,7 +260,7 @@ class TestReconcileAgentResources:
                     repl_out_port=0,
                     stdin_port=0,
                     stdout_port=0,
-                    scaling_group=infra.sg_name,
+                    resource_group=infra.sg_name,
                     resource_group_id=infra.resource_group_id,
                     agent=infra.agent_id,
                 )
@@ -483,7 +483,7 @@ class TestOrphanedAllocationCleanup:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 GroupRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -559,13 +559,13 @@ class TestOrphanedAllocationCleanup:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=resource_group_id,
                     name=sg_name,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
         async with db.begin_session() as db_sess:
@@ -584,7 +584,7 @@ class TestOrphanedAllocationCleanup:
                     status=AgentStatus.ALIVE,
                     status_changed=datetime.now(tzutc()),
                     region="test-region",
-                    scaling_group=sg_name,
+                    resource_group=sg_name,
                     resource_group_id=resource_group_id,
                     available_slots=ResourceSlot({SlotName("cpu"): "8", SlotName("mem"): "32768"}),
                     occupied_slots=ResourceSlot({}),
@@ -624,7 +624,7 @@ class TestOrphanedAllocationCleanup:
                     group_id=infra.project_id,
                     user_uuid=uuid4(),
                     resource_group_id=infra.resource_group_id,
-                    scaling_group_name=infra.sg_name,
+                    resource_group_name=infra.sg_name,
                     occupying_slots=empty_slots,
                     requested_slots=empty_slots,
                 )
@@ -644,7 +644,7 @@ class TestOrphanedAllocationCleanup:
                     repl_out_port=0,
                     stdin_port=0,
                     stdout_port=0,
-                    scaling_group=infra.sg_name,
+                    resource_group=infra.sg_name,
                     resource_group_id=infra.resource_group_id,
                     agent=infra.agent_id,
                 )
@@ -802,7 +802,7 @@ class TestOrphanedAllocationCleanup:
                     group_id=infra.project_id,
                     user_uuid=uuid4(),
                     resource_group_id=infra.resource_group_id,
-                    scaling_group_name=infra.sg_name,
+                    resource_group_name=infra.sg_name,
                     occupying_slots=empty_slots,
                     requested_slots=empty_slots,
                 )
@@ -822,7 +822,7 @@ class TestOrphanedAllocationCleanup:
                     repl_out_port=0,
                     stdin_port=0,
                     stdout_port=0,
-                    scaling_group=infra.sg_name,
+                    resource_group=infra.sg_name,
                     resource_group_id=infra.resource_group_id,
                     agent=infra.agent_id,
                 )
@@ -848,7 +848,7 @@ class TestOrphanedAllocationCleanup:
                     group_id=infra.project_id,
                     user_uuid=uuid4(),
                     resource_group_id=infra.resource_group_id,
-                    scaling_group_name=infra.sg_name,
+                    resource_group_name=infra.sg_name,
                     occupying_slots=empty_slots,
                     requested_slots=empty_slots,
                 )
@@ -868,7 +868,7 @@ class TestOrphanedAllocationCleanup:
                     repl_out_port=0,
                     stdin_port=0,
                     stdout_port=0,
-                    scaling_group=infra.sg_name,
+                    resource_group=infra.sg_name,
                     resource_group_id=infra.resource_group_id,
                     agent=infra.agent_id,
                 )
@@ -957,7 +957,7 @@ class TestTerminalSessionKernelReconciliation:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 GroupRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -1031,13 +1031,13 @@ class TestTerminalSessionKernelReconciliation:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=resource_group_id,
                     name=sg_name,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
         async with db.begin_session() as db_sess:
@@ -1056,7 +1056,7 @@ class TestTerminalSessionKernelReconciliation:
                     status=AgentStatus.ALIVE,
                     status_changed=datetime.now(tzutc()),
                     region="test-region",
-                    scaling_group=sg_name,
+                    resource_group=sg_name,
                     resource_group_id=resource_group_id,
                     available_slots=ResourceSlot({SlotName("cpu"): "8", SlotName("mem"): "32768"}),
                     occupied_slots=ResourceSlot({}),
@@ -1103,7 +1103,7 @@ class TestTerminalSessionKernelReconciliation:
                     group_id=infra.project_id,
                     user_uuid=uuid4(),
                     resource_group_id=infra.resource_group_id,
-                    scaling_group_name=infra.sg_name,
+                    resource_group_name=infra.sg_name,
                     status=session_status,
                     occupying_slots=empty_slots,
                     requested_slots=empty_slots,
@@ -1124,7 +1124,7 @@ class TestTerminalSessionKernelReconciliation:
                     repl_out_port=0,
                     stdin_port=0,
                     stdout_port=0,
-                    scaling_group=infra.sg_name,
+                    resource_group=infra.sg_name,
                     resource_group_id=infra.resource_group_id,
                     agent=infra.agent_id,
                 )

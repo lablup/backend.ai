@@ -30,7 +30,7 @@ from ai.backend.manager.data.domain.types import (
 )
 from ai.backend.manager.data.permission.permission_defs import (
     DomainPermission,
-    ScalingGroupPermission,
+    ResourceGroupPermission,
 )
 from ai.backend.manager.models.domain import DomainRow, domains, get_permission_ctx
 from ai.backend.manager.models.domain.creators import DomainCreator
@@ -43,7 +43,7 @@ from ai.backend.manager.models.rbac import (
     SystemScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.scaling_group import get_scaling_groups
+from ai.backend.manager.models.resource_group import get_resource_groups
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_node import (
@@ -58,7 +58,7 @@ from ai.backend.manager.services.domain.actions.update_domain_node import (
     UpdateDomainNodeAction,
     UpdateDomainNodeActionResult,
 )
-from ai.backend.manager.services.scaling_group.actions.lookup import LookupResourceGroupAction
+from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import (
@@ -352,7 +352,7 @@ async def _resolve_sgroup_ids(
 ) -> list[ResourceGroupID]:
     resolved: list[ResourceGroupID] = []
     for name in sgroup_names:
-        result = await graph_ctx.processors.scaling_group.lookup.run(
+        result = await graph_ctx.processors.resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(name))
         )
         resolved.append(result.data.id)
@@ -364,9 +364,9 @@ async def _ensure_sgroup_permission(
 ) -> None:
     user = graph_ctx.user
     client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
-    sgroup_models = await get_scaling_groups(
+    sgroup_models = await get_resource_groups(
         SystemScope(),
-        ScalingGroupPermission.ASSOCIATE_WITH_SCOPES,
+        ResourceGroupPermission.ASSOCIATE_WITH_SCOPES,
         sgroup_names,
         db_session=db_session,
         ctx=client_ctx,
@@ -421,7 +421,7 @@ class CreateDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
                 )
             ),
             user_info=user_info,
-            scaling_group_ids=scaling_group_ids,
+            resource_group_ids=scaling_group_ids,
         )
 
 

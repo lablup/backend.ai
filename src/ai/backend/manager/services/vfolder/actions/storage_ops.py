@@ -296,7 +296,7 @@ class GlobalMountHostAction(VFolderGlobalAction):
     fs_location: str
     fs_type: str | None = None
     options: str | None = None
-    scaling_group: str | None = None
+    resource_group: str | None = None
     fstab_path: str | None = None
     edit_fstab: bool = False
 
@@ -322,7 +322,7 @@ class GlobalUmountHostAction(VFolderGlobalAction):
     """Unmount a filesystem from agents via agent watchers."""
 
     name: str
-    scaling_group: str | None = None
+    resource_group: str | None = None
     fstab_path: str | None = None
     edit_fstab: bool = False
 

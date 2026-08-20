@@ -36,6 +36,7 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -44,7 +45,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -77,7 +77,7 @@ class TestEndpointSearchInProject:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -135,11 +135,11 @@ class TestEndpointSearchInProject:
 
             # Scaling group
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=sgroup_name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             await db_sess.flush()

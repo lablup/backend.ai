@@ -21,13 +21,13 @@ from ai.backend.manager.models.agent import AgentRow
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
+from ai.backend.manager.models.resource_group import ResourceGroupForProjectRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
     AgentRow,
-    ScalingGroupForProjectRow,
+    ResourceGroupForProjectRow,
 )
 
 

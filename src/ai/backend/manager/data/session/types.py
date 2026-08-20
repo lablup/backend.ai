@@ -206,7 +206,7 @@ class SessionData(EntityData):
     timeout: int | None
     batch_timeout: int | None
     terminated_at: datetime | None = field(compare=False)
-    scaling_group_name: str | None
+    resource_group_name: str | None
     starts_at: datetime | None = field(compare=False)
     status_info: str | None = field(compare=False)
     status_data: dict[str, Any] | None = field(compare=False)
@@ -273,7 +273,7 @@ class ResourceSpec:
     cluster_size: int
     occupying_slots: ResourceSlot
     requested_slots: ResourceSlot
-    scaling_group_name: str | None
+    resource_group_name: str | None
     target_sgroup_names: list[str] | None
     agent_ids: list[str] | None
 

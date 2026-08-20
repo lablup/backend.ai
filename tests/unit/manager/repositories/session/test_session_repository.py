@@ -40,13 +40,13 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow, batch_populate_session_occupied_slots
 from ai.backend.manager.models.session_template import SessionTemplateRow, TemplateType
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -61,7 +61,7 @@ from ai.backend.testutils.db import with_tables
 class SessionTestData:
     domain_id: DomainID
     domain_name: str
-    scaling_group_id: ResourceGroupID
+    resource_group_id: ResourceGroupID
     user_id: uuid.UUID
     group_id: uuid.UUID
     session_id: SessionId
@@ -91,7 +91,7 @@ class TestSessionRepository:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 AgentRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
@@ -143,7 +143,7 @@ class TestSessionRepository:
             db_sess.add(domain)
 
             # Create scaling group
-            scaling_group = ScalingGroupRow(
+            resource_group = ResourceGroupRow(
                 id=test_scaling_group_id,
                 name="default",
                 is_active=True,
@@ -151,9 +151,9 @@ class TestSessionRepository:
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
-            db_sess.add(scaling_group)
+            db_sess.add(resource_group)
 
             # Create resource policies
             user_resource_policy = UserResourcePolicyRow(
@@ -270,7 +270,7 @@ class TestSessionRepository:
                 bootstrap_script=None,
                 use_host_network=False,
                 resource_group_id=test_scaling_group_id,
-                scaling_group_name="default",
+                resource_group_name="default",
             )
             db_sess.add(session)
 
@@ -291,7 +291,7 @@ class TestSessionRepository:
                 cluster_idx=0,
                 local_rank=0,
                 cluster_hostname="main",
-                scaling_group="default",
+                resource_group="default",
                 resource_group_id=test_scaling_group_id,
                 image="cr.backend.ai/stable/python:latest",
                 architecture="x86_64",
@@ -331,7 +331,7 @@ class TestSessionRepository:
         return SessionTestData(
             domain_id=test_domain_id,
             domain_name=domain_name,
-            scaling_group_id=test_scaling_group_id,
+            resource_group_id=test_scaling_group_id,
             user_id=user_id,
             group_id=group_id,
             session_id=session_id,
@@ -475,8 +475,8 @@ class TestSessionRepository:
                     environ=None,
                     bootstrap_script=None,
                     use_host_network=False,
-                    resource_group_id=base.scaling_group_id,
-                    scaling_group_name="default",
+                    resource_group_id=base.resource_group_id,
+                    resource_group_name="default",
                 )
             )
             await db_sess.commit()
@@ -600,7 +600,7 @@ class TestBatchPopulateSessionOccupiedSlots:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 AgentRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
@@ -646,7 +646,7 @@ class TestBatchPopulateSessionOccupiedSlots:
             )
             db_sess.add(domain)
 
-            scaling_group = ScalingGroupRow(
+            resource_group = ResourceGroupRow(
                 id=test_scaling_group_id,
                 name="default",
                 is_active=True,
@@ -654,9 +654,9 @@ class TestBatchPopulateSessionOccupiedSlots:
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
-            db_sess.add(scaling_group)
+            db_sess.add(resource_group)
 
             user_resource_policy = UserResourcePolicyRow(
                 name="default-user-policy",
@@ -766,7 +766,7 @@ class TestBatchPopulateSessionOccupiedSlots:
                 bootstrap_script=None,
                 use_host_network=False,
                 resource_group_id=test_scaling_group_id,
-                scaling_group_name="default",
+                resource_group_name="default",
             )
             db_sess.add(session)
             await db_sess.flush()
@@ -785,7 +785,7 @@ class TestBatchPopulateSessionOccupiedSlots:
                 cluster_idx=0,
                 local_rank=0,
                 cluster_hostname="main",
-                scaling_group="default",
+                resource_group="default",
                 resource_group_id=test_scaling_group_id,
                 image="cr.backend.ai/stable/python:latest",
                 architecture="x86_64",
@@ -848,7 +848,7 @@ class TestBatchPopulateSessionOccupiedSlots:
         return SessionTestData(
             domain_id=test_domain_id,
             domain_name=domain_name,
-            scaling_group_id=test_scaling_group_id,
+            resource_group_id=test_scaling_group_id,
             user_id=user_id,
             group_id=group_id,
             session_id=session_id,
@@ -933,7 +933,7 @@ class TestGetTemplateInfoById:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 AgentRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,

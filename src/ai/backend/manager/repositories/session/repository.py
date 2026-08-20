@@ -184,11 +184,11 @@ class SessionRepository:
         return await self._db_source.get_group_name_by_domain_and_id(domain_name, group_id)
 
     @session_repository_resilience.apply()
-    async def get_scaling_group_wsproxy_addr(
+    async def get_resource_group_wsproxy_addr(
         self,
-        scaling_group_name: str,
+        resource_group_name: str,
     ) -> str | None:
-        return await self._db_source.get_scaling_group_wsproxy_addr(scaling_group_name)
+        return await self._db_source.get_resource_group_wsproxy_addr(resource_group_name)
 
     @session_repository_resilience.apply()
     async def get_session_by_id(

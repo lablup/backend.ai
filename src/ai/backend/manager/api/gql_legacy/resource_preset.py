@@ -93,7 +93,7 @@ class ResourcePreset(graphene.ObjectType):  # type: ignore[misc]
                     name=row.name,
                     resource_slots=row.resource_slots.to_json(),
                     shared_memory=shared_memory,
-                    scaling_group_name=row.scaling_group_name,
+                    scaling_group_name=row.resource_group_name,
                 )
             case Row():
                 shared_memory = str(row.shared_memory) if row.shared_memory else None
@@ -191,7 +191,7 @@ class CreateResourcePresetInput(graphene.InputObjectType):  # type: ignore[misc]
                 name=name,
                 resource_slots=ResourceSlot.from_user_input(self.resource_slots, None),
                 shared_memory=self.shared_memory if self.shared_memory else None,
-                scaling_group_name=self.scaling_group_name if self.scaling_group_name else None,
+                resource_group_name=self.scaling_group_name if self.scaling_group_name else None,
             )
         )
 
@@ -239,7 +239,7 @@ class ModifyResourcePresetInput(graphene.InputObjectType):  # type: ignore[misc]
                     if self.shared_memory is not Undefined and self.shared_memory is not None
                     else self.shared_memory
                 ),
-                scaling_group_name=TriState[str].from_graphql(self.scaling_group_name),
+                resource_group_name=TriState[str].from_graphql(self.scaling_group_name),
             ),
             pk_value=pk_value,
         )

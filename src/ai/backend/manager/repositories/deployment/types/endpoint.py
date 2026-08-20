@@ -44,7 +44,7 @@ class EndpointCreationArgs:
     runtime_variant: str
     desired_session_count: int
     resource_opts: dict[str, Any] | None = None
-    scaling_group: str | None = None
+    resource_group: str | None = None
 
 
 @dataclass

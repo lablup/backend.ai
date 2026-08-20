@@ -157,7 +157,7 @@ class UserData:
 
 
 @dataclass
-class ScalingGroupData:
+class ResourceGroupData:
     wsproxy_addr: str
     wsproxy_api_token: str
 
@@ -176,7 +176,7 @@ class ModelServiceValidationContext:
     owner_role: UserRole
     group_id: uuid.UUID
     resource_policy: dict[str, Any]
-    scaling_group: str
+    resource_group: str
     extra_mounts: Sequence[VFolderMount]
     variant_reads_vfolder_config_files: bool
 
@@ -191,7 +191,7 @@ class ModelServicePrepareCtx:
     owner_role: UserRole
     group_id: uuid.UUID
     resource_policy: dict[str, Any]
-    scaling_group: str
+    resource_group: str
     extra_mounts: Sequence[VFolderMount]
 
 
@@ -252,7 +252,7 @@ class ServiceConfig:
     model_mount_destination: str
     extra_mounts: dict[uuid.UUID, MountOption]
     environ: dict[str, str] | None
-    scaling_group: str
+    resource_group: str
     resources: dict[str, str | int | float] | None
     resource_opts: dict[str, str | int | bool] | None
     vfolder_subpath: str | None = None
@@ -265,7 +265,7 @@ class ServiceConfig:
             "vfolder_subpath": self.vfolder_subpath,
             "extra_mounts": {key: value.to_dict() for key, value in self.extra_mounts.items()},
             "environ": self.environ if self.environ is not None else {},
-            "scaling_group": self.scaling_group,
+            "scaling_group": self.resource_group,
             "resources": self.resources,
             "resource_opts": self.resource_opts,
         }

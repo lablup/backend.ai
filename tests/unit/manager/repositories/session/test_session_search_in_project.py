@@ -33,13 +33,13 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -70,7 +70,7 @@ class TestSessionSearchInProject:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 AgentRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
@@ -126,7 +126,7 @@ class TestSessionSearchInProject:
                 )
             )
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=test_scaling_group_id,
                     name="default",
                     is_active=True,
@@ -134,7 +134,7 @@ class TestSessionSearchInProject:
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             db_sess.add(
@@ -259,7 +259,7 @@ class TestSessionSearchInProject:
                         bootstrap_script=None,
                         use_host_network=False,
                         resource_group_id=test_scaling_group_id,
-                        scaling_group_name="default",
+                        resource_group_name="default",
                     )
                 )
                 kernel_id = KernelId(uuid.uuid4())
@@ -278,7 +278,7 @@ class TestSessionSearchInProject:
                         cluster_idx=0,
                         local_rank=0,
                         cluster_hostname="main",
-                        scaling_group="default",
+                        resource_group="default",
                         resource_group_id=test_scaling_group_id,
                         image="cr.backend.ai/stable/python:latest",
                         architecture="x86_64",

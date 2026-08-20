@@ -47,6 +47,7 @@ from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -55,7 +56,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -79,7 +79,7 @@ class TestKernelTermination:
             [
                 # FK dependency order: parents first
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -148,12 +148,12 @@ class TestKernelTermination:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sg = ScalingGroupRow(
+            sg = ResourceGroupRow(
                 id=test_scaling_group_id,
                 name=sg_name,
                 driver="static",
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(
+                scheduler_opts=ResourceGroupOpts(
                     allowed_session_types=[],
                     pending_timeout=timedelta(hours=1),
                     config={},
@@ -328,7 +328,7 @@ class TestKernelTermination:
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 region="local",
-                scaling_group=test_scaling_group_name,
+                resource_group=test_scaling_group_name,
                 resource_group_id=test_scaling_group_id,
                 available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
                 occupied_slots=ResourceSlot(),
@@ -363,7 +363,7 @@ class TestKernelTermination:
                 domain_name=test_domain.domain_name,
                 group_id=test_group_id,
                 resource_group_id=test_scaling_group_id,
-                scaling_group_name=test_scaling_group_name,
+                resource_group_name=test_scaling_group_name,
                 status=SessionStatus.TERMINATING,
                 status_info="test-termination",
                 cluster_mode=ClusterMode.SINGLE_NODE,
@@ -401,7 +401,7 @@ class TestKernelTermination:
                 session_id=test_session_id,
                 agent=test_agent_id,
                 agent_addr="127.0.0.1:6001",
-                scaling_group=test_scaling_group_name,
+                resource_group=test_scaling_group_name,
                 resource_group_id=test_scaling_group_id,
                 cluster_idx=0,
                 cluster_role="main",
@@ -454,7 +454,7 @@ class TestKernelTermination:
                 session_id=test_session_id,
                 agent=test_agent_id,
                 agent_addr="127.0.0.1:6001",
-                scaling_group=test_scaling_group_name,
+                resource_group=test_scaling_group_name,
                 resource_group_id=test_scaling_group_id,
                 cluster_idx=0,
                 cluster_role="main",
@@ -507,7 +507,7 @@ class TestKernelTermination:
                 session_id=test_session_id,
                 agent=test_agent_id,
                 agent_addr="127.0.0.1:6001",
-                scaling_group=test_scaling_group_name,
+                resource_group=test_scaling_group_name,
                 resource_group_id=test_scaling_group_id,
                 cluster_idx=1,
                 cluster_role="sub",
@@ -627,7 +627,7 @@ class TestKernelTermination:
                 session_id=test_session_id,
                 agent=test_agent_id,
                 agent_addr="127.0.0.1:6001",
-                scaling_group=test_scaling_group_name,
+                resource_group=test_scaling_group_name,
                 resource_group_id=test_scaling_group_id,
                 cluster_idx=0,
                 cluster_role="main",

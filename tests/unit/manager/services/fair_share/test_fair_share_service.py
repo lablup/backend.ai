@@ -23,7 +23,7 @@ from ai.backend.manager.data.fair_share import (
     UserFairShareData,
     UserFairShareSearchResult,
 )
-from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
+from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -172,7 +172,7 @@ class TestGetDomainFairShare:
         now = datetime.now(UTC)
         today = now.date()
         # Repository creates default data using custom scaling group spec
-        custom_spec = FairShareScalingGroupSpec(
+        custom_spec = FairShareResourceGroupSpec(
             default_weight=Decimal("3.5"),
             half_life_days=10,
             lookback_days=90,
@@ -396,7 +396,7 @@ class TestGetProjectFairShare:
         now = datetime.now(UTC)
         today = now.date()
         # Repository creates default data using custom scaling group spec
-        custom_spec = FairShareScalingGroupSpec(
+        custom_spec = FairShareResourceGroupSpec(
             default_weight=Decimal("3.5"),
             half_life_days=10,
             lookback_days=90,
@@ -632,7 +632,7 @@ class TestGetUserFairShare:
         now = datetime.now(UTC)
         today = now.date()
         # Repository creates default data using custom scaling group spec
-        custom_spec = FairShareScalingGroupSpec(
+        custom_spec = FairShareResourceGroupSpec(
             default_weight=Decimal("3.5"),
             half_life_days=10,
             lookback_days=90,
@@ -886,7 +886,7 @@ class TestSearchDomainFairShareEntities:
     ) -> None:
         """Default values match scaling group settings."""
         # Custom scaling group spec
-        custom_spec = FairShareScalingGroupSpec(
+        custom_spec = FairShareResourceGroupSpec(
             default_weight=Decimal("2.5"),
             half_life_days=7,
             lookback_days=60,

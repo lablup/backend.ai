@@ -457,7 +457,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             result=session_data.result.name,
             # resources
             agent_ids=session_data.agent_ids,
-            scaling_group=session_data.scaling_group_name,
+            scaling_group=session_data.resource_group_name,
             vfolder_mounts=vfolder_mounts,
             occupied_slots=session_data.occupying_slots,
             requested_slots=session_data.requested_slots,

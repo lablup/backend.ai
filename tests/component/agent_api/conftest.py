@@ -121,7 +121,7 @@ def server_module_registries(
 @pytest.fixture()
 async def agent_fixture(
     db_engine: SAEngine,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[str]:
     """Insert a test agent row and yield its ID.
@@ -136,7 +136,7 @@ async def agent_fixture(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 region="local",
-                scaling_group=scaling_group_name,
+                resource_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 schedulable=True,
                 available_slots=ResourceSlot({"cpu": "4", "mem": "8589934592"}),

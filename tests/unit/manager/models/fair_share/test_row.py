@@ -54,13 +54,13 @@ class TestDomainFairShareRow:
         database_with_fair_share_tables: ExtendedAsyncSAEngine,
         domain_fair_share_id: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group: str,
+        resource_group: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
         """Duplicate (resource_group_id, domain_name) should raise IntegrityError."""
         duplicate = DomainFairShareRow(
             domain_name=domain_fixture.domain_name,
-            resource_group=scaling_group,
+            resource_group=resource_group,
             resource_group_id=resource_group_id,
             weight=Decimal("1.0"),
             total_decayed_usage=ResourceSlot(),
@@ -77,13 +77,13 @@ class TestDomainFairShareRow:
         self,
         database_with_fair_share_tables: ExtendedAsyncSAEngine,
         domain_fixture: DomainFixtureData,
-        scaling_group: str,
+        resource_group: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
         """Weight field should preserve Numeric(10, 4) precision."""
         row = DomainFairShareRow(
             domain_name=domain_fixture.domain_name,
-            resource_group=scaling_group,
+            resource_group=resource_group,
             resource_group_id=resource_group_id,
             weight=Decimal("1234.5678"),
             total_decayed_usage=ResourceSlot(),
@@ -124,14 +124,14 @@ class TestProjectFairShareRow:
         project_fair_share_id: uuid.UUID,
         project_id: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group: str,
+        resource_group: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
         """Duplicate (resource_group_id, project_id) should raise IntegrityError."""
         duplicate = ProjectFairShareRow(
             project_id=project_id,
             domain_name=domain_fixture.domain_name,
-            resource_group=scaling_group,
+            resource_group=resource_group,
             resource_group_id=resource_group_id,
             weight=Decimal("1.0"),
             total_decayed_usage=ResourceSlot(),
@@ -170,7 +170,7 @@ class TestUserFairShareRow:
         user_uuid: uuid.UUID,
         project_id: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group: str,
+        resource_group: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
         """Duplicate (resource_group_id, user_uuid, project_id) should raise IntegrityError."""
@@ -178,7 +178,7 @@ class TestUserFairShareRow:
             user_uuid=user_uuid,
             project_id=project_id,
             domain_name=domain_fixture.domain_name,
-            resource_group=scaling_group,
+            resource_group=resource_group,
             resource_group_id=resource_group_id,
             weight=Decimal("1.0"),
             total_decayed_usage=ResourceSlot(),

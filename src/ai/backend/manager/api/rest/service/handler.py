@@ -364,7 +364,7 @@ class ServiceHandler:
                     name=params.service_name,
                     domain=params.domain_name,
                     project=validation_result.group_id,
-                    resource_group=validation_result.scaling_group,
+                    resource_group=validation_result.resource_group,
                     created_user=request["user"]["uuid"],
                     session_owner=validation_result.owner_uuid,
                     created_at=None,
@@ -675,7 +675,7 @@ class ServiceHandler:
                     k: MountOption.from_dto(v) for k, v in params.config.extra_mounts.items()
                 },
                 environ=params.config.environ,
-                scaling_group=params.config.scaling_group,
+                resource_group=params.config.scaling_group,
                 resources=params.config.resources,
                 resource_opts=params.config.resource_opts,
             ),
@@ -779,7 +779,7 @@ class ServiceHandler:
                     k: MountOption.from_dto(v) for k, v in params.config.extra_mounts.items()
                 },
                 environ=params.config.environ,
-                scaling_group=params.config.scaling_group,
+                resource_group=params.config.scaling_group,
                 resources=params.config.resources,
                 resource_opts=params.config.resource_opts,
             ),
@@ -794,7 +794,7 @@ class ServiceHandler:
                 owner_role=validation_result.owner_role,
                 group_id=validation_result.group_id,
                 resource_policy=validation_result.resource_policy,
-                scaling_group=validation_result.scaling_group,
+                resource_group=validation_result.resource_group,
                 extra_mounts=validation_result.extra_mounts,
             ),
         )

@@ -29,7 +29,7 @@ from ai.backend.manager.data.fair_share import (
     UserFairShareFactors,
     UserFairShareSearchResult,
 )
-from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
+from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkUpserter,
@@ -332,10 +332,10 @@ class FairShareRepository:
         return await self._db_source.get_domain_exists(domain_name)
 
     @fair_share_repository_resilience.apply()
-    async def get_scaling_group_fair_share_spec(
+    async def get_resource_group_fair_share_spec(
         self,
         resource_group_id: ResourceGroupID,
-    ) -> FairShareScalingGroupSpec:
+    ) -> FairShareResourceGroupSpec:
         """Get fair share spec for a resource group.
 
         Returns:
@@ -344,7 +344,7 @@ class FairShareRepository:
         Raises:
             ScalingGroupNotFound: If scaling group doesn't exist.
         """
-        return await self._db_source.get_scaling_group_fair_share_spec(resource_group_id)
+        return await self._db_source.get_resource_group_fair_share_spec(resource_group_id)
 
     @fair_share_repository_resilience.apply()
     async def get_user_scheduling_ranks_batch(

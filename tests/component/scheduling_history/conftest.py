@@ -193,7 +193,7 @@ async def kernel_history_seed(
     database_engine: ExtendedAsyncSAEngine,
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
     admin_user_fixture: UserFixtureData,
 ) -> AsyncIterator[KernelHistorySeed]:
@@ -244,7 +244,7 @@ async def kernel_history_seed(
                 domain_id=domain_fixture.domain_id,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
-                scaling_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 occupying_slots=slots,
                 requested_slots=slots,
@@ -264,7 +264,7 @@ async def kernel_history_seed(
                 repl_out_port=0,
                 stdin_port=0,
                 stdout_port=0,
-                scaling_group=scaling_group_name,
+                resource_group=resource_group_name,
                 resource_group_id=resource_group_id,
             )
             for kid in (kernel_id, other_kernel_id)
@@ -353,7 +353,7 @@ async def replica_group_history_seed(
     database_engine: ExtendedAsyncSAEngine,
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     admin_user_fixture: UserFixtureData,
 ) -> AsyncIterator[ReplicaGroupHistorySeed]:
     """Seed one deployment with two replica groups so the scope has rows to exclude."""
@@ -384,7 +384,7 @@ async def replica_group_history_seed(
                 session_owner=admin_user_fixture.user_uuid,
                 domain=domain_fixture.domain_name,
                 project=group_fixture,
-                resource_group=scaling_group_name,
+                resource_group=resource_group_name,
                 lifecycle_stage=EndpointLifecycle.CREATED,
                 replicas=1,
             )

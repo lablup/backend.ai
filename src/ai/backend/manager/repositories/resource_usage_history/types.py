@@ -15,17 +15,21 @@ from ai.backend.manager.data.resource_usage_history.types import (
     ProjectUsageBucketData,
     UserUsageBucketData,
 )
-from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound, ScalingGroupNotFound
+from ai.backend.manager.errors.resource import (
+    DomainNotFound,
+    ProjectNotFound,
+    ResourceGroupNotFound,
+)
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
     ProjectUsageBucketRow,
     UserUsageBucketRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
 
@@ -98,9 +102,9 @@ class DomainUsageBucketOperationScope(OperationScope):
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(
-                column=ScalingGroupRow.name,
+                column=ResourceGroupRow.name,
                 value=self.resource_group,
-                error=ScalingGroupNotFound(self.resource_group),
+                error=ResourceGroupNotFound(self.resource_group),
             ),
             ExistenceCheck(
                 column=DomainRow.name,
@@ -138,9 +142,9 @@ class ProjectUsageBucketOperationScope(OperationScope):
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(
-                column=ScalingGroupRow.name,
+                column=ResourceGroupRow.name,
                 value=self.resource_group,
-                error=ScalingGroupNotFound(self.resource_group),
+                error=ResourceGroupNotFound(self.resource_group),
             ),
             ExistenceCheck(
                 column=DomainRow.name,
@@ -186,9 +190,9 @@ class UserUsageBucketOperationScope(OperationScope):
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(
-                column=ScalingGroupRow.name,
+                column=ResourceGroupRow.name,
                 value=self.resource_group,
-                error=ScalingGroupNotFound(self.resource_group),
+                error=ResourceGroupNotFound(self.resource_group),
             ),
             ExistenceCheck(
                 column=DomainRow.name,

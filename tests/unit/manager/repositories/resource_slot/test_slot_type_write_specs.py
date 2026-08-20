@@ -35,6 +35,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -54,7 +55,6 @@ from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.resource_slot.updaters import ResourceSlotTypeUpdater
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -83,7 +83,7 @@ async def db_with_referencing_tables(
             EntityMembershipRow,
             ScopeBindingRow,
             DomainRow,
-            ScalingGroupRow,
+            ResourceGroupRow,
             UserResourcePolicyRow,
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
@@ -292,12 +292,12 @@ class TestResourceSlotTypePurger:
                 )
             )
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=resource_group_id,
                     name="conflict-sgroup",
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             await db_sess.flush()
@@ -307,7 +307,7 @@ class TestResourceSlotTypePurger:
                     status=AgentStatus.ALIVE,
                     region="local",
                     version="26.9.0",
-                    scaling_group="conflict-sgroup",
+                    resource_group="conflict-sgroup",
                     resource_group_id=resource_group_id,
                     available_slots=ResourceSlot(),
                     occupied_slots=ResourceSlot(),

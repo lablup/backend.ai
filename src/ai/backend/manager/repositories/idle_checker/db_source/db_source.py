@@ -41,8 +41,8 @@ from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
-from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
-from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
+from ai.backend.manager.models.resource_group.conditions import ResourceGroupConditions
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.row import SessionRow
@@ -152,10 +152,10 @@ class IdleCheckerDBSource:
                     querier = BatchQuerier(
                         pagination=OffsetPagination(limit=1),
                         conditions=[
-                            ScalingGroupConditions.by_ids([ResourceGroupID(spec.scope_id)])
+                            ResourceGroupConditions.by_ids([ResourceGroupID(spec.scope_id)])
                         ],
                     )
-                    result = await w.batch_query_in_global(sa.select(ScalingGroupRow), querier)
+                    result = await w.batch_query_in_global(sa.select(ResourceGroupRow), querier)
                     scope_exists = bool(result.rows)
                 case ScopeType.USER:
                     user_row = await w.query(Querier(row_class=UserRow, pk_value=spec.scope_id))

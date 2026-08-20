@@ -47,11 +47,11 @@ class KeypairResourceData:
     group_limits: list[SlotQuantity]
     group_occupied: list[SlotQuantity]
     group_remaining: list[SlotQuantity]
-    scaling_group_remaining: list[SlotQuantity]
+    resource_group_remaining: list[SlotQuantity]
 
 
 @dataclass
-class PerScalingGroupResourceData:
+class PerResourceGroupResourceData:
     """Resource data per scaling group."""
 
     using: list[SlotQuantity]
@@ -65,7 +65,7 @@ class PerScalingGroupResourceData:
         }
 
     @classmethod
-    def from_cache(cls, data: dict[str, Any]) -> PerScalingGroupResourceData:
+    def from_cache(cls, data: dict[str, Any]) -> PerResourceGroupResourceData:
         """Deserialize from cache format."""
         return cls(
             using=quantities_from_json(data[ResourceSlotState.OCCUPIED]),
@@ -90,7 +90,7 @@ class PresetAllocatabilityData:
                 "shared_memory": str(self.preset.shared_memory)
                 if self.preset.shared_memory is not None
                 else None,
-                "scaling_group_name": self.preset.scaling_group_name,
+                "scaling_group_name": self.preset.resource_group_name,
             },
             "allocatable": self.allocatable,
         }
@@ -106,7 +106,7 @@ class PresetAllocatabilityData:
                 shared_memory=int(BinarySize.from_str(data["preset"]["shared_memory"]))
                 if data["preset"]["shared_memory"] is not None
                 else None,
-                scaling_group_name=data["preset"]["scaling_group_name"],
+                resource_group_name=data["preset"]["scaling_group_name"],
             ),
             allocatable=data["allocatable"],
         )
@@ -118,7 +118,7 @@ class CheckPresetsDBData:
 
     known_slot_types: Mapping[SlotName, SlotTypes]
     keypair_data: KeypairResourceData
-    per_sgroup_data: dict[str, PerScalingGroupResourceData]
+    per_sgroup_data: dict[str, PerResourceGroupResourceData]
     presets: list[PresetAllocatabilityData]
 
 

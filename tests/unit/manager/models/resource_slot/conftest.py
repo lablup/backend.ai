@@ -19,6 +19,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -29,7 +30,6 @@ from ai.backend.manager.models.resource_slot import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -47,7 +47,7 @@ async def database_with_resource_slot_tables(
         [
             # FK dependency order: parents before children
             DomainRow,
-            ScalingGroupRow,
+            ResourceGroupRow,
             UserResourcePolicyRow,
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
@@ -71,7 +71,7 @@ async def database_with_resource_slot_tables(
 
 
 @pytest.fixture
-def scaling_group_id() -> ResourceGroupID:
+def resource_group_id() -> ResourceGroupID:
     return ResourceGroupID(uuid.uuid4())
 
 
@@ -87,15 +87,15 @@ async def domain_fixture(
 
 
 @pytest.fixture
-async def scaling_group(
+async def resource_group(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-    scaling_group_id: ResourceGroupID,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[str, None]:
     name = "default"
     async with database_with_resource_slot_tables.begin_session() as db_sess:
         db_sess.add(
-            ScalingGroupRow(
-                id=scaling_group_id,
+            ResourceGroupRow(
+                id=resource_group_id,
                 name=name,
                 description="Test scaling group",
                 is_active=True,
@@ -103,7 +103,7 @@ async def scaling_group(
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
                 use_host_network=False,
             )
         )
@@ -195,16 +195,16 @@ async def project_id(
 @pytest.fixture
 async def agent_id(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-    scaling_group: str,
-    scaling_group_id: ResourceGroupID,
+    resource_group: str,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[str, None]:
     aid = "i-test-agent-001"
     async with database_with_resource_slot_tables.begin_session() as db_sess:
         db_sess.add(
             AgentRow(
                 id=aid,
-                scaling_group=scaling_group,
-                resource_group_id=scaling_group_id,
+                resource_group=resource_group,
+                resource_group_id=resource_group_id,
                 region="local",
                 addr="tcp://127.0.0.1:6001",
                 available_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("4294967296")}),
@@ -225,8 +225,8 @@ async def kernel_id(
     domain_fixture: DomainFixtureData,
     project_id: uuid.UUID,
     user_uuid: uuid.UUID,
-    scaling_group_id: ResourceGroupID,
-    scaling_group: str,
+    resource_group_id: ResourceGroupID,
+    resource_group: str,
     agent_id: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     kid = uuid.uuid4()
@@ -238,8 +238,8 @@ async def kernel_id(
                 domain_id=domain_fixture.domain_id,
                 domain_name=domain_fixture.domain_name,
                 group_id=project_id,
-                resource_group_id=scaling_group_id,
-                scaling_group_name=scaling_group,
+                resource_group_id=resource_group_id,
+                resource_group_name=resource_group,
                 user_uuid=user_uuid,
                 occupying_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),
                 requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),
@@ -259,8 +259,8 @@ async def kernel_id(
                 repl_out_port=0,
                 stdin_port=0,
                 stdout_port=0,
-                scaling_group=scaling_group,
-                resource_group_id=scaling_group_id,
+                resource_group=resource_group,
+                resource_group_id=resource_group_id,
                 agent=agent_id,
             )
         )

@@ -74,16 +74,16 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
+    ResourceGroupCleanupConfig,
     RevisionSearchResult,
     RouteHandlerCategory,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
-    ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
-from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
+from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import DeploymentContext
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.service import EndpointNotFound
@@ -205,8 +205,8 @@ class DeploymentRepository:
         return await self._db_source.get_image_id(image)
 
     @deployment_repository_resilience.apply()
-    async def get_default_architecture_from_scaling_group(
-        self, scaling_group_name: str
+    async def get_default_architecture_from_resource_group(
+        self, resource_group_name: str
     ) -> str | None:
         """Most common architecture among live agents in a scaling group.
 
@@ -214,7 +214,9 @@ class DeploymentRepository:
         only the image canonical without an explicit architecture. Returns
         ``None`` when no live agents are attached to the scaling group.
         """
-        return await self._db_source.get_default_architecture_from_scaling_group(scaling_group_name)
+        return await self._db_source.get_default_architecture_from_resource_group(
+            resource_group_name
+        )
 
     @deployment_repository_resilience.apply()
     async def get_modified_endpoint(
@@ -300,9 +302,9 @@ class DeploymentRepository:
         return await self._db_source.get_deployments_by_ids(deployment_ids)
 
     @deployment_repository_resilience.apply()
-    async def get_scaling_group_cleanup_configs(
-        self, scaling_group_names: Sequence[str]
-    ) -> Mapping[str, ScalingGroupCleanupConfig]:
+    async def get_resource_group_cleanup_configs(
+        self, resource_group_names: Sequence[str]
+    ) -> Mapping[str, ResourceGroupCleanupConfig]:
         """
         Get route cleanup target statuses configuration for scaling groups.
 
@@ -312,7 +314,7 @@ class DeploymentRepository:
         Returns:
             Mapping of scaling group name to ScalingGroupCleanupConfig
         """
-        return await self._db_source.get_scaling_group_cleanup_configs(scaling_group_names)
+        return await self._db_source.get_resource_group_cleanup_configs(resource_group_names)
 
     @deployment_repository_resilience.apply()
     async def get_resource_group_default_deployment_options(
@@ -640,12 +642,12 @@ class DeploymentRepository:
         return await self._db_source.batch_update_desired_replicas(updates)
 
     @deployment_repository_resilience.apply()
-    async def fetch_scaling_group_proxy_targets(
+    async def fetch_resource_group_proxy_targets(
         self,
-        scaling_group: set[str],
-    ) -> Mapping[str, ScalingGroupProxyTarget | None]:
+        resource_group: set[str],
+    ) -> Mapping[str, ResourceGroupProxyTarget | None]:
         """Fetch the proxy target URL for a scaling group endpoint."""
-        return await self._db_source.fetch_scaling_group_proxy_targets(scaling_group)
+        return await self._db_source.fetch_resource_group_proxy_targets(resource_group)
 
     @deployment_repository_resilience.apply()
     async def fetch_auto_scaling_rules_by_deployment_ids(

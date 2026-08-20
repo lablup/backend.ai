@@ -21,7 +21,7 @@ from ai.backend.manager.data.agent.types import AgentData, AgentStatus
 def create_mock_agent_data(
     agent_id: str,
     status: AgentStatus = AgentStatus.ALIVE,
-    scaling_group: str = "default",
+    resource_group: str = "default",
 ) -> AgentData:
     """Create a mock AgentData for testing."""
     return AgentData(
@@ -30,7 +30,7 @@ def create_mock_agent_data(
         status=status,
         status_changed=None,
         region="test-region",
-        scaling_group=scaling_group,
+        resource_group=resource_group,
         schedulable=True,
         available_slots=ResourceSlot({SlotName("cpu"): Decimal("8")}),
         cached_occupied_slots=ResourceSlot({}),

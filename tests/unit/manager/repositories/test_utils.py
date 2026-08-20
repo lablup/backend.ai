@@ -30,6 +30,7 @@ from ai.backend.manager.models.kernel import KernelRow, kernels
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -38,7 +39,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
@@ -71,7 +71,7 @@ async def db_with_cleanup(
         [
             # FK dependency order: parents before children
             DomainRow,
-            ScalingGroupRow,
+            ResourceGroupRow,
             UserResourcePolicyRow,
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
@@ -118,14 +118,14 @@ async def session_info(
     domain_id = DomainID(uuid.uuid4())
 
     async with db_with_cleanup.begin_session() as db_sess:
-        scaling_group = ScalingGroupRow(
+        resource_group = ResourceGroupRow(
             id=resource_group_id,
             name=sgroup_name,
             driver="test",
             scheduler="test",
-            scheduler_opts=ScalingGroupOpts(),
+            scheduler_opts=ResourceGroupOpts(),
         )
-        db_sess.add(scaling_group)
+        db_sess.add(resource_group)
 
         domain = DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
         db_sess.add(domain)
@@ -174,7 +174,7 @@ async def session_info(
             domain_id=domain_id,
             domain_name=domain_name,
             resource_group_id=resource_group_id,
-            scaling_group_name=sgroup_name,
+            resource_group_name=sgroup_name,
             group_id=group_id,
             user_uuid=user_uuid,
             occupying_slots=ResourceSlot(),
@@ -188,7 +188,7 @@ async def session_info(
             domain_name=domain_name,
             group_id=group_id,
             user_uuid=user_uuid,
-            scaling_group=sgroup_name,
+            resource_group=sgroup_name,
             resource_group_id=resource_group_id,
             cluster_role=DEFAULT_ROLE,
             occupied_slots=ResourceSlot(),

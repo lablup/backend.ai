@@ -442,7 +442,7 @@ class ImageRegistry(ExtraScope):
 
 
 @dataclass(frozen=True)
-class ScalingGroup(ExtraScope):
+class ResourceGroup(ExtraScope):
     name: str
 
 

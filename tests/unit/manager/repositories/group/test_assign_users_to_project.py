@@ -36,7 +36,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -73,7 +73,7 @@ class TestAssignUsersToProject:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -528,7 +528,7 @@ class TestUnassignUsersFromProject:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,

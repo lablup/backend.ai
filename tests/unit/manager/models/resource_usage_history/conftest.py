@@ -17,6 +17,7 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -28,7 +29,6 @@ from ai.backend.manager.models.resource_usage_history import (
     ProjectUsageBucketRow,
     UserUsageBucketRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
@@ -45,7 +45,7 @@ async def database_with_usage_tables(
         [
             # FK dependency order: parents before children
             DomainRow,
-            ScalingGroupRow,
+            ResourceGroupRow,
             UserResourcePolicyRow,
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
@@ -82,15 +82,15 @@ def resource_group_id() -> ResourceGroupID:
 
 
 @pytest.fixture
-async def scaling_group(
+async def resource_group(
     database_with_usage_tables: ExtendedAsyncSAEngine,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[str, None]:
-    """Create ScalingGroupRow and return its name."""
+    """Create ResourceGroupRow and return its name."""
     name = "default"
     async with database_with_usage_tables.begin_session() as db_sess:
         db_sess.add(
-            ScalingGroupRow(
+            ResourceGroupRow(
                 id=resource_group_id,
                 name=name,
                 description="Test scaling group",
@@ -99,7 +99,7 @@ async def scaling_group(
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
                 use_host_network=False,
             )
         )
@@ -196,13 +196,13 @@ async def project_id(
 async def domain_usage_bucket_id(
     database_with_usage_tables: ExtendedAsyncSAEngine,
     domain_fixture: DomainFixtureData,
-    scaling_group: str,
+    resource_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create DomainUsageBucketRow and return its ID."""
     row = DomainUsageBucketRow(
         domain_name=domain_fixture.domain_name,
-        resource_group=scaling_group,
+        resource_group=resource_group,
         resource_group_id=resource_group_id,
         period_start=date(2024, 1, 1),
         period_end=date(2024, 1, 1),
@@ -221,13 +221,13 @@ async def domain_usage_bucket_id(
 async def domain_usage_bucket_with_capacity_id(
     database_with_usage_tables: ExtendedAsyncSAEngine,
     domain_fixture: DomainFixtureData,
-    scaling_group: str,
+    resource_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create DomainUsageBucketRow with capacity snapshot and return its ID."""
     row = DomainUsageBucketRow(
         domain_name=domain_fixture.domain_name,
-        resource_group=scaling_group,
+        resource_group=resource_group,
         resource_group_id=resource_group_id,
         period_start=date(2024, 1, 1),
         period_end=date(2024, 1, 1),
@@ -254,14 +254,14 @@ async def project_usage_bucket_id(
     database_with_usage_tables: ExtendedAsyncSAEngine,
     project_id: uuid.UUID,
     domain_fixture: DomainFixtureData,
-    scaling_group: str,
+    resource_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create ProjectUsageBucketRow and return its ID."""
     row = ProjectUsageBucketRow(
         project_id=project_id,
         domain_name=domain_fixture.domain_name,
-        resource_group=scaling_group,
+        resource_group=resource_group,
         resource_group_id=resource_group_id,
         period_start=date(2024, 1, 1),
         period_end=date(2024, 1, 1),
@@ -282,7 +282,7 @@ async def user_usage_bucket_id(
     user_uuid: uuid.UUID,
     project_id: uuid.UUID,
     domain_fixture: DomainFixtureData,
-    scaling_group: str,
+    resource_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create UserUsageBucketRow and return its ID."""
@@ -290,7 +290,7 @@ async def user_usage_bucket_id(
         user_uuid=user_uuid,
         project_id=project_id,
         domain_name=domain_fixture.domain_name,
-        resource_group=scaling_group,
+        resource_group=resource_group,
         resource_group_id=resource_group_id,
         period_start=date(2024, 1, 1),
         period_end=date(2024, 1, 1),
@@ -311,7 +311,7 @@ async def kernel_usage_record_id(
     user_uuid: uuid.UUID,
     project_id: uuid.UUID,
     domain_fixture: DomainFixtureData,
-    scaling_group: str,
+    resource_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[tuple[uuid.UUID, uuid.UUID, uuid.UUID], None]:
     """Create KernelUsageRecordRow and return (record_id, kernel_id, session_id)."""
@@ -325,7 +325,7 @@ async def kernel_usage_record_id(
         user_uuid=user_uuid,
         project_id=project_id,
         domain_name=domain_fixture.domain_name,
-        resource_group=scaling_group,
+        resource_group=resource_group,
         resource_group_id=resource_group_id,
         period_start=now,
         period_end=now,
@@ -344,7 +344,7 @@ async def kernel_usage_record_with_usage_id(
     user_uuid: uuid.UUID,
     project_id: uuid.UUID,
     domain_fixture: DomainFixtureData,
-    scaling_group: str,
+    resource_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create KernelUsageRecordRow with resource usage and return its ID."""
@@ -354,7 +354,7 @@ async def kernel_usage_record_with_usage_id(
         user_uuid=user_uuid,
         project_id=project_id,
         domain_name=domain_fixture.domain_name,
-        resource_group=scaling_group,
+        resource_group=resource_group,
         resource_group_id=resource_group_id,
         period_start=datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC),
         period_end=datetime(2024, 1, 1, 12, 5, 0, tzinfo=UTC),

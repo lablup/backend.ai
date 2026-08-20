@@ -299,7 +299,7 @@ class TestDryRunModelService:
                         model_mount_destination="/models",
                         extra_mounts={},
                         environ={},
-                        scaling_group="default",
+                        resource_group="default",
                         resources={"cpu": "2", "memory": "4G"},
                         resource_opts={},
                     ),
@@ -314,7 +314,7 @@ class TestDryRunModelService:
                         owner_role=UserRole.USER,
                         group_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                         resource_policy={},
-                        scaling_group="default",
+                        resource_group="default",
                         extra_mounts=[],
                     ),
                 ),
@@ -363,7 +363,7 @@ class TestDryRunModelServiceActionWithRevision:
             model_mount_destination="/models",
             extra_mounts={},
             environ={"API_KEY": "original-value"},
-            scaling_group="default",
+            resource_group="default",
             resources={"cpu": "1", "memory": "2G"},
             resource_opts={},
         )
@@ -379,7 +379,7 @@ class TestDryRunModelServiceActionWithRevision:
             owner_role=UserRole.USER,
             group_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
             resource_policy={},
-            scaling_group="default",
+            resource_group="default",
             extra_mounts=[],
         )
 
@@ -519,7 +519,7 @@ class TestDryRunModelServiceActionWithRevision:
         assert result.config.model_version == base_action.config.model_version
         assert result.config.model_mount_destination == base_action.config.model_mount_destination
         assert result.config.extra_mounts == base_action.config.extra_mounts
-        assert result.config.scaling_group == base_action.config.scaling_group
+        assert result.config.resource_group == base_action.config.resource_group
         assert result.config.resource_opts == base_action.config.resource_opts
 
     @pytest.fixture
@@ -797,7 +797,7 @@ class TestDryRunWithDeploymentConfigOverrides:
                 model_mount_destination="/models",
                 extra_mounts={},
                 environ={"API_VAR": "from-api-request"},  # Different from service def
-                scaling_group="default",
+                resource_group="default",
                 resources={"cpu": "1", "memory": "2G"},  # Different from service def
                 resource_opts={},
             ),
@@ -812,7 +812,7 @@ class TestDryRunWithDeploymentConfigOverrides:
                 owner_role=UserRole.USER,
                 group_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 resource_policy={},
-                scaling_group="default",
+                resource_group="default",
                 extra_mounts=[],
             ),
         )
@@ -1102,7 +1102,7 @@ class TestDryRunExtraMountsHandling:
                 model_mount_destination="/models",
                 extra_mounts={},
                 environ={},
-                scaling_group="default",
+                resource_group="default",
                 resources={"cpu": "2", "memory": "4G"},
                 resource_opts={},
             ),
@@ -1117,7 +1117,7 @@ class TestDryRunExtraMountsHandling:
                 owner_role=UserRole.USER,
                 group_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 resource_policy={},
-                scaling_group="default",
+                resource_group="default",
                 extra_mounts=[extra_mount],
             ),
         )

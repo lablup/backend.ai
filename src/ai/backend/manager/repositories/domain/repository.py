@@ -18,7 +18,7 @@ from ai.backend.manager.models.domain.purgers import DomainKernelPurger, DomainP
 from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater, DomainUpdater
 from ai.backend.manager.models.group.creators import GroupCreator
 from ai.backend.manager.models.group.row import ProjectType
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.db_source import DomainDBSource
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -77,7 +77,7 @@ class DomainRepository:
 
     @domain_repository_resilience.apply()
     async def create_domain_node(
-        self, creator: DomainCreator, scaling_group_ids: list[ResourceGroupID] | None = None
+        self, creator: DomainCreator, resource_group_ids: list[ResourceGroupID] | None = None
     ) -> DomainData:
         """Register a domain and the resource groups it may schedule on.
 
@@ -86,13 +86,13 @@ class DomainRepository:
         """
         async with self._v2_ops.write_ops() as w:
             data = await w.create_role_managed_entity(creator)
-        if scaling_group_ids:
+        if resource_group_ids:
             async with self._db.begin_session() as session:
                 await session.execute(
-                    sa.insert(ScalingGroupForDomainRow),
+                    sa.insert(ResourceGroupForDomainRow),
                     [
                         {"resource_group_id": sgroup_id, "domain_id": data.id}
-                        for sgroup_id in scaling_group_ids
+                        for sgroup_id in resource_group_ids
                     ],
                 )
         return data
@@ -110,7 +110,7 @@ class DomainRepository:
             async with self._db.begin_session() as session:
                 if sgroup_ids_to_add:
                     await session.execute(
-                        sa.insert(ScalingGroupForDomainRow),
+                        sa.insert(ResourceGroupForDomainRow),
                         [
                             {"resource_group_id": sgroup_id, "domain_id": domain_id}
                             for sgroup_id in sgroup_ids_to_add
@@ -118,9 +118,13 @@ class DomainRepository:
                     )
                 if sgroup_ids_to_remove:
                     await session.execute(
-                        sa.delete(ScalingGroupForDomainRow).where(
-                            (ScalingGroupForDomainRow.domain_id == domain_id)
-                            & (ScalingGroupForDomainRow.resource_group_id.in_(sgroup_ids_to_remove))
+                        sa.delete(ResourceGroupForDomainRow).where(
+                            (ResourceGroupForDomainRow.domain_id == domain_id)
+                            & (
+                                ResourceGroupForDomainRow.resource_group_id.in_(
+                                    sgroup_ids_to_remove
+                                )
+                            )
                         ),
                     )
         async with self._v2_ops.write_ops() as w:

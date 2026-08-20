@@ -29,13 +29,13 @@ from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -97,7 +97,7 @@ def _make_session_row(
         bootstrap_script=None,
         use_host_network=False,
         resource_group_id=resource_group_id,
-        scaling_group_name="default",
+        resource_group_name="default",
     )
 
 
@@ -121,7 +121,7 @@ def _make_kernel_row(
         domain_name=domain_name,
         group_id=group_id,
         user_uuid=user_uuid,
-        scaling_group="default",
+        resource_group="default",
         resource_group_id=resource_group_id,
         access_key=access_key,
         cluster_mode=ClusterMode.SINGLE_NODE.value,
@@ -185,7 +185,7 @@ class TestStreamRepository:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 AgentRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
@@ -247,7 +247,7 @@ class TestStreamRepository:
                 )
             )
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=test_scaling_group_id,
                     name="default",
                     is_active=True,
@@ -255,7 +255,7 @@ class TestStreamRepository:
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             user_resource_policy = UserResourcePolicyRow(

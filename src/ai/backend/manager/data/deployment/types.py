@@ -366,10 +366,10 @@ class RouteStatusTransitions:
 
 
 @dataclass
-class ScalingGroupCleanupConfig:
+class ResourceGroupCleanupConfig:
     """Cleanup configuration for a scaling group."""
 
-    scaling_group_name: str
+    resource_group_name: str
     cleanup_target_statuses: list[RouteHealthStatus]
 
 

@@ -14,7 +14,7 @@ from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePoli
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
     ImageInfo,
-    ScalingGroupNetworkInfo,
+    ResourceGroupNetworkInfo,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 
@@ -24,7 +24,7 @@ class ResourceGroupEnqueueInfo:
     """Enqueue-time information read from the target resource group."""
 
     defaults: DefaultSessionOptions
-    network: ScalingGroupNetworkInfo | None
+    network: ResourceGroupNetworkInfo | None
     allow_fractional: bool
     # Slot names served by the group's non-terminated agents (membership
     # only; unit metadata lives in the global registry SlotTypeInfo)

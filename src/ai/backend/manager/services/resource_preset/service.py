@@ -78,7 +78,9 @@ class ResourcePresetService:
         return DeleteResourcePresetActionResult(resource_preset=preset_data)
 
     async def list_presets(self, action: ListResourcePresetsAction) -> ListResourcePresetsResult:
-        preset_data_list = await self._resource_preset_repository.list_presets(action.scaling_group)
+        preset_data_list = await self._resource_preset_repository.list_presets(
+            action.resource_group
+        )
 
         presets = []
         for preset_data in preset_data_list:
@@ -116,7 +118,7 @@ class ResourcePresetService:
             group_name=action.group,
             domain_name=action.domain_name,
             resource_policy=action.resource_policy,
-            scaling_group=action.scaling_group,
+            resource_group=action.resource_group,
         )
 
         # Convert repository result to action result
@@ -138,7 +140,7 @@ class ResourcePresetService:
 
         # Convert per scaling group data to appropriate format
         per_sgroup_dict = {}
-        for sgname, sg_data in result.scaling_groups.items():
+        for sgname, sg_data in result.resource_groups.items():
             per_sgroup_dict[sgname] = {
                 ResourceSlotState.OCCUPIED: sg_data.using,
                 ResourceSlotState.AVAILABLE: sg_data.remaining,
@@ -152,6 +154,6 @@ class ResourcePresetService:
             group_limits=result.group_limits,
             group_using=result.group_using,
             group_remaining=result.group_remaining,
-            scaling_group_remaining=result.scaling_group_remaining,
-            scaling_groups=per_sgroup_dict,
+            resource_group_remaining=result.resource_group_remaining,
+            resource_groups=per_sgroup_dict,
         )

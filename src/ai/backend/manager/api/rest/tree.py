@@ -115,10 +115,10 @@ def build_api_routes(
     from .rbac.registry import register_rbac_routes
     from .resource.handler import ResourceHandler
     from .resource.registry import register_resource_routes
+    from .resource_group.handler import ResourceGroupHandler
+    from .resource_group.registry import register_resource_group_routes
     from .resource_slot.handler import ResourceSlotHandler
     from .resource_slot.registry import register_resource_slot_routes
-    from .scaling_group.handler import ScalingGroupHandler
-    from .scaling_group.registry import register_scaling_group_routes
     from .scheduling_history.handler import SchedulingHistoryHandler
     from .scheduling_history.registry import register_scheduling_history_routes
     from .service.handler import ServiceHandler
@@ -185,7 +185,7 @@ def build_api_routes(
     fair_share_handler = FairShareAPIHandler(
         fair_share=processors.fair_share,
         resource_usage=processors.resource_usage,
-        scaling_group=processors.scaling_group,
+        resource_group=processors.resource_group,
     )
     group_handler = GroupHandler(container_registry=processors.container_registry)
     groupconfig_handler = GroupConfigHandler(group=processors.group)
@@ -202,7 +202,7 @@ def build_api_routes(
         user=processors.user,
         container_registry=processors.container_registry,
     )
-    scaling_group_handler = ScalingGroupHandler(scaling_group=processors.scaling_group)
+    resource_group_handler = ResourceGroupHandler(resource_group=processors.resource_group)
     scheduling_history_handler = SchedulingHistoryHandler(
         scheduling_history=processors.scheduling_history
     )
@@ -342,7 +342,7 @@ def build_api_routes(
             route_deps,
             sub_registries=[cluster_template_reg, session_template_reg],
         ),
-        register_scaling_group_routes(scaling_group_handler, route_deps),
+        register_resource_group_routes(resource_group_handler, route_deps),
         register_error_log_routes(error_log_handler, route_deps),
         register_health_routes(health_handler, route_deps),
         register_ratelimit_routes(route_deps, valkey_rate_limit=valkey_rate_limit),

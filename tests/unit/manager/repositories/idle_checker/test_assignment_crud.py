@@ -37,11 +37,11 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -78,7 +78,7 @@ class TestIdleCheckerAssignmentRepository:
                 UserResourcePolicyRow,
                 GroupRow,
                 UserRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 RoleRow,
                 PermissionRow,
                 AssociationScopesEntitiesRow,
@@ -123,12 +123,12 @@ class TestIdleCheckerAssignmentRepository:
         resource_group_id = ResourceGroupID(uuid.uuid4())
         async with database.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=resource_group_id,
                     name=f"rg-{resource_group_id.hex[:8]}",
                     driver="test",
                     scheduler="test",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
         return resource_group_id

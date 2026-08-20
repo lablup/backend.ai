@@ -49,7 +49,7 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.models.rbac.context import ClientContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
+    from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -113,8 +113,8 @@ class DomainRow(LifecycleTimestampsMixin, Base):
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
     )
 
-    sgroup_for_domains_rows: Mapped[list[ScalingGroupForDomainRow]] = relationship(
-        "ScalingGroupForDomainRow",
+    sgroup_for_domains_rows: Mapped[list[ResourceGroupForDomainRow]] = relationship(
+        "ResourceGroupForDomainRow",
     )
 
     @classmethod

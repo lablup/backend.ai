@@ -17,7 +17,7 @@ class ResourcePresetNameLookup(DataLookup[ResourcePresetRow, ResourcePresetData]
     """Reads the preset a name refers to, within a resource group or outside one."""
 
     name: str
-    scaling_group_name: str | None = None
+    resource_group_name: str | None = None
 
     @override
     def row_class(self) -> type[ResourcePresetRow]:
@@ -28,8 +28,8 @@ class ResourcePresetNameLookup(DataLookup[ResourcePresetRow, ResourcePresetData]
         return [
             lambda: ResourcePresetRow.name == self.name,
             lambda: ResourcePresetRow.scaling_group_name.is_(None)
-            if self.scaling_group_name is None
-            else ResourcePresetRow.scaling_group_name == self.scaling_group_name,
+            if self.resource_group_name is None
+            else ResourcePresetRow.scaling_group_name == self.resource_group_name,
         ]
 
     @override

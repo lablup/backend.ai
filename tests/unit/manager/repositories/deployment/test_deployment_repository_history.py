@@ -33,6 +33,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -41,7 +42,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history import DeploymentHistoryRow, RouteHistoryRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -88,8 +88,8 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
             [
                 # FK order: parent -> child
                 DomainRow,
-                ScalingGroupRow,
-                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                ResourceGroupRow,
+                ResourcePresetRow,  # ResourceGroupRow relationship dependency
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -145,14 +145,14 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             db_sess.add(sgroup)
             await db_sess.commit()
@@ -507,8 +507,8 @@ class TestUpdateRouteStatusBulkWithHistory:
             [
                 # FK order: parent -> child
                 DomainRow,
-                ScalingGroupRow,
-                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                ResourceGroupRow,
+                ResourcePresetRow,  # ResourceGroupRow relationship dependency
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -564,14 +564,14 @@ class TestUpdateRouteStatusBulkWithHistory:
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             db_sess.add(sgroup)
             await db_sess.commit()
@@ -953,7 +953,7 @@ class TestDeploymentHistoryMergeLogic:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 ResourcePresetRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -1012,14 +1012,14 @@ class TestDeploymentHistoryMergeLogic:
 
             # Create scaling group
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=sgroup_name,
                     description="Test scaling group",
                     is_active=True,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
 
@@ -1272,7 +1272,7 @@ class TestRouteHistoryMergeLogic:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 ResourcePresetRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -1332,14 +1332,14 @@ class TestRouteHistoryMergeLogic:
 
             # Create scaling group
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=sgroup_name,
                     description="Test scaling group",
                     is_active=True,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
 

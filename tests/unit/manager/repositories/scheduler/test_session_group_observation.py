@@ -43,7 +43,7 @@ class SessionScope(TypedDict):
     domain_id: DomainID
     domain_name: str
     resource_group_id: ResourceGroupID
-    scaling_group_name: str
+    resource_group_name: str
     group_id: uuid.UUID
     user_uuid: uuid.UUID
     access_key: AccessKey
@@ -79,7 +79,7 @@ async def _create_session_group(
 async def _create_extra_agent(
     db: ExtendedAsyncSAEngine,
     *,
-    scaling_group_name: str,
+    resource_group_name: str,
     resource_group_id: ResourceGroupID,
 ) -> str:
     agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
@@ -89,7 +89,7 @@ async def _create_extra_agent(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 region="local",
-                scaling_group=scaling_group_name,
+                resource_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
                 occupied_slots=ResourceSlot(),
@@ -116,7 +116,7 @@ def session_scope(
         "domain_id": test_domain_id,
         "domain_name": test_domain.domain_name,
         "resource_group_id": test_scaling_group_id,
-        "scaling_group_name": test_scaling_group_name,
+        "resource_group_name": test_scaling_group_name,
         "group_id": test_group_id,
         "user_uuid": test_user_uuid,
         "access_key": test_access_key,
@@ -240,7 +240,7 @@ class TestSessionGroupMemberObservation:
         )
         other_agent_id = await _create_extra_agent(
             db_with_cleanup,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             resource_group_id=test_scaling_group_id,
         )
         await create_pending_session_with_kernels(
@@ -300,7 +300,7 @@ class TestSessionGroupMemberObservation:
         )
         other_agent_id = await _create_extra_agent(
             db_with_cleanup,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             resource_group_id=test_scaling_group_id,
         )
         await create_pending_session_with_kernels(

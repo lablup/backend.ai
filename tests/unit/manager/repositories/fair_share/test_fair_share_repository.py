@@ -29,6 +29,12 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.resource_group import (
+    ResourceGroupForDomainRow,
+    ResourceGroupForProjectRow,
+    ResourceGroupOpts,
+    ResourceGroupRow,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -36,12 +42,6 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupForDomainRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupOpts,
-    ScalingGroupRow,
-)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import (
@@ -85,8 +85,8 @@ class TestFairShareRepository:
             [
                 # Base rows in FK dependency order (parents before children)
                 DomainRow,
-                ScalingGroupRow,
-                ScalingGroupForDomainRow,
+                ResourceGroupRow,
+                ResourceGroupForDomainRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -95,7 +95,7 @@ class TestFairShareRepository:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
-                ScalingGroupForProjectRow,
+                ResourceGroupForProjectRow,
                 AssocGroupUserRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -122,7 +122,7 @@ class TestFairShareRepository:
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sg = ScalingGroupRow(
+            sg = ResourceGroupRow(
                 id=RESOURCE_GROUP_ID,
                 name=sg_name,
                 description="Test scaling group for fair share",
@@ -130,7 +130,7 @@ class TestFairShareRepository:
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
                 wsproxy_addr=None,
             )
             db_sess.add(sg)
@@ -163,7 +163,7 @@ class TestFairShareRepository:
 
             # Associate domain with scaling group
             db_sess.add(
-                ScalingGroupForDomainRow(resource_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
+                ResourceGroupForDomainRow(resource_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
             )
             await db_sess.commit()
 
@@ -204,7 +204,7 @@ class TestFairShareRepository:
 
             # Associate project with scaling group
             db_sess.add(
-                ScalingGroupForProjectRow(resource_group_id=RESOURCE_GROUP_ID, group=project_id)
+                ResourceGroupForProjectRow(resource_group_id=RESOURCE_GROUP_ID, group=project_id)
             )
             await db_sess.commit()
 

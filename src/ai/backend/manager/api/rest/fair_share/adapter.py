@@ -59,12 +59,12 @@ from ai.backend.manager.data.fair_share.types import (
     ProjectFairShareData,
     UserFairShareData,
 )
+from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
 from ai.backend.manager.data.resource_usage_history.types import (
     DomainUsageBucketData,
     ProjectUsageBucketData,
     UserUsageBucketData,
 )
-from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.fair_share.conditions import (
     DomainFairShareConditions,
@@ -930,8 +930,8 @@ class FairShareAdapter:
     def merge_fair_share_spec(
         self,
         request: UpdateResourceGroupFairShareSpecRequest,
-        existing: FairShareScalingGroupSpec,
-    ) -> FairShareScalingGroupSpec:
+        existing: FairShareResourceGroupSpec,
+    ) -> FairShareResourceGroupSpec:
         """Merge partial update request with existing spec.
 
         Only provided fields are updated; others retain existing values.
@@ -950,7 +950,7 @@ class FairShareAdapter:
                     merged_weights_dict[entry.resource_type] = entry.weight
             merged_resource_weights = ResourceSlot(merged_weights_dict)
 
-        return FairShareScalingGroupSpec(
+        return FairShareResourceGroupSpec(
             half_life_days=(
                 request.half_life_days
                 if request.half_life_days is not None
@@ -974,9 +974,9 @@ class FairShareAdapter:
             resource_weights=merged_resource_weights,
         )
 
-    def convert_scaling_group_spec_to_dto(
+    def convert_resource_group_spec_to_dto(
         self,
-        spec: FairShareScalingGroupSpec,
+        spec: FairShareResourceGroupSpec,
     ) -> ResourceGroupFairShareSpecDTO:
         """Convert FairShareScalingGroupSpec to DTO."""
         return ResourceGroupFairShareSpecDTO(

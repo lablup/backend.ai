@@ -101,7 +101,7 @@ class TestCreationConfigV3:
             "scalingGroup": "default",
         })
         assert cfg.resources == {"cpu": 2}
-        assert cfg.resource_opts is not None
+        assert cfg.scaling_group is not None
         assert cfg.scaling_group == "default"
 
 
@@ -113,7 +113,7 @@ class TestCreationConfigV3Template:
         assert cfg.cluster_size is None
         assert cfg.scaling_group is None
         assert cfg.resources is None
-        assert cfg.resource_opts is None
+        assert cfg.scaling_group is None
 
 
 class TestCreationConfigV4:
@@ -131,7 +131,7 @@ class TestCreationConfigV4Template:
         cfg = CreationConfigV4Template()
         assert cfg.mounts is None
         assert cfg.mount_map is None
-        assert cfg.resource_opts is None
+        assert cfg.scaling_group is None
 
 
 class TestCreationConfigV5:

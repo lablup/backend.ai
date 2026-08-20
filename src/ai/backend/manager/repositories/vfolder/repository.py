@@ -2340,14 +2340,14 @@ class VfolderRepository:
     @vfolder_repository_resilience.apply()
     async def get_alive_agent_ids(
         self,
-        scaling_group: str | None = None,
+        resource_group: str | None = None,
     ) -> list[str]:
         """Get IDs of agents with ALIVE status, optionally filtered by scaling group."""
         async with self._db.begin_readonly_session() as session:
             conn = await session.connection()
             stmt = sa.select(agents.c.id).where(agents.c.status == AgentStatus.ALIVE)
-            if scaling_group is not None:
-                stmt = stmt.where(agents.c.scaling == scaling_group)
+            if resource_group is not None:
+                stmt = stmt.where(agents.c.scaling == resource_group)
             result = await conn.execute(stmt)
             return [row.id for row in result.fetchall()]
 

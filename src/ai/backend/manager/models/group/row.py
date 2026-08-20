@@ -75,8 +75,8 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.rbac import ContainerRegistryScope
+    from ai.backend.manager.models.resource_group import ResourceGroupForProjectRow
     from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
-    from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -201,8 +201,8 @@ class GroupRow(LifecycleTimestampsMixin, Base):
     )
 
     # Relationships (defined with deferred join conditions to avoid circular imports)
-    sgroup_for_groups_rows: Mapped[list[ScalingGroupForProjectRow]] = relationship(
-        "ScalingGroupForProjectRow"
+    sgroup_for_groups_rows: Mapped[list[ResourceGroupForProjectRow]] = relationship(
+        "ResourceGroupForProjectRow"
     )
     users: Mapped[list[AssocGroupUserRow]] = relationship("AssocGroupUserRow")
     resource_policy_row: Mapped[ProjectResourcePolicyRow] = relationship("ProjectResourcePolicyRow")

@@ -41,7 +41,7 @@ def _build_kernel_values(
     group_id: uuid.UUID,
     user_uuid: uuid.UUID,
     access_key: str,
-    scaling_group: str,
+    resource_group: str,
     resource_group_id: ResourceGroupID,
     now: datetime,
 ) -> dict[str, Any]:
@@ -57,7 +57,7 @@ def _build_kernel_values(
         group_id=group_id,
         user_uuid=user_uuid,
         access_key=access_key,
-        scaling_group=scaling_group,
+        resource_group=resource_group,
         resource_group_id=resource_group_id,
         status_info="",
         occupied_slots=ResourceSlot(),
@@ -76,7 +76,7 @@ async def degraded_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING_DEGRADED session with two kernels (one RUNNING, one ERROR)."""
@@ -100,7 +100,7 @@ async def degraded_session_seed(
         group_id=group_fixture,
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
-        scaling_group=scaling_group_name,
+        resource_group=resource_group_name,
         resource_group_id=resource_group_id,
         now=now,
     )
@@ -119,7 +119,7 @@ async def degraded_session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING_DEGRADED,
                 status_info="",
@@ -172,7 +172,7 @@ async def full_lifecycle_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session with a full lifecycle status_history
@@ -202,7 +202,7 @@ async def full_lifecycle_session_seed(
         group_id=group_fixture,
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
-        scaling_group=scaling_group_name,
+        resource_group=resource_group_name,
         resource_group_id=resource_group_id,
         now=now,
     )
@@ -221,7 +221,7 @@ async def full_lifecycle_session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",

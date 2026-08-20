@@ -117,7 +117,7 @@ class AgentFilterGQL(PydanticInputMixin[AgentFilter]):
     id: StringFilter | None = None
     status: AgentStatusFilterGQL | None = None
     schedulable: bool | None = None
-    scaling_group: StringFilter | None = None
+    resource_group: StringFilter | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -358,7 +358,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
     permissions: list[AgentPermissionGQL] = gql_field(
         description="List of permissions the current authenticated user has on this agent. Determines which operations (read attributes, create sessions, etc.) the user can perform on this specific agent based on RBAC policies."
     )
-    scaling_group: str = gql_field(
+    resource_group: str = gql_field(
         description="Name of the scaling group this agent belongs to. Scaling groups are logical collections of agents used for resource scheduling, quota management, and workload isolation across different user groups or projects."
     )
 

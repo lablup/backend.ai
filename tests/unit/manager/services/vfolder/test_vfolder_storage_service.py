@@ -514,7 +514,7 @@ class TestMountHostAction:
             fs_location="/dev/sda1",
             fs_type="ext4",
             options=None,
-            scaling_group=None,
+            resource_group=None,
             fstab_path=None,
             edit_fstab=False,
         )
@@ -533,7 +533,7 @@ class TestMountHostAction:
         action = GlobalMountHostAction(
             name="test-volume",
             fs_location="/dev/sda1",
-            scaling_group="sg-01",
+            resource_group="sg-01",
         )
         await vfolder_service.mount_host(action)
 

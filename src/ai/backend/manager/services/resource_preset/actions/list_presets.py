@@ -8,7 +8,7 @@ from ai.backend.manager.services.resource_preset.actions.base import ResourcePre
 @dataclass
 class ListResourcePresetsAction(ResourcePresetAction):
     access_key: str
-    scaling_group: str | None
+    resource_group: str | None
 
     @override
     @classmethod

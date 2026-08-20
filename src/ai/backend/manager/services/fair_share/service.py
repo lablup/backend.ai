@@ -5,7 +5,7 @@ from __future__ import annotations
 from ai.backend.manager.data.fair_share import (
     FairShareSpec,
 )
-from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
+from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkUpserter,
@@ -72,14 +72,16 @@ class FairShareService:
 
     # Helper methods for creating default fair share data
 
-    def _create_default_spec(self, scaling_group_spec: FairShareScalingGroupSpec) -> FairShareSpec:
+    def _create_default_spec(
+        self, resource_group_spec: FairShareResourceGroupSpec
+    ) -> FairShareSpec:
         """Create default FairShareSpec from scaling group spec."""
         return FairShareSpec(
-            weight=scaling_group_spec.default_weight,
-            half_life_days=scaling_group_spec.half_life_days,
-            lookback_days=scaling_group_spec.lookback_days,
-            decay_unit_days=scaling_group_spec.decay_unit_days,
-            resource_weights=scaling_group_spec.resource_weights,
+            weight=resource_group_spec.default_weight,
+            half_life_days=resource_group_spec.half_life_days,
+            lookback_days=resource_group_spec.lookback_days,
+            decay_unit_days=resource_group_spec.decay_unit_days,
+            resource_weights=resource_group_spec.resource_weights,
         )
 
     # Domain Fair Share

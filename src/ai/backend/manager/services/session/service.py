@@ -485,7 +485,7 @@ class SessionService:
         owner_access_key = action.owner_access_key
         domain_name = action.domain_name
         group_name = action.group_name
-        scaling_group_name = action.scaling_group_name
+        resource_group_name = action.resource_group_name
         session_name = action.session_name
         session_type = action.session_type
         enqueue_only = action.enqueue_only
@@ -523,7 +523,7 @@ class SessionService:
                 ),
                 owner_access_key,
                 user_info.resource_policy,
-                scaling_group_name,
+                resource_group_name,
                 session_type,
                 tag,
                 enqueue_only=enqueue_only,
@@ -691,8 +691,8 @@ class SessionService:
                 param_from_template["startup_command"] = startup
 
         config_from_template: MutableMapping[Any, Any] = {}
-        if scaling_group := template["spec"].get("scaling_group"):
-            config_from_template["scaling_group"] = scaling_group
+        if resource_group := template["spec"].get("scaling_group"):
+            config_from_template["scaling_group"] = resource_group
         if mounts := template["spec"].get("mounts"):
             config_from_template["mounts"] = list(mounts.keys())
             config_from_template["mount_map"] = {
@@ -1354,10 +1354,10 @@ class SessionService:
         info = await self._session_repository.get_session_with_routing_minimal(session_id)
         session_data = info.session
 
-        if session_data.scaling_group_name is None:
+        if session_data.resource_group_name is None:
             raise ServiceUnavailable("Session has no scaling group assigned")
-        wsproxy_addr = await self._session_repository.get_scaling_group_wsproxy_addr(
-            session_data.scaling_group_name
+        wsproxy_addr = await self._session_repository.get_resource_group_wsproxy_addr(
+            session_data.resource_group_name
         )
         if not wsproxy_addr:
             raise ServiceUnavailable("No coordinator configured for this resource group")

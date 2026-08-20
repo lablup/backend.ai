@@ -82,19 +82,19 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionData,
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
+    ResourceGroupCleanupConfig,
     RevisionSearchResult,
     RouteHandlerCategory,
     RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
-    ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
+from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import (
     ContainerUserContext,
     DeploymentContext,
@@ -113,9 +113,9 @@ from ai.backend.manager.errors.deployment import (
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
     ProjectNotFound,
+    ResourceGroupNotFound,
+    ResourceGroupProxyTargetNotFound,
     RuntimeVariantNotFound,
-    ScalingGroupNotFound,
-    ScalingGroupProxyTargetNotFound,
 )
 from ai.backend.manager.errors.service import (
     AutoScalingRuleNotFound,
@@ -142,6 +142,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow, resource_groups
 from ai.backend.manager.models.resource_slot.row import (
     DeploymentRevisionResourceSlotRow,
     PresetResourceSlotRow,
@@ -150,7 +151,6 @@ from ai.backend.manager.models.resource_slot.row import (
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow, scaling_groups
 from ai.backend.manager.models.scheduling_history import (
     DeploymentHistoryRow,
     RouteHistoryRow,
@@ -513,18 +513,18 @@ class DeploymentDBSource:
         retroactively affect running deployments.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            stmt = sa.select(ScalingGroupRow.default_deployment_options).where(
-                ScalingGroupRow.name == resource_group_name
+            stmt = sa.select(ResourceGroupRow.default_deployment_options).where(
+                ResourceGroupRow.name == resource_group_name
             )
             result = await db_sess.execute(stmt)
             row = result.scalar_one_or_none()
             if row is None:
-                raise ScalingGroupNotFound(f"Resource group {resource_group_name!r} not found")
+                raise ResourceGroupNotFound(f"Resource group {resource_group_name!r} not found")
             return row
 
-    async def get_scaling_group_cleanup_configs(
-        self, scaling_group_names: Sequence[str]
-    ) -> dict[str, ScalingGroupCleanupConfig]:
+    async def get_resource_group_cleanup_configs(
+        self, resource_group_names: Sequence[str]
+    ) -> dict[str, ResourceGroupCleanupConfig]:
         """
         Get route cleanup target statuses configuration for scaling groups.
 
@@ -534,16 +534,16 @@ class DeploymentDBSource:
         Returns:
             Mapping of scaling group name to ScalingGroupCleanupConfig
         """
-        if not scaling_group_names:
+        if not resource_group_names:
             return {}
 
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = sa.select(ScalingGroupRow.name, ScalingGroupRow.scheduler_opts).where(
-                ScalingGroupRow.name.in_(scaling_group_names)
+            stmt = sa.select(ResourceGroupRow.name, ResourceGroupRow.scheduler_opts).where(
+                ResourceGroupRow.name.in_(resource_group_names)
             )
             result = await db_sess.execute(stmt)
 
-            cleanup_configs: dict[str, ScalingGroupCleanupConfig] = {}
+            cleanup_configs: dict[str, ResourceGroupCleanupConfig] = {}
             for row in result:
                 # Convert str to RouteHealthStatus
                 status_strs = row.scheduler_opts.route_cleanup_target_statuses
@@ -555,8 +555,8 @@ class DeploymentDBSource:
                         # Skip invalid status strings
                         pass
 
-                cleanup_configs[row.name] = ScalingGroupCleanupConfig(
-                    scaling_group_name=row.name, cleanup_target_statuses=statuses
+                cleanup_configs[row.name] = ResourceGroupCleanupConfig(
+                    resource_group_name=row.name, cleanup_target_statuses=statuses
                 )
 
             return cleanup_configs
@@ -1573,37 +1573,37 @@ class DeploymentDBSource:
                 usage_mode=row.usage_mode,
             )
 
-    async def fetch_scaling_group_proxy_targets(
+    async def fetch_resource_group_proxy_targets(
         self,
-        scaling_group: set[str],
-    ) -> Mapping[str, ScalingGroupProxyTarget | None]:
+        resource_group: set[str],
+    ) -> Mapping[str, ResourceGroupProxyTarget | None]:
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = (
                 sa.select(
-                    scaling_groups.c.name,
-                    scaling_groups.c.wsproxy_addr,
-                    scaling_groups.c.wsproxy_api_token,
+                    resource_groups.c.name,
+                    resource_groups.c.wsproxy_addr,
+                    resource_groups.c.wsproxy_api_token,
                 )
-                .select_from(scaling_groups)
-                .where(scaling_groups.c.name.in_(scaling_group))
+                .select_from(resource_groups)
+                .where(resource_groups.c.name.in_(resource_group))
             )
             result = await db_sess.execute(query)
             rows = result.all()
             if not rows:
-                raise ScalingGroupProxyTargetNotFound(
-                    f"Scaling group proxy target not found for groups: {scaling_group}"
+                raise ResourceGroupProxyTargetNotFound(
+                    f"Scaling group proxy target not found for groups: {resource_group}"
                 )
-            scaling_group_targets: defaultdict[str, ScalingGroupProxyTarget | None] = defaultdict(
+            resource_group_targets: defaultdict[str, ResourceGroupProxyTarget | None] = defaultdict(
                 lambda: None
             )
             for row in rows:
                 if row.wsproxy_addr is None or row.wsproxy_api_token is None:
                     continue
-                scaling_group_targets[row.name] = ScalingGroupProxyTarget(
+                resource_group_targets[row.name] = ResourceGroupProxyTarget(
                     addr=row.wsproxy_addr,
                     api_token=row.wsproxy_api_token,
                 )
-            return scaling_group_targets
+            return resource_group_targets
 
     async def fetch_auto_scaling_rules_by_deployment_ids(
         self,
@@ -2125,12 +2125,12 @@ class DeploymentDBSource:
             raise DomainNotFound(deployment_info.metadata.domain)
 
         resource_group_id = await db_sess.scalar(
-            sa.select(ScalingGroupRow.id).where(
-                ScalingGroupRow.name == deployment_info.metadata.resource_group
+            sa.select(ResourceGroupRow.id).where(
+                ResourceGroupRow.name == deployment_info.metadata.resource_group
             )
         )
         if resource_group_id is None:
-            raise ScalingGroupNotFound(
+            raise ResourceGroupNotFound(
                 f"Resource group {deployment_info.metadata.resource_group!r} not found"
             )
 
@@ -2590,8 +2590,8 @@ class DeploymentDBSource:
                 )
             return perms
 
-    async def get_default_architecture_from_scaling_group(
-        self, scaling_group_name: str
+    async def get_default_architecture_from_resource_group(
+        self, resource_group_name: str
     ) -> str | None:
         """Most common architecture among live agents in the scaling group.
 
@@ -2603,7 +2603,7 @@ class DeploymentDBSource:
             result = await session.execute(
                 sa.select(AgentRow.architecture).where(
                     sa.and_(
-                        AgentRow.scaling_group == scaling_group_name,
+                        AgentRow.scaling_group == resource_group_name,
                         AgentRow.status == AgentStatus.ALIVE,
                         AgentRow.schedulable == sa.true(),
                     )

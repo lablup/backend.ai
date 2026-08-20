@@ -21,12 +21,12 @@ from ai.backend.manager.data.fair_share import (
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
     ProjectNotFound,
-    ScalingGroupNotFound,
+    ResourceGroupNotFound,
 )
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 __all__ = (
@@ -74,9 +74,9 @@ class DomainFairShareOperationScope(OperationScope):
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
-                column=ScalingGroupRow.id,
+                column=ResourceGroupRow.id,
                 value=self.resource_group_id,
-                error=ScalingGroupNotFound(str(self.resource_group_id)),
+                error=ResourceGroupNotFound(str(self.resource_group_id)),
             ),
         ]
 
@@ -115,9 +115,9 @@ class ProjectFairShareOperationScope(OperationScope):
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
-                column=ScalingGroupRow.id,
+                column=ResourceGroupRow.id,
                 value=self.resource_group_id,
-                error=ScalingGroupNotFound(str(self.resource_group_id)),
+                error=ResourceGroupNotFound(str(self.resource_group_id)),
             ),
             ExistenceCheck(
                 column=DomainRow.name,
@@ -172,9 +172,9 @@ class UserFairShareOperationScope(OperationScope):
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
-                column=ScalingGroupRow.id,
+                column=ResourceGroupRow.id,
                 value=self.resource_group_id,
-                error=ScalingGroupNotFound(str(self.resource_group_id)),
+                error=ResourceGroupNotFound(str(self.resource_group_id)),
             ),
             ExistenceCheck(
                 column=DomainRow.name,

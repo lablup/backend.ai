@@ -56,7 +56,7 @@ from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePoli
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
     ImageInfo,
-    ScalingGroupNetworkInfo,
+    ResourceGroupNetworkInfo,
 )
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
@@ -221,7 +221,7 @@ def _spec_context(
     return SessionSpecContext(
         resource_group=ResourceGroupEnqueueInfo(
             defaults=rg_defaults if rg_defaults is not None else DefaultSessionOptions(),
-            network=ScalingGroupNetworkInfo(use_host_network=False, wsproxy_addr=None),
+            network=ResourceGroupNetworkInfo(use_host_network=False, wsproxy_addr=None),
             allow_fractional=False,
             served_slot_names=frozenset({ResourceSlotName("cpu"), ResourceSlotName("mem")}),
         ),

@@ -197,6 +197,8 @@ from ai.backend.manager.services.prometheus_query_preset.service import (
 from ai.backend.manager.services.prometheus_query_preset_category.processors import (
     PrometheusQueryPresetCategoryProcessors,
 )
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
+from ai.backend.manager.services.resource_group.service import ResourceGroupService
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
@@ -214,8 +216,6 @@ from ai.backend.manager.services.runtime_variant_preset.processors import (
     RuntimeVariantPresetProcessors,
 )
 from ai.backend.manager.services.runtime_variant_preset.service import RuntimeVariantPresetService
-from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
-from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
 from ai.backend.manager.services.scheduling_history.service import SchedulingHistoryService
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
@@ -384,8 +384,8 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.model_card.repository,
             args.storage_manager,
         ),
-        scaling_group=ScalingGroupService(
-            repositories.scaling_group.repository,
+        resource_group=ResourceGroupService(
+            repositories.resource_group.repository,
             appproxy_client_pool=args.appproxy_client_pool,
         ),
         metric=MetricService(
@@ -683,8 +683,8 @@ def create_processors(
                 FieldGroupMeta(USER_USAGE_BUCKET_FIELD_TYPE), UserUsageBucketData
             ),
         ),
-        scaling_group=ScalingGroupProcessors(
-            registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), services.scaling_group
+        resource_group=ResourceGroupProcessors(
+            registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), services.resource_group
         ),
         metric=MetricProcessors(services.metric, action_monitors, validators),
         model_serving=ModelServingProcessors(

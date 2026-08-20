@@ -13,8 +13,8 @@ from ai.backend.manager.models.association_container_registries_groups import (
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupForProjectRow, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow, ScalingGroupRow
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,
     ExportFieldType,
@@ -58,12 +58,12 @@ RESOURCE_POLICY_JOIN = JoinDef(
 
 # Scaling Group JOINs (1:N, causes duplication)
 SCALING_GROUP_FOR_PROJECT_JOIN = JoinDef(
-    table=ScalingGroupForProjectRow.__table__,
-    condition=GroupRow.id == ScalingGroupForProjectRow.group,
+    table=ResourceGroupForProjectRow.__table__,
+    condition=GroupRow.id == ResourceGroupForProjectRow.group,
 )
 SCALING_GROUP_JOIN = JoinDef(
-    table=ScalingGroupRow.__table__,
-    condition=ScalingGroupForProjectRow.resource_group_id == ScalingGroupRow.id,
+    table=ResourceGroupRow.__table__,
+    condition=ResourceGroupForProjectRow.resource_group_id == ResourceGroupRow.id,
 )
 SCALING_GROUP_JOINS = (SCALING_GROUP_FOR_PROJECT_JOIN, SCALING_GROUP_JOIN)
 
@@ -222,7 +222,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Scaling Group Name",
         description="Scaling group name",
         field_type=ExportFieldType.STRING,
-        column=ScalingGroupRow.name,
+        column=ResourceGroupRow.name,
         joins=SCALING_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -230,7 +230,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Scaling Group Description",
         description="Scaling group description",
         field_type=ExportFieldType.STRING,
-        column=ScalingGroupRow.description,
+        column=ResourceGroupRow.description,
         joins=SCALING_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -238,7 +238,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Scaling Group Is Active",
         description="Scaling group active status",
         field_type=ExportFieldType.BOOLEAN,
-        column=ScalingGroupRow.is_active,
+        column=ResourceGroupRow.is_active,
         joins=SCALING_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -246,7 +246,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Scaling Group Is Public",
         description="Scaling group public status",
         field_type=ExportFieldType.BOOLEAN,
-        column=ScalingGroupRow.is_public,
+        column=ResourceGroupRow.is_public,
         joins=SCALING_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -254,7 +254,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Scaling Group Driver",
         description="Scaling group driver type",
         field_type=ExportFieldType.STRING,
-        column=ScalingGroupRow.driver,
+        column=ResourceGroupRow.driver,
         joins=SCALING_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -262,7 +262,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Scaling Group Scheduler",
         description="Scaling group scheduler type",
         field_type=ExportFieldType.STRING,
-        column=ScalingGroupRow.scheduler,
+        column=ResourceGroupRow.scheduler,
         joins=SCALING_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -270,7 +270,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Scaling Group Created At",
         description="Scaling group creation time",
         field_type=ExportFieldType.DATETIME,
-        column=ScalingGroupRow.created_at,
+        column=ResourceGroupRow.created_at,
         formatter=lambda v: v.isoformat() if v else "",
         joins=SCALING_GROUP_JOINS,
     ),

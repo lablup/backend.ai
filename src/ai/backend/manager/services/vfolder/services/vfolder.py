@@ -1029,7 +1029,7 @@ class VFolderService:
             for proxy_name, volume_data in volumes
         ]
         get_sftp_tasks = [
-            self._storage_manager.get_sftp_scaling_groups(proxy_name)
+            self._storage_manager.get_sftp_resource_groups(proxy_name)
             for proxy_name, volume_data in volumes
         ]
 
@@ -1039,7 +1039,7 @@ class VFolderService:
         )
 
         volume_info: dict[str, Any] = {}
-        for (proxy_name, volume_data), usage, sftp_scaling_groups in zip(
+        for (proxy_name, volume_data), usage, sftp_resource_groups in zip(
             volumes,
             fetch_results,
             sftp_results,
@@ -1050,7 +1050,7 @@ class VFolderService:
                 "backend": volume_data["backend"],
                 "capabilities": volume_data["capabilities"],
                 "usage": usage,
-                "sftp_scaling_groups": sftp_scaling_groups,
+                "sftp_scaling_groups": sftp_resource_groups,
             }
 
         return SearchHostsActionResult(
@@ -1297,14 +1297,14 @@ class VFolderService:
             message="Managers do not have mountpoints since v20.09.",
         )
 
-        agent_ids = await self._vfolder_repository.get_alive_agent_ids(action.scaling_group)
+        agent_ids = await self._vfolder_repository.get_alive_agent_ids(action.resource_group)
 
         mount_params = {
             "fs_location": action.fs_location,
             "name": action.name,
             "fs_type": action.fs_type,
             "options": action.options,
-            "scaling_group": action.scaling_group,
+            "scaling_group": action.resource_group,
             "fstab_path": action.fstab_path,
             "edit_fstab": action.edit_fstab,
         }
@@ -1361,7 +1361,7 @@ class VFolderService:
         if action.name in mounted_names:
             raise VFolderOperationFailed("Target host is used in sessions")
 
-        agent_ids = await self._vfolder_repository.get_alive_agent_ids(action.scaling_group)
+        agent_ids = await self._vfolder_repository.get_alive_agent_ids(action.resource_group)
 
         manager_result = MountResultData(
             success=True,
@@ -1370,7 +1370,7 @@ class VFolderService:
 
         umount_params = {
             "name": action.name,
-            "scaling_group": action.scaling_group,
+            "scaling_group": action.resource_group,
             "fstab_path": action.fstab_path,
             "edit_fstab": action.edit_fstab,
         }

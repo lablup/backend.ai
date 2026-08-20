@@ -112,7 +112,7 @@ class TestRunValidationUsesKeypairResourcePolicy:
                 owner_role=UserRole.USER,
                 group_id=uuid.UUID("22222222-2222-2222-2222-222222222222"),
                 resource_policy=action.keypair_resource_policy,
-                scaling_group="default",
+                resource_group="default",
                 extra_mounts=[],
             )
 

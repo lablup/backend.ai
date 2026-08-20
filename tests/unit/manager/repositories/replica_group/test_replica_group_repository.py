@@ -45,6 +45,7 @@ from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
 from ai.backend.manager.models.replica_group_history import ReplicaGroupHistoryRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -52,7 +53,6 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -164,7 +164,7 @@ class TestReplicaGroupRepository:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 ResourcePresetRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
@@ -211,14 +211,14 @@ class TestReplicaGroupRepository:
                 )
             )
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=sgroup_name,
                     description="Test scaling group",
                     is_active=True,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             db_sess.add(
@@ -382,7 +382,7 @@ class TestReplicaGroupRepository:
         replica_group_repository: ReplicaGroupRepository,
         two_group_ids: tuple[ReplicaGroupID, ReplicaGroupID],
     ) -> None:
-        scaling_group_id, _ = two_group_ids
+        resource_group_id, _ = two_group_ids
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10),
             conditions=[
@@ -393,7 +393,7 @@ class TestReplicaGroupRepository:
         result = await replica_group_repository.search_scaling_scheduling_views(querier)
 
         assert len(result) == 1
-        assert result[0].group_id == scaling_group_id
+        assert result[0].group_id == resource_group_id
         assert result[0].desired_current_replica_count == 1
         assert result[0].scaling_status is ReplicaGroupScalingStatus.SCALING
 

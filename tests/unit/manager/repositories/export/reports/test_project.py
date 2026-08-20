@@ -25,12 +25,12 @@ from ai.backend.manager.models.association_container_registries_groups import (
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupForProjectRow,
-    ScalingGroupOpts,
-    ScalingGroupRow,
+from ai.backend.manager.models.resource_group import (
+    ResourceGroupForProjectRow,
+    ResourceGroupOpts,
+    ResourceGroupRow,
 )
+from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,
@@ -171,11 +171,11 @@ class TestJoinDefinitions:
 
     def test_scaling_group_for_project_join_table(self) -> None:
         """ScalingGroupForProject JOIN should use correct table."""
-        assert SCALING_GROUP_FOR_PROJECT_JOIN.table is ScalingGroupForProjectRow.__table__
+        assert SCALING_GROUP_FOR_PROJECT_JOIN.table is ResourceGroupForProjectRow.__table__
 
     def test_scaling_group_join_table(self) -> None:
         """ScalingGroup JOIN should use correct table."""
-        assert SCALING_GROUP_JOIN.table is ScalingGroupRow.__table__
+        assert SCALING_GROUP_JOIN.table is ResourceGroupRow.__table__
 
     def test_container_registry_join_table(self) -> None:
         """Container registry JOIN should use correct table."""
@@ -346,7 +346,7 @@ class TestBuildProjectQueryWithRealReport:
         )
 
         compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        # 4 LEFT OUTER JOINs: 1 (resource_policy) + 2 (scaling_group) + 1 (container_registry)
+        # 4 LEFT OUTER JOINs: 1 (resource_policy) + 2 (resource_group) + 1 (container_registry)
         assert "project_resource_policies" in compiled
         assert "sgroups_for_groups" in compiled
         assert "scaling_groups" in compiled
@@ -419,7 +419,7 @@ class TestProjectQuerySQLGenerationForBugReproduction:
         )
 
         compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        # 2 JOINs for scaling group (sgroups_for_groups + scaling_groups)
+        # 2 JOINs for scaling group (sgroups_for_groups + resource_groups)
         # 1 JOIN for container registry (with EXISTS subquery for associations)
         assert compiled.count("LEFT OUTER JOIN") == 3
 
@@ -466,7 +466,7 @@ class TestProjectQuerySQLGenerationForBugReproduction:
         )
 
         compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        # Exactly 4 JOINs: 1 (resource_policy) + 2 (scaling_group) + 1 (container_registry)
+        # Exactly 4 JOINs: 1 (resource_policy) + 2 (resource_group) + 1 (container_registry)
         assert compiled.count("LEFT OUTER JOIN") == 4
 
     def test_all_joins_are_left_outer_not_inner(self, adapter: ExportAdapter) -> None:
@@ -627,7 +627,7 @@ class TestProjectQuerySQLGenerationForBugReproduction:
         """sgroups_for_groups must appear before scaling_groups in the JOIN chain.
 
         SCALING_GROUP_JOIN depends on sgroups_for_groups already being joined,
-        because its condition references ScalingGroupForProjectRow.resource_group_id.
+        because its condition references ResourceGroupForProjectRow.resource_group_id.
         """
         query = adapter.build_project_query(
             report=PROJECT_REPORT,
@@ -702,7 +702,7 @@ class TestJoinDefIdentityAndHashing:
         """
         adapter = ExportAdapter()
         # Build two separate fields both using SCALING_GROUP_JOINS
-        # scaling_group_name, scaling_group_description, scaling_group_is_active all
+        # resource_group_name, resource_group_description, resource_group_is_active all
         # reference the same SCALING_GROUP_JOINS tuple → same JoinDef objects
         fields_map = {f.key: f for f in PROJECT_REPORT.fields}
         selected_fields = [
@@ -753,8 +753,8 @@ class TestProjectExportExecuteStreamingDB:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 GroupRow,
-                ScalingGroupRow,
-                ScalingGroupForProjectRow,
+                ResourceGroupRow,
+                ResourceGroupForProjectRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
             ],
@@ -810,7 +810,7 @@ class TestProjectExportExecuteStreamingDB:
             await db_sess.flush()
 
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=rg_id,
                     name=rg_name,
                     description="",
@@ -818,13 +818,13 @@ class TestProjectExportExecuteStreamingDB:
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                     wsproxy_addr=None,
                 )
             )
             await db_sess.flush()
 
-            db_sess.add(ScalingGroupForProjectRow(resource_group_id=rg_id, group=project_id))
+            db_sess.add(ResourceGroupForProjectRow(resource_group_id=rg_id, group=project_id))
             await db_sess.flush()
 
             db_sess.add(
@@ -1025,8 +1025,8 @@ class TestGlobalContainerRegistryExport:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 GroupRow,
-                ScalingGroupRow,
-                ScalingGroupForProjectRow,
+                ResourceGroupRow,
+                ResourceGroupForProjectRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
             ],

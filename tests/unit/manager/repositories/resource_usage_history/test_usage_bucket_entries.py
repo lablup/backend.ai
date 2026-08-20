@@ -31,6 +31,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -43,7 +44,6 @@ from ai.backend.manager.models.resource_usage_history import (
     UsageBucketEntryRow,
     UserUsageBucketRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -69,7 +69,7 @@ class TestUsageBucketEntries:
             [
                 # Base rows in FK dependency order (parents before children)
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,

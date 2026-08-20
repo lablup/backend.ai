@@ -6,8 +6,8 @@ from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.services.session.resource_allocation.actions.check_preset_availability import (
@@ -69,7 +69,7 @@ class ResourceAllocationProcessors:
         user: ProcessorGroup[UserData],
         project: ProcessorGroup[GroupData],
         domain: ProcessorGroup[DomainData],
-        resource_group: ProcessorGroup[ScalingGroupData],
+        resource_group: ProcessorGroup[ResourceGroupData],
         session: ProcessorGroup[SessionData],
         resource_preset: ProcessorGroup[ResourcePresetData],
         service: ResourceAllocationService,

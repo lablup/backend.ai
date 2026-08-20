@@ -248,7 +248,7 @@ def _create_kernel_info(
             cluster_hostname="kernel-0",
         ),
         resource=ResourceInfo(
-            scaling_group="default",
+            resource_group="default",
             resource_group_id=ResourceGroupID(uuid4()),
             agent=aid,
             agent_addr=f"tcp://{aid}:5001" if aid else None,

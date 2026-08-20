@@ -28,12 +28,12 @@ from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow, SessionStatus, SessionTypes
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
@@ -67,7 +67,7 @@ class TestDomainPurgersIntegration:
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
                 GroupRow,
@@ -194,7 +194,7 @@ class TestDomainPurgersIntegration:
         sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
         sgroup_id = ResourceGroupID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as session:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 name=sgroup_name,
                 id=sgroup_id,
                 description="Test scaling group",
@@ -202,7 +202,7 @@ class TestDomainPurgersIntegration:
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             session.add(sgroup)
             await session.flush()
@@ -215,7 +215,7 @@ class TestDomainPurgersIntegration:
                     domain_name=sample_domain.domain_name,
                     domain_id=sample_domain.domain_id,
                     group_id=sample_group.id,
-                    scaling_group_name=sgroup_name,
+                    resource_group_name=sgroup_name,
                     resource_group_id=sgroup_id,
                     user_uuid=sample_user.uuid,
                     occupying_slots=ResourceSlot({}),
@@ -251,7 +251,7 @@ class TestDomainPurgersIntegration:
                     domain_name=sample_domain.domain_name,
                     group_id=sample_group.id,
                     user_uuid=sample_user.uuid,
-                    scaling_group=sess.scaling_group_name,
+                    resource_group=sess.resource_group_id,
                     resource_group_id=sess.resource_group_id,
                     occupied_slots=ResourceSlot({}),
                     requested_slots=ResourceSlot({}),

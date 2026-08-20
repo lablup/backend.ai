@@ -185,7 +185,7 @@ class TestCheckPresetsPayload:
         assert payload.group_limits == {"cpu": "100", "mem": "500g"}
         assert payload.group_using == {"cpu": "20", "mem": "80g"}
         assert payload.group_remaining == {"cpu": "80", "mem": "420g"}
-        assert payload.scaling_group_remaining == {"cpu": "50", "mem": "200g"}
+        assert payload.group_remaining == {"cpu": "50", "mem": "200g"}
         assert "default" in payload.scaling_groups
 
     def test_has_all_required_fields(self) -> None:
@@ -210,7 +210,7 @@ class TestCheckPresetsPayload:
         assert restored.group_limits == payload.group_limits
         assert restored.group_using == payload.group_using
         assert restored.group_remaining == payload.group_remaining
-        assert restored.scaling_group_remaining == payload.scaling_group_remaining
+        assert restored.group_remaining == payload.group_remaining
         assert restored.scaling_groups == payload.scaling_groups
 
     def test_json_has_all_resource_limit_keys(self) -> None:

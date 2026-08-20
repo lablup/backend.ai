@@ -38,12 +38,12 @@ from ai.backend.manager.models.image.row import (
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
@@ -58,7 +58,7 @@ PROJECT_RESOURCE_POLICY_NAME = "test-project-policy"
 
 _ORM_CLUSTER = (
     AgentRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
 )
 
 

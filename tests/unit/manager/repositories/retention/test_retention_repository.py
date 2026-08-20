@@ -72,6 +72,7 @@ from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -86,7 +87,6 @@ from ai.backend.manager.models.resource_usage_history.row import (
 )
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.routing.row import RouteStatus, RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import (
     DeploymentHistoryRow,
     KernelSchedulingHistoryRow,
@@ -192,13 +192,13 @@ async def _seed_scope(engine: ExtendedAsyncSAEngine) -> _Scope:
             DomainRow(id=scope.domain_id, name=scope.domain_name, description=None, is_active=True)
         )
         sess.add(
-            ScalingGroupRow(
+            ResourceGroupRow(
                 name=scope.sgroup_name,
                 id=scope.sgroup_id,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
         )
         sess.add(
@@ -538,7 +538,7 @@ class TestSessionsRetention:
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
                 GroupRow,
@@ -587,13 +587,13 @@ class TestSessionsRetention:
                 )
             )
             sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=scope.sgroup_name,
                     id=scope.sgroup_id,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             sess.add(
@@ -654,7 +654,7 @@ class TestSessionsRetention:
                     domain_name=scope.domain_name,
                     domain_id=scope.domain_id,
                     group_id=scope.group_id,
-                    scaling_group_name=scope.sgroup_name,
+                    resource_group_name=scope.sgroup_name,
                     resource_group_id=scope.sgroup_id,
                     user_uuid=scope.user_uuid,
                     occupying_slots=ResourceSlot({}),
@@ -685,7 +685,7 @@ class TestSessionsRetention:
                     domain_name=scope.domain_name,
                     group_id=scope.group_id,
                     user_uuid=scope.user_uuid,
-                    scaling_group=scope.sgroup_name,
+                    resource_group=scope.sgroup_name,
                     resource_group_id=scope.sgroup_id,
                     occupied_slots=ResourceSlot({}),
                     requested_slots=ResourceSlot({}),
@@ -920,7 +920,7 @@ class TestDeploymentsRetention:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 GroupRow,
                 EndpointRow,
                 DeploymentPolicyRow,
@@ -947,13 +947,13 @@ class TestDeploymentsRetention:
                 )
             )
             sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=scope.sgroup_name,
                     id=scope.sgroup_id,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             sess.add(
@@ -1126,7 +1126,7 @@ class TestDeploymentsTerminalChildCleanup:
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
                 GroupRow,
@@ -1165,13 +1165,13 @@ class TestDeploymentsTerminalChildCleanup:
                 )
             )
             sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=scope.sgroup_name,
                     id=scope.sgroup_id,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             sess.add(
@@ -1364,7 +1364,7 @@ class TestDeploymentsSessionGroupCleanup:
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
                 GroupRow,
@@ -1464,7 +1464,7 @@ class TestDeploymentsSessionGroupCleanup:
                     domain_name=scope.domain_name,
                     domain_id=scope.domain_id,
                     group_id=scope.group_id,
-                    scaling_group_name=scope.sgroup_name,
+                    resource_group_name=scope.sgroup_name,
                     resource_group_id=scope.sgroup_id,
                     user_uuid=scope.user_uuid,
                     occupying_slots=ResourceSlot({}),

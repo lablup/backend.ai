@@ -16,7 +16,7 @@ class CreateDomainNodeAction(BaseGlobalAction):
 
     creator: DomainCreator
     user_info: UserInfo
-    scaling_group_ids: list[ResourceGroupID] | None = None
+    resource_group_ids: list[ResourceGroupID] | None = None
 
     @override
     @classmethod

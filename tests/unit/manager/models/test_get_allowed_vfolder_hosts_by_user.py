@@ -35,12 +35,12 @@ from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
     UserRole,
@@ -95,7 +95,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,

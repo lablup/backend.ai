@@ -84,10 +84,10 @@ class TestSearchAgents:
         self,
         admin_registry: BackendAIClientRegistry,
         agent_fixture: str,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
     ) -> None:
         """Filtering by resource_group returns agents in that scaling group."""
-        sgroup_name = scaling_group_name
+        sgroup_name = resource_group_name
         result = await admin_registry.agent.search_agents(
             SearchAgentsRequest(
                 filter=AgentFilter(
@@ -140,11 +140,11 @@ class TestSearchAgents:
         self,
         admin_registry: BackendAIClientRegistry,
         agent_fixture: str,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
     ) -> None:
         """Compound filters (status + resource_group) return intersection of conditions."""
         # Search with both status=ALIVE and resource_group filters
-        sgroup_name = scaling_group_name
+        sgroup_name = resource_group_name
         result = await admin_registry.agent.search_agents(
             SearchAgentsRequest(
                 filter=AgentFilter(

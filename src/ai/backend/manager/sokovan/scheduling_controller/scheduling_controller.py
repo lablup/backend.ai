@@ -463,7 +463,7 @@ class SchedulingController:
                 continue
             seen_ids.add(image_id)
             image_ids.append(image_id)
-        # An unknown resource group (ScalingGroupNotFound) is a request error,
+        # An unknown resource group (ResourceGroupNotFound) is a request error,
         # not a per-kernel fitting outcome, so let it propagate to the caller.
         fetched = await self._repository.fetch_compute_schedule_data(resource_group_id, image_ids)
         prepared = await self._spec_preparer.prepare_resources(draft, fetched.spec_context)

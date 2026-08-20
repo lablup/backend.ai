@@ -68,7 +68,7 @@ class TestPresetCRUD:
         name: str | None = None,
         resource_slots: ResourceSlot | None = None,
         shared_memory: str | None = None,
-        scaling_group_name: str | None = None,
+        resource_group_name: str | None = None,
     ) -> ResourcePresetData:
         """Create a preset through the processor and return the data."""
         if name is None:
@@ -82,7 +82,7 @@ class TestPresetCRUD:
                     name=name,
                     resource_slots=resource_slots,
                     shared_memory=shared_memory,
-                    scaling_group_name=scaling_group_name,
+                    resource_group_name=resource_group_name,
                 )
             )
         )
@@ -93,12 +93,12 @@ class TestPresetCRUD:
         self,
         processors: ResourcePresetProcessors,
         access_key: str,
-        scaling_group: str | None = None,
+        resource_group: str | None = None,
     ) -> list[Any]:
         """List presets through the processor layer."""
         action = ListResourcePresetsAction(
             access_key=access_key,
-            scaling_group=scaling_group,
+            resource_group=resource_group,
         )
         result = await processors.list_presets.run(action)
         return result.presets
@@ -335,7 +335,7 @@ class TestCheckPresets:
                     name=name,
                     resource_slots=resource_slots,
                     shared_memory=None,
-                    scaling_group_name=None,
+                    resource_group_name=None,
                 )
             )
         )
@@ -432,7 +432,7 @@ class TestCheckPresets:
         result = await admin_registry.infra.check_presets(
             CheckPresetsRequest(group=group_name_fixture)
         )
-        assert isinstance(result.scaling_group_remaining, dict)
+        assert isinstance(result.group_remaining, dict)
         assert isinstance(result.scaling_groups, dict)
 
     async def test_s6_check_presets_with_scaling_group_filter(
@@ -440,7 +440,7 @@ class TestCheckPresets:
         resource_preset_processors: ResourcePresetProcessors,
         admin_registry: BackendAIClientRegistry,
         group_name_fixture: str,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         database_fixture: None,
     ) -> None:
         """S-6: check_presets with scaling_group filter returns only that SG."""
@@ -452,14 +452,14 @@ class TestCheckPresets:
         result = await admin_registry.infra.check_presets(
             CheckPresetsRequest(
                 group=group_name_fixture,
-                scaling_group=scaling_group_name,
+                scaling_group=resource_group_name,
             )
         )
         assert isinstance(result, CheckPresetsResponse)
         assert isinstance(result.presets, list)
-        # When filtered, scaling_groups should contain only the specified SG
+        # When filtered, resource_groups should contain only the specified SG
         if result.scaling_groups:
-            assert scaling_group_name in result.scaling_groups
+            assert resource_group_name in result.scaling_groups
             assert len(result.scaling_groups) == 1
 
     async def test_s7_check_presets_no_sessions_zero_usage(

@@ -1132,7 +1132,7 @@ class SessionAdapter(BaseAdapter):
             ),
             resource=SessionResourceInfoGQLDTO(
                 allocation=ResourceAllocationGQLDTO(requested=requested, used=occupied),
-                resource_group_name=data.scaling_group_name,
+                resource_group_name=data.resource_group_name,
             ),
             lifecycle=SessionLifecycleInfoGQLDTO(
                 status=_fold_session_status(data.status),
@@ -1214,7 +1214,7 @@ class SessionAdapter(BaseAdapter):
             ),
             resource=KernelResourceInfoGQLDTO(
                 agent_id=info.resource.agent,
-                resource_group_name=info.resource.scaling_group,
+                resource_group_name=info.resource.resource_group,
                 container_id=info.resource.container_id,
                 allocation=ResourceAllocationGQLDTO(requested=requested, used=occupied),
                 shares=shares,

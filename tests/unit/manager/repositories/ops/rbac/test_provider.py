@@ -62,12 +62,12 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -113,7 +113,7 @@ _ORM_CLUSTER = (
     ObjectPermissionRow,
     PermissionRow,
     RoleRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
     UserResourcePolicyRow,
     UserRoleRow,
     UserRow,
@@ -2018,7 +2018,7 @@ async def scope_name_seed(
         [
             # FK dependency order: parents before children
             DomainRow,
-            ScalingGroupRow,
+            ResourceGroupRow,
             UserResourcePolicyRow,
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
@@ -2039,7 +2039,7 @@ async def scope_name_seed(
         async with database_connection.begin_session() as db_sess:
             db_sess.add_all([
                 DomainRow(name=domain_name, id=domain_id),
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=resource_group_id,
                     name=resource_group_name,
                     driver="static",

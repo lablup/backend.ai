@@ -38,6 +38,7 @@ from ai.backend.manager.models.rbac_models.orders import (
     UserScopeOrders,
 )
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -46,7 +47,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import PasswordHashAlgorithm, PasswordInfo, UserRow, UserStatus
@@ -83,7 +83,7 @@ class TestSearchDomainScopes:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -345,7 +345,7 @@ class TestSearchProjectScopes:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -563,7 +563,7 @@ class TestSearchUserScopes:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -783,7 +783,7 @@ class TestSearchGlobalScope:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -834,7 +834,7 @@ class TestSearchScopesEmptyResult:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,

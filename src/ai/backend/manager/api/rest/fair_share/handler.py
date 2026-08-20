@@ -69,12 +69,12 @@ from ai.backend.common.dto.manager.fair_share import (
     UserUsageBucketFilter,
 )
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.manager.models.resource_group.conditions import ResourceGroupConditions
 from ai.backend.manager.models.resource_usage_history.searchers import (
     DomainUsageBucketSearcher,
     ProjectUsageBucketSearcher,
     UserUsageBucketSearcher,
 )
-from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.fair_share.types import (
@@ -102,6 +102,14 @@ from ai.backend.manager.services.fair_share.actions import (
     UpsertUserFairShareWeightAction,
     UserWeightInput,
 )
+from ai.backend.manager.services.resource_group.actions.list_resource_groups import (
+    SearchResourceGroupsAction,
+)
+from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
+from ai.backend.manager.services.resource_group.actions.update_fair_share_spec import (
+    ResourceWeightInput,
+    UpdateFairShareSpecAction,
+)
 from ai.backend.manager.services.resource_usage.actions.global_search_domain_usage_buckets import (
     GlobalSearchDomainUsageBucketsAction,
 )
@@ -111,21 +119,13 @@ from ai.backend.manager.services.resource_usage.actions.global_search_project_us
 from ai.backend.manager.services.resource_usage.actions.global_search_user_usage_buckets import (
     GlobalSearchUserUsageBucketsAction,
 )
-from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
-    SearchScalingGroupsAction,
-)
-from ai.backend.manager.services.scaling_group.actions.lookup import LookupResourceGroupAction
-from ai.backend.manager.services.scaling_group.actions.update_fair_share_spec import (
-    ResourceWeightInput,
-    UpdateFairShareSpecAction,
-)
 
 from .adapter import FairShareAdapter
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.fair_share.processors import FairShareProcessors
+    from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
     from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
-    from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 
 
 class FairShareAPIHandler:
@@ -136,15 +136,15 @@ class FairShareAPIHandler:
         *,
         fair_share: FairShareProcessors,
         resource_usage: ResourceUsageProcessors,
-        scaling_group: ScalingGroupProcessors,
+        resource_group: ResourceGroupProcessors,
     ) -> None:
         self._fair_share = fair_share
         self._resource_usage = resource_usage
-        self._scaling_group = scaling_group
+        self._resource_group = resource_group
         self._adapter = FairShareAdapter()
 
     async def _resolve_resource_group_id(self, resource_group: str) -> ResourceGroupID:
-        result = await self._scaling_group.lookup.run(
+        result = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(resource_group))
         )
         return result.data.id
@@ -724,7 +724,7 @@ class FairShareAPIHandler:
         body: BodyParam[UpsertDomainFairShareWeightRequest],
     ) -> APIResponse:
         """Upsert domain fair share weight."""
-        result = await self._scaling_group.lookup.run(
+        result = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(path.parsed.resource_group))
         )
         action_result = await self._fair_share.upsert_domain_fair_share_weight.run(
@@ -748,7 +748,7 @@ class FairShareAPIHandler:
         body: BodyParam[UpsertProjectFairShareWeightRequest],
     ) -> APIResponse:
         """Upsert project fair share weight."""
-        result = await self._scaling_group.lookup.run(
+        result = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(path.parsed.resource_group))
         )
         action_result = await self._fair_share.upsert_project_fair_share_weight.run(
@@ -773,7 +773,7 @@ class FairShareAPIHandler:
         body: BodyParam[UpsertUserFairShareWeightRequest],
     ) -> APIResponse:
         """Upsert user fair share weight."""
-        result = await self._scaling_group.lookup.run(
+        result = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(path.parsed.resource_group))
         )
         action_result = await self._fair_share.upsert_user_fair_share_weight.run(
@@ -807,7 +807,7 @@ class FairShareAPIHandler:
             for entry in body.parsed.inputs
         ]
 
-        result = await self._scaling_group.lookup.run(
+        result = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(body.parsed.resource_group))
         )
         action_result = await self._fair_share.bulk_upsert_domain_fair_share_weight.run(
@@ -838,7 +838,7 @@ class FairShareAPIHandler:
             for entry in body.parsed.inputs
         ]
 
-        result = await self._scaling_group.lookup.run(
+        result = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(body.parsed.resource_group))
         )
         action_result = await self._fair_share.bulk_upsert_project_fair_share_weight.run(
@@ -870,7 +870,7 @@ class FairShareAPIHandler:
             for entry in body.parsed.inputs
         ]
 
-        result = await self._scaling_group.lookup.run(
+        result = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(body.parsed.resource_group))
         )
         action_result = await self._fair_share.bulk_upsert_user_fair_share_weight.run(
@@ -899,23 +899,23 @@ class FairShareAPIHandler:
         )
         querier = BatchQuerier(
             pagination=NoPagination(),
-            conditions=[ScalingGroupConditions.by_name_equals(name_spec)],
+            conditions=[ResourceGroupConditions.by_name_equals(name_spec)],
         )
-        search_result = await self._scaling_group.search_scaling_groups.run(
-            SearchScalingGroupsAction(querier=querier)
+        search_result = await self._resource_group.search_resource_groups.run(
+            SearchResourceGroupsAction(querier=querier)
         )
 
-        if not search_result.scaling_groups:
+        if not search_result.resource_groups:
             raise web.HTTPNotFound(
                 reason=f"Resource group '{path.parsed.resource_group}' not found"
             )
 
-        scaling_group = search_result.scaling_groups[0]
+        resource_group = search_result.resource_groups[0]
 
         resp = GetResourceGroupFairShareSpecResponse(
-            resource_group=scaling_group.name,
-            fair_share_spec=self._adapter.convert_scaling_group_spec_to_dto(
-                scaling_group.fair_share_spec
+            resource_group=resource_group.name,
+            fair_share_spec=self._adapter.convert_resource_group_spec_to_dto(
+                resource_group.fair_share_spec
             ),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
@@ -929,16 +929,18 @@ class FairShareAPIHandler:
             pagination=NoPagination(),
             conditions=[],
         )
-        search_result = await self._scaling_group.search_scaling_groups.run(
-            SearchScalingGroupsAction(querier=querier)
+        search_result = await self._resource_group.search_resource_groups.run(
+            SearchResourceGroupsAction(querier=querier)
         )
 
         items = [
             ResourceGroupFairShareSpecItemDTO(
                 resource_group=sg.name,
-                fair_share_spec=self._adapter.convert_scaling_group_spec_to_dto(sg.fair_share_spec),
+                fair_share_spec=self._adapter.convert_resource_group_spec_to_dto(
+                    sg.fair_share_spec
+                ),
             )
-            for sg in search_result.scaling_groups
+            for sg in search_result.resource_groups
         ]
 
         resp = SearchResourceGroupFairShareSpecsResponse(
@@ -974,12 +976,12 @@ class FairShareAPIHandler:
             resource_weights=resource_weights,
         )
 
-        result = await self._scaling_group.update_fair_share_spec.run(action)
+        result = await self._resource_group.update_fair_share_spec.run(action)
 
         resp = UpdateResourceGroupFairShareSpecResponse(
-            resource_group=result.scaling_group.name,
-            fair_share_spec=self._adapter.convert_scaling_group_spec_to_dto(
-                result.scaling_group.fair_share_spec
+            resource_group=result.resource_group.name,
+            fair_share_spec=self._adapter.convert_resource_group_spec_to_dto(
+                result.resource_group.fair_share_spec
             ),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

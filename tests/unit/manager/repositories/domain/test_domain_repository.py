@@ -52,6 +52,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -60,7 +61,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -86,7 +86,7 @@ class TestDomainRepository:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -376,7 +376,7 @@ class TestDomainRepository:
             )
             session.add(domain)
 
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 id=sgroup_id,
                 name=sgroup_name,
                 description="Test scaling group",
@@ -384,7 +384,7 @@ class TestDomainRepository:
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             session.add(sgroup)
 
@@ -432,7 +432,7 @@ class TestDomainRepository:
                 domain_name=domain_name,
                 domain_id=domain_id,
                 group_id=group_id,
-                scaling_group_name=sgroup_name,
+                resource_group_name=sgroup_name,
                 resource_group_id=sgroup_id,
                 user_uuid=user_uuid,
                 occupying_slots=ResourceSlot(),
@@ -446,7 +446,7 @@ class TestDomainRepository:
                 domain_name=domain_name,
                 group_id=group_id,
                 user_uuid=user_uuid,
-                scaling_group=sgroup_name,
+                resource_group=sgroup_name,
                 resource_group_id=sgroup_id,
                 cluster_role="main",
                 status=KernelStatus.RUNNING,

@@ -63,6 +63,7 @@ from ai.backend.manager.models.rbac_models import (
     RoleRow,
     UserRoleRow,
 )
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -70,7 +71,6 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
@@ -86,7 +86,7 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 # Tables required to satisfy FK constraints for ScheduleDBSource, in dependency order.
 _SCHEDULER_ROWS: list[type] = [
     DomainRow,
-    ScalingGroupRow,
+    ResourceGroupRow,
     UserResourcePolicyRow,
     ProjectResourcePolicyRow,
     KeyPairResourcePolicyRow,
@@ -161,12 +161,12 @@ async def test_scaling_group_name(
     sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
-            ScalingGroupRow(
+            ResourceGroupRow(
                 id=test_scaling_group_id,
                 name=sg_name,
                 driver="static",
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(
+                scheduler_opts=ResourceGroupOpts(
                     allowed_session_types=[],
                     pending_timeout=timedelta(hours=1),
                     config={},
@@ -327,7 +327,7 @@ async def test_agent_id(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 region="local",
-                scaling_group=test_scaling_group_name,
+                resource_group=test_scaling_group_name,
                 resource_group_id=test_scaling_group_id,
                 available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
                 occupied_slots=ResourceSlot(),
@@ -421,7 +421,7 @@ async def create_pending_session_with_kernels(
     domain_id: DomainID,
     domain_name: str,
     resource_group_id: ResourceGroupID,
-    scaling_group_name: str,
+    resource_group_name: str,
     group_id: uuid.UUID,
     user_uuid: uuid.UUID,
     access_key: AccessKey,
@@ -466,7 +466,7 @@ async def create_pending_session_with_kernels(
                 user_uuid=user_uuid,
                 access_key=access_key,
                 resource_group_id=resource_group_id,
-                scaling_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 status=session_status,
                 status_info="test",
                 job_priority=job_priority,
@@ -494,7 +494,7 @@ async def create_pending_session_with_kernels(
                     session_id=session_id,
                     agent=agent_id if assign_agents else None,
                     agent_addr="127.0.0.1:6001" if assign_agents else None,
-                    scaling_group=scaling_group_name,
+                    resource_group=resource_group_name,
                     resource_group_id=resource_group_id,
                     cluster_idx=idx,
                     cluster_role="main" if idx == 0 else "sub",

@@ -42,6 +42,7 @@ from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -51,7 +52,6 @@ from ai.backend.manager.models.resource_slot.row import (
     ModelCardResourceRequirementRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderRow
@@ -117,7 +117,7 @@ class TestModelCardDelete:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -173,15 +173,15 @@ class TestModelCardDelete:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_id: ResourceGroupID,
-    ) -> ScalingGroupRow:
+    ) -> ResourceGroupRow:
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 id=test_scaling_group_id,
                 name=f"test-sgroup-{uuid.uuid4().hex[:8]}",
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             db_sess.add(sgroup)
             await db_sess.flush()
@@ -307,7 +307,7 @@ class TestModelCardDelete:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
         test_domain_id: DomainID,
-        test_scaling_group: ScalingGroupRow,
+        test_scaling_group: ResourceGroupRow,
         test_scaling_group_id: ResourceGroupID,
         test_user: UserRow,
         test_group: GroupRow,
@@ -327,21 +327,21 @@ class TestModelCardDelete:
             )
             db_sess.add(vfolder)
             await db_sess.flush()
-            scaling_group = ScalingGroupRow(
+            resource_group = ResourceGroupRow(
                 name="test-sg",
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
-            db_sess.add(scaling_group)
+            db_sess.add(resource_group)
             await db_sess.flush()
             mount_holder = SessionRow(
                 id=uuid.uuid4(),
                 domain_id=test_domain_id,
                 domain_name=test_domain.name,
                 resource_group_id=test_scaling_group_id,
-                scaling_group_name=test_scaling_group.name,
+                resource_group_name=test_scaling_group.name,
                 group_id=test_group.id,
                 user_uuid=test_user.uuid,
                 occupying_slots=ResourceSlot(),

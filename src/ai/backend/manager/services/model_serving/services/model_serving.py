@@ -420,7 +420,7 @@ class ModelServingService:
                 environ=action.config.environ,
             ),
         )
-        revision = await self._generate_revision(revision_draft, service_prepare_ctx.scaling_group)
+        revision = await self._generate_revision(revision_draft, service_prepare_ctx.resource_group)
         image_data = await self._repository.get_image_by_id(revision.image_id)
         action = action.with_revision(
             revision,
@@ -471,8 +471,8 @@ class ModelServingService:
 
         domain_name = DomainName(action.domain_name)
         domain_id = await self._scheduler_repository.get_domain_id_by_name(domain_name)
-        if service_prepare_ctx.scaling_group:
-            resource_group_name = ResourceGroupName(service_prepare_ctx.scaling_group)
+        if service_prepare_ctx.resource_group:
+            resource_group_name = ResourceGroupName(service_prepare_ctx.resource_group)
             resource_group_id = await self._scheduler_repository.get_resource_group_id_by_name(
                 resource_group_name
             )
@@ -765,10 +765,10 @@ class ModelServingService:
             raise ModelServiceNotFound
 
         # Get scaling group info
-        scaling_group_data = await self._repository.get_scaling_group_info(
+        resource_group_data = await self._repository.get_resource_group_info(
             endpoint_data.resource_group
         )
-        if not scaling_group_data:
+        if not resource_group_data:
             raise InvalidAPIParameters(f"Scaling group {endpoint_data.resource_group} not found")
 
         # Generate token via wsproxy
@@ -776,11 +776,11 @@ class ModelServingService:
         async with (
             aiohttp.ClientSession() as session,
             session.post(
-                f"{scaling_group_data.wsproxy_addr}/v2/endpoints/{endpoint_data.id}/token",
+                f"{resource_group_data.wsproxy_addr}/v2/endpoints/{endpoint_data.id}/token",
                 json=body,
                 headers={
                     "accept": "application/json",
-                    "X-BackendAI-Token": scaling_group_data.wsproxy_api_token,
+                    "X-BackendAI-Token": resource_group_data.wsproxy_api_token,
                 },
             ) as resp,
         ):
@@ -967,7 +967,7 @@ class ModelServingService:
 
         # Delegate all DB-dependent resolution to the repository.
         ctx = await self._repository.resolve_model_service_validation_context(
-            scaling_group=action.config.scaling_group,
+            resource_group=action.config.resource_group,
             owner_access_key=owner_access_key,
             domain_name=action.domain_name,
             group_name=action.group_name,
@@ -1009,6 +1009,6 @@ class ModelServingService:
             owner_role=ctx.owner_role,
             group_id=ctx.group_id,
             resource_policy=ctx.resource_policy,
-            scaling_group=ctx.scaling_group,
+            resource_group=ctx.resource_group,
             extra_mounts=ctx.extra_mounts,
         )

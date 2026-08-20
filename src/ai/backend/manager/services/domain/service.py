@@ -58,7 +58,7 @@ class DomainService:
     ) -> CreateDomainNodeActionResult:
         self._validate_name(action.creator.name)
         domain_data = await self._repository.create_domain_node(
-            action.creator, action.scaling_group_ids
+            action.creator, action.resource_group_ids
         )
         return CreateDomainNodeActionResult(domain_data=domain_data)
 

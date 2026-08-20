@@ -22,13 +22,13 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -62,7 +62,7 @@ class TestAgentResources:
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         async with with_tables(
             database_connection,
-            [ScalingGroupRow, AgentRow, ResourceSlotTypeRow, AgentResourceRow],
+            [ResourceGroupRow, AgentRow, ResourceSlotTypeRow, AgentResourceRow],
         ):
             async with database_connection.begin_session() as db_sess:
                 for name, stype in [("cpu", "count"), ("mem", "bytes")]:
@@ -81,13 +81,13 @@ class TestAgentResources:
         agent_id = str(uuid4())
         async with db.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=sg_id,
                     name=sg_name,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
         async with db.begin_session() as db_sess:
@@ -97,7 +97,7 @@ class TestAgentResources:
                     status=AgentStatus.ALIVE,
                     status_changed=datetime.now(tzutc()),
                     region="test-region",
-                    scaling_group=sg_name,
+                    resource_group=sg_name,
                     resource_group_id=sg_id,
                     available_slots=ResourceSlot({SlotName("cpu"): "8"}),
                     occupied_slots=ResourceSlot({}),
@@ -166,14 +166,14 @@ class TestResourceAllocations:
         self,
         database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        # Full FK chain: DomainRow, ProjectResourcePolicyRow, ScalingGroupRow, GroupRow,
+        # Full FK chain: DomainRow, ProjectResourcePolicyRow, ResourceGroupRow, GroupRow,
         # AgentRow, SessionRow, KernelRow, ResourceSlotTypeRow → ResourceAllocationRow
         async with with_tables(
             database_connection,
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 GroupRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -205,7 +205,7 @@ class TestAggregation:
         return DomainID(uuid4())
 
     @pytest.fixture
-    def scaling_group_id(self) -> ResourceGroupID:
+    def resource_group_id(self) -> ResourceGroupID:
         return ResourceGroupID(uuid4())
 
     @pytest.fixture
@@ -218,7 +218,7 @@ class TestAggregation:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 GroupRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -240,7 +240,7 @@ class TestAggregation:
         self,
         db: ExtendedAsyncSAEngine,
         domain_id: DomainID,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
     ) -> tuple[str, uuid.UUID, str]:
         """Create domain, project, scaling group, and agent. Returns (domain_name, project_id, agent_id)."""
         domain_name = "test-domain"
@@ -260,13 +260,13 @@ class TestAggregation:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
-                    id=scaling_group_id,
+                ResourceGroupRow(
+                    id=resource_group_id,
                     name=sg_name,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
         async with db.begin_session() as db_sess:
@@ -285,8 +285,8 @@ class TestAggregation:
                     status=AgentStatus.ALIVE,
                     status_changed=datetime.now(tzutc()),
                     region="test-region",
-                    scaling_group=sg_name,
-                    resource_group_id=scaling_group_id,
+                    resource_group=sg_name,
+                    resource_group_id=resource_group_id,
                     available_slots=ResourceSlot({SlotName("cpu"): "8"}),
                     occupied_slots=ResourceSlot({}),
                     addr="tcp://127.0.0.1:6001",
@@ -326,7 +326,7 @@ class TestAggregation:
                     domain_name=domain_name,
                     group_id=project_id,
                     resource_group_id=resource_group_id,
-                    scaling_group_name="test-sg",
+                    resource_group_name="test-sg",
                     user_uuid=uuid4(),
                     occupying_slots=empty_slots,
                     requested_slots=empty_slots,
@@ -347,7 +347,7 @@ class TestAggregation:
                     repl_out_port=0,
                     stdin_port=0,
                     stdout_port=0,
-                    scaling_group="test-sg",
+                    resource_group="test-sg",
                     resource_group_id=resource_group_id,
                     agent=agent_id,
                 )
@@ -369,12 +369,12 @@ class TestAggregation:
         self,
         db_with_full_tables: ExtendedAsyncSAEngine,
         domain_id: DomainID,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         db = db_with_full_tables
         await self._seed_slot_types(db)
         domain_name, project_id, agent_id = await self._seed_infrastructure(
-            db, domain_id, scaling_group_id
+            db, domain_id, resource_group_id
         )
 
         # Kernel 1: RUNNING with used values
@@ -384,7 +384,7 @@ class TestAggregation:
             project_id=project_id,
             agent_id=agent_id,
             domain_id=domain_id,
-            resource_group_id=scaling_group_id,
+            resource_group_id=resource_group_id,
             status=KernelStatus.RUNNING,
             allocations={
                 "cpu": (Decimal("2"), Decimal("2")),
@@ -398,7 +398,7 @@ class TestAggregation:
             project_id=project_id,
             agent_id=agent_id,
             domain_id=domain_id,
-            resource_group_id=scaling_group_id,
+            resource_group_id=resource_group_id,
             status=KernelStatus.SCHEDULED,
             allocations={
                 "cpu": (Decimal("4"), None),
@@ -420,12 +420,12 @@ class TestAggregation:
         self,
         db_with_full_tables: ExtendedAsyncSAEngine,
         domain_id: DomainID,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         db = db_with_full_tables
         await self._seed_slot_types(db)
         domain_name, project_id, agent_id = await self._seed_infrastructure(
-            db, domain_id, scaling_group_id
+            db, domain_id, resource_group_id
         )
 
         # TERMINATED kernel — should be excluded
@@ -435,7 +435,7 @@ class TestAggregation:
             project_id=project_id,
             agent_id=agent_id,
             domain_id=domain_id,
-            resource_group_id=scaling_group_id,
+            resource_group_id=resource_group_id,
             status=KernelStatus.TERMINATED,
             allocations={"cpu": (Decimal("4"), Decimal("4"))},
         )
@@ -450,12 +450,12 @@ class TestAggregation:
         self,
         db_with_full_tables: ExtendedAsyncSAEngine,
         domain_id: DomainID,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         db = db_with_full_tables
         await self._seed_slot_types(db)
         domain_name, project_id, agent_id = await self._seed_infrastructure(
-            db, domain_id, scaling_group_id
+            db, domain_id, resource_group_id
         )
 
         # RUNNING kernel but allocations already freed (free_at is set)
@@ -465,7 +465,7 @@ class TestAggregation:
             project_id=project_id,
             agent_id=agent_id,
             domain_id=domain_id,
-            resource_group_id=scaling_group_id,
+            resource_group_id=resource_group_id,
             status=KernelStatus.RUNNING,
             allocations={"cpu": (Decimal("2"), Decimal("2"))},
             free_at=datetime.now(tzutc()),
@@ -494,12 +494,12 @@ class TestAggregation:
         self,
         db_with_full_tables: ExtendedAsyncSAEngine,
         domain_id: DomainID,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         db = db_with_full_tables
         await self._seed_slot_types(db)
         domain_name, project_id, agent_id = await self._seed_infrastructure(
-            db, domain_id, scaling_group_id
+            db, domain_id, resource_group_id
         )
 
         await self._create_kernel_with_allocations(
@@ -508,7 +508,7 @@ class TestAggregation:
             project_id=project_id,
             agent_id=agent_id,
             domain_id=domain_id,
-            resource_group_id=scaling_group_id,
+            resource_group_id=resource_group_id,
             status=KernelStatus.RUNNING,
             allocations={
                 "cpu": (Decimal("1"), Decimal("1")),
@@ -521,7 +521,7 @@ class TestAggregation:
             project_id=project_id,
             agent_id=agent_id,
             domain_id=domain_id,
-            resource_group_id=scaling_group_id,
+            resource_group_id=resource_group_id,
             status=KernelStatus.PREPARING,
             allocations={
                 "cpu": (Decimal("3"), None),
@@ -554,13 +554,13 @@ class TestAggregation:
         self,
         db_with_full_tables: ExtendedAsyncSAEngine,
         domain_id: DomainID,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """Verify used_slots are sorted by rank (cpu=0 before mem=1)."""
         db = db_with_full_tables
         await self._seed_slot_types(db)
         domain_name, project_id, agent_id = await self._seed_infrastructure(
-            db, domain_id, scaling_group_id
+            db, domain_id, resource_group_id
         )
 
         await self._create_kernel_with_allocations(
@@ -569,7 +569,7 @@ class TestAggregation:
             project_id=project_id,
             agent_id=agent_id,
             domain_id=domain_id,
-            resource_group_id=scaling_group_id,
+            resource_group_id=resource_group_id,
             status=KernelStatus.RUNNING,
             allocations={
                 "cpu": (Decimal("1"), Decimal("1")),
@@ -593,7 +593,7 @@ class TestComputeActualAgentResourceUsage:
         return DomainID(uuid4())
 
     @pytest.fixture
-    def scaling_group_id(self) -> ResourceGroupID:
+    def resource_group_id(self) -> ResourceGroupID:
         return ResourceGroupID(uuid4())
 
     @pytest.fixture
@@ -606,7 +606,7 @@ class TestComputeActualAgentResourceUsage:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 GroupRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -628,7 +628,7 @@ class TestComputeActualAgentResourceUsage:
         self,
         db: ExtendedAsyncSAEngine,
         domain_id: DomainID,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
     ) -> tuple[str, uuid.UUID, str]:
         """Create domain, project, scaling group, and agent."""
         domain_name = "test-domain"
@@ -648,13 +648,13 @@ class TestComputeActualAgentResourceUsage:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
-                    id=scaling_group_id,
+                ResourceGroupRow(
+                    id=resource_group_id,
                     name=sg_name,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
         async with db.begin_session() as db_sess:
@@ -673,8 +673,8 @@ class TestComputeActualAgentResourceUsage:
                     status=AgentStatus.ALIVE,
                     status_changed=datetime.now(tzutc()),
                     region="test-region",
-                    scaling_group=sg_name,
-                    resource_group_id=scaling_group_id,
+                    resource_group=sg_name,
+                    resource_group_id=resource_group_id,
                     available_slots=ResourceSlot({SlotName("cpu"): "8"}),
                     occupied_slots=ResourceSlot({}),
                     addr="tcp://127.0.0.1:6001",
@@ -709,7 +709,7 @@ class TestComputeActualAgentResourceUsage:
                     domain_name=domain_name,
                     group_id=project_id,
                     resource_group_id=resource_group_id,
-                    scaling_group_name="test-sg",
+                    resource_group_name="test-sg",
                     user_uuid=uuid4(),
                     occupying_slots=empty_slots,
                     requested_slots=empty_slots,
@@ -730,7 +730,7 @@ class TestComputeActualAgentResourceUsage:
                     repl_out_port=0,
                     stdin_port=0,
                     stdout_port=0,
-                    scaling_group="test-sg",
+                    resource_group="test-sg",
                     resource_group_id=resource_group_id,
                     agent=agent_id,
                 )
@@ -765,13 +765,13 @@ class TestComputeActualAgentResourceUsage:
         self,
         db_with_full_tables: ExtendedAsyncSAEngine,
         domain_id: DomainID,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """Active allocations are summed per (agent_id, slot_name)."""
         db = db_with_full_tables
         await self._seed_slot_types(db)
         domain_name, project_id, agent_id = await self._seed_infrastructure(
-            db, domain_id, scaling_group_id
+            db, domain_id, resource_group_id
         )
 
         await self._create_kernel_with_allocations(
@@ -780,7 +780,7 @@ class TestComputeActualAgentResourceUsage:
             project_id=project_id,
             agent_id=agent_id,
             domain_id=domain_id,
-            resource_group_id=scaling_group_id,
+            resource_group_id=resource_group_id,
             status=KernelStatus.RUNNING,
             allocations={
                 "cpu": (Decimal("2"), Decimal("2")),
@@ -793,7 +793,7 @@ class TestComputeActualAgentResourceUsage:
             project_id=project_id,
             agent_id=agent_id,
             domain_id=domain_id,
-            resource_group_id=scaling_group_id,
+            resource_group_id=resource_group_id,
             status=KernelStatus.RUNNING,
             allocations={
                 "cpu": (Decimal("4"), Decimal("4")),
@@ -811,13 +811,13 @@ class TestComputeActualAgentResourceUsage:
         self,
         db_with_full_tables: ExtendedAsyncSAEngine,
         domain_id: DomainID,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """Allocations with free_at set are excluded."""
         db = db_with_full_tables
         await self._seed_slot_types(db)
         domain_name, project_id, agent_id = await self._seed_infrastructure(
-            db, domain_id, scaling_group_id
+            db, domain_id, resource_group_id
         )
 
         await self._create_kernel_with_allocations(
@@ -826,7 +826,7 @@ class TestComputeActualAgentResourceUsage:
             project_id=project_id,
             agent_id=agent_id,
             domain_id=domain_id,
-            resource_group_id=scaling_group_id,
+            resource_group_id=resource_group_id,
             status=KernelStatus.RUNNING,
             allocations={"cpu": (Decimal("4"), Decimal("4"))},
             free_at=datetime.now(tzutc()),
@@ -841,13 +841,13 @@ class TestComputeActualAgentResourceUsage:
         self,
         db_with_full_tables: ExtendedAsyncSAEngine,
         domain_id: DomainID,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """Kernels with TERMINATED status are excluded."""
         db = db_with_full_tables
         await self._seed_slot_types(db)
         domain_name, project_id, agent_id = await self._seed_infrastructure(
-            db, domain_id, scaling_group_id
+            db, domain_id, resource_group_id
         )
 
         await self._create_kernel_with_allocations(
@@ -856,7 +856,7 @@ class TestComputeActualAgentResourceUsage:
             project_id=project_id,
             agent_id=agent_id,
             domain_id=domain_id,
-            resource_group_id=scaling_group_id,
+            resource_group_id=resource_group_id,
             status=KernelStatus.TERMINATED,
             allocations={"cpu": (Decimal("4"), Decimal("4"))},
         )
@@ -870,13 +870,13 @@ class TestComputeActualAgentResourceUsage:
         self,
         db_with_full_tables: ExtendedAsyncSAEngine,
         domain_id: DomainID,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """When used is None, COALESCE falls back to requested."""
         db = db_with_full_tables
         await self._seed_slot_types(db)
         domain_name, project_id, agent_id = await self._seed_infrastructure(
-            db, domain_id, scaling_group_id
+            db, domain_id, resource_group_id
         )
 
         await self._create_kernel_with_allocations(
@@ -885,7 +885,7 @@ class TestComputeActualAgentResourceUsage:
             project_id=project_id,
             agent_id=agent_id,
             domain_id=domain_id,
-            resource_group_id=scaling_group_id,
+            resource_group_id=resource_group_id,
             status=KernelStatus.SCHEDULED,
             allocations={"cpu": (Decimal("4"), None)},
         )

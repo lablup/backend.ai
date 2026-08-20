@@ -153,6 +153,7 @@ from ai.backend.manager.services.prometheus_query_preset.processors import (
 from ai.backend.manager.services.prometheus_query_preset_category.processors import (
     PrometheusQueryPresetCategoryProcessors,
 )
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.services.retention_policy.processors import RetentionPolicyProcessors
@@ -165,7 +166,6 @@ from ai.backend.manager.services.runtime_variant.processors import RuntimeVarian
 from ai.backend.manager.services.runtime_variant_preset.processors import (
     RuntimeVariantPresetProcessors,
 )
-from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.services.scheduling_history.processors import (
     SchedulingHistoryProcessors,
 )
@@ -347,7 +347,7 @@ def test_every_defined_v2_action_is_wired() -> None:
         MagicMock(),
     )
     ResourcePresetProcessors(registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)), MagicMock())
-    ScalingGroupProcessors(registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), MagicMock())
+    ResourceGroupProcessors(registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), MagicMock())
     ArtifactProcessors(
         registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
         ArtifactRevisionProcessors(

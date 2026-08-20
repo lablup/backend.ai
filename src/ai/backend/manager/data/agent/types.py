@@ -78,7 +78,7 @@ class AgentData(EntityData):
     status: AgentStatus
     status_changed: datetime | None
     region: str
-    scaling_group: str
+    resource_group: str
     schedulable: bool
     available_slots: ResourceSlot
     cached_occupied_slots: ResourceSlot
@@ -103,7 +103,7 @@ class AgentMetadata:
     id: AgentId
     status: AgentStatus
     region: str | None
-    scaling_group: str | None
+    resource_group: str | None
     architecture: str
     version: str
     auto_terminate_abusing_kernel: bool
@@ -176,7 +176,7 @@ class AgentHeartbeatUpsert:
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 region=agent_info.region,
-                scaling_group=agent_info.scaling_group,
+                resource_group=agent_info.scaling_group,
                 architecture=agent_info.architecture,
                 auto_terminate_abusing_kernel=agent_info.auto_terminate_abusing_kernel,
                 version=agent_info.version,

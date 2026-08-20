@@ -25,7 +25,7 @@ class ResourcePresetData(EntityData):
     name: str
     resource_slots: ResourceSlot
     shared_memory: int | None
-    scaling_group_name: str | None
+    resource_group_name: str | None
 
     @override
     def entity_id(self) -> ResourcePresetID:
@@ -38,7 +38,7 @@ class ResourcePresetData(EntityData):
             "name": self.name,
             "resource_slots": self.resource_slots.to_json(),
             "shared_memory": str(self.shared_memory) if self.shared_memory is not None else None,
-            "scaling_group_name": self.scaling_group_name,
+            "scaling_group_name": self.resource_group_name,
         }
 
     @classmethod
@@ -51,5 +51,5 @@ class ResourcePresetData(EntityData):
             shared_memory=int(BinarySize.from_str(data["shared_memory"]))
             if data["shared_memory"] is not None
             else None,
-            scaling_group_name=data["scaling_group_name"],
+            resource_group_name=data["scaling_group_name"],
         )

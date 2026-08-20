@@ -693,9 +693,9 @@ class RouteExecutor:
 
         deployments = await self._deployment_repo.get_deployments_by_ids(set(endpoint_ids))
         deployment_by_id = {dep.id: dep for dep in deployments}
-        scaling_groups = {dep.metadata.resource_group for dep in deployments}
-        proxy_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
-            scaling_groups
+        resource_groups = {dep.metadata.resource_group for dep in deployments}
+        proxy_targets = await self._deployment_repo.fetch_resource_group_proxy_targets(
+            resource_groups
         )
 
         # Caller composes the filter so the conditions stay explicit at
@@ -826,9 +826,9 @@ class RouteExecutor:
 
         deployments = await self._deployment_repo.get_deployments_by_ids(set(endpoint_ids))
         deployment_by_id = {dep.id: dep for dep in deployments}
-        scaling_groups = {dep.metadata.resource_group for dep in deployments}
-        proxy_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
-            scaling_groups
+        resource_groups = {dep.metadata.resource_group for dep in deployments}
+        proxy_targets = await self._deployment_repo.fetch_resource_group_proxy_targets(
+            resource_groups
         )
 
         # Routes that actually make it onto the wire per endpoint;
@@ -970,9 +970,9 @@ class RouteExecutor:
 
         deployments = await self._deployment_repo.get_deployments_by_ids(set(endpoint_ids))
         deployment_by_id = {dep.id: dep for dep in deployments}
-        scaling_groups = {dep.metadata.resource_group for dep in deployments}
-        proxy_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
-            scaling_groups
+        resource_groups = {dep.metadata.resource_group for dep in deployments}
+        proxy_targets = await self._deployment_repo.fetch_resource_group_proxy_targets(
+            resource_groups
         )
 
         items_by_target: dict[tuple[str, str], list[UnregisterRoutesItem]] = {}
@@ -1080,11 +1080,11 @@ class RouteExecutor:
                 deployments = await self._deployment_repo.get_deployments_by_ids(deployment_ids)
 
             with RouteRecorderContext.shared_step("load_cleanup_policy"):
-                scaling_group_names = list({
+                resource_group_names = list({
                     deployment.metadata.resource_group for deployment in deployments
                 })
-                cleanup_configs = await self._deployment_repo.get_scaling_group_cleanup_configs(
-                    scaling_group_names
+                cleanup_configs = await self._deployment_repo.get_resource_group_cleanup_configs(
+                    resource_group_names
                 )
 
         # Create mapping of deployment_id -> cleanup config (no phase - transformation only)

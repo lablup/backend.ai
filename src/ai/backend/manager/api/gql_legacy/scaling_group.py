@@ -23,16 +23,16 @@ from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.agent import AgentStatus
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupForDomainRow,
-    ScalingGroupForKeypairsRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupOpts,
-    ScalingGroupRow,
-    scaling_groups,
+from ai.backend.manager.models.resource_group import (
+    ResourceGroupForDomainRow,
+    ResourceGroupForKeypairsRow,
+    ResourceGroupForProjectRow,
+    ResourceGroupOpts,
+    ResourceGroupRow,
+    resource_groups,
     sgroups_for_domains,
     sgroups_for_groups,
     sgroups_for_keypairs,
@@ -45,56 +45,56 @@ from ai.backend.manager.repositories.base.rbac.scope_binder import (
     RBACScopeBindingPair,
 )
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.scaling_group.creators import (
-    ScalingGroupCreatorSpec,
-    ScalingGroupForDomainCreatorSpec,
-    ScalingGroupForKeypairsCreatorSpec,
-    ScalingGroupForProjectCreatorSpec,
+from ai.backend.manager.repositories.resource_group.creators import (
+    ResourceGroupCreatorSpec,
+    ResourceGroupForDomainCreatorSpec,
+    ResourceGroupForKeypairsCreatorSpec,
+    ResourceGroupForProjectCreatorSpec,
 )
-from ai.backend.manager.repositories.scaling_group.purgers import (
-    ScalingGroupPurgerSpec,
-    create_scaling_group_for_keypairs_purger,
+from ai.backend.manager.repositories.resource_group.purgers import (
+    ResourceGroupNamePurgerSpec,
+    create_resource_group_for_keypairs_purger,
 )
-from ai.backend.manager.repositories.scaling_group.scope_binders import (
+from ai.backend.manager.repositories.resource_group.scope_binders import (
     ResourceGroupDomainEntityUnbinder,
     ResourceGroupProjectEntityUnbinder,
 )
-from ai.backend.manager.repositories.scaling_group.updaters import (
-    ScalingGroupDriverConfigUpdaterSpec,
-    ScalingGroupMetadataUpdaterSpec,
-    ScalingGroupNetworkConfigUpdaterSpec,
-    ScalingGroupSchedulerConfigUpdaterSpec,
-    ScalingGroupStatusUpdaterSpec,
-    ScalingGroupUpdaterSpec,
+from ai.backend.manager.repositories.resource_group.updaters import (
+    ResourceGroupDriverConfigUpdaterSpec,
+    ResourceGroupMetadataUpdaterSpec,
+    ResourceGroupNetworkConfigUpdaterSpec,
+    ResourceGroupSchedulerConfigUpdaterSpec,
+    ResourceGroupStatusUpdaterSpec,
+    ResourceGroupUpdaterSpec,
 )
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
-from ai.backend.manager.services.scaling_group.actions.associate_with_domain import (
-    AssociateScalingGroupWithDomainsAction,
+from ai.backend.manager.services.resource_group.actions.associate_with_domain import (
+    AssociateResourceGroupWithDomainsAction,
 )
-from ai.backend.manager.services.scaling_group.actions.associate_with_keypair import (
-    AssociateScalingGroupWithKeypairsAction,
+from ai.backend.manager.services.resource_group.actions.associate_with_keypair import (
+    AssociateResourceGroupWithKeypairsAction,
 )
-from ai.backend.manager.services.scaling_group.actions.associate_with_user_group import (
-    AssociateScalingGroupWithUserGroupsAction,
+from ai.backend.manager.services.resource_group.actions.associate_with_user_group import (
+    AssociateResourceGroupWithUserGroupsAction,
 )
-from ai.backend.manager.services.scaling_group.actions.create import (
-    CreateScalingGroupAction,
+from ai.backend.manager.services.resource_group.actions.create import (
+    CreateResourceGroupAction,
 )
-from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain import (
-    DisassociateScalingGroupWithDomainsAction,
+from ai.backend.manager.services.resource_group.actions.disassociate_with_domain import (
+    DisassociateResourceGroupWithDomainsAction,
 )
-from ai.backend.manager.services.scaling_group.actions.disassociate_with_keypair import (
-    DisassociateScalingGroupWithKeypairsAction,
+from ai.backend.manager.services.resource_group.actions.disassociate_with_keypair import (
+    DisassociateResourceGroupWithKeypairsAction,
 )
-from ai.backend.manager.services.scaling_group.actions.disassociate_with_user_group import (
-    DisassociateScalingGroupWithUserGroupsAction,
+from ai.backend.manager.services.resource_group.actions.disassociate_with_user_group import (
+    DisassociateResourceGroupWithUserGroupsAction,
 )
-from ai.backend.manager.services.scaling_group.actions.lookup import LookupResourceGroupAction
-from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
-    PurgeScalingGroupAction,
+from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
+from ai.backend.manager.services.resource_group.actions.purge_resource_group import (
+    PurgeResourceGroupAction,
 )
-from ai.backend.manager.services.scaling_group.actions.update import (
-    UpdateScalingGroupAction,
+from ai.backend.manager.services.resource_group.actions.update import (
+    UpdateResourceGroupAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -141,7 +141,7 @@ async def _resolve_resource_group_id(
     graph_ctx: GraphQueryContext,
     scaling_group: str,
 ) -> ResourceGroupID:
-    result = await graph_ctx.processors.scaling_group.lookup.run(
+    result = await graph_ctx.processors.resource_group.lookup.run(
         LookupResourceGroupAction(name=ResourceGroupName(scaling_group))
     )
     return result.data.id
@@ -149,9 +149,9 @@ async def _resolve_resource_group_id(
 
 async def _resolve_resource_group_ids(
     graph_ctx: GraphQueryContext,
-    scaling_groups: Sequence[str],
+    resource_groups: Sequence[str],
 ) -> list[ResourceGroupID]:
-    return [await _resolve_resource_group_id(graph_ctx, name) for name in scaling_groups]
+    return [await _resolve_resource_group_id(graph_ctx, name) for name in resource_groups]
 
 
 @graphene_federation.key("id")
@@ -177,7 +177,7 @@ class ScalingGroupNode(graphene.ObjectType):  # type: ignore[misc]
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: ScalingGroupRow,
+        row: ResourceGroupRow,
     ) -> Self:
         return cls(
             name=row.name,
@@ -201,12 +201,12 @@ class ScalingGroupNode(graphene.ObjectType):  # type: ignore[misc]
         _, scaling_group_name = AsyncNode.resolve_global_id(info, self.id)
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            query_stmt = sa.select(ScalingGroupRow).where(
-                ScalingGroupRow.name == scaling_group_name
+            query_stmt = sa.select(ResourceGroupRow).where(
+                ResourceGroupRow.name == scaling_group_name
             )
             result = await db_session.scalar(query_stmt)
             if result is None:
-                raise ScalingGroupNotFound(f"Scaling group not found: {scaling_group_name}")
+                raise ResourceGroupNotFound(f"Scaling group not found: {scaling_group_name}")
             return ScalingGroupNode.from_row(graph_ctx, result)
 
     @classmethod
@@ -216,14 +216,14 @@ class ScalingGroupNode(graphene.ObjectType):  # type: ignore[misc]
         group_ids: Sequence[uuid.UUID],
     ) -> Sequence[Sequence[ScalingGroupNode]]:
         j = sa.join(
-            ScalingGroupRow,
-            ScalingGroupForProjectRow,
-            ScalingGroupRow.id == ScalingGroupForProjectRow.resource_group_id,
+            ResourceGroupRow,
+            ResourceGroupForProjectRow,
+            ResourceGroupRow.id == ResourceGroupForProjectRow.resource_group_id,
         )
         _stmt = (
-            sa.select(ScalingGroupRow)
+            sa.select(ResourceGroupRow)
             .select_from(j)
-            .where(ScalingGroupForProjectRow.group.in_(group_ids))
+            .where(ResourceGroupForProjectRow.group.in_(group_ids))
         )
         async with ctx.db.begin_readonly_session() as db_session:
             return await batch_multiresult_in_scalar_stream(
@@ -242,11 +242,11 @@ class ScalingGroupNode(graphene.ObjectType):  # type: ignore[misc]
         domain_names: Sequence[str],
     ) -> Sequence[Sequence[ScalingGroupNode]]:
         j = sa.join(
-            ScalingGroupRow,
-            ScalingGroupForDomainRow,
-            ScalingGroupRow.id == ScalingGroupForDomainRow.resource_group_id,
-        ).join(DomainRow, DomainRow.id == ScalingGroupForDomainRow.domain_id)
-        _stmt = sa.select(ScalingGroupRow).select_from(j).where(DomainRow.name.in_(domain_names))
+            ResourceGroupRow,
+            ResourceGroupForDomainRow,
+            ResourceGroupRow.id == ResourceGroupForDomainRow.resource_group_id,
+        ).join(DomainRow, DomainRow.id == ResourceGroupForDomainRow.domain_id)
+        _stmt = sa.select(ResourceGroupRow).select_from(j).where(DomainRow.name.in_(domain_names))
         async with ctx.db.begin_readonly_session() as db_session:
             return await batch_multiresult_in_scalar_stream(
                 ctx,
@@ -264,14 +264,14 @@ class ScalingGroupNode(graphene.ObjectType):  # type: ignore[misc]
         access_keys: Sequence[AccessKey],
     ) -> Sequence[Sequence[ScalingGroupNode]]:
         j = sa.join(
-            ScalingGroupRow,
-            ScalingGroupForKeypairsRow,
-            ScalingGroupRow.id == ScalingGroupForKeypairsRow.resource_group_id,
+            ResourceGroupRow,
+            ResourceGroupForKeypairsRow,
+            ResourceGroupRow.id == ResourceGroupForKeypairsRow.resource_group_id,
         )
         _stmt = (
-            sa.select(ScalingGroupRow)
+            sa.select(ResourceGroupRow)
             .select_from(j)
-            .where(ScalingGroupForKeypairsRow.access_key.in_(access_keys))
+            .where(ResourceGroupForKeypairsRow.access_key.in_(access_keys))
         )
         async with ctx.db.begin_readonly_session() as db_session:
             return await batch_multiresult_in_scalar_stream(
@@ -487,7 +487,7 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
     @classmethod
     def from_orm_row(
         cls,
-        row: ScalingGroupRow,
+        row: ResourceGroupRow,
     ) -> ScalingGroup:
         return cls(
             name=row.name,
@@ -521,9 +521,9 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
         *,
         is_active: bool | None = None,
     ) -> Sequence[ScalingGroup]:
-        query = sa.select(scaling_groups).select_from(scaling_groups)
+        query = sa.select(resource_groups).select_from(resource_groups)
         if is_active is not None:
-            query = query.where(scaling_groups.c.is_active == is_active)
+            query = query.where(resource_groups.c.is_active == is_active)
         async with ctx.db.begin_readonly() as conn:
             return [
                 obj
@@ -540,12 +540,12 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
         is_active: bool | None = None,
     ) -> Sequence[ScalingGroup]:
         j = sa.join(
-            scaling_groups,
+            resource_groups,
             sgroups_for_domains,
-            scaling_groups.c.id == sgroups_for_domains.c.resource_group_id,
+            resource_groups.c.id == sgroups_for_domains.c.resource_group_id,
         )
         query = (
-            sa.select(scaling_groups)
+            sa.select(resource_groups)
             .select_from(j)
             .where(
                 sgroups_for_domains.c.domain_id
@@ -553,7 +553,7 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
             )
         )
         if is_active is not None:
-            query = query.where(scaling_groups.c.is_active == is_active)
+            query = query.where(resource_groups.c.is_active == is_active)
         async with ctx.db.begin_readonly() as conn:
             return [
                 obj
@@ -570,13 +570,13 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
         is_active: bool | None = None,
     ) -> Sequence[ScalingGroup]:
         j = sa.join(
-            scaling_groups,
+            resource_groups,
             sgroups_for_groups,
-            scaling_groups.c.id == sgroups_for_groups.c.resource_group_id,
+            resource_groups.c.id == sgroups_for_groups.c.resource_group_id,
         )
-        query = sa.select(scaling_groups).select_from(j).where(sgroups_for_groups.c.group == group)
+        query = sa.select(resource_groups).select_from(j).where(sgroups_for_groups.c.group == group)
         if is_active is not None:
-            query = query.where(scaling_groups.c.is_active == is_active)
+            query = query.where(resource_groups.c.is_active == is_active)
         async with ctx.db.begin_readonly() as conn:
             return [
                 obj
@@ -593,17 +593,17 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
         is_active: bool | None = None,
     ) -> Sequence[ScalingGroup]:
         j = sa.join(
-            scaling_groups,
+            resource_groups,
             sgroups_for_keypairs,
-            scaling_groups.c.id == sgroups_for_keypairs.c.resource_group_id,
+            resource_groups.c.id == sgroups_for_keypairs.c.resource_group_id,
         )
         query = (
-            sa.select(scaling_groups)
+            sa.select(resource_groups)
             .select_from(j)
             .where(sgroups_for_keypairs.c.access_key == access_key)
         )
         if is_active is not None:
-            query = query.where(scaling_groups.c.is_active == is_active)
+            query = query.where(resource_groups.c.is_active == is_active)
         async with ctx.db.begin_readonly() as conn:
             return [
                 obj
@@ -618,12 +618,12 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
         group_ids: Sequence[uuid.UUID],
     ) -> Sequence[Sequence[ScalingGroup | None]]:
         j = sa.join(
-            scaling_groups,
+            resource_groups,
             sgroups_for_groups,
-            scaling_groups.c.id == sgroups_for_groups.c.resource_group_id,
+            resource_groups.c.id == sgroups_for_groups.c.resource_group_id,
         )
         query = (
-            sa.select(scaling_groups, sgroups_for_groups.c.group)
+            sa.select(resource_groups, sgroups_for_groups.c.group)
             .select_from(j)
             .where(sgroups_for_groups.c.group.in_(group_ids))
         )
@@ -644,9 +644,9 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
         names: Sequence[str],
     ) -> Sequence[ScalingGroup | None]:
         query = (
-            sa.select(scaling_groups)
-            .select_from(scaling_groups)
-            .where(scaling_groups.c.name.in_(names))
+            sa.select(resource_groups)
+            .select_from(resource_groups)
+            .where(resource_groups.c.name.in_(names))
         )
         async with ctx.db.begin_readonly() as conn:
             return await batch_result(
@@ -684,33 +684,33 @@ class ModifyScalingGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     scheduler_opts = graphene.JSONString(required=False)
     use_host_network = graphene.Boolean(required=False)
 
-    def to_updater(self, name: str) -> Updater[ScalingGroupRow]:
+    def to_updater(self, name: str) -> Updater[ResourceGroupRow]:
         """Convert GraphQL input to Updater for scaling group modification."""
-        status_spec = ScalingGroupStatusUpdaterSpec(
+        status_spec = ResourceGroupStatusUpdaterSpec(
             is_active=OptionalState.from_graphql(self.is_active),
             is_public=OptionalState.from_graphql(self.is_public),
         )
-        metadata_spec = ScalingGroupMetadataUpdaterSpec(
+        metadata_spec = ResourceGroupMetadataUpdaterSpec(
             description=TriState.from_graphql(self.description),
         )
-        network_spec = ScalingGroupNetworkConfigUpdaterSpec(
+        network_spec = ResourceGroupNetworkConfigUpdaterSpec(
             wsproxy_addr=TriState.from_graphql(self.wsproxy_addr),
             wsproxy_api_token=TriState.from_graphql(self.wsproxy_api_token),
             use_host_network=OptionalState.from_graphql(self.use_host_network),
         )
-        driver_spec = ScalingGroupDriverConfigUpdaterSpec(
+        driver_spec = ResourceGroupDriverConfigUpdaterSpec(
             driver=OptionalState.from_graphql(self.driver),
             driver_opts=OptionalState.from_graphql(self.driver_opts),
         )
-        scheduler_spec = ScalingGroupSchedulerConfigUpdaterSpec(
+        scheduler_spec = ResourceGroupSchedulerConfigUpdaterSpec(
             scheduler=OptionalState.from_graphql(self.scheduler),
             scheduler_opts=OptionalState.from_graphql(
-                ScalingGroupOpts.model_validate(self.scheduler_opts)
+                ResourceGroupOpts.model_validate(self.scheduler_opts)
                 if self.scheduler_opts is not None and self.scheduler_opts is not Undefined
                 else Undefined
             ),
         )
-        spec = ScalingGroupUpdaterSpec(
+        spec = ResourceGroupUpdaterSpec(
             status=status_spec,
             metadata=metadata_spec,
             network=network_spec,
@@ -740,7 +740,7 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
         props: CreateScalingGroupInput,
     ) -> CreateScalingGroup:
         graph_ctx: GraphQueryContext = info.context
-        spec = ScalingGroupCreatorSpec(
+        spec = ResourceGroupCreatorSpec(
             name=name,
             description=props.description,
             is_active=bool(props.is_active),
@@ -750,28 +750,28 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
             driver=props.driver,
             driver_opts=props.driver_opts,
             scheduler=props.scheduler,
-            scheduler_opts=ScalingGroupOpts.model_validate(props.scheduler_opts),
+            scheduler_opts=ResourceGroupOpts.model_validate(props.scheduler_opts),
             use_host_network=bool(props.use_host_network),
         )
         creator = Creator(spec=spec)
-        action = CreateScalingGroupAction(creator=creator)
-        result = await graph_ctx.processors.scaling_group.create_scaling_group.run(action)
+        action = CreateResourceGroupAction(creator=creator)
+        result = await graph_ctx.processors.resource_group.create_resource_group.run(action)
         return cls(
             ok=True,
             msg="success",
             scaling_group=ScalingGroup(
-                name=result.scaling_group.name,
-                description=result.scaling_group.metadata.description,
-                is_active=result.scaling_group.status.is_active,
-                is_public=result.scaling_group.status.is_public,
-                created_at=result.scaling_group.metadata.created_at,
-                wsproxy_addr=result.scaling_group.network.wsproxy_addr,
-                wsproxy_api_token=result.scaling_group.network.wsproxy_api_token,
-                driver=result.scaling_group.driver.name,
-                driver_opts=dict(result.scaling_group.driver.options),
-                scheduler=result.scaling_group.scheduler.name.value,
-                scheduler_opts=result.scaling_group.scheduler.options.to_json(),
-                use_host_network=result.scaling_group.network.use_host_network,
+                name=result.resource_group.name,
+                description=result.resource_group.metadata.description,
+                is_active=result.resource_group.status.is_active,
+                is_public=result.resource_group.status.is_public,
+                created_at=result.resource_group.metadata.created_at,
+                wsproxy_addr=result.resource_group.network.wsproxy_addr,
+                wsproxy_api_token=result.resource_group.network.wsproxy_api_token,
+                driver=result.resource_group.driver.name,
+                driver_opts=dict(result.resource_group.driver.options),
+                scheduler=result.resource_group.scheduler.name.value,
+                scheduler_opts=result.resource_group.scheduler.options.to_json(),
+                use_host_network=result.resource_group.network.use_host_network,
             ),
         )
 
@@ -796,8 +796,8 @@ class ModifyScalingGroup(graphene.Mutation):  # type: ignore[misc]
     ) -> ModifyScalingGroup:
         graph_ctx: GraphQueryContext = info.context
         resource_group_id = await _resolve_resource_group_id(graph_ctx, name)
-        await graph_ctx.processors.scaling_group.update_scaling_group.run(
-            UpdateScalingGroupAction(
+        await graph_ctx.processors.resource_group.update_resource_group.run(
+            UpdateResourceGroupAction(
                 resource_group_id=resource_group_id, updater=props.to_updater(name)
             )
         )
@@ -823,10 +823,10 @@ class DeleteScalingGroup(graphene.Mutation):  # type: ignore[misc]
         graph_ctx: GraphQueryContext = info.context
 
         resource_group_id = await _resolve_resource_group_id(graph_ctx, name)
-        await graph_ctx.processors.scaling_group.purge_scaling_group.run(
-            PurgeScalingGroupAction(
+        await graph_ctx.processors.resource_group.purge_resource_group.run(
+            PurgeResourceGroupAction(
                 resource_group_id=resource_group_id,
-                purger=Purger(spec=ScalingGroupPurgerSpec(name=name)),
+                purger=Purger(spec=ResourceGroupNamePurgerSpec(name=name)),
             )
         )
 
@@ -858,12 +858,12 @@ class AssociateScalingGroupWithDomain(graphene.Mutation):  # type: ignore[misc]
             )
         ).data
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
-        action = AssociateScalingGroupWithDomainsAction(
+        action = AssociateResourceGroupWithDomainsAction(
             domain_id=domain_data.id,
             binder=RBACScopeBinder(
                 pairs=[
                     RBACScopeBindingPair(
-                        spec=ScalingGroupForDomainCreatorSpec(
+                        spec=ResourceGroupForDomainCreatorSpec(
                             resource_group_id=resource_group_id,
                             domain_id=domain_data.id,
                         ),
@@ -875,7 +875,7 @@ class AssociateScalingGroupWithDomain(graphene.Mutation):  # type: ignore[misc]
                 ]
             ),
         )
-        await graph_ctx.processors.scaling_group.associate_scaling_group_with_domains.run(action)
+        await graph_ctx.processors.resource_group.associate_resource_group_with_domains.run(action)
         return cls(ok=True, msg="success")
 
 
@@ -885,7 +885,7 @@ class AssociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        scaling_groups = graphene.List(graphene.String, required=True)
+        resource_groups = graphene.List(graphene.String, required=True)
         domain = graphene.String(required=True)
 
     ok = graphene.Boolean()
@@ -896,7 +896,7 @@ class AssociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[misc]
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        scaling_groups: Sequence[str],
+        resource_groups: Sequence[str],
         domain: str,
     ) -> AssociateScalingGroupsWithDomain:
         graph_ctx: GraphQueryContext = info.context
@@ -905,13 +905,13 @@ class AssociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[misc]
                 LookupDomainAction(name=DomainName(domain))
             )
         ).data
-        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
-        action = AssociateScalingGroupWithDomainsAction(
+        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, resource_groups)
+        action = AssociateResourceGroupWithDomainsAction(
             domain_id=domain_data.id,
             binder=RBACScopeBinder(
                 pairs=[
                     RBACScopeBindingPair(
-                        spec=ScalingGroupForDomainCreatorSpec(
+                        spec=ResourceGroupForDomainCreatorSpec(
                             resource_group_id=resource_group_id,
                             domain_id=domain_data.id,
                         ),
@@ -924,7 +924,7 @@ class AssociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[misc]
                 ]
             ),
         )
-        await graph_ctx.processors.scaling_group.associate_scaling_group_with_domains.run(action)
+        await graph_ctx.processors.resource_group.associate_resource_group_with_domains.run(action)
         return cls(ok=True, msg="success")
 
 
@@ -953,14 +953,16 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):  # type: ignore[mis
             )
         ).data
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
-        action = DisassociateScalingGroupWithDomainsAction(
+        action = DisassociateResourceGroupWithDomainsAction(
             domain_id=domain_data.id,
             unbinder=ResourceGroupDomainEntityUnbinder(
                 resource_group_ids=[resource_group_id],
                 domain_id=domain_data.id,
             ),
         )
-        await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_domains.run(action)
+        await graph_ctx.processors.resource_group.disassociate_resource_group_with_domains.run(
+            action
+        )
         return cls(ok=True, msg="success")
 
 
@@ -970,7 +972,7 @@ class DisassociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[mi
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        scaling_groups = graphene.List(graphene.String, required=True)
+        resource_groups = graphene.List(graphene.String, required=True)
         domain = graphene.String(required=True)
 
     ok = graphene.Boolean()
@@ -981,7 +983,7 @@ class DisassociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[mi
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        scaling_groups: Sequence[str],
+        resource_groups: Sequence[str],
         domain: str,
     ) -> DisassociateScalingGroupsWithDomain:
         graph_ctx: GraphQueryContext = info.context
@@ -990,15 +992,17 @@ class DisassociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[mi
                 LookupDomainAction(name=DomainName(domain))
             )
         ).data
-        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
-        action = DisassociateScalingGroupWithDomainsAction(
+        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, resource_groups)
+        action = DisassociateResourceGroupWithDomainsAction(
             domain_id=domain_data.id,
             unbinder=ResourceGroupDomainEntityUnbinder(
                 resource_group_ids=resource_group_ids,
                 domain_id=domain_data.id,
             ),
         )
-        await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_domains.run(action)
+        await graph_ctx.processors.resource_group.disassociate_resource_group_with_domains.run(
+            action
+        )
         return cls(ok=True, msg="success")
 
 
@@ -1024,14 +1028,16 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):  # type: ignore
                 LookupDomainAction(name=DomainName(domain))
             )
         ).data
-        action = DisassociateScalingGroupWithDomainsAction(
+        action = DisassociateResourceGroupWithDomainsAction(
             domain_id=domain_data.id,
             unbinder=ResourceGroupDomainEntityUnbinder(
                 resource_group_ids=None,
                 domain_id=domain_data.id,
             ),
         )
-        await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_domains.run(action)
+        await graph_ctx.processors.resource_group.disassociate_resource_group_with_domains.run(
+            action
+        )
         return cls(ok=True, msg="success")
 
 
@@ -1055,12 +1061,12 @@ class AssociateScalingGroupWithUserGroup(graphene.Mutation):  # type: ignore[mis
     ) -> AssociateScalingGroupWithUserGroup:
         graph_ctx: GraphQueryContext = info.context
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
-        action = AssociateScalingGroupWithUserGroupsAction(
+        action = AssociateResourceGroupWithUserGroupsAction(
             project_id=ProjectID(user_group),
             binder=RBACScopeBinder(
                 pairs=[
                     RBACScopeBindingPair(
-                        spec=ScalingGroupForProjectCreatorSpec(
+                        spec=ResourceGroupForProjectCreatorSpec(
                             resource_group_id=resource_group_id,
                             project=user_group,
                         ),
@@ -1072,7 +1078,7 @@ class AssociateScalingGroupWithUserGroup(graphene.Mutation):  # type: ignore[mis
                 ]
             ),
         )
-        await graph_ctx.processors.scaling_group.associate_scaling_group_with_user_groups.run(
+        await graph_ctx.processors.resource_group.associate_resource_group_with_user_groups.run(
             action
         )
         return cls(ok=True, msg="success")
@@ -1084,7 +1090,7 @@ class AssociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore[mi
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        scaling_groups = graphene.List(graphene.String, required=True)
+        resource_groups = graphene.List(graphene.String, required=True)
         user_group = graphene.UUID(required=True)
 
     ok = graphene.Boolean()
@@ -1095,17 +1101,17 @@ class AssociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore[mi
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        scaling_groups: Sequence[str],
+        resource_groups: Sequence[str],
         user_group: uuid.UUID,
     ) -> AssociateScalingGroupsWithUserGroup:
         graph_ctx: GraphQueryContext = info.context
-        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
-        action = AssociateScalingGroupWithUserGroupsAction(
+        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, resource_groups)
+        action = AssociateResourceGroupWithUserGroupsAction(
             project_id=ProjectID(user_group),
             binder=RBACScopeBinder(
                 pairs=[
                     RBACScopeBindingPair(
-                        spec=ScalingGroupForProjectCreatorSpec(
+                        spec=ResourceGroupForProjectCreatorSpec(
                             resource_group_id=resource_group_id,
                             project=user_group,
                         ),
@@ -1118,7 +1124,7 @@ class AssociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore[mi
                 ]
             ),
         )
-        await graph_ctx.processors.scaling_group.associate_scaling_group_with_user_groups.run(
+        await graph_ctx.processors.resource_group.associate_resource_group_with_user_groups.run(
             action
         )
         return cls(ok=True, msg="success")
@@ -1144,14 +1150,14 @@ class DisassociateScalingGroupWithUserGroup(graphene.Mutation):  # type: ignore[
     ) -> DisassociateScalingGroupWithUserGroup:
         graph_ctx: GraphQueryContext = info.context
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
-        action = DisassociateScalingGroupWithUserGroupsAction(
+        action = DisassociateResourceGroupWithUserGroupsAction(
             project_id=ProjectID(user_group),
             unbinder=ResourceGroupProjectEntityUnbinder(
                 resource_group_ids=[resource_group_id],
                 project=user_group,
             ),
         )
-        await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_user_groups.run(
+        await graph_ctx.processors.resource_group.disassociate_resource_group_with_user_groups.run(
             action
         )
         return cls(ok=True, msg="success")
@@ -1163,7 +1169,7 @@ class DisassociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        scaling_groups = graphene.List(graphene.String, required=True)
+        resource_groups = graphene.List(graphene.String, required=True)
         user_group = graphene.UUID(required=True)
 
     ok = graphene.Boolean()
@@ -1174,19 +1180,19 @@ class DisassociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        scaling_groups: Sequence[str],
+        resource_groups: Sequence[str],
         user_group: uuid.UUID,
     ) -> DisassociateScalingGroupsWithUserGroup:
         graph_ctx: GraphQueryContext = info.context
-        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
-        action = DisassociateScalingGroupWithUserGroupsAction(
+        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, resource_groups)
+        action = DisassociateResourceGroupWithUserGroupsAction(
             project_id=ProjectID(user_group),
             unbinder=ResourceGroupProjectEntityUnbinder(
                 resource_group_ids=resource_group_ids,
                 project=user_group,
             ),
         )
-        await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_user_groups.run(
+        await graph_ctx.processors.resource_group.disassociate_resource_group_with_user_groups.run(
             action
         )
         return cls(ok=True, msg="success")
@@ -1209,14 +1215,14 @@ class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):  # type: ignore[
         user_group: uuid.UUID,
     ) -> DisassociateAllScalingGroupsWithGroup:
         graph_ctx: GraphQueryContext = info.context
-        action = DisassociateScalingGroupWithUserGroupsAction(
+        action = DisassociateResourceGroupWithUserGroupsAction(
             project_id=ProjectID(user_group),
             unbinder=ResourceGroupProjectEntityUnbinder(
                 resource_group_ids=None,
                 project=user_group,
             ),
         )
-        await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_user_groups.run(
+        await graph_ctx.processors.resource_group.disassociate_resource_group_with_user_groups.run(
             action
         )
         return cls(ok=True, msg="success")
@@ -1242,18 +1248,18 @@ class AssociateScalingGroupWithKeyPair(graphene.Mutation):  # type: ignore[misc]
     ) -> AssociateScalingGroupWithKeyPair:
         graph_ctx: GraphQueryContext = info.context
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
-        action = AssociateScalingGroupWithKeypairsAction(
+        action = AssociateResourceGroupWithKeypairsAction(
             resource_group_id=resource_group_id,
             bulk_creator=BulkCreator(
                 specs=[
-                    ScalingGroupForKeypairsCreatorSpec(
+                    ResourceGroupForKeypairsCreatorSpec(
                         resource_group_id=resource_group_id,
                         access_key=AccessKey(access_key),
                     )
                 ]
             ),
         )
-        await graph_ctx.processors.scaling_group.associate_scaling_group_with_keypairs.run(action)
+        await graph_ctx.processors.resource_group.associate_resource_group_with_keypairs.run(action)
         return cls(ok=True, msg="success")
 
 
@@ -1263,7 +1269,7 @@ class AssociateScalingGroupsWithKeyPair(graphene.Mutation):  # type: ignore[misc
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        scaling_groups = graphene.List(graphene.String, required=True)
+        resource_groups = graphene.List(graphene.String, required=True)
         access_key = graphene.String(required=True)
 
     ok = graphene.Boolean()
@@ -1274,16 +1280,16 @@ class AssociateScalingGroupsWithKeyPair(graphene.Mutation):  # type: ignore[misc
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        scaling_groups: Sequence[str],
+        resource_groups: Sequence[str],
         access_key: str,
     ) -> AssociateScalingGroupsWithKeyPair:
         graph_ctx: GraphQueryContext = info.context
-        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
-        action = AssociateScalingGroupWithKeypairsAction(
+        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, resource_groups)
+        action = AssociateResourceGroupWithKeypairsAction(
             resource_group_id=resource_group_ids[0],
             bulk_creator=BulkCreator(
                 specs=[
-                    ScalingGroupForKeypairsCreatorSpec(
+                    ResourceGroupForKeypairsCreatorSpec(
                         resource_group_id=resource_group_id,
                         access_key=AccessKey(access_key),
                     )
@@ -1291,7 +1297,7 @@ class AssociateScalingGroupsWithKeyPair(graphene.Mutation):  # type: ignore[misc
                 ]
             ),
         )
-        await graph_ctx.processors.scaling_group.associate_scaling_group_with_keypairs.run(action)
+        await graph_ctx.processors.resource_group.associate_resource_group_with_keypairs.run(action)
         return cls(ok=True, msg="success")
 
 
@@ -1315,14 +1321,14 @@ class DisassociateScalingGroupWithKeyPair(graphene.Mutation):  # type: ignore[mi
     ) -> DisassociateScalingGroupWithKeyPair:
         graph_ctx: GraphQueryContext = info.context
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
-        action = DisassociateScalingGroupWithKeypairsAction(
+        action = DisassociateResourceGroupWithKeypairsAction(
             resource_group_id=resource_group_id,
-            purger=create_scaling_group_for_keypairs_purger(
+            purger=create_resource_group_for_keypairs_purger(
                 resource_group_id=resource_group_id,
                 access_key=AccessKey(access_key),
             ),
         )
-        await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_keypairs.run(
+        await graph_ctx.processors.resource_group.disassociate_resource_group_with_keypairs.run(
             action
         )
         return cls(ok=True, msg="success")
@@ -1334,7 +1340,7 @@ class DisassociateScalingGroupsWithKeyPair(graphene.Mutation):  # type: ignore[m
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        scaling_groups = graphene.List(graphene.String, required=True)
+        resource_groups = graphene.List(graphene.String, required=True)
         access_key = graphene.String(required=True)
 
     ok = graphene.Boolean()
@@ -1345,19 +1351,19 @@ class DisassociateScalingGroupsWithKeyPair(graphene.Mutation):  # type: ignore[m
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        scaling_groups: Sequence[str],
+        resource_groups: Sequence[str],
         access_key: str,
     ) -> DisassociateScalingGroupsWithKeyPair:
         graph_ctx: GraphQueryContext = info.context
-        resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_groups[0])
-        action = DisassociateScalingGroupWithKeypairsAction(
+        resource_group_id = await _resolve_resource_group_id(graph_ctx, resource_groups[0])
+        action = DisassociateResourceGroupWithKeypairsAction(
             resource_group_id=resource_group_id,
-            purger=create_scaling_group_for_keypairs_purger(
+            purger=create_resource_group_for_keypairs_purger(
                 resource_group_id=resource_group_id,
                 access_key=AccessKey(access_key),
             ),
         )
-        await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_keypairs.run(
+        await graph_ctx.processors.resource_group.disassociate_resource_group_with_keypairs.run(
             action
         )
         return cls(ok=True, msg="success")

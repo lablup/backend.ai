@@ -226,7 +226,7 @@ class ResourceConfig:
     @gql_field(description="The resource group of this entity.")  # type: ignore[misc]
     def resource_group(self) -> ResourceGroup | None:
         """Resolves the federated ResourceGroup."""
-        # Federated ScalingGroupNode stub is a relay.Node; pass the inner id so Strawberry
+        # Federated ResourceGroupNode stub is a relay.Node; pass the inner id so Strawberry
         # re-encodes the same global ID the graphene subgraph expects.
         return ResourceGroup(id=ID(str(self.resource_group_name)))
 

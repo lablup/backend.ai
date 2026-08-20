@@ -129,13 +129,13 @@ from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.resource_group import resource_groups, sgroups_for_domains
+from ai.backend.manager.models.resource_group.row import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
     keypair_resource_policies,
 )
-from ai.backend.manager.models.scaling_group import scaling_groups, sgroups_for_domains
-from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import SessionTemplateRow
 from ai.backend.manager.models.user import users
@@ -718,7 +718,7 @@ async def resource_policy_fixture(
 
 
 @pytest.fixture()
-async def scaling_group_name(
+async def resource_group_name(
     db_engine: SAEngine,
     domain_fixture: DomainFixtureData,
 ) -> AsyncIterator[ResourceGroupName]:
@@ -727,7 +727,7 @@ async def scaling_group_name(
     sgroup_id = uuid.uuid4()
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(scaling_groups).values(
+            sa.insert(resource_groups).values(
                 id=sgroup_id,
                 name=sgroup_name,
                 description=f"Test scaling group {sgroup_name}",
@@ -735,7 +735,7 @@ async def scaling_group_name(
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
         )
         await conn.execute(
@@ -749,18 +749,18 @@ async def scaling_group_name(
         await conn.execute(
             sgroups_for_domains.delete().where(sgroups_for_domains.c.resource_group_id == sgroup_id)
         )
-        await conn.execute(scaling_groups.delete().where(scaling_groups.c.name == sgroup_name))
+        await conn.execute(resource_groups.delete().where(resource_groups.c.name == sgroup_name))
 
 
 @pytest.fixture()
 async def resource_group_id(
     db_engine: SAEngine,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
 ) -> ResourceGroupID:
     """Return the inserted scaling group's ID."""
     async with db_engine.begin() as conn:
         result = await conn.execute(
-            sa.select(scaling_groups.c.id).where(scaling_groups.c.name == scaling_group_name)
+            sa.select(resource_groups.c.id).where(resource_groups.c.name == resource_group_name)
         )
         return ResourceGroupID(result.scalar_one())
 
@@ -1110,7 +1110,7 @@ async def regular_user_fixture(
 async def database_fixture(
     admin_user_fixture: UserFixtureData,
     regular_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
 ) -> AsyncIterator[None]:
     """Backward-compatible aggregate: requests all seed data fixtures."""
     yield

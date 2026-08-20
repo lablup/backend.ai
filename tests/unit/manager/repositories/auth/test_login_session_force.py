@@ -28,11 +28,11 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import AuthDBSource
@@ -40,7 +40,7 @@ from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
     AgentRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
 )
 
 

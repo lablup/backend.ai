@@ -790,7 +790,7 @@ class SessionHandler:
                 group_name=params.group,
                 requester_access_key=requester_access_key,
                 owner_access_key=owner_access_key,
-                scaling_group_name=params.scaling_group or "",
+                resource_group_name=params.scaling_group or "",
                 tag=params.tag or "",
                 session_type=params.session_type,
                 enqueue_only=params.enqueue_only,

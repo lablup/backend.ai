@@ -115,7 +115,7 @@ class TestPrereservationLifecycle:
             db_with_cleanup,
             domain_name=test_domain.domain_name,
             domain_id=test_domain_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,

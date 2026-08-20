@@ -38,9 +38,9 @@ from ai.backend.common.dto.manager.domain import (
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import groups
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupOpts,
-    scaling_groups,
+from ai.backend.manager.models.resource_group import (
+    ResourceGroupOpts,
+    resource_groups,
     sgroups_for_domains,
 )
 
@@ -147,7 +147,7 @@ class TestDomainCreateCRUD:
                 await conn.execute(sa.select(domains.c.id).where(domains.c.name == domain_name))
             ).scalar_one()
             await conn.execute(
-                sa.insert(scaling_groups).values(
+                sa.insert(resource_groups).values(
                     id=sgroup_id,
                     name=sgroup_name,
                     description=f"CRUD test scaling group {sgroup_name}",
@@ -156,7 +156,7 @@ class TestDomainCreateCRUD:
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             await conn.execute(
@@ -184,7 +184,7 @@ class TestDomainCreateCRUD:
                     )
                 )
                 await conn.execute(
-                    scaling_groups.delete().where(scaling_groups.c.name == sgroup_name)
+                    resource_groups.delete().where(resource_groups.c.name == sgroup_name)
                 )
 
     async def test_f_biz1_create_domain_with_duplicate_name_raises_conflict(

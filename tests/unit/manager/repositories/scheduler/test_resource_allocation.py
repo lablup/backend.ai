@@ -57,6 +57,7 @@ from ai.backend.manager.models.rbac_models import (
     RoleRow,
     UserRoleRow,
 )
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -64,7 +65,6 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
@@ -120,7 +120,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -183,12 +183,12 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=test_scaling_group_id,
                     name=sg_name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(
+                    scheduler_opts=ResourceGroupOpts(
                         allowed_session_types=[],
                         pending_timeout=timedelta(hours=1),
                         config={},
@@ -349,7 +349,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                     id=agent_id,
                     status=AgentStatus.ALIVE,
                     region="local",
-                    scaling_group=test_scaling_group_name,
+                    resource_group=test_scaling_group_name,
                     resource_group_id=test_scaling_group_id,
                     available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
                     occupied_slots=ResourceSlot(),
@@ -379,7 +379,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         domain_id: DomainID,
         domain_name: str,
         resource_group_id: ResourceGroupID,
-        scaling_group_name: str,
+        resource_group_name: str,
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
         access_key: AccessKey,
@@ -406,7 +406,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                     domain_name=domain_name,
                     group_id=group_id,
                     resource_group_id=resource_group_id,
-                    scaling_group_name=scaling_group_name,
+                    resource_group_name=resource_group_name,
                     status=SessionStatus.CREATING,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
@@ -426,7 +426,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                     session_id=session_id,
                     agent=agent_id,
                     agent_addr="127.0.0.1:6001" if agent_id else None,
-                    scaling_group=scaling_group_name,
+                    resource_group=resource_group_name,
                     resource_group_id=resource_group_id,
                     cluster_idx=0,
                     cluster_role="main",
@@ -515,7 +515,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -570,7 +570,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -620,7 +620,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -662,7 +662,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -725,7 +725,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -776,7 +776,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -826,7 +826,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,

@@ -46,7 +46,7 @@ async def session_seed(
     domain_fixture: str,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_fixture: str,
+    resource_group_fixture: str,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session + kernel directly in the database for integration tests.
 
@@ -78,7 +78,7 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_fixture,
+                resource_group_name=resource_group_fixture,
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
@@ -103,7 +103,7 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_fixture,
+                resource_group=resource_group_fixture,
                 status=KernelStatus.RUNNING,
                 status_info="",
                 occupied_slots=ResourceSlot(),

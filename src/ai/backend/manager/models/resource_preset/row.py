@@ -113,7 +113,7 @@ class ResourcePresetRow(Base):
             name=self.name,
             resource_slots=self.resource_slots,
             shared_memory=self.shared_memory,
-            scaling_group_name=self.scaling_group_name,
+            resource_group_name=self.scaling_group_name,
         )
 
 

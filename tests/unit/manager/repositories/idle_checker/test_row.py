@@ -28,11 +28,11 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow, SessionIdleCheckRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -59,7 +59,7 @@ class TestSessionIdleCheckRow:
                 UserResourcePolicyRow,
                 UserRow,
                 GroupRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 SessionRow,
                 IdleCheckerRow,
                 SessionIdleCheckRow,
@@ -107,7 +107,7 @@ class TestSessionIdleCheckRow:
                 )
             )
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=resource_group_id,
                     name="session-idle-check-resource-group",
                     description=None,
@@ -150,7 +150,7 @@ class TestSessionIdleCheckRow:
                     environ=None,
                     bootstrap_script=None,
                     use_host_network=False,
-                    scaling_group_name="session-idle-check-resource-group",
+                    resource_group_name="session-idle-check-resource-group",
                 )
             )
             db_sess.add(

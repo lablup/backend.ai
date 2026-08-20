@@ -224,13 +224,13 @@ class TestHideAgentsVisibility:
         self,
         user_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
     ) -> None:
         """Regular user with hide_agents=True should get resource_group=null."""
         result = await user_v2_registry.resource_allocation.effective(
             EffectiveResourceAllocationInput(
                 project_id=group_fixture,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
             ),
         )
         assert isinstance(result, EffectiveResourceAllocationPayload)
@@ -243,13 +243,13 @@ class TestHideAgentsVisibility:
         self,
         admin_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
     ) -> None:
         """Admin should see resource_group even when hide_agents=True."""
         result = await admin_v2_registry.resource_allocation.effective(
             EffectiveResourceAllocationInput(
                 project_id=group_fixture,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
             ),
         )
         assert isinstance(result, EffectiveResourceAllocationPayload)
@@ -360,13 +360,13 @@ class TestGroupResourceVisibility:
         self,
         user_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
     ) -> None:
         """Regular user with group_resource_visibility=False should get project=null."""
         result = await user_v2_registry.resource_allocation.effective(
             EffectiveResourceAllocationInput(
                 project_id=group_fixture,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
             ),
         )
         assert isinstance(result, EffectiveResourceAllocationPayload)
@@ -379,13 +379,13 @@ class TestGroupResourceVisibility:
         self,
         admin_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
     ) -> None:
         """Admin should see project even when group_resource_visibility=False."""
         result = await admin_v2_registry.resource_allocation.effective(
             EffectiveResourceAllocationInput(
                 project_id=group_fixture,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
             ),
         )
         assert isinstance(result, EffectiveResourceAllocationPayload)

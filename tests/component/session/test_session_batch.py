@@ -21,7 +21,7 @@ from ai.backend.common.dto.manager.session.response import (
     StartServiceResponse,
 )
 from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.scaling_group import scaling_groups
+from ai.backend.manager.models.resource_group import resource_groups
 
 from .conftest import SessionSeedData
 
@@ -132,7 +132,7 @@ class TestSessionStartService:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
@@ -141,8 +141,8 @@ class TestSessionStartService:
         # Set wsproxy_addr on scaling group
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=wsproxy_addr)
             )
 

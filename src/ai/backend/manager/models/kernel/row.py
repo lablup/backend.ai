@@ -556,7 +556,7 @@ class KernelRow(CreatedAtMixin, Base):
                 cluster_hostname=self.cluster_hostname,
             ),
             resource=ResourceInfo(
-                scaling_group=self.scaling_group,
+                resource_group=self.scaling_group,
                 resource_group_id=self.resource_group_id,
                 agent=self.agent,
                 agent_addr=self.agent_addr,

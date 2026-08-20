@@ -78,7 +78,7 @@ class KeyPairResourcePolicyData(EntityData):
 
 
 @dataclass
-class ScalingGroupProxyTarget:
+class ResourceGroupProxyTarget:
     addr: str
     api_token: str
 

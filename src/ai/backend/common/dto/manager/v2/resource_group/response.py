@@ -32,7 +32,7 @@ __all__ = (
     "AllowedResourceGroupsPayload",
     "CreateResourceGroupPayload",
     "DeleteResourceGroupPayload",
-    "FairShareScalingGroupSpecInfo",
+    "FairShareResourceGroupSpecInfo",
     "PreemptionConfigInfo",
     "ReplaceResourceGroupDefaultDeploymentOptionsPayload",
     "ReplaceResourceGroupDefaultSessionOptionsPayload",
@@ -272,7 +272,7 @@ class ReplaceResourceGroupDefaultSessionOptionsPayload(BaseResponseModel):
     )
 
 
-class FairShareScalingGroupSpecInfo(BaseResponseModel):
+class FairShareResourceGroupSpecInfo(BaseResponseModel):
     """Fair share configuration for a resource group."""
 
     half_life_days: int = Field(description="Half-life for exponential decay in days")

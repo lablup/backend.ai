@@ -147,8 +147,8 @@ from .errors.resource import (
     DatabaseConnectionUnavailable,
     InstanceNotFound,
     NoCurrentTaskContext,
-    ScalingGroupNotFound,
-    ScalingGroupSessionTypeNotAllowed,
+    ResourceGroupNotFound,
+    ResourceGroupSessionTypeNotAllowed,
 )
 from .models.agent import AgentRow, agents
 from .models.domain import domains
@@ -164,8 +164,8 @@ from .models.kernel import (
 )
 from .models.keypair import query_bootstrap_script
 from .models.network import NetworkRow, NetworkType
+from .models.resource_group import query_allowed_sgroups, resource_groups
 from .models.runtime_variant.row import RuntimeVariantRow
-from .models.scaling_group import query_allowed_sgroups, scaling_groups
 from .models.session import (
     PRIVATE_SESSION_TYPES,
     KernelLoadingStrategy,
@@ -737,7 +737,7 @@ class AgentRegistry:
         user_scope: UserScope,
         owner_access_key: AccessKey,
         resource_policy: dict[str, Any],
-        scaling_group: str,
+        resource_group: str,
         sess_type: SessionTypes,
         tag: str,
         enqueue_only: bool = False,
@@ -896,7 +896,7 @@ class AgentRegistry:
                             },
                             "kernel_configs": kernel_configs,
                         },
-                        scaling_group,
+                        resource_group,
                         sess_type,
                         resource_policy,
                         user_scope=user_scope,
@@ -978,7 +978,7 @@ class AgentRegistry:
         session_name: str,
         access_key: AccessKey,
         session_enqueue_configs: SessionEnqueueingConfig,
-        scaling_group: str | None,
+        resource_group: str | None,
         session_type: SessionTypes,
         resource_policy: dict[str, Any],
         *,
@@ -1130,8 +1130,8 @@ class AgentRegistry:
 
         domain_name = DomainName(user_scope.domain_name)
         domain_id = await self._scheduler_repository.get_domain_id_by_name(domain_name)
-        if scaling_group:
-            resource_group_name = ResourceGroupName(scaling_group)
+        if resource_group:
+            resource_group_name = ResourceGroupName(resource_group)
             resource_group_id = await self._scheduler_repository.get_resource_group_id_by_name(
                 resource_group_name
             )
@@ -1196,7 +1196,7 @@ class AgentRegistry:
         session_name: str,
         access_key: AccessKey,
         session_enqueue_configs: SessionEnqueueingConfig,
-        scaling_group: str | None,
+        resource_group: str | None,
         session_type: SessionTypes,
         resource_policy: dict[str, Any],
         *,
@@ -1224,7 +1224,7 @@ class AgentRegistry:
             session_name=session_name,
             access_key=access_key,
             session_enqueue_configs=session_enqueue_configs,
-            scaling_group=scaling_group,
+            resource_group=resource_group,
             session_type=session_type,
             resource_policy=resource_policy,
             user_scope=user_scope,
@@ -1841,9 +1841,9 @@ class AgentRegistry:
         endpoint: EndpointData,
     ) -> str:
         query = (
-            sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
-            .select_from(scaling_groups)
-            .where(scaling_groups.c.name == endpoint.resource_group)
+            sa.select(resource_groups.c.wsproxy_addr, resource_groups.c.wsproxy_api_token)
+            .select_from(resource_groups)
+            .where(resource_groups.c.name == endpoint.resource_group)
         )
 
         result = await db_sess.execute(query)
@@ -1894,9 +1894,9 @@ class AgentRegistry:
 
     async def delete_appproxy_endpoint(self, db_sess: AsyncSession, endpoint: EndpointRow) -> None:
         query = (
-            sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
-            .select_from(scaling_groups)
-            .where(scaling_groups.c.name == endpoint.resource_group)
+            sa.select(resource_groups.c.wsproxy_addr, resource_groups.c.wsproxy_api_token)
+            .select_from(resource_groups)
+            .where(resource_groups.c.name == endpoint.resource_group)
         )
 
         result = await db_sess.execute(query)
@@ -1910,17 +1910,17 @@ class AgentRegistry:
         await wsproxy_client.delete_endpoint(endpoint.id)
 
 
-async def check_scaling_group(
+async def check_resource_group(
     conn: SAConnection,
-    scaling_group: str | None,
+    resource_group: str | None,
     session_type: SessionTypes,
     access_key: AccessKey,
     domain_name: str,
     group_id: ProjectID | str,
     public_sgroup_only: bool = False,
 ) -> str:
-    # Check scaling group availability if scaling_group parameter is given.
-    # If scaling_group is not provided, it will be selected as the first one among
+    # Check scaling group availability if resource_group parameter is given.
+    # If resource_group is not provided, it will be selected as the first one among
     # the list of allowed scaling groups.
     candidates = await query_allowed_sgroups(
         conn,
@@ -1931,39 +1931,39 @@ async def check_scaling_group(
     if public_sgroup_only:
         candidates = [sgroup for sgroup in candidates if sgroup.is_public]
     if not candidates:
-        raise ScalingGroupNotFound("You have no scaling groups allowed to use.")
+        raise ResourceGroupNotFound("You have no scaling groups allowed to use.")
 
     stype = session_type.value.lower()
-    if scaling_group is None:
+    if resource_group is None:
         for sgroup in candidates:
             allowed_session_types = sgroup.scheduler_opts.allowed_session_types
             if stype in allowed_session_types:
-                scaling_group = sgroup.name
+                resource_group = sgroup.name
                 break
         else:
-            raise ScalingGroupNotFound(
+            raise ResourceGroupNotFound(
                 f"No scaling groups accept the session type '{session_type}'.",
             )
     else:
-        scaling_group_found = False
+        resource_group_found = False
         for sgroup in candidates:
-            if scaling_group == sgroup.name:
-                # scaling_group's unique key is 'name' field for now,
-                # but we will change scaling_group's unique key to new 'id' field.
-                scaling_group_found = True
+            if resource_group == sgroup.name:
+                # resource_group's unique key is 'name' field for now,
+                # but we will change resource_group's unique key to new 'id' field.
+                resource_group_found = True
                 allowed_session_types = sgroup.scheduler_opts.allowed_session_types
                 if stype in allowed_session_types:
                     break
         else:
-            if scaling_group_found:
-                raise ScalingGroupSessionTypeNotAllowed(
-                    f"The scaling group '{scaling_group}' does not accept "
+            if resource_group_found:
+                raise ResourceGroupSessionTypeNotAllowed(
+                    f"The scaling group '{resource_group}' does not accept "
                     f"the session type '{session_type}'."
                 )
-            raise ScalingGroupNotFound(
-                f"The scaling group '{scaling_group}' does not exist "
-                f"or you do not have access to the scaling group '{scaling_group}'."
+            raise ResourceGroupNotFound(
+                f"The scaling group '{resource_group}' does not exist "
+                f"or you do not have access to the scaling group '{resource_group}'."
             )
-    if scaling_group is None:
-        raise ScalingGroupNotFound("Scaling group not found")
-    return scaling_group
+    if resource_group is None:
+        raise ResourceGroupNotFound("Scaling group not found")
+    return resource_group

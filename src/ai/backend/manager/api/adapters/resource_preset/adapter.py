@@ -146,7 +146,7 @@ class ResourcePresetAdapter(BaseAdapter):
                 name=name,
                 resource_slots=resource_slots,
                 shared_memory=shared_memory_str,
-                scaling_group_name=resource_group_name,
+                resource_group_name=resource_group_name,
             )
         )
         result = await self._processors.resource_preset.create_preset.run(
@@ -184,7 +184,7 @@ class ResourcePresetAdapter(BaseAdapter):
             resource_slots=resource_slots_state,
             name=name_state,
             shared_memory=shared_memory_value,
-            scaling_group_name=resource_group_state,
+            resource_group_name=resource_group_state,
         )
         updater = Updater(spec=updater_spec, pk_value=input.id)
         result = await self._processors.resource_preset.update_preset.run(
@@ -268,7 +268,7 @@ class ResourcePresetAdapter(BaseAdapter):
                 if data.shared_memory is not None
                 else None
             ),
-            resource_group_name=data.scaling_group_name,
+            resource_group_name=data.resource_group_name,
         )
 
 

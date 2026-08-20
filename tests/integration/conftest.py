@@ -58,13 +58,13 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.resource_group import resource_groups, sgroups_for_domains
+from ai.backend.manager.models.resource_group.row import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
     keypair_resource_policies,
 )
-from ai.backend.manager.models.scaling_group import scaling_groups, sgroups_for_domains
-from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import SessionTemplateRow
 from ai.backend.manager.models.user import users
@@ -542,7 +542,7 @@ async def resource_policy_fixture(
 
 
 @pytest.fixture()
-async def scaling_group_fixture(
+async def resource_group_fixture(
     db_engine: SAEngine,
     domain_fixture: str,
 ) -> AsyncIterator[ResourceGroupName]:
@@ -554,7 +554,7 @@ async def scaling_group_fixture(
             await conn.execute(sa.select(domains.c.id).where(domains.c.name == domain_fixture))
         ).scalar_one()
         await conn.execute(
-            sa.insert(scaling_groups).values(
+            sa.insert(resource_groups).values(
                 id=sgroup_id,
                 name=sgroup_name,
                 description=f"Test scaling group {sgroup_name}",
@@ -562,7 +562,7 @@ async def scaling_group_fixture(
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
         )
         await conn.execute(
@@ -576,7 +576,7 @@ async def scaling_group_fixture(
         await conn.execute(
             sgroups_for_domains.delete().where(sgroups_for_domains.c.resource_group_id == sgroup_id)
         )
-        await conn.execute(scaling_groups.delete().where(scaling_groups.c.name == sgroup_name))
+        await conn.execute(resource_groups.delete().where(resource_groups.c.name == sgroup_name))
 
 
 @pytest.fixture()
@@ -764,7 +764,7 @@ async def regular_user_fixture(
 async def database_fixture(
     admin_user_fixture: UserFixtureData,
     regular_user_fixture: UserFixtureData,
-    scaling_group_fixture: str,
+    resource_group_fixture: str,
 ) -> AsyncIterator[None]:
     """Backward-compatible aggregate: requests all seed data fixtures."""
     yield

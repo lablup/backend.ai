@@ -156,7 +156,7 @@ def _create_kernel_binding_data(
         startup_command=None,
         internal_data={},
         preopen_ports=[],
-        scaling_group="default",
+        resource_group="default",
     )
 
 

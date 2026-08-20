@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
+from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
 from ai.backend.manager.sokovan.deployment.types import (
@@ -39,7 +39,7 @@ class TestDestroyDeployment:
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
         destroying_deployment: DeploymentWithHistory,
-        proxy_targets_by_scaling_group: dict[str, ScalingGroupProxyTarget],
+        proxy_targets_by_scaling_group: dict[str, ResourceGroupProxyTarget],
     ) -> None:
         """DD-001: Successful deployment destruction.
 
@@ -84,7 +84,7 @@ class TestDestroyDeployment:
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
         destroying_deployments_multiple: list[DeploymentWithHistory],
-        proxy_targets_by_scaling_group: dict[str, ScalingGroupProxyTarget],
+        proxy_targets_by_scaling_group: dict[str, ResourceGroupProxyTarget],
     ) -> None:
         """DD-002: Multiple deployments destroyed in parallel.
 
@@ -125,7 +125,7 @@ class TestDestroyDeployment:
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
         destroying_deployment: DeploymentWithHistory,
-        proxy_targets_by_scaling_group: dict[str, ScalingGroupProxyTarget],
+        proxy_targets_by_scaling_group: dict[str, ResourceGroupProxyTarget],
     ) -> None:
         """DD-003: Unregister failure is captured.
 

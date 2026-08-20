@@ -28,7 +28,7 @@ class CheckPresetAvailabilityAction(BaseScopeAction):
     group_resource_visibility: bool
     hide_agents: bool
     is_admin: bool
-    scaling_group: str | None = None
+    resource_group: str | None = None
 
     @override
     @classmethod

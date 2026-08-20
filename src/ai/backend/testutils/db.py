@@ -101,7 +101,7 @@ async def with_tables(
         # With association tables:
         async with with_tables(database_connection, [
             DomainRow,
-            ScalingGroupRow,
+            ResourceGroupRow,
             sgroups_for_domains,  # raw Table object
         ]):
             ...

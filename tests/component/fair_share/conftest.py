@@ -37,18 +37,18 @@ from ai.backend.manager.data.resource_usage_history.types import (
     UserUsageBucketData,
 )
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.scaling_group import sgroups_for_groups
+from ai.backend.manager.models.resource_group import sgroups_for_groups
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
-from ai.backend.manager.repositories.scaling_group.repository import ScalingGroupRepository
+from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
 from ai.backend.manager.services.fair_share.service import FairShareService
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
+from ai.backend.manager.services.resource_group.service import ResourceGroupService
 from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
-from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
-from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -85,12 +85,12 @@ def resource_usage_processors(
 
 
 @pytest.fixture()
-def scaling_group_processors(
+def resource_group_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
-) -> ScalingGroupProcessors:
-    service = ScalingGroupService(ScalingGroupRepository(database_engine))
-    return ScalingGroupProcessors(
+) -> ResourceGroupProcessors:
+    service = ResourceGroupService(ResourceGroupRepository(database_engine))
+    return ResourceGroupProcessors(
         processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service
     )
 
@@ -100,7 +100,7 @@ def server_module_registries(
     route_deps: RouteDeps,
     fair_share_processors: FairShareProcessors,
     resource_usage_processors: ResourceUsageProcessors,
-    scaling_group_processors: ScalingGroupProcessors,
+    resource_group_processors: ResourceGroupProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for fair-share-domain tests."""
     return [
@@ -108,7 +108,7 @@ def server_module_registries(
             FairShareAPIHandler(
                 fair_share=fair_share_processors,
                 resource_usage=resource_usage_processors,
-                scaling_group=scaling_group_processors,
+                resource_group=resource_group_processors,
             ),
             route_deps,
         ),

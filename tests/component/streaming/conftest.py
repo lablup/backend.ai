@@ -109,7 +109,7 @@ async def session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session + kernel with service_ports in the database.
@@ -142,7 +142,7 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
@@ -168,7 +168,7 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_name,
+                resource_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
@@ -217,7 +217,7 @@ async def session_seed_no_ports(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session + kernel with ``service_ports=None``.
@@ -250,7 +250,7 @@ async def session_seed_no_ports(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
@@ -276,7 +276,7 @@ async def session_seed_no_ports(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_name,
+                resource_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",

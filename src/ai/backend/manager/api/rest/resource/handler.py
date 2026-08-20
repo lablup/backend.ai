@@ -100,7 +100,7 @@ class ResourceHandler:
         result = await self._resource_preset.list_presets.run(
             ListResourcePresetsAction(
                 access_key=ctx.access_key,
-                scaling_group=params.scaling_group,
+                resource_group=params.scaling_group,
             )
         )
         return APIResponse.build(HTTPStatus.OK, ListPresetsResponse(presets=result.presets))
@@ -130,12 +130,12 @@ class ResourceHandler:
                 domain_name=ctx.user_domain,
                 user_id=ctx.user_uuid,
                 group=params.group,
-                scaling_group=params.scaling_group,
+                resource_group=params.scaling_group,
             )
         )
-        scaling_groups_json: dict[str, Any] = {}
-        for sgname, sg_data in result.scaling_groups.items():
-            scaling_groups_json[sgname] = {
+        resource_groups_json: dict[str, Any] = {}
+        for sgname, sg_data in result.resource_groups.items():
+            resource_groups_json[sgname] = {
                 ResourceSlotState.OCCUPIED: quantities_to_dict(sg_data[ResourceSlotState.OCCUPIED]),
                 ResourceSlotState.AVAILABLE: quantities_to_dict(
                     sg_data[ResourceSlotState.AVAILABLE]
@@ -149,8 +149,8 @@ class ResourceHandler:
             group_limits=quantities_to_dict(result.group_limits),
             group_using=quantities_to_dict(result.group_using),
             group_remaining=quantities_to_dict(result.group_remaining),
-            scaling_group_remaining=quantities_to_dict(result.scaling_group_remaining),
-            scaling_groups=scaling_groups_json,
+            scaling_group_remaining=quantities_to_dict(result.resource_group_remaining),
+            scaling_groups=resource_groups_json,
         )
         return APIResponse.build(HTTPStatus.OK, resp)
 

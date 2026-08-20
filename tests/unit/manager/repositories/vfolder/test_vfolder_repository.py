@@ -72,6 +72,7 @@ from ai.backend.manager.models.rbac_models.permission.object_permission import O
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -84,7 +85,6 @@ from ai.backend.manager.models.resource_slot.row import (
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow, SessionStatus
 from ai.backend.manager.models.user import (
     UserRole,
@@ -148,7 +148,7 @@ class TestVfolderRepository:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -640,7 +640,7 @@ class TestVfolderRepositoryPurge:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -1021,7 +1021,7 @@ class TestVfolderRepositoryDeleteForever:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -1395,14 +1395,14 @@ class TestVfolderRepositoryDeleteForever:
     ) -> tuple[uuid.UUID, str]:
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             db_sess.add(sgroup)
             await db_sess.flush()
@@ -1498,7 +1498,7 @@ class TestVfolderRepositoryDeleteForever:
                     domain_name=domain_name,
                     domain_id=domain_id,
                     resource_group_id=sgroup_id,
-                    scaling_group_name=sgroup_name,
+                    resource_group_name=sgroup_name,
                     group_id=group_id,
                     user_uuid=user_id,
                     occupying_slots=ResourceSlot(),
@@ -1593,7 +1593,7 @@ class TestVfolderRepositoryDeleteForever:
                     domain_name=domain_name,
                     domain_id=domain_id,
                     resource_group_id=sgroup_id,
-                    scaling_group_name=sgroup_name,
+                    resource_group_name=sgroup_name,
                     group_id=group_id,
                     user_uuid=user_id,
                     occupying_slots=ResourceSlot(),
@@ -1609,7 +1609,7 @@ class TestVfolderRepositoryDeleteForever:
                     domain_name=domain_name,
                     group_id=group_id,
                     user_uuid=user_id,
-                    scaling_group=sgroup_name,
+                    resource_group=sgroup_name,
                     resource_group_id=sgroup_id,
                     cluster_role=DEFAULT_ROLE,
                     occupied_slots=ResourceSlot(),
@@ -1925,7 +1925,7 @@ class TestVFolderRepositoryTrashAndRestore:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,

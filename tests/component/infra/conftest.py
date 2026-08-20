@@ -33,9 +33,9 @@ from ai.backend.manager.api.rest.etcd.handler import EtcdHandler
 from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
 from ai.backend.manager.api.rest.resource.registry import register_resource_routes
+from ai.backend.manager.api.rest.resource_group.handler import ResourceGroupHandler
+from ai.backend.manager.api.rest.resource_group.registry import register_resource_group_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
-from ai.backend.manager.api.rest.scaling_group.handler import ScalingGroupHandler
-from ai.backend.manager.api.rest.scaling_group.registry import register_scaling_group_routes
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.error_log.types import ErrorLogData
@@ -52,8 +52,8 @@ from ai.backend.manager.repositories.etcd_config.repository import EtcdConfigRep
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
-from ai.backend.manager.repositories.scaling_group.repository import ScalingGroupRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
@@ -64,10 +64,10 @@ from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcess
 from ai.backend.manager.services.etcd_config.service import EtcdConfigService
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.group.service import GroupService
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
+from ai.backend.manager.services.resource_group.service import ResourceGroupService
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
-from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
-from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupBulkKeypairOwnerAction,
     LookupKeypairOwnerAction,
@@ -233,13 +233,13 @@ def user_processors(
 
 
 @pytest.fixture()
-def scaling_group_processors(
+def resource_group_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
-) -> ScalingGroupProcessors:
-    repo = ScalingGroupRepository(database_engine)
-    service = ScalingGroupService(repo, appproxy_client_pool=AsyncMock())
-    return ScalingGroupProcessors(
+) -> ResourceGroupProcessors:
+    repo = ResourceGroupRepository(database_engine)
+    service = ResourceGroupService(repo, appproxy_client_pool=AsyncMock())
+    return ResourceGroupProcessors(
         processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service
     )
 
@@ -253,7 +253,7 @@ def server_module_registries(
     agent_processors: AgentProcessors,
     group_processors: GroupProcessors,
     user_processors: UserProcessors,
-    scaling_group_processors: ScalingGroupProcessors,
+    resource_group_processors: ResourceGroupProcessors,
     config_provider: ManagerConfigProvider,
 ) -> list[RouteRegistry]:
     """Load only the modules required for infra-domain tests."""
@@ -277,8 +277,8 @@ def server_module_registries(
             ),
             route_deps,
         ),
-        register_scaling_group_routes(
-            ScalingGroupHandler(scaling_group=scaling_group_processors), route_deps
+        register_resource_group_routes(
+            ResourceGroupHandler(resource_group=resource_group_processors), route_deps
         ),
     ]
 
@@ -316,7 +316,7 @@ async def resource_preset_fixture(
                 name=preset_name,
                 resource_slots=resource_slots,
                 shared_memory=None,
-                scaling_group_name=None,
+                resource_group_name=None,
             )
         )
     yield {"id": str(preset_id), "name": preset_name}

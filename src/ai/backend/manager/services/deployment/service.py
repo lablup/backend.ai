@@ -1011,7 +1011,7 @@ class DeploymentService:
         target configured — an opaque local fallback would not pass the
         worker's HS256 check, so refusing here is the only safe option.
         """
-        proxy_targets = await self._deployment_repository.fetch_scaling_group_proxy_targets({
+        proxy_targets = await self._deployment_repository.fetch_resource_group_proxy_targets({
             resource_group
         })
         proxy_target = proxy_targets.get(resource_group)

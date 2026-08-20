@@ -187,6 +187,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.prometheus_query_preset_category.processors import (
         PrometheusQueryPresetCategoryProcessors,
     )
+    from ai.backend.manager.services.resource_group.processors import (
+        ResourceGroupProcessors,
+    )
+    from ai.backend.manager.services.resource_group.service import (
+        ResourceGroupService,
+    )
     from ai.backend.manager.services.resource_preset.processors import (
         ResourcePresetProcessors,
     )
@@ -217,12 +223,6 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.runtime_variant_preset.service import (
         RuntimeVariantPresetService,
-    )
-    from ai.backend.manager.services.scaling_group.processors import (
-        ScalingGroupProcessors,
-    )
-    from ai.backend.manager.services.scaling_group.service import (
-        ScalingGroupService,
     )
     from ai.backend.manager.services.scheduling_history.processors import (
         SchedulingHistoryProcessors,
@@ -354,7 +354,7 @@ class Services:
     runtime_variant_preset: RuntimeVariantPresetService
     deployment_revision_preset: DeploymentPresetService
     model_card: ModelCardService
-    scaling_group: ScalingGroupService
+    resource_group: ResourceGroupService
     metric: MetricService
     model_serving: ModelServingService
     model_serving_auto_scaling: AutoScalingService
@@ -420,7 +420,7 @@ class Processors:
     deployment_revision_preset: DeploymentPresetProcessors
     model_card: ModelCardProcessors
     resource_usage: ResourceUsageProcessors
-    scaling_group: ScalingGroupProcessors
+    resource_group: ResourceGroupProcessors
     metric: MetricProcessors
     model_serving: ModelServingProcessors
     model_serving_auto_scaling: ModelServingAutoScalingProcessors

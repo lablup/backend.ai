@@ -47,6 +47,7 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -55,7 +56,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -77,7 +77,7 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 # one project, one endpoint).
 _REQUIRED_TABLES: list[TableOrORM] = [
     DomainRow,
-    ScalingGroupRow,
+    ResourceGroupRow,
     UserResourcePolicyRow,
     ProjectResourcePolicyRow,
     KeyPairResourcePolicyRow,
@@ -167,15 +167,15 @@ class TestObserverCycleRouteScope:
         return DomainFixtureData(domain_name=DomainName(name), domain_id=domain_id)
 
     @pytest.fixture
-    async def scaling_group(self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str) -> str:
+    async def resource_group(self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str) -> str:
         name = f"sg-{suffix}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
         return name
@@ -274,7 +274,7 @@ class TestObserverCycleRouteScope:
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
         domain: DomainFixtureData,
-        scaling_group: str,
+        resource_group: str,
         user: UUID,
         project: UUID,
         revision_id: UUID,
@@ -289,7 +289,7 @@ class TestObserverCycleRouteScope:
                     session_owner=user,
                     domain=domain.domain_name,
                     project=project,
-                    resource_group=scaling_group,
+                    resource_group=resource_group,
                     lifecycle_stage=EndpointLifecycle.CREATED,
                     replicas=4,
                 )

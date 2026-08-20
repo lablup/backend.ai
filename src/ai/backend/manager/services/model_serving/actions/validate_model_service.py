@@ -57,5 +57,5 @@ class ValidateModelServiceActionResult(ModelServiceScopeActionResult):
     owner_role: UserRole
     group_id: uuid.UUID
     resource_policy: dict[str, Any]
-    scaling_group: str
+    resource_group: str
     extra_mounts: Sequence[VFolderMount]

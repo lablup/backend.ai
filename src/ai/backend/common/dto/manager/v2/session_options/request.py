@@ -129,7 +129,7 @@ class KernelExecutionSpecInput(BaseRequestModel):
     """Per-kernel execution spec shared by all replicas of one group.
 
     Every field is optional. The resolver fills gaps from
-    `ScalingGroupRow.default_session_options.default_kernel_execution_spec`
+    `ResourceGroupRow.default_session_options.default_kernel_execution_spec`
     before a session is enqueued; any remaining gaps are surfaced as
     validation errors (e.g. an image must ultimately be resolved).
     """

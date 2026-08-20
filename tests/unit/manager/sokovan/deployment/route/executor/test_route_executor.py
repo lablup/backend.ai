@@ -40,7 +40,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
-from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
+from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
@@ -1022,7 +1022,7 @@ def _wire_proxy_target(
     deployments = [_make_deployment_mock(UUID(str(eid)), resource_group) for eid in endpoint_ids]
     mock_deployment_repo.get_deployments_by_ids.return_value = deployments
     mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = {
-        resource_group: ScalingGroupProxyTarget(addr=addr, api_token=token),
+        resource_group: ResourceGroupProxyTarget(addr=addr, api_token=token),
     }
     mock_deployment_repo.fetch_route_connection_infos.return_value = {
         UUID(str(eid)): [

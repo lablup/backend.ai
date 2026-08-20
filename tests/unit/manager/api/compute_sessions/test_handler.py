@@ -59,7 +59,7 @@ def create_session_data(
     session_id: UUID | None = None,
     name: str = "test-session",
     status: SessionStatus = SessionStatus.RUNNING,
-    scaling_group: str = "default",
+    resource_group: str = "default",
     images: list[str] | None = None,
 ) -> SessionData:
     """Create a SessionData for testing."""
@@ -95,7 +95,7 @@ def create_session_data(
         timeout=None,
         batch_timeout=None,
         terminated_at=None,
-        scaling_group_name=scaling_group,
+        resource_group_name=resource_group,
         starts_at=None,
         status_info=None,
         status_data=None,
@@ -161,7 +161,7 @@ def create_kernel_info(
             cluster_hostname="main",
         ),
         resource=ResourceInfo(
-            scaling_group="default",
+            resource_group="default",
             resource_group_id=ResourceGroupID(uuid4()),
             agent=agent,
             agent_addr=None,

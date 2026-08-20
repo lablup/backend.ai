@@ -693,7 +693,7 @@ class DeploymentController:
         architecture = image_identifier.architecture
         if not architecture:
             architecture = (
-                await self._deployment_repository.get_default_architecture_from_scaling_group(
+                await self._deployment_repository.get_default_architecture_from_resource_group(
                     resource_group
                 )
             )

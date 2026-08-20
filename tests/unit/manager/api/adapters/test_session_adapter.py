@@ -53,7 +53,7 @@ def _create_session_data(
         creation_id="test-creation-id",
         name=name,
         access_key=None,
-        scaling_group_name="default",
+        resource_group_name="default",
         target_sgroup_names=None,
         agent_ids=None,
         images=None,

@@ -27,8 +27,8 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry_quota.repositories import (
     PerProjectRegistryQuotaRepositories,
@@ -42,7 +42,7 @@ from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 _ORM_CLUSTER = (
     AgentRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
 )
 
 

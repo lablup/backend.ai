@@ -35,12 +35,12 @@ from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -61,7 +61,7 @@ class TestPersistentNetworkNotRecreated:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -107,12 +107,12 @@ class TestPersistentNetworkNotRecreated:
                 )
             )
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=sg_id,
                     name=sg_name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(
+                    scheduler_opts=ResourceGroupOpts(
                         allowed_session_types=[],
                         pending_timeout=timedelta(hours=1),
                         config={},
@@ -182,7 +182,7 @@ class TestPersistentNetworkNotRecreated:
                     id=agent_id,
                     status=AgentStatus.ALIVE,
                     region="local",
-                    scaling_group=sg_name,
+                    resource_group=sg_name,
                     resource_group_id=sg_id,
                     available_slots=ResourceSlot({
                         "cpu": Decimal("10"),
@@ -245,7 +245,7 @@ class TestPersistentNetworkNotRecreated:
                     user_uuid=env["user_uuid"],
                     access_key=env["access_key"],
                     resource_group_id=env["sg_id"],
-                    scaling_group_name=env["sg_name"],
+                    resource_group_name=env["sg_name"],
                     status=SessionStatus.PREPARED,
                     status_info="prepared",
                     cluster_mode=ClusterMode.MULTI_NODE,
@@ -270,7 +270,7 @@ class TestPersistentNetworkNotRecreated:
                     session_id=session_id,
                     agent=env["agent_id"],
                     agent_addr="127.0.0.1:6001",
-                    scaling_group=env["sg_name"],
+                    resource_group=env["sg_name"],
                     resource_group_id=env["sg_id"],
                     cluster_idx=0,
                     cluster_role="main",

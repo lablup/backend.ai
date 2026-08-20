@@ -22,7 +22,7 @@ from ai.backend.common.dto.manager.session.response import (
     StartServiceResponse,
 )
 from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.scaling_group import scaling_groups
+from ai.backend.manager.models.resource_group import resource_groups
 
 from .conftest import SessionSeedData
 
@@ -333,15 +333,15 @@ class TestSessionStartService:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """S-1: Start service 'ttyd' → StartServiceResponse with token and wsproxy_addr."""
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -383,7 +383,7 @@ class TestSessionStartService:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
@@ -400,8 +400,8 @@ class TestSessionStartService:
         ]
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -441,15 +441,15 @@ class TestSessionStartService:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """S-3: Start service with arguments/envs → opts contain parsed arguments and envs."""
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -497,15 +497,15 @@ class TestSessionStartService:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """S-4: kernel_host=None → kernel_host extracted from agent_addr hostname."""
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -557,15 +557,15 @@ class TestSessionStartService:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """S-5: advertise_address=None → fallback to original wsproxy_addr."""
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -615,14 +615,14 @@ class TestSessionStartServiceFailures:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """F-BIZ-1: Service name not in service_ports → NotFoundError (AppNotFound)."""
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -653,7 +653,7 @@ class TestSessionStartServiceFailures:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """F-BIZ-2: Inference app → InvalidRequestError."""
@@ -669,8 +669,8 @@ class TestSessionStartServiceFailures:
         ]
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -701,14 +701,14 @@ class TestSessionStartServiceFailures:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """F-BIZ-3: Port not in container_ports → InvalidRequestError."""
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -739,14 +739,14 @@ class TestSessionStartServiceFailures:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
     ) -> None:
         """F-BIZ-5: Scaling group has no wsproxy_addr → ServerError (ServiceUnavailable)."""
         # Ensure wsproxy_addr is NULL on the scaling group
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=None)
             )
 
@@ -761,15 +761,15 @@ class TestSessionStartServiceFailures:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """F-BIZ-6: Agent returns status='failed' → ServerError (InternalServerError)."""
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:

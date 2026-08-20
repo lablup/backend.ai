@@ -58,13 +58,13 @@ class TestDomainUsageBucketRow:
         database_with_usage_tables: ExtendedAsyncSAEngine,
         domain_usage_bucket_id: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group: str,
+        resource_group: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
         """Duplicate (domain_name, resource_group_id, period_start) should raise IntegrityError."""
         duplicate = DomainUsageBucketRow(
             domain_name=domain_fixture.domain_name,
-            resource_group=scaling_group,
+            resource_group=resource_group,
             resource_group_id=resource_group_id,
             period_start=date(2024, 1, 1),
             period_end=date(2024, 1, 1),
@@ -102,14 +102,14 @@ class TestProjectUsageBucketRow:
         project_usage_bucket_id: uuid.UUID,
         project_id: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group: str,
+        resource_group: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
         """Duplicate (project_id, resource_group_id, period_start) should raise IntegrityError."""
         duplicate = ProjectUsageBucketRow(
             project_id=project_id,
             domain_name=domain_fixture.domain_name,
-            resource_group=scaling_group,
+            resource_group=resource_group,
             resource_group_id=resource_group_id,
             period_start=date(2024, 1, 1),
             period_end=date(2024, 1, 1),
@@ -150,7 +150,7 @@ class TestUserUsageBucketRow:
         user_uuid: uuid.UUID,
         project_id: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group: str,
+        resource_group: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
         """Duplicate (user_uuid, project_id, resource_group_id, period_start) should raise IntegrityError."""
@@ -158,7 +158,7 @@ class TestUserUsageBucketRow:
             user_uuid=user_uuid,
             project_id=project_id,
             domain_name=domain_fixture.domain_name,
-            resource_group=scaling_group,
+            resource_group=resource_group,
             resource_group_id=resource_group_id,
             period_start=date(2024, 1, 1),
             period_end=date(2024, 1, 1),

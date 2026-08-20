@@ -31,7 +31,7 @@ class CreateClusterAction(SessionScopeAction):
     session_type: SessionTypes
     group_name: str
     domain_name: str
-    scaling_group_name: str
+    resource_group_name: str
     requester_access_key: AccessKey
     owner_access_key: AccessKey
     tag: str

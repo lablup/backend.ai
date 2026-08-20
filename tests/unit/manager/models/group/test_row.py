@@ -18,15 +18,15 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.group.row import resolve_group_name_or_id
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 _ORM_CLUSTER = (
     AgentRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
 )
 
 

@@ -436,7 +436,7 @@ class ExportAdapter(BaseFilterAdapter):
                 cond = self._build_in_condition(filter.status, field)
                 conditions.append(cond)
 
-        # scaling_group_name filter
+        # resource_group_name filter
         if filter.scaling_group_name is not None:
             field = report.get_field("scaling_group_name")
             if field:

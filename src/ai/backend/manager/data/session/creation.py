@@ -73,7 +73,7 @@ class DeploymentContext:
 
 
 @dataclass
-class ScalingGroupNetworkInfo:
+class ResourceGroupNetworkInfo:
     """Network configuration from scaling group."""
 
     use_host_network: bool

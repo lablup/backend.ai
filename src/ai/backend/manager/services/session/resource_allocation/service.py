@@ -144,7 +144,7 @@ class ResourceAllocationService:
         )
 
         preset_data_list = await self._resource_preset_repository.list_presets(
-            action.scaling_group,
+            action.resource_group,
         )
 
         presets: list[PresetAvailabilityData] = []

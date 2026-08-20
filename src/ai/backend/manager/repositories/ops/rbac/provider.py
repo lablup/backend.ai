@@ -67,7 +67,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.user import UserRow, UserStatus
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
@@ -284,7 +284,7 @@ class RBACWriteOps(WriteOps):
         CONTAINER_REGISTRY_SCOPE_TYPE: ContainerRegistryRow,
         DOMAIN_SCOPE_TYPE: DomainRow,
         PROJECT_SCOPE_TYPE: GroupRow,
-        RESOURCE_GROUP_SCOPE_TYPE: ScalingGroupRow,
+        RESOURCE_GROUP_SCOPE_TYPE: ResourceGroupRow,
         USER_SCOPE_TYPE: UserRow,
     }
 

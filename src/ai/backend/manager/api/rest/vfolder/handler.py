@@ -1851,7 +1851,7 @@ class VFolderHandler:
                 fs_location=params.fs_location,
                 fs_type=params.fs_type,
                 options=params.options,
-                scaling_group=params.scaling_group,
+                resource_group=params.scaling_group,
                 fstab_path=params.fstab_path,
                 edit_fstab=params.edit_fstab,
             )
@@ -1892,7 +1892,7 @@ class VFolderHandler:
         result = await self._vfolder.umount_host.run(
             GlobalUmountHostAction(
                 name=params.name,
-                scaling_group=params.scaling_group,
+                resource_group=params.scaling_group,
                 fstab_path=params.fstab_path,
                 edit_fstab=params.edit_fstab,
             )

@@ -77,9 +77,9 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group(scaling_group: str) -> QueryCondition:
+    def by_resource_group(resource_group: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return SessionRow.scaling_group_name == scaling_group
+            return SessionRow.scaling_group_name == resource_group
 
         return inner
 
@@ -251,10 +251,10 @@ class SessionConditions:
         return inner
 
     by_domain_name_in = staticmethod(make_string_in_factory(SessionRow.domain_name))
-    by_scaling_group_in = staticmethod(make_string_in_factory(SessionRow.scaling_group_name))
+    by_resource_group_in = staticmethod(make_string_in_factory(SessionRow.scaling_group_name))
 
     @staticmethod
-    def by_scaling_group_contains(spec: StringMatchSpec) -> QueryCondition:
+    def by_resource_group_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = SessionRow.scaling_group_name.ilike(f"%{spec.value}%")
@@ -267,7 +267,7 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group_equals(spec: StringMatchSpec) -> QueryCondition:
+    def by_resource_group_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = sa.func.lower(SessionRow.scaling_group_name) == spec.value.lower()
@@ -280,7 +280,7 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
+    def by_resource_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = SessionRow.scaling_group_name.ilike(f"{spec.value}%")
@@ -293,7 +293,7 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
+    def by_resource_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = SessionRow.scaling_group_name.ilike(f"%{spec.value}")

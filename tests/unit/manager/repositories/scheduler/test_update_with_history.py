@@ -31,12 +31,12 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
@@ -66,7 +66,7 @@ class TestUpdateWithHistory:
             [
                 # FK dependency order: parents first
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -122,12 +122,12 @@ class TestUpdateWithHistory:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sg = ScalingGroupRow(
+            sg = ResourceGroupRow(
                 id=test_scaling_group_id,
                 name=sg_name,
                 driver="static",
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(
+                scheduler_opts=ResourceGroupOpts(
                     allowed_session_types=[],
                     pending_timeout=timedelta(hours=1),
                     config={},
@@ -310,7 +310,7 @@ class TestUpdateWithHistory:
                 domain_name=test_domain.domain_name,
                 group_id=test_group_id,
                 resource_group_id=test_scaling_group_id,
-                scaling_group_name=test_scaling_group_name,
+                resource_group_name=test_scaling_group_name,
                 status=SessionStatus.PREPARING,
                 status_info="preparing",
                 result=SessionResult.UNDEFINED,
@@ -482,7 +482,7 @@ class TestUpdateWithHistory:
                     domain_name=test_domain.domain_name,
                     group_id=test_group_id,
                     resource_group_id=test_scaling_group_id,
-                    scaling_group_name=test_scaling_group_name,
+                    resource_group_name=test_scaling_group_name,
                     status=SessionStatus.PREPARING,
                     status_info="preparing",
                     result=SessionResult.UNDEFINED,
@@ -1043,7 +1043,7 @@ class TestUpdateWithHistory:
                     domain_name=test_domain.domain_name,
                     group_id=test_group_id,
                     resource_group_id=test_scaling_group_id,
-                    scaling_group_name=test_scaling_group_name,
+                    resource_group_name=test_scaling_group_name,
                     status=SessionStatus.PREPARING,
                     status_info="preparing",
                     result=SessionResult.UNDEFINED,
@@ -1152,7 +1152,7 @@ class TestUpdateWithHistory:
                 domain_name=test_domain.domain_name,
                 group_id=test_group_id,
                 resource_group_id=test_scaling_group_id,
-                scaling_group_name=test_scaling_group_name,
+                resource_group_name=test_scaling_group_name,
                 status=SessionStatus.CREATING,
                 result=SessionResult.UNDEFINED,
                 cluster_mode=ClusterMode.SINGLE_NODE,

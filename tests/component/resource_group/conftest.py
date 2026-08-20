@@ -27,20 +27,20 @@ from ai.backend.manager.api.rest.v2.resource_group.registry import (
     register_v2_resource_group_routes,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.scaling_group.repository import ScalingGroupRepository
+from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.services.processors import Processors
-from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
-from ai.backend.manager.services.scaling_group.service import ScalingGroupService
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
+from ai.backend.manager.services.resource_group.service import ResourceGroupService
 
 
 @pytest.fixture()
-def scaling_group_processors(
+def resource_group_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
-) -> ScalingGroupProcessors:
-    repo = ScalingGroupRepository(database_engine)
-    service = ScalingGroupService(repo)
-    return ScalingGroupProcessors(
+) -> ResourceGroupProcessors:
+    repo = ResourceGroupRepository(database_engine)
+    service = ResourceGroupService(repo)
+    return ResourceGroupProcessors(
         processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service
     )
 
@@ -48,11 +48,11 @@ def scaling_group_processors(
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    scaling_group_processors: ScalingGroupProcessors,
+    resource_group_processors: ResourceGroupProcessors,
 ) -> list[RouteRegistry]:
     """Register v2 resource group REST routes for testing."""
     processors = MagicMock(spec=Processors)
-    processors.scaling_group = scaling_group_processors
+    processors.resource_group = resource_group_processors
 
     adapter = ResourceGroupAdapter(
         processors,

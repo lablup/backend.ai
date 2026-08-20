@@ -38,8 +38,8 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointTokenData,
     ModelServiceValidationContext,
     MutationResult,
+    ResourceGroupData,
     RoutingData,
-    ScalingGroupData,
     ServiceSearchItem,
     ServiceSearchResult,
     UserData,
@@ -62,17 +62,17 @@ from ai.backend.manager.models.endpoint import (
 from ai.backend.manager.models.group import resolve_group_name_or_id
 from ai.backend.manager.models.image import ImageAlias, ImageIdentifier, ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_group import resource_groups
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import VFolderRow, VFolderUsageMode
 from ai.backend.manager.models.vfolder.row import query_accessible_vfolders, vfolders
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.registry import check_scaling_group as registry_check_scaling_group
+from ai.backend.manager.registry import check_resource_group as registry_check_resource_group
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
@@ -114,10 +114,10 @@ class ModelServingRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def _check_inference_scaling_group(
+    async def _check_inference_resource_group(
         self,
         conn: AsyncConnection,
-        scaling_group: str,
+        resource_group: str,
         owner_access_key: AccessKey,
         target_domain: str,
         target_project: str | ProjectID,
@@ -126,9 +126,9 @@ class ModelServingRepository:
         Wrapper of ``registry.check_scaling_group()`` with additional guards flavored for
         model service included.
         """
-        checked_scaling_group = await registry_check_scaling_group(
+        checked_resource_group = await registry_check_resource_group(
             conn,
-            scaling_group,
+            resource_group,
             SessionTypes.INFERENCE,
             owner_access_key,
             target_domain,
@@ -136,9 +136,9 @@ class ModelServingRepository:
         )
 
         query = (
-            sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
-            .select_from(scaling_groups)
-            .where(scaling_groups.c.name == checked_scaling_group)
+            sa.select(resource_groups.c.wsproxy_addr, resource_groups.c.wsproxy_api_token)
+            .select_from(resource_groups)
+            .where(resource_groups.c.name == checked_resource_group)
         )
 
         result = await conn.execute(query)
@@ -152,7 +152,7 @@ class ModelServingRepository:
         if not sgroup.wsproxy_api_token:
             raise ServiceUnavailable("Scaling group not ready to start model service")
 
-        return checked_scaling_group
+        return checked_resource_group
 
     @model_serving_repository_resilience.apply()
     async def get_endpoint_by_id(self, endpoint_id: uuid.UUID) -> EndpointData | None:
@@ -444,22 +444,22 @@ class ModelServingRepository:
             return result.row.to_dataclass()
 
     @model_serving_repository_resilience.apply()
-    async def get_scaling_group_info(self, scaling_group_name: str) -> ScalingGroupData | None:
+    async def get_resource_group_info(self, resource_group_name: str) -> ResourceGroupData | None:
         """
         Get scaling group information (wsproxy details).
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             query = (
-                sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
-                .select_from(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.select(resource_groups.c.wsproxy_addr, resource_groups.c.wsproxy_api_token)
+                .select_from(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
             )
             result = await session.execute(query)
             row = result.first()
             if not row:
                 return None
 
-            return ScalingGroupData(
+            return ResourceGroupData(
                 wsproxy_addr=row.wsproxy_addr, wsproxy_api_token=row.wsproxy_api_token
             )
 
@@ -861,7 +861,7 @@ class ModelServingRepository:
                 if conn is None:
                     raise DatabaseConnectionUnavailable("Database connection is not available")
 
-                await self._check_inference_scaling_group(
+                await self._check_inference_resource_group(
                     conn,
                     endpoint_row.resource_group,
                     AccessKey(default_access_key),
@@ -961,7 +961,7 @@ class ModelServingRepository:
     async def resolve_model_service_validation_context(
         self,
         *,
-        scaling_group: str,
+        resource_group: str,
         owner_access_key: AccessKey,
         domain_name: str,
         group_name: str,
@@ -987,9 +987,9 @@ class ModelServingRepository:
         used by ``SchedulerRepository.prepare_vfolder_mounts``.
         """
         async with self._db.begin_readonly() as conn:
-            checked_scaling_group = await self._check_inference_scaling_group(
+            checked_resource_group = await self._check_inference_resource_group(
                 conn,
-                scaling_group,
+                resource_group,
                 owner_access_key,
                 domain_name,
                 group_name,
@@ -1086,7 +1086,7 @@ class ModelServingRepository:
             owner_role=owner_role,
             group_id=group_id,
             resource_policy=resource_policy,
-            scaling_group=checked_scaling_group,
+            resource_group=checked_resource_group,
             extra_mounts=vfolder_mounts,
             variant_reads_vfolder_config_files=reads_vfolder_config_files,
         )

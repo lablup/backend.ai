@@ -58,7 +58,7 @@ from ai.backend.manager.data.deployment.types import (
     ResourceSpec,
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
-from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
+from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -573,8 +573,8 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         )
 
     @pytest.fixture
-    def sample_proxy_target(self) -> ScalingGroupProxyTarget:
-        return ScalingGroupProxyTarget(
+    def sample_proxy_target(self) -> ResourceGroupProxyTarget:
+        return ResourceGroupProxyTarget(
             addr="http://app-proxy.local:10200",
             api_token="proxy-api-token",
         )
@@ -604,7 +604,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         self,
         mock_deployment_repository: MagicMock,
         deployment_info: DeploymentInfo,
-        sample_proxy_target: ScalingGroupProxyTarget,
+        sample_proxy_target: ResourceGroupProxyTarget,
         sample_token_row: MagicMock,
     ) -> MagicMock:
         mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=deployment_info)

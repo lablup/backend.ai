@@ -28,8 +28,8 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.resource_group import ResourceGroupForKeypairsRow
     from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
-    from ai.backend.manager.models.scaling_group import ScalingGroupForKeypairsRow
     from ai.backend.manager.models.user import UserRow
 
 __all__: Sequence[str] = (
@@ -108,8 +108,8 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
 
     # Relationships
     resource_policy_row: Mapped[KeyPairResourcePolicyRow] = relationship("KeyPairResourcePolicyRow")
-    sgroup_for_keypairs_rows: Mapped[list[ScalingGroupForKeypairsRow]] = relationship(
-        "ScalingGroupForKeypairsRow",
+    sgroup_for_keypairs_rows: Mapped[list[ResourceGroupForKeypairsRow]] = relationship(
+        "ResourceGroupForKeypairsRow",
     )
     user_row: Mapped[UserRow] = relationship(
         "UserRow", back_populates="keypairs", foreign_keys=[user]

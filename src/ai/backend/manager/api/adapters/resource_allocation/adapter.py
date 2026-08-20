@@ -311,7 +311,7 @@ class ResourceAllocationAdapter(BaseAdapter):
                 group_resource_visibility=grv,
                 hide_agents=hide,
                 is_admin=me.is_admin,
-                scaling_group=input.resource_group_name,
+                resource_group=input.resource_group_name,
             )
         )
         return CheckPresetAvailabilityPayload(
@@ -396,6 +396,6 @@ def _preset_availability_to_node(data: PresetAvailabilityData) -> PresetAvailabi
             if data.preset.shared_memory is not None
             else None
         ),
-        resource_group_name=data.preset.scaling_group_name,
+        resource_group_name=data.preset.resource_group_name,
         available=data.available,
     )

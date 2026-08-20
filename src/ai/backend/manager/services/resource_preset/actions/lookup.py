@@ -18,7 +18,7 @@ class ResourcePresetNameKey(LookupKey):
     it applies within."""
 
     name: str
-    scaling_group_name: str | None = None
+    resource_group_name: str | None = None
 
     @override
     def kind(self) -> str:
@@ -26,7 +26,7 @@ class ResourcePresetNameKey(LookupKey):
 
     @override
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "scaling_group_name": self.scaling_group_name}
+        return {"name": self.name, "scaling_group_name": self.resource_group_name}
 
 
 @dataclass
@@ -34,7 +34,7 @@ class LookupResourcePresetAction(LookupEntityOpsAction[ResourcePresetRow, Resour
     """Resolve a preset's name into the preset it names."""
 
     name: str
-    scaling_group_name: str | None = None
+    resource_group_name: str | None = None
 
     @override
     @classmethod
@@ -48,8 +48,10 @@ class LookupResourcePresetAction(LookupEntityOpsAction[ResourcePresetRow, Resour
 
     @override
     def lookup_key(self) -> ResourcePresetNameKey:
-        return ResourcePresetNameKey(name=self.name, scaling_group_name=self.scaling_group_name)
+        return ResourcePresetNameKey(name=self.name, resource_group_name=self.resource_group_name)
 
     @override
     def to_lookup(self) -> ResourcePresetNameLookup:
-        return ResourcePresetNameLookup(name=self.name, scaling_group_name=self.scaling_group_name)
+        return ResourcePresetNameLookup(
+            name=self.name, resource_group_name=self.resource_group_name
+        )

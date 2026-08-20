@@ -20,7 +20,7 @@ from ai.backend.manager.models.condition_utils import (
     make_string_in_factory,
 )
 from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow, ResourceGroupRow
 from ai.backend.manager.models.user import UserRow
 
 from .row import DomainRow
@@ -39,10 +39,10 @@ class DomainConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return DomainRow.id.in_(
-                sa.select(ScalingGroupForDomainRow.domain_id).where(
-                    ScalingGroupForDomainRow.resource_group_id
-                    == sa.select(ScalingGroupRow.id)
-                    .where(ScalingGroupRow.name == name)
+                sa.select(ResourceGroupForDomainRow.domain_id).where(
+                    ResourceGroupForDomainRow.resource_group_id
+                    == sa.select(ResourceGroupRow.id)
+                    .where(ResourceGroupRow.name == name)
                     .scalar_subquery()
                 )
             )
@@ -290,11 +290,11 @@ class DomainConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.exists(
                 sa.select(1)
-                .where(ScalingGroupForDomainRow.domain_id == DomainRow.id)
+                .where(ResourceGroupForDomainRow.domain_id == DomainRow.id)
                 .where(
-                    ScalingGroupForDomainRow.resource_group_id
-                    == sa.select(ScalingGroupRow.id)
-                    .where(ScalingGroupRow.name == resource_group)
+                    ResourceGroupForDomainRow.resource_group_id
+                    == sa.select(ResourceGroupRow.id)
+                    .where(ResourceGroupRow.name == resource_group)
                     .scalar_subquery()
                 )
             )

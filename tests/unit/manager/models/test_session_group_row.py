@@ -22,12 +22,12 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user import UserRow
@@ -109,7 +109,7 @@ class TestSessionGroupRow:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -126,7 +126,7 @@ class TestSessionGroupRow:
     async def scope(self, db: ExtendedAsyncSAEngine) -> AsyncIterator[_OwnershipScope]:
         domain_id = DomainID(uuid.uuid4())
         domain = DomainRow(id=domain_id, name=f"test-{uuid.uuid4().hex[:8]}")
-        scaling_group = ScalingGroupRow(
+        resource_group = ResourceGroupRow(
             id=ResourceGroupID(uuid.uuid4()),
             name=f"test-sg-{uuid.uuid4().hex[:8]}",
             driver="static",
@@ -161,7 +161,7 @@ class TestSessionGroupRow:
         )
 
         async with db.begin_session() as sess:
-            sess.add_all([domain, scaling_group, user_policy, project_policy])
+            sess.add_all([domain, resource_group, user_policy, project_policy])
             await sess.flush()
             sess.add_all([user, project])
             await sess.flush()
@@ -171,8 +171,8 @@ class TestSessionGroupRow:
             domain_name=domain.name,
             project_id=ProjectID(project.id),
             owner_user_id=UserID(user.uuid),
-            resource_group_id=ResourceGroupID(scaling_group.id),
-            resource_group_name=scaling_group.name,
+            resource_group_id=ResourceGroupID(resource_group.id),
+            resource_group_name=resource_group.name,
         )
 
     async def test_placement_policy_round_trips(
@@ -257,7 +257,7 @@ def _make_session(
         domain_id=scope.domain_id,
         domain_name=scope.domain_name,
         resource_group_id=scope.resource_group_id,
-        scaling_group_name=scope.resource_group_name,
+        resource_group_name=scope.resource_group_name,
         status=SessionStatus.PENDING,
         occupying_slots=ResourceSlot(),
         requested_slots=ResourceSlot(),
