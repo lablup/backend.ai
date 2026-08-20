@@ -44,7 +44,7 @@ class DeploymentAutoScalingPolicyRow(LifecycleTimestampsMixin, Base):
     id: Mapped[UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    endpoint: Mapped[DeploymentID] = mapped_column("endpoint", GUID, nullable=False)
+    endpoint: Mapped[DeploymentID] = mapped_column("endpoint", GUID(DeploymentID), nullable=False)
 
     # Replica bounds (always enforced)
     min_replicas: Mapped[int] = mapped_column(

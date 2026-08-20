@@ -46,7 +46,7 @@ class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):
     )
     endpoint: Mapped[DeploymentID] = mapped_column(
         "endpoint",
-        GUID,
+        GUID(DeploymentID),
         sa.ForeignKey("endpoints.id", name="fk_deployment_policies_endpoint", ondelete="CASCADE"),
         nullable=False,
     )

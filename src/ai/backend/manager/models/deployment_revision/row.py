@@ -91,7 +91,7 @@ class DeploymentRevisionRow(CreatedAtMixin, Base):
         primary_key=True,
         server_default=sa.text("uuid_generate_v4()"),
     )
-    endpoint: Mapped[DeploymentID] = mapped_column("endpoint", GUID, nullable=False)
+    endpoint: Mapped[DeploymentID] = mapped_column("endpoint", GUID(DeploymentID), nullable=False)
     revision_number: Mapped[int] = mapped_column("revision_number", sa.Integer, nullable=False)
 
     # Image configuration.

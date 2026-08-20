@@ -240,7 +240,7 @@ class ScalingGroupRow(CreatedAtMixin, Base):
     name: Mapped[str] = mapped_column("name", sa.String(length=64), primary_key=True)
     id: Mapped[ResourceGroupID] = mapped_column(
         "id",
-        GUID,
+        GUID(ResourceGroupID),
         nullable=False,
         unique=True,
         server_default=sa.text("uuid_generate_v4()"),

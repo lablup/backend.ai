@@ -157,7 +157,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
     )
     domain_id: Mapped[DomainID] = mapped_column(
         "domain_id",
-        GUID,
+        GUID(DomainID),
         sa.ForeignKey("domains.id"),
         index=True,
         nullable=False,

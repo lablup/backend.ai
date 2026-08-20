@@ -1045,7 +1045,7 @@ class EndpointAutoScalingRuleRow(Base):
 
     endpoint: Mapped[DeploymentID] = mapped_column(
         "endpoint",
-        GUID,
+        GUID(DeploymentID),
         sa.ForeignKey("endpoints.id", ondelete="CASCADE"),
         nullable=False,
     )

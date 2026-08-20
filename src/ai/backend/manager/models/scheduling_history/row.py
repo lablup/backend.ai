@@ -264,7 +264,9 @@ class RouteHistoryRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    route_id: Mapped[ReplicaID] = mapped_column("route_id", GUID, nullable=False, index=True)
+    route_id: Mapped[ReplicaID] = mapped_column(
+        "route_id", GUID(ReplicaID), nullable=False, index=True
+    )
     deployment_id: Mapped[uuid.UUID] = mapped_column(
         "deployment_id", GUID, nullable=False, index=True
     )

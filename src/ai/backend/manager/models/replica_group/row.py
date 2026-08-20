@@ -48,7 +48,7 @@ class ReplicaGroupRow(LifecycleTimestampsMixin, Base):
     )
     deployment_id: Mapped[DeploymentID] = mapped_column(
         "deployment_id",
-        GUID,
+        GUID(DeploymentID),
         sa.ForeignKey("endpoints.id", ondelete="CASCADE"),
         nullable=False,
     )

@@ -51,10 +51,13 @@ class RoutingRow(Base):
     )
 
     id: Mapped[ReplicaID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ReplicaID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     endpoint: Mapped[DeploymentID] = mapped_column(
-        "endpoint", GUID, sa.ForeignKey("endpoints.id", ondelete="CASCADE"), nullable=False
+        "endpoint",
+        GUID(DeploymentID),
+        sa.ForeignKey("endpoints.id", ondelete="CASCADE"),
+        nullable=False,
     )
     session: Mapped[uuid.UUID | None] = mapped_column(
         "session", GUID, sa.ForeignKey("sessions.id", ondelete="RESTRICT"), nullable=True
