@@ -21,10 +21,10 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
+from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.api.gql_legacy.group import CreateGroup, GroupNode
 from ai.backend.manager.data.group.types import GroupData, ProjectType
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.services.group.actions.create_group import CreateGroupActionResult
 
 
 class TestCreateGroupMutation:
@@ -71,14 +71,12 @@ class TestCreateGroupMutation:
         """GraphQueryContext mock with processors and user context."""
 
         ctx = MagicMock()
-        ctx.processors.group.create_group.wait_for_complete = AsyncMock(
-            return_value=CreateGroupActionResult(data=group_data_response, _domain_name="default")
+        ctx.processors.group.create_group.run = AsyncMock(
+            return_value=CreatedEntityOpsResult(data=group_data_response)
         )
         domain_data = MagicMock()
         domain_data.id = uuid4()
-        ctx.processors.domain.get_domain.wait_for_complete = AsyncMock(
-            return_value=MagicMock(data=domain_data)
-        )
+        ctx.processors.domain.lookup.run = AsyncMock(return_value=MagicMock(data=domain_data))
         # Required for privileged_mutation decorator
         ctx.user = {
             "role": UserRole.SUPERADMIN,

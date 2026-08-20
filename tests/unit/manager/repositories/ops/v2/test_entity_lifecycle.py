@@ -36,6 +36,7 @@ from ai.backend.common.data.entity.types import (
     EntityIdentifier,
     EntityType,
     ScopeType,
+    SidecarIdentifier,
 )
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -729,11 +730,19 @@ class TestEntityPurge:
 # =============================================================================
 
 
+class _SidecarID(SidecarIdentifier):
+    """The id of a row that rides beside the graph."""
+
+
 class _Sidecar(SidecarCreator[EntityLifecycleTestRow, _EntityData]):
     """A row that rides beside the graph: no node, no owner."""
 
     def __init__(self, name: str) -> None:
         self.name = name
+
+    @override
+    def sidecar_id(self, row: EntityLifecycleTestRow) -> SidecarIdentifier:
+        return _SidecarID(row.id)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

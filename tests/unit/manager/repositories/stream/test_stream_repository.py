@@ -164,7 +164,10 @@ def _make_kernel_row(
 
 
 class TestStreamRepository:
-    """Tests for StreamRepository.get_streaming_session() using a real database."""
+    """Tests for StreamRepository.get_streaming_session() using a real database.
+
+    Ownership is enforced by the lookup that resolves the name, not here.
+    """
 
     @pytest.fixture
     def test_domain_id(self) -> DomainID:
@@ -467,9 +470,7 @@ class TestStreamRepository:
         repository: StreamRepository,
         stream_session: StreamSessionFixture,
     ) -> None:
-        session = await repository.get_streaming_session(
-            stream_session.session_name, stream_session.user_uuid
-        )
+        session = await repository.get_streaming_session(stream_session.session_id)
 
         assert session.id == stream_session.session_id
         assert session.status == SessionStatus.RUNNING
@@ -480,19 +481,9 @@ class TestStreamRepository:
         repository: StreamRepository,
         stream_session: StreamSessionFixture,
     ) -> None:
-        session = await repository.get_streaming_session(
-            stream_session.session_name, stream_session.user_uuid
-        )
+        session = await repository.get_streaming_session(stream_session.session_id)
 
         assert session.main_kernel.id == stream_session.main_kernel_id
-
-    async def test_isolated_from_other_users_session(
-        self,
-        repository: StreamRepository,
-        stream_session: StreamSessionFixture,
-    ) -> None:
-        with pytest.raises(SessionNotFound):
-            await repository.get_streaming_session(stream_session.session_name, uuid.uuid4())
 
     async def test_ignores_terminated_session(
         self,
@@ -507,14 +498,11 @@ class TestStreamRepository:
             session.status = SessionStatus.TERMINATED
 
         with pytest.raises(SessionNotFound):
-            await repository.get_streaming_session(
-                stream_session.session_name, stream_session.user_uuid
-            )
+            await repository.get_streaming_session(stream_session.session_id)
 
-    async def test_session_not_found_for_unknown_name(
+    async def test_session_not_found_for_unknown_id(
         self,
         repository: StreamRepository,
-        stream_session: StreamSessionFixture,
     ) -> None:
         with pytest.raises(SessionNotFound):
-            await repository.get_streaming_session("no-such-session", stream_session.user_uuid)
+            await repository.get_streaming_session(SessionId(uuid.uuid4()))

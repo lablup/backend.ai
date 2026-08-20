@@ -32,7 +32,7 @@ from ai.backend.manager.repositories.deployment.creators.deployment import (
     DeploymentCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
-    DeploymentRevisionPresetRepository,
+    DeploymentPresetRepository,
 )
 from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentController,
@@ -69,7 +69,7 @@ class TestDeploymentFromPreset:
 
     @pytest.fixture
     def mock_preset_repository(self, preset_data: DeploymentRevisionPresetData) -> MagicMock:
-        repository = MagicMock(spec=DeploymentRevisionPresetRepository)
+        repository = MagicMock(spec=DeploymentPresetRepository)
         repository.get_by_id = AsyncMock(return_value=preset_data)
         return repository
 

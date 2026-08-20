@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
@@ -411,7 +412,9 @@ class TestScalingGroupService:
             ),
         )
         updater = Updater(spec=spec, pk_value="default")
-        action = UpdateScalingGroupAction(updater=updater)
+        action = UpdateScalingGroupAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()), updater=updater
+        )
         result = await scaling_group_service.update_scaling_group(action)
 
         assert result.scaling_group == sample_scaling_group
@@ -433,7 +436,9 @@ class TestScalingGroupService:
             ),
         )
         updater = Updater(spec=spec, pk_value="nonexistent")
-        action = UpdateScalingGroupAction(updater=updater)
+        action = UpdateScalingGroupAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()), updater=updater
+        )
 
         with pytest.raises(ScalingGroupNotFound):
             await scaling_group_service.update_scaling_group(action)
@@ -465,7 +470,9 @@ class TestScalingGroupService:
                 )
             ]
         )
-        action = AssociateScalingGroupWithDomainsAction(binder=binder)
+        action = AssociateScalingGroupWithDomainsAction(
+            domain_id=DomainID(uuid.uuid4()), binder=binder
+        )
         result = await scaling_group_service.associate_scaling_group_with_domains(action)
 
         assert result is not None
@@ -485,7 +492,9 @@ class TestScalingGroupService:
             resource_group_ids=[ResourceGroupID(uuid.uuid4())],
             domain_id=DomainID(uuid.uuid4()),
         )
-        action = DisassociateScalingGroupWithDomainsAction(unbinder=unbinder)
+        action = DisassociateScalingGroupWithDomainsAction(
+            domain_id=DomainID(uuid.uuid4()), unbinder=unbinder
+        )
         result = await scaling_group_service.disassociate_scaling_group_with_domains(action)
 
         assert result is not None
@@ -512,7 +521,9 @@ class TestScalingGroupService:
                 )
             ]
         )
-        action = AssociateScalingGroupWithKeypairsAction(bulk_creator=bulk_creator)
+        action = AssociateScalingGroupWithKeypairsAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()), bulk_creator=bulk_creator
+        )
         result = await scaling_group_service.associate_scaling_group_with_keypairs(action)
 
         assert result is not None
@@ -533,7 +544,9 @@ class TestScalingGroupService:
             resource_group_id=resource_group_id,
             access_key=access_key,
         )
-        action = DisassociateScalingGroupWithKeypairsAction(purger=purger)
+        action = DisassociateScalingGroupWithKeypairsAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()), purger=purger
+        )
         result = await scaling_group_service.disassociate_scaling_group_with_keypairs(action)
 
         assert result is not None
@@ -566,7 +579,9 @@ class TestScalingGroupService:
                 )
             ]
         )
-        action = AssociateScalingGroupWithUserGroupsAction(binder=binder)
+        action = AssociateScalingGroupWithUserGroupsAction(
+            project_id=ProjectID(uuid.uuid4()), binder=binder
+        )
         result = await scaling_group_service.associate_scaling_group_with_user_groups(action)
 
         assert result is not None
@@ -587,7 +602,9 @@ class TestScalingGroupService:
             resource_group_ids=[resource_group_id],
             project=project_id,
         )
-        action = DisassociateScalingGroupWithUserGroupsAction(unbinder=unbinder)
+        action = DisassociateScalingGroupWithUserGroupsAction(
+            project_id=ProjectID(uuid.uuid4()), unbinder=unbinder
+        )
         result = await scaling_group_service.disassociate_scaling_group_with_user_groups(action)
 
         assert result is not None

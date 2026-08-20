@@ -241,13 +241,11 @@ class TestUsagePerPeriod:
         })
         mock_result = MagicMock()
         mock_result.result = []
-        mock_processors.group.usage_per_period.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
+        mock_processors.group.usage_per_period.run = AsyncMock(return_value=mock_result)
 
         await handler.usage_per_period(query, superadmin_context)
 
-        call_args = mock_processors.group.usage_per_period.wait_for_complete.call_args
+        call_args = mock_processors.group.usage_per_period.run.call_args
         action = call_args[0][0]
         assert action.project_id is None
 
@@ -303,13 +301,11 @@ class TestCheckPresets:
         mock_req.__getitem__ = lambda _, key: storage[key]
         req_ctx = RequestCtx(request=mock_req)
         mock_result, _ = self._create_mock_result()
-        mock_processors.resource_preset.check_presets.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
+        mock_processors.resource_preset.check_presets.run = AsyncMock(return_value=mock_result)
 
         response = await handler.check_presets(body, user_context, req_ctx)
 
-        call_args = mock_processors.resource_preset.check_presets.wait_for_complete.call_args
+        call_args = mock_processors.resource_preset.check_presets.run.call_args
         action = call_args[0][0]
         assert action.access_key == "AKTEST"
         assert action.resource_policy == "default"
@@ -356,9 +352,7 @@ class TestCheckPresets:
         mock_req.__getitem__ = lambda _, key: storage[key]
         req_ctx = RequestCtx(request=mock_req)
         mock_result, _ = self._create_mock_result()
-        mock_processors.resource_preset.check_presets.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
+        mock_processors.resource_preset.check_presets.run = AsyncMock(return_value=mock_result)
 
         response = await handler.check_presets(body, user_context, req_ctx)
 

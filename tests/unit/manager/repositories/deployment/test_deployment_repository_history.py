@@ -53,6 +53,7 @@ from ai.backend.manager.repositories.deployment.creators import (
     EndpointLifecycleBatchUpdaterSpec,
     RouteBatchUpdaterSpec,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.scheduling_history.creators import (
     DeploymentHistoryCreatorSpec,
     RouteHistoryCreatorSpec,
@@ -420,6 +421,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -867,6 +869,7 @@ class TestUpdateRouteStatusBulkWithHistory:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -1165,6 +1168,7 @@ class TestDeploymentHistoryMergeLogic:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -1500,6 +1504,7 @@ class TestRouteHistoryMergeLogic:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,

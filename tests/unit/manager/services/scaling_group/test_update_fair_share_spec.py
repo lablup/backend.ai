@@ -119,6 +119,7 @@ class TestValidation:
     def action_add_mem_weight(self) -> UpdateFairShareSpecAction:
         """V1: Add mem which exists in capacity."""
         return UpdateFairShareSpecAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group="default",
             resource_weights=[ResourceWeightInput("mem", Decimal("0.5"))],
         )
@@ -165,6 +166,7 @@ class TestValidation:
     def action_add_tpu_weight(self) -> UpdateFairShareSpecAction:
         """V2: Add tpu.device which does NOT exist in capacity."""
         return UpdateFairShareSpecAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group="default",
             resource_weights=[ResourceWeightInput("tpu.device", Decimal("1.0"))],
         )
@@ -194,6 +196,7 @@ class TestValidation:
     def action_mixed_valid_invalid(self) -> UpdateFairShareSpecAction:
         """V3: Mix of valid (cpu) and invalid (tpu, rocm) types."""
         return UpdateFairShareSpecAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group="default",
             resource_weights=[
                 ResourceWeightInput("cpu", Decimal("2.0")),
@@ -229,6 +232,7 @@ class TestValidation:
     def action_delete_cuda(self) -> UpdateFairShareSpecAction:
         """V4: Delete cuda.device (weight=None) - no validation needed for deletion."""
         return UpdateFairShareSpecAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group="default",
             resource_weights=[ResourceWeightInput("cuda.device", None)],
         )
@@ -260,6 +264,7 @@ class TestValidation:
     def action_delete_nonexistent_tpu(self) -> UpdateFairShareSpecAction:
         """V5: Delete tpu.device that doesn't exist anywhere (no-op, no validation)."""
         return UpdateFairShareSpecAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group="default",
             resource_weights=[ResourceWeightInput("tpu.device", None)],
         )
@@ -314,7 +319,11 @@ class TestFiltering:
     @pytest.fixture
     def action_update_half_life(self) -> UpdateFairShareSpecAction:
         """Update half_life_days only (triggers filtering)."""
-        return UpdateFairShareSpecAction(resource_group="default", half_life_days=14)
+        return UpdateFairShareSpecAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
+            resource_group="default",
+            half_life_days=14,
+        )
 
     async def test_f1_filters_types_not_in_capacity(
         self,
@@ -462,6 +471,7 @@ class TestMerge:
     @pytest.fixture
     def action_add_mem(self) -> UpdateFairShareSpecAction:
         return UpdateFairShareSpecAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group="default",
             resource_weights=[ResourceWeightInput("mem", Decimal("0.5"))],
         )
@@ -499,6 +509,7 @@ class TestMerge:
     @pytest.fixture
     def action_update_cpu(self) -> UpdateFairShareSpecAction:
         return UpdateFairShareSpecAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group="default",
             resource_weights=[ResourceWeightInput("cpu", Decimal("2.0"))],
         )
@@ -535,6 +546,7 @@ class TestMerge:
     @pytest.fixture
     def action_delete_cpu(self) -> UpdateFairShareSpecAction:
         return UpdateFairShareSpecAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group="default",
             resource_weights=[ResourceWeightInput("cpu", None)],
         )
@@ -572,6 +584,7 @@ class TestMerge:
     @pytest.fixture
     def action_update_half_life_only(self) -> UpdateFairShareSpecAction:
         return UpdateFairShareSpecAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group="default",
             half_life_days=14,
             resource_weights=None,
@@ -634,6 +647,7 @@ class TestIntegration:
     @pytest.fixture
     def action_update_cpu_add_mem(self) -> UpdateFairShareSpecAction:
         return UpdateFairShareSpecAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group="default",
             resource_weights=[
                 ResourceWeightInput("cpu", Decimal("2.0")),
@@ -674,7 +688,11 @@ class TestIntegration:
 
     @pytest.fixture
     def action_half_life_only(self) -> UpdateFairShareSpecAction:
-        return UpdateFairShareSpecAction(resource_group="default", half_life_days=14)
+        return UpdateFairShareSpecAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
+            resource_group="default",
+            half_life_days=14,
+        )
 
     async def test_i2_agent_removal_cleans_weights(
         self,
@@ -718,7 +736,11 @@ class TestEdgeCases:
 
     @pytest.fixture
     def action_nonexistent_group(self) -> UpdateFairShareSpecAction:
-        return UpdateFairShareSpecAction(resource_group="nonexistent", half_life_days=14)
+        return UpdateFairShareSpecAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
+            resource_group="nonexistent",
+            half_life_days=14,
+        )
 
     async def test_e1_nonexistent_group_raises_error(
         self,
@@ -748,6 +770,7 @@ class TestEdgeCases:
     @pytest.fixture
     def action_empty_weights_list(self) -> UpdateFairShareSpecAction:
         return UpdateFairShareSpecAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group="default",
             resource_weights=[],
             half_life_days=14,

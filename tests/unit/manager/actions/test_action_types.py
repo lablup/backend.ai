@@ -6,25 +6,25 @@ from ai.backend.manager.actions.types import ActionOperationType
 
 # Import representative concrete action classes across different entity types
 # and operation types to verify enum usage at runtime.
-from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
-from ai.backend.manager.services.model_card.actions.create import CreateModelCardAction
-from ai.backend.manager.services.model_card.actions.delete import DeleteModelCardAction
-from ai.backend.manager.services.model_card.actions.update import UpdateModelCardAction
-from ai.backend.manager.services.session.actions.search import SearchSessionsAction
-from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
-from ai.backend.manager.services.vfolder.actions.base import RestoreVFolderFromTrashAction
+from ai.backend.manager.services.agent.actions.handle_heartbeat import HandleHeartbeatAction
+from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
+from ai.backend.manager.services.agent.actions.watcher_agent_start import WatcherAgentStartAction
+from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
+from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
+from ai.backend.manager.services.auth.actions.logout import LogoutAction
+from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 
 # Legacy-family actions only. The v2 families answer with
 # ``ai.backend.common.data.entity.types.EntityType``, a distinct NewType, so mixing
 # them in would conflate two type systems rather than test either one.
 _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
-    GetArtifactAction,
-    SearchSessionsAction,
-    CreateModelCardAction,
-    UpdateModelCardAction,
-    DeleteModelCardAction,
-    PurgeUserAction,
-    RestoreVFolderFromTrashAction,
+    AuthorizeAction,
+    GetRoleAction,
+    HandleHeartbeatAction,
+    LogoutAction,
+    PurgeRoleAction,
+    SearchAgentsAction,
+    WatcherAgentStartAction,
 ]
 
 
@@ -150,12 +150,13 @@ class TestAllActionClassesUseEnums:
         """Ensure the representative classes cover every declarable operation.
 
         ``UPSERT`` is excluded: the upsert actions declare ``CREATE`` today, so
-        nothing can stand for it. ``LOOKUP`` is excluded because only the v2 lookup
-        base declares it, and every class here is a legacy one.
+        nothing can stand for it. ``LOOKUP`` and ``RESTORE`` are excluded because no
+        legacy action declares them, and every class here is a legacy one.
         """
         expected = set(ActionOperationType) - {
             ActionOperationType.UPSERT,
             ActionOperationType.LOOKUP,
+            ActionOperationType.RESTORE,
         }
         covered = {cls.operation_type() for cls in _REPRESENTATIVE_ACTION_CLASSES}
         assert covered == expected, (

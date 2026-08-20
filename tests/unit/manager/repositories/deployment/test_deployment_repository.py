@@ -126,6 +126,7 @@ from ai.backend.manager.repositories.deployment.updaters import (
     RouteUpdaterSpec,
 )
 from ai.backend.manager.repositories.deployment.upserters import DeploymentPolicyUpserterSpec
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -796,6 +797,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -1165,6 +1167,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -1742,6 +1745,7 @@ class TestDeploymentRevisionOperations:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -2424,6 +2428,7 @@ class TestDeploymentPolicyOperations:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -2788,6 +2793,7 @@ class TestSearchDeploymentPolicies:
         valkey_schedule = MagicMock()
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -3149,6 +3155,7 @@ class TestRouteOperations:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -3581,6 +3588,7 @@ class TestDeploymentRepositoryDuplicateName:
         mock_valkey_schedule = MagicMock()
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=mock_storage_manager,
             valkey_stat=mock_valkey_stat,
             valkey_live=mock_valkey_live,

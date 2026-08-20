@@ -6,6 +6,7 @@ Only artifact-related tests. Revision tests are in artifact_revision/test_artifa
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
@@ -14,6 +15,7 @@ import pytest
 from aiohttp.client_exceptions import ClientConnectorError
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -306,7 +308,7 @@ class TestArtifactService:
         )
         mock_artifact_repository.update_artifact = AsyncMock(return_value=updated_artifact)
 
-        action = UpdateArtifactAction(updater=updater)
+        action = UpdateArtifactAction(artifact_id=ArtifactID(uuid.uuid4()), updater=updater)
         result = await artifact_service.update(action)
 
         assert result.result.description == "Updated description"

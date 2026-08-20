@@ -13,7 +13,6 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.types import ImageCanonical, ImageID
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryData,
@@ -57,9 +56,6 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
 )
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
-)
-from ai.backend.manager.services.container_registry.processors import (
-    ContainerRegistryProcessors,
 )
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 
@@ -827,7 +823,6 @@ class TestSearchContainerRegistries:
             db=mock_db_engine,
             container_registry_repository=mock_container_registry_repository,
         )
-        processors = ContainerRegistryProcessors(service, [], MagicMock(spec=ActionValidators))
 
         mock_container_registry_repository.search_container_registries = AsyncMock(
             return_value=ContainerRegistrySearchResult(
@@ -845,7 +840,7 @@ class TestSearchContainerRegistries:
         )
         action = SearchContainerRegistriesAction(querier=querier)
 
-        result = await processors.search_container_registries.wait_for_complete(action)
+        result = await service.search_container_registries(action)
 
         assert result.data == [sample_registry_data]
         assert result.total_count == 1

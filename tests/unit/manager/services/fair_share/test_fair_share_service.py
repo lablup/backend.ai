@@ -42,12 +42,12 @@ from ai.backend.manager.services.fair_share import (
     GetDomainFairShareAction,
     GetProjectFairShareAction,
     GetUserFairShareAction,
-    SearchDomainFairSharesAction,
-    SearchProjectFairSharesAction,
+    GlobalSearchDomainFairSharesAction,
+    GlobalSearchProjectFairSharesAction,
+    GlobalSearchUserFairSharesAction,
     SearchRGDomainFairSharesAction,
     SearchRGProjectFairSharesAction,
     SearchRGUserFairSharesAction,
-    SearchUserFairSharesAction,
 )
 from ai.backend.manager.services.fair_share.actions import (
     UpsertDomainFairShareWeightAction,
@@ -243,7 +243,7 @@ class TestSearchDomainFairShares:
         )
         mock_repository.search_domain_fair_shares = AsyncMock(return_value=mock_result)
 
-        action = SearchDomainFairSharesAction(
+        action = GlobalSearchDomainFairSharesAction(
             pagination=OffsetPagination(offset=0, limit=10),
             conditions=[],
             orders=[],
@@ -270,7 +270,7 @@ class TestSearchDomainFairShares:
         mock_repository.search_domain_fair_shares = AsyncMock(return_value=mock_result)
 
         pagination = OffsetPagination(offset=0, limit=20)
-        action = SearchDomainFairSharesAction(
+        action = GlobalSearchDomainFairSharesAction(
             pagination=pagination,
             conditions=[],
             orders=[],
@@ -468,7 +468,7 @@ class TestSearchProjectFairShares:
         )
         mock_repository.search_project_fair_shares = AsyncMock(return_value=mock_result)
 
-        action = SearchProjectFairSharesAction(
+        action = GlobalSearchProjectFairSharesAction(
             pagination=OffsetPagination(offset=0, limit=10),
             conditions=[],
             orders=[],
@@ -495,7 +495,7 @@ class TestSearchProjectFairShares:
         mock_repository.search_project_fair_shares = AsyncMock(return_value=mock_result)
 
         pagination = OffsetPagination(offset=0, limit=20)
-        action = SearchProjectFairSharesAction(
+        action = GlobalSearchProjectFairSharesAction(
             pagination=pagination,
             conditions=[],
             orders=[],
@@ -707,7 +707,7 @@ class TestSearchUserFairShares:
         )
         mock_repository.search_user_fair_shares = AsyncMock(return_value=mock_result)
 
-        action = SearchUserFairSharesAction(
+        action = GlobalSearchUserFairSharesAction(
             pagination=OffsetPagination(offset=0, limit=10),
             conditions=[],
             orders=[],
@@ -734,7 +734,7 @@ class TestSearchUserFairShares:
         mock_repository.search_user_fair_shares = AsyncMock(return_value=mock_result)
 
         pagination = OffsetPagination(offset=0, limit=20)
-        action = SearchUserFairSharesAction(
+        action = GlobalSearchUserFairSharesAction(
             pagination=pagination,
             conditions=[],
             orders=[],
@@ -815,7 +815,9 @@ class TestSearchDomainFairShareEntities:
             conditions=[],
             orders=[],
         )
-        action = SearchRGDomainFairSharesAction(scope=scope, querier=querier)
+        action = SearchRGDomainFairSharesAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()), scope=scope, querier=querier
+        )
         result = await service.search_rg_domain_fair_shares(action)
 
         # Both domains should be included
@@ -867,7 +869,9 @@ class TestSearchDomainFairShareEntities:
             conditions=[],
             orders=[],
         )
-        action = SearchRGDomainFairSharesAction(scope=scope, querier=querier)
+        action = SearchRGDomainFairSharesAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()), scope=scope, querier=querier
+        )
         result = await service.search_rg_domain_fair_shares(action)
 
         # Domain without record has weight set to default_weight
@@ -923,7 +927,9 @@ class TestSearchDomainFairShareEntities:
             conditions=[],
             orders=[],
         )
-        action = SearchRGDomainFairSharesAction(scope=scope, querier=querier)
+        action = SearchRGDomainFairSharesAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()), scope=scope, querier=querier
+        )
         result = await service.search_rg_domain_fair_shares(action)
 
         default = result.items[0]
@@ -1007,7 +1013,9 @@ class TestSearchProjectFairShareEntities:
             conditions=[],
             orders=[],
         )
-        action = SearchRGProjectFairSharesAction(scope=scope, querier=querier)
+        action = SearchRGProjectFairSharesAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()), scope=scope, querier=querier
+        )
         result = await service.search_rg_project_fair_shares(action)
 
         assert result.total_count == 2
@@ -1092,7 +1100,9 @@ class TestSearchUserFairShareEntities:
             conditions=[],
             orders=[],
         )
-        action = SearchRGUserFairSharesAction(scope=scope, querier=querier)
+        action = SearchRGUserFairSharesAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()), scope=scope, querier=querier
+        )
         result = await service.search_rg_user_fair_shares(action)
 
         assert result.total_count == 2

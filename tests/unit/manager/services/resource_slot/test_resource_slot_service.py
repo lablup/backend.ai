@@ -16,12 +16,12 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
 from ai.backend.manager.services.resource_slot.actions.search_agent_resources import (
-    SearchAgentResourcesAction,
-    SearchAgentResourcesResult,
+    GlobalSearchAgentResourcesAction,
+    GlobalSearchAgentResourcesResult,
 )
 from ai.backend.manager.services.resource_slot.actions.search_resource_allocations import (
-    SearchResourceAllocationsAction,
-    SearchResourceAllocationsResult,
+    GlobalSearchResourceAllocationsAction,
+    GlobalSearchResourceAllocationsResult,
 )
 from ai.backend.manager.services.resource_slot.service import ResourceSlotService
 
@@ -61,9 +61,11 @@ class TestAgentResources:
             )
         )
 
-        result = await service.search_agent_resources(SearchAgentResourcesAction(querier=querier))
+        result = await service.search_agent_resources(
+            GlobalSearchAgentResourcesAction(querier=querier)
+        )
 
-        assert isinstance(result, SearchAgentResourcesResult)
+        assert isinstance(result, GlobalSearchAgentResourcesResult)
         assert result.items == [item]
         assert result.total_count == 1
         assert result.has_next_page is False
@@ -81,7 +83,9 @@ class TestAgentResources:
             )
         )
 
-        result = await service.search_agent_resources(SearchAgentResourcesAction(querier=querier))
+        result = await service.search_agent_resources(
+            GlobalSearchAgentResourcesAction(querier=querier)
+        )
 
         assert result.items == []
         assert result.total_count == 0
@@ -111,7 +115,7 @@ class TestAgentResources:
         paged_querier = BatchQuerier(pagination=OffsetPagination(offset=5, limit=5))
 
         result = await service.search_agent_resources(
-            SearchAgentResourcesAction(querier=paged_querier)
+            GlobalSearchAgentResourcesAction(querier=paged_querier)
         )
 
         assert result.total_count == 20
@@ -137,10 +141,10 @@ class TestResourceAllocations:
         )
 
         result = await service.search_resource_allocations(
-            SearchResourceAllocationsAction(querier=querier)
+            GlobalSearchResourceAllocationsAction(querier=querier)
         )
 
-        assert isinstance(result, SearchResourceAllocationsResult)
+        assert isinstance(result, GlobalSearchResourceAllocationsResult)
         assert result.items == [item]
         assert result.total_count == 1
         mock_repository.search_resource_allocations.assert_called_once_with(querier)
@@ -158,7 +162,7 @@ class TestResourceAllocations:
         )
 
         result = await service.search_resource_allocations(
-            SearchResourceAllocationsAction(querier=querier)
+            GlobalSearchResourceAllocationsAction(querier=querier)
         )
 
         assert result.items == []

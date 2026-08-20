@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.exception import InvalidAPIParameters, ResourcePresetConflict
 from ai.backend.common.types import (
     AccessKey,
@@ -248,8 +249,7 @@ class TestResourcePresetServiceCompatibility:
 
         # Test resource slots update
         action = UpdateResourcePresetAction(
-            name="cpu-small",
-            id=None,
+            preset_id=ResourcePresetID(uuid.uuid4()),
             updater=Updater(
                 spec=ResourcePresetUpdaterSpec(
                     resource_slots=OptionalState.update(ResourceSlot({"cpu": "4", "mem": "8G"}))
@@ -284,8 +284,7 @@ class TestResourcePresetServiceCompatibility:
         )
 
         action = UpdateResourcePresetAction(
-            name=None,
-            id=preset_id,
+            preset_id=ResourcePresetID(preset_id),
             updater=Updater(
                 spec=ResourcePresetUpdaterSpec(name=OptionalState.update("cpu-medium")),
                 pk_value=preset_id,
@@ -295,22 +294,6 @@ class TestResourcePresetServiceCompatibility:
         result = await resource_preset_service.update_preset(action)
 
         assert result.resource_preset.name == "cpu-medium"
-
-    async def test_modify_preset_missing_identifiers(
-        self, resource_preset_service: ResourcePresetService
-    ) -> None:
-        """Test modify fails when neither name nor id provided."""
-        action = UpdateResourcePresetAction(
-            name=None,
-            id=None,
-            updater=Updater(
-                spec=ResourcePresetUpdaterSpec(name=OptionalState.update("new-name")),
-                pk_value="",
-            ),
-        )
-
-        with pytest.raises(InvalidAPIParameters):
-            await resource_preset_service.update_preset(action)
 
     async def test_delete_preset_action_structure(
         self,
@@ -330,7 +313,7 @@ class TestResourcePresetServiceCompatibility:
             return_value=mock_preset_data
         )
 
-        action = DeleteResourcePresetAction(name="unused-preset", id=None)
+        action = DeleteResourcePresetAction(preset_id=ResourcePresetID(uuid.uuid4()))
 
         result = await resource_preset_service.delete_preset(action)
 
@@ -348,7 +331,7 @@ class TestResourcePresetServiceCompatibility:
             side_effect=ObjectNotFound("Resource preset not found")
         )
 
-        action = DeleteResourcePresetAction(name="non-existent", id=None)
+        action = DeleteResourcePresetAction(preset_id=ResourcePresetID(uuid.uuid4()))
 
         with pytest.raises(ObjectNotFound):
             await resource_preset_service.delete_preset(action)
@@ -569,8 +552,7 @@ class TestResourcePresetServiceCompatibility:
         )
 
         action = UpdateResourcePresetAction(
-            name="gpu-standard",
-            id=None,
+            preset_id=ResourcePresetID(uuid.uuid4()),
             updater=Updater(
                 spec=ResourcePresetUpdaterSpec(
                     shared_memory=TriState.update(BinarySize(BinarySize.from_str("4G"))),
@@ -589,8 +571,7 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test modify fails when resource_slots provided without intrinsic slots."""
         action = UpdateResourcePresetAction(
-            name="existing-preset",
-            id=None,
+            preset_id=ResourcePresetID(uuid.uuid4()),
             updater=Updater(
                 spec=ResourcePresetUpdaterSpec(
                     resource_slots=OptionalState.update(ResourceSlot({"gpu": "1"}))
@@ -601,16 +582,6 @@ class TestResourcePresetServiceCompatibility:
 
         with pytest.raises(InvalidAPIParameters):
             await resource_preset_service.update_preset(action)
-
-    async def test_delete_preset_missing_identifiers(
-        self,
-        resource_preset_service: ResourcePresetService,
-    ) -> None:
-        """Test delete fails when neither name nor id provided."""
-        action = DeleteResourcePresetAction(name=None, id=None)
-
-        with pytest.raises(InvalidAPIParameters):
-            await resource_preset_service.delete_preset(action)
 
     async def test_delete_preset_by_id(
         self,
@@ -631,7 +602,7 @@ class TestResourcePresetServiceCompatibility:
             return_value=mock_preset_data
         )
 
-        action = DeleteResourcePresetAction(name=None, id=preset_id)
+        action = DeleteResourcePresetAction(preset_id=ResourcePresetID(uuid.uuid4()))
 
         result = await resource_preset_service.delete_preset(action)
 

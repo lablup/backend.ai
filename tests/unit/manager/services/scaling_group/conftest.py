@@ -15,7 +15,6 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -24,7 +23,6 @@ from sqlalchemy import text
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -73,7 +71,6 @@ from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRo
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.manager.repositories.scaling_group.repository import ScalingGroupRepository
-from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
@@ -193,12 +190,8 @@ def scaling_group_repository(database_engine: ExtendedAsyncSAEngine) -> ScalingG
 
 
 @pytest.fixture
-def scaling_group_processors(database_engine: ExtendedAsyncSAEngine) -> ScalingGroupProcessors:
-    repo = ScalingGroupRepository(database_engine)
-    service = ScalingGroupService(repo)
-    return ScalingGroupProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
-    )
+def scaling_group_service(database_engine: ExtendedAsyncSAEngine) -> ScalingGroupService:
+    return ScalingGroupService(ScalingGroupRepository(database_engine))
 
 
 # ---------------------------------------------------------------------------

@@ -102,10 +102,7 @@ class TestGetStreamingSession(TestStreamService):
         mock_session: MagicMock,
     ) -> None:
         mock_repository.get_streaming_session.return_value = mock_session
-        action = GetStreamingSessionAction(
-            session_name="my-session",
-            user_uuid=FAKE_USER_UUID,
-        )
+        action = GetStreamingSessionAction(session_id=FAKE_SESSION_ID)
 
         result = await stream_service.get_streaming_session(action)
 
@@ -119,7 +116,7 @@ class TestGetStreamingSession(TestStreamService):
         assert result.service_ports == [
             {"name": "jupyter", "protocol": "http", "container_ports": [8080]}
         ]
-        mock_repository.get_streaming_session.assert_awaited_once_with("my-session", FAKE_USER_UUID)
+        mock_repository.get_streaming_session.assert_awaited_once_with(FAKE_SESSION_ID)
 
     async def test_no_service_ports_returns_empty_list(
         self,
@@ -129,10 +126,7 @@ class TestGetStreamingSession(TestStreamService):
     ) -> None:
         mock_session.main_kernel.service_ports = None
         mock_repository.get_streaming_session.return_value = mock_session
-        action = GetStreamingSessionAction(
-            session_name="my-session",
-            user_uuid=FAKE_USER_UUID,
-        )
+        action = GetStreamingSessionAction(session_id=FAKE_SESSION_ID)
 
         result = await stream_service.get_streaming_session(action)
 
@@ -144,10 +138,7 @@ class TestGetStreamingSession(TestStreamService):
         mock_repository: AsyncMock,
     ) -> None:
         mock_repository.get_streaming_session.side_effect = SessionNotFound()
-        action = GetStreamingSessionAction(
-            session_name="nonexistent",
-            user_uuid=FAKE_USER_UUID,
-        )
+        action = GetStreamingSessionAction(session_id=SessionId(uuid.uuid4()))
 
         with pytest.raises(SessionNotFound):
             await stream_service.get_streaming_session(action)
@@ -164,8 +155,7 @@ class TestExecuteInStream(TestStreamService):
         mock_repository.get_streaming_session.return_value = mock_session
         mock_registry.execute.return_value = {"status": "finished", "exitCode": 0}
         action = ExecuteInStreamAction(
-            session_name="my-session",
-            user_uuid=FAKE_USER_UUID,
+            session_id=SessionId(uuid.uuid4()),
             api_version=(4, "websocket"),
             run_id="run-001",
             mode="query",
@@ -198,8 +188,7 @@ class TestExecuteInStream(TestStreamService):
         mock_repository.get_streaming_session.return_value = mock_session
         mock_registry.execute.return_value = {"status": "finished"}
         action = ExecuteInStreamAction(
-            session_name="my-session",
-            user_uuid=FAKE_USER_UUID,
+            session_id=SessionId(uuid.uuid4()),
             api_version=(3, "batch"),
             run_id="run-002",
             mode="batch",
@@ -223,10 +212,7 @@ class TestInterruptInStream(TestStreamService):
     ) -> None:
         mock_repository.get_streaming_session.return_value = mock_session
         mock_registry.interrupt_session.return_value = {"status": "interrupted"}
-        action = InterruptInStreamAction(
-            session_name="my-session",
-            user_uuid=FAKE_USER_UUID,
-        )
+        action = InterruptInStreamAction(session_id=SessionId(uuid.uuid4()))
 
         result = await stream_service.interrupt_in_stream(action)
 
@@ -246,8 +232,7 @@ class TestStartServiceInStream(TestStreamService):
         mock_repository.get_streaming_session.return_value = mock_session
         mock_registry.start_service.return_value = {"status": "started"}
         action = StartServiceInStreamAction(
-            session_name="my-session",
-            user_uuid=FAKE_USER_UUID,
+            session_id=SessionId(uuid.uuid4()),
             service="jupyter",
             opts={"port": 8888},
         )

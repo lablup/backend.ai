@@ -118,7 +118,7 @@ class TestRunValidationUsesKeypairResourcePolicy:
 
         mock = MagicMock()
         mock.validate_model_service = MagicMock()
-        mock.validate_model_service.wait_for_complete = AsyncMock(side_effect=_capture)
+        mock.validate_model_service.run = AsyncMock(side_effect=_capture)
         return mock
 
     @pytest.fixture

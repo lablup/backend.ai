@@ -52,6 +52,7 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import ProjectDeploymentOperationScope
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
@@ -288,6 +289,7 @@ class TestEndpointSearchInProject:
         mock_valkey_schedule = AsyncMock()
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=mock_storage_manager,
             valkey_stat=mock_valkey_stat,
             valkey_live=mock_valkey_live,
