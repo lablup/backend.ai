@@ -181,6 +181,7 @@ class EnrootRuntime(OciRuntime):
             if own:
                 os.chown(p, self._kernel_uid, self._kernel_gid)
         await asyncio.to_thread(self._recover_containers)
+        await asyncio.to_thread(self._sweep_orphan_cgroups)
         if self._rotator_task is None:
             self._rotator_task = asyncio.create_task(self._rotate_logs_loop())
 
@@ -673,6 +674,32 @@ class EnrootRuntime(OciRuntime):
                 (cgroup / name).write_text(value)
             except OSError as e:
                 log.warning("[enroot] cannot set {}={} on {}: {!r}", name, value, cgroup, e)
+
+    def _sweep_orphan_cgroups(self) -> None:
+        """Reclaim kernel cgroups left behind by an agent that died before it could clean up.
+
+        remove_container normally reclaims them, but it only runs when the agent is alive to run
+        it: kill the agent mid-session and the cgroup outlives both the container and the process
+        that made it. Nothing else ever revisits that path, so they accumulate one per kernel the
+        node lost that way. Runs after the journal replay, so a cgroup whose container we just
+        recovered is populated and therefore skipped — only genuinely empty ones are removed.
+        """
+        parent = container_cgroup_fs_path("_").parent
+        if not parent.is_dir():
+            return
+        removed = 0
+        for cgroup in parent.iterdir():
+            if not cgroup.is_dir() or cgroup.name in self._pids:
+                continue
+            try:
+                if (cgroup / "cgroup.procs").read_text().strip():
+                    continue  # something is still running in it; not ours to reap
+                cgroup.rmdir()
+                removed += 1
+            except OSError:
+                continue
+        if removed:
+            log.info("[enroot] reclaimed {} orphaned kernel cgroup(s)", removed)
 
     def _remove_cgroup(self, container_id: str) -> None:
         """Reclaim the kernel's cgroup once its processes are gone.
