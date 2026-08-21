@@ -407,5 +407,10 @@ def health() -> None:
     """Command set for health checking."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.idle_checker:cli")
+def idle_checker() -> None:
+    """Command set for idle checker related operations."""
+
+
 if __name__ == "__main__":
     main()
