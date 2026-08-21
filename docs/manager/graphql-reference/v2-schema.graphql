@@ -5822,6 +5822,7 @@ enum IdleCheckerScopeType {
   DOMAIN
   PROJECT
   RESOURCE_GROUP
+  USER
 }
 
 """

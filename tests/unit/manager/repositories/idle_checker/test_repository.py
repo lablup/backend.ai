@@ -133,19 +133,21 @@ def _expired_check_session_row(
     scope: ScopeFixture,
     session_id: SessionId,
     status: SessionStatus,
+    user_uuid: uuid.UUID | None = None,
+    session_type: SessionTypes = SessionTypes.INTERACTIVE,
 ) -> SessionRow:
     return SessionRow(
         id=session_id,
         creation_id=str(session_id)[:32],
         name=f"session-{session_id}",
-        session_type=SessionTypes.INTERACTIVE,
+        session_type=session_type,
         cluster_mode=ClusterMode.SINGLE_NODE,
         cluster_size=1,
         domain_name=scope.domain_name,
         domain_id=scope.domain_id,
         resource_group_id=scope.scaling_group_id,
         group_id=scope.project_id,
-        user_uuid=uuid.uuid4(),
+        user_uuid=user_uuid if user_uuid is not None else uuid.uuid4(),
         access_key=None,
         tag=None,
         status=status,
@@ -1511,3 +1513,176 @@ class TestSessionIdleCheckExclusion:
         assert user_row is not None
         assert user_row.is_manual is True
         assert system_row is None
+
+
+@dataclass(frozen=True)
+class UserScopeRows:
+    bound_user_id: uuid.UUID
+    bound_user_session_id: SessionId
+    other_user_session_id: SessionId
+    batch_session_id: SessionId
+    user_only_checker_id: IdleCheckerID
+    domain_checker_id: IdleCheckerID
+    interactive_only_checker_id: IdleCheckerID
+
+
+class TestUserScopeAssignments:
+    @pytest.fixture
+    async def database(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                ProjectResourcePolicyRow,
+                DomainRow,
+                UserResourcePolicyRow,
+                UserRow,
+                GroupRow,
+                ScalingGroupRow,
+                SessionRow,
+                IdleCheckerRow,
+                IdleCheckerBindingRow,
+                SessionIdleCheckRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
+        return IdleCheckerRepository(DBOpsProvider(database))
+
+    @pytest.fixture
+    async def user_scope_rows(
+        self,
+        database: ExtendedAsyncSAEngine,
+    ) -> UserScopeRows:
+        scope = _expired_check_scope_fixture("user-scope")
+        bound_user_id = uuid.uuid4()
+        other_user_id = uuid.uuid4()
+        bound_user_session_id = SessionId(uuid.uuid4())
+        other_user_session_id = SessionId(uuid.uuid4())
+        batch_session_id = SessionId(uuid.uuid4())
+        user_only_checker_id = IdleCheckerID(uuid.uuid4())
+        domain_checker_id = IdleCheckerID(uuid.uuid4())
+        interactive_only_checker_id = IdleCheckerID(uuid.uuid4())
+        async with database.begin_session() as db_sess:
+            for scope_row in _expired_check_scope_rows(scope):
+                db_sess.add(scope_row)
+            db_sess.add(
+                _expired_check_session_row(
+                    scope,
+                    bound_user_session_id,
+                    SessionStatus.RUNNING,
+                    user_uuid=bound_user_id,
+                )
+            )
+            db_sess.add(
+                _expired_check_session_row(
+                    scope,
+                    other_user_session_id,
+                    SessionStatus.RUNNING,
+                    user_uuid=other_user_id,
+                )
+            )
+            db_sess.add(
+                _expired_check_session_row(
+                    scope,
+                    batch_session_id,
+                    SessionStatus.RUNNING,
+                    user_uuid=bound_user_id,
+                    session_type=SessionTypes.BATCH,
+                )
+            )
+            db_sess.add(_expired_check_checker_row(user_only_checker_id))
+            db_sess.add(_expired_check_checker_row(domain_checker_id))
+            db_sess.add(_expired_check_checker_row(interactive_only_checker_id))
+            await db_sess.flush()
+            db_sess.add(
+                IdleCheckerBindingRow(
+                    scope_type=ScopeType.USER.value,
+                    scope_id=bound_user_id,
+                    idle_checker_id=user_only_checker_id,
+                    enabled=True,
+                )
+            )
+            db_sess.add(
+                IdleCheckerBindingRow(
+                    scope_type=ScopeType.DOMAIN.value,
+                    scope_id=scope.domain_id,
+                    idle_checker_id=domain_checker_id,
+                    enabled=True,
+                )
+            )
+            # A disabled narrower binding must not subtract the domain-inherited checker.
+            db_sess.add(
+                IdleCheckerBindingRow(
+                    scope_type=ScopeType.USER.value,
+                    scope_id=bound_user_id,
+                    idle_checker_id=domain_checker_id,
+                    enabled=False,
+                )
+            )
+            db_sess.add(
+                IdleCheckerBindingRow(
+                    scope_type=ScopeType.USER.value,
+                    scope_id=bound_user_id,
+                    idle_checker_id=interactive_only_checker_id,
+                    enabled=True,
+                )
+            )
+        return UserScopeRows(
+            bound_user_id=bound_user_id,
+            bound_user_session_id=bound_user_session_id,
+            other_user_session_id=other_user_session_id,
+            batch_session_id=batch_session_id,
+            user_only_checker_id=user_only_checker_id,
+            domain_checker_id=domain_checker_id,
+            interactive_only_checker_id=interactive_only_checker_id,
+        )
+
+    async def test_user_binding_attaches_only_to_that_users_sessions(
+        self,
+        repository: IdleCheckerRepository,
+        user_scope_rows: UserScopeRows,
+    ) -> None:
+        assignments = await repository.fetch_session_idle_check_assignments([SessionStatus.RUNNING])
+
+        sessions_of_user_only_checker = {
+            pair.session_id
+            for pair in assignments.desired_pairs
+            if pair.checker_id == user_scope_rows.user_only_checker_id
+        }
+        assert sessions_of_user_only_checker == {user_scope_rows.bound_user_session_id}
+
+    async def test_disabled_user_binding_keeps_domain_inherited_checker(
+        self,
+        repository: IdleCheckerRepository,
+        user_scope_rows: UserScopeRows,
+    ) -> None:
+        assignments = await repository.fetch_session_idle_check_assignments([SessionStatus.RUNNING])
+
+        assert (
+            SessionIdleCheckPair(
+                user_scope_rows.bound_user_session_id,
+                user_scope_rows.domain_checker_id,
+            )
+            in assignments.desired_pairs
+        )
+
+    async def test_user_binding_respects_target_session_types(
+        self,
+        repository: IdleCheckerRepository,
+        user_scope_rows: UserScopeRows,
+    ) -> None:
+        assignments = await repository.fetch_session_idle_check_assignments([SessionStatus.RUNNING])
+
+        sessions_of_interactive_only_checker = {
+            pair.session_id
+            for pair in assignments.desired_pairs
+            if pair.checker_id == user_scope_rows.interactive_only_checker_id
+        }
+        # The binding is live for this user, so only the session-type filter can exclude the
+        # batch session.
+        assert sessions_of_interactive_only_checker == {user_scope_rows.bound_user_session_id}

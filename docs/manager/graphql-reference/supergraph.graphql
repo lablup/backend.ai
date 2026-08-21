@@ -8445,6 +8445,7 @@ enum IdleCheckerScopeType
   DOMAIN @join__enumValue(graph: STRAWBERRY)
   PROJECT @join__enumValue(graph: STRAWBERRY)
   RESOURCE_GROUP @join__enumValue(graph: STRAWBERRY)
+  USER @join__enumValue(graph: STRAWBERRY)
 }
 
 """

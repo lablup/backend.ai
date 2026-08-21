@@ -10547,7 +10547,8 @@
         "enum": [
           "domain",
           "project",
-          "resource_group"
+          "resource_group",
+          "user"
         ],
         "title": "IdleCheckerScopeTypeDTO",
         "type": "string"

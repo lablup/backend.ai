@@ -80,6 +80,7 @@ class AssignmentSeedData:
     domain_assignment_id: uuid.UUID
     project_assignment_id: uuid.UUID
     other_project_assignment_id: uuid.UUID
+    user_assignment_id: uuid.UUID
 
 
 @pytest.fixture()
@@ -159,6 +160,7 @@ async def user_v2_registry(
 async def assignment_seed(
     database_engine: ExtendedAsyncSAEngine,
     database_fixture: None,
+    regular_user_fixture: UserFixtureData,
 ) -> AsyncIterator[AssignmentSeedData]:
     """Seed a domain and two projects, one checker, and one assignment per scope.
 
@@ -231,14 +233,22 @@ async def assignment_seed(
             idle_checker_id=checker_id,
             enabled=True,
         )
+        user_assignment = IdleCheckerBindingRow(
+            scope_type=ScopeType.USER,
+            scope_id=regular_user_fixture.user_uuid,
+            idle_checker_id=checker_id,
+            enabled=True,
+        )
         db_sess.add(domain_assignment)
         db_sess.add(project_assignment)
         db_sess.add(other_project_assignment)
+        db_sess.add(user_assignment)
         await db_sess.flush()
         assignment_scopes = [
             (domain_assignment.id, ScopeType.DOMAIN, str(domain_id)),
             (project_assignment.id, ScopeType.PROJECT, str(project_id)),
             (other_project_assignment.id, ScopeType.PROJECT, str(other_project_id)),
+            (user_assignment.id, ScopeType.USER, str(regular_user_fixture.user_uuid)),
         ]
         for assignment_id, scope_type, scope_id in assignment_scopes:
             db_sess.add(
@@ -258,6 +268,7 @@ async def assignment_seed(
             domain_assignment_id=domain_assignment.id,
             project_assignment_id=project_assignment.id,
             other_project_assignment_id=other_project_assignment.id,
+            user_assignment_id=user_assignment.id,
         )
     yield seed
     async with database_engine.begin() as conn:
@@ -268,6 +279,7 @@ async def assignment_seed(
                     str(seed.domain_assignment_id),
                     str(seed.project_assignment_id),
                     str(seed.other_project_assignment_id),
+                    str(seed.user_assignment_id),
                 ])
             )
         )
@@ -373,3 +385,78 @@ async def project_assignment_manage_permission(
             UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)
         )
         await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
+
+
+@pytest.fixture()
+async def user_self_scope_permission(
+    database_engine: ExtendedAsyncSAEngine,
+    regular_user_fixture: UserFixtureData,
+) -> AsyncIterator[None]:
+    """Grant the regular user UPDATE/PURGE on entity type USER at their own user scope.
+
+    This mirrors what a user's system self-role carries. It must not reach idle checker
+    assignments bound to that same user scope.
+    """
+    role_id = uuid.uuid4()
+    async with database_engine.begin_session() as db_sess:
+        db_sess.add(
+            RoleRow(
+                id=role_id,
+                name=f"icb-self-role-{role_id.hex[:8]}",
+                description="idle checker assignment self scope test role",
+            )
+        )
+        await db_sess.flush()
+        db_sess.add(UserRoleRow(user_id=regular_user_fixture.user_uuid, role_id=role_id))
+        for operation in (OperationType.UPDATE, OperationType.HARD_DELETE):
+            db_sess.add(
+                PermissionRow(
+                    role_id=role_id,
+                    scope_type=ScopeType.USER,
+                    scope_id=str(regular_user_fixture.user_uuid),
+                    entity_type=EntityType.USER,
+                    operation=operation,
+                    permission=Permission.from_operation(operation),
+                )
+            )
+        await db_sess.flush()
+    yield
+    async with database_engine.begin() as conn:
+        await conn.execute(
+            PermissionRow.__table__.delete().where(PermissionRow.__table__.c.role_id == role_id)
+        )
+        await conn.execute(
+            UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)
+        )
+        await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
+
+
+@pytest.fixture()
+async def user_in_seeded_project(
+    database_engine: ExtendedAsyncSAEngine,
+    regular_user_fixture: UserFixtureData,
+    assignment_seed: AssignmentSeedData,
+) -> AsyncIterator[None]:
+    """Place the regular user under the seeded project via an AUTO scope edge."""
+    async with database_engine.begin_session() as db_sess:
+        db_sess.add(
+            AssociationScopesEntitiesRow(
+                scope_type=ScopeType.PROJECT,
+                scope_id=str(assignment_seed.project_id),
+                entity_type=EntityType.USER,
+                entity_id=str(regular_user_fixture.user_uuid),
+                relation_type=RelationType.AUTO,
+            )
+        )
+        await db_sess.flush()
+    yield
+    async with database_engine.begin() as conn:
+        await conn.execute(
+            AssociationScopesEntitiesRow.__table__.delete().where(
+                AssociationScopesEntitiesRow.__table__.c.entity_type == EntityType.USER,
+                AssociationScopesEntitiesRow.__table__.c.entity_id
+                == str(regular_user_fixture.user_uuid),
+                AssociationScopesEntitiesRow.__table__.c.scope_id
+                == str(assignment_seed.project_id),
+            )
+        )

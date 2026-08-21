@@ -47,6 +47,7 @@ from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
@@ -156,6 +157,9 @@ class IdleCheckerDBSource:
                     )
                     result = await w.batch_query_in_global(sa.select(ScalingGroupRow), querier)
                     scope_exists = bool(result.rows)
+                case ScopeType.USER:
+                    user_row = await w.query(Querier(row_class=UserRow, pk_value=spec.scope_id))
+                    scope_exists = user_row is not None
                 case _:
                     scope_exists = False
             if not scope_exists:
@@ -359,6 +363,10 @@ class IdleCheckerDBSource:
             sa.and_(
                 IdleCheckerBindingRow.scope_type == ScopeType.DOMAIN.value,
                 IdleCheckerBindingRow.scope_id == SessionRow.domain_id,
+            ),
+            sa.and_(
+                IdleCheckerBindingRow.scope_type == ScopeType.USER.value,
+                IdleCheckerBindingRow.scope_id == SessionRow.user_uuid,
             ),
         )
         desired_query = (
