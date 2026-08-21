@@ -56,7 +56,9 @@ from ai.backend.agent.containerd.runtime.interface import (
 from ai.backend.agent.containerd.runtime.spec import container_cgroup_fs_path
 from ai.backend.agent.enroot.registry import fetch_image_metadata
 from ai.backend.agent.enroot.registry import push_image as fetch_push
+from ai.backend.agent.enroot.seccomp import compile_profile
 from ai.backend.agent.network.journal_io import atomic_write
+from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -73,9 +75,20 @@ _GATE_MNT: Final = "/.bai-enroot-gate"
 # create_task knows the wrapper — not a transient enroot setup process — is the stable netns holder,
 # then (2) blocks in the shell itself (`read`, no child `cat`) opening the go FIFO, so this exact PID
 # is what create_task attaches to; on go it `exec`s the real command, preserving that PID.
-_PAUSE_SCRIPT: Final = (
-    f'#!/bin/sh\n: > {_GATE_MNT}/ready\nread _ < {_GATE_MNT}/go 2>/dev/null\nexec "$@"\n'
-)
+# The seccomp filter the agent compiled for this container, and the installer that puts it on.
+# Both are bind-mounted in with the gate.
+_SECCOMP_FILTER: Final = "seccomp.bpf"
+_SECCOMP_INSTALLER: Final = "seccomp_installer.py"
+# The interpreter the krunner mount always provides; the image's own python may not exist.
+_KRUNNER_PYTHON: Final = "/opt/backend.ai/bin/python"
+_PAUSE_SCRIPT: Final = f"""#!/bin/sh
+: > {_GATE_MNT}/ready
+read _ < {_GATE_MNT}/go 2>/dev/null
+if [ -f {_GATE_MNT}/{_SECCOMP_FILTER} ]; then
+  exec {_KRUNNER_PYTHON} {_GATE_MNT}/{_SECCOMP_INSTALLER} {_GATE_MNT}/{_SECCOMP_FILTER} "$@"
+fi
+exec "$@"
+"""
 # OCI mount types that enroot provides itself (userns) — never forwarded as host binds.
 _SKIP_MOUNT_TYPES: Final = frozenset({
     "proc",
@@ -573,6 +586,7 @@ class EnrootRuntime(OciRuntime):
         spec = self._specs[container_id]
         gate_dir = self._gate_dir(container_id)
         await asyncio.to_thread(self._write_gate, gate_dir)
+        await asyncio.to_thread(self._write_seccomp, gate_dir, spec)
         argv = self._enroot_start_argv(container_id, spec, gate_dir)
         log.debug("[enroot] start argv: {}", " ".join(argv))
         log_fd = self._open_log(container_id)
@@ -618,17 +632,32 @@ class EnrootRuntime(OciRuntime):
         # BPF), so syscall filtering must come from BAI's runtime-independent `jail` sandbox
         # (sandbox_type=jail), which the krunner entrypoint installs in-container regardless of the
         # runtime. Warn once per container when a profile is present but no jail is in effect.
-        linux = spec.get("linux", {})
-        if "seccomp" in linux:
-            log.warning(
-                "[enroot] OCI seccomp profile present but not enforceable by enroot (no runc); "
-                "use sandbox_type=jail for syscall filtering (container {})",
+        if not spec.get("seccomp"):
+            log.info(
+                "[enroot] no seccomp profile for container {} — syscall filtering comes from the "
+                "jail sandbox alone (sandbox_type=jail)",
                 container_id,
             )
 
     # --- two-phase gate + netns-holder discovery helpers ---
     def _gate_dir(self, container_id: str) -> Path:
         return self._state_path / container_id / "gate"
+
+    def _write_seccomp(self, gate_dir: Path, spec: Mapping[str, Any]) -> None:
+        """Compile this container's seccomp profile into the gate, for the pause wrapper to apply.
+
+        Absent profile means the operator chose the jail sandbox (the agent then does not generate
+        one) — that is a deliberate posture, not a failure, so there is simply no filter to install.
+        A profile that is present but will not compile IS a failure: starting the container anyway
+        would silently run it unconfined.
+        """
+        oci_seccomp = spec.get("seccomp")
+        if not oci_seccomp:
+            return
+        program = compile_profile(oci_seccomp, arch=CURRENT_ARCH)
+        (gate_dir / _SECCOMP_FILTER).write_bytes(program)
+        shutil.copyfile(Path(__file__).with_name(_SECCOMP_INSTALLER), gate_dir / _SECCOMP_INSTALLER)
+        log.debug("[enroot] seccomp: {} instructions for {}", len(program) // 8, CURRENT_ARCH)
 
     def _write_gate(self, gate_dir: Path) -> None:
         gate_dir.mkdir(parents=True, exist_ok=True)
