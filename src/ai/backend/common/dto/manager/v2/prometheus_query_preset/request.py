@@ -65,7 +65,7 @@ class CreateQueryDefinitionInput(BaseRequestModel):
     category_id: UUID | None = Field(default=None, description="Category ID")
     metric_name: str = Field(description="Prometheus metric name")
     query_template: str = Field(
-        description=("PromQL template with placeholders (${labels}, ${window}, ${group_by})")
+        description=("PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}})")
     )
     time_window: str | None = Field(
         default=None,
@@ -119,7 +119,7 @@ class ModifyQueryDefinitionInput(BaseRequestModel):
     query_template: str | None = Field(
         default=None,
         description=(
-            "Updated PromQL template with placeholders (${labels}, ${window}, ${group_by})"
+            "Updated PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}})"
         ),
     )
     time_window: str | Sentinel | None = Field(

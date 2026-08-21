@@ -7,7 +7,7 @@
       "rank": 100,
       "category_name": "container",
       "metric_name": "backendai_container_utilization",
-      "query_template": "sum by (${group_by})(backendai_container_utilization{${labels}})",
+      "query_template": "sum by (${{group_by}})(backendai_container_utilization{${{labels}}})",
       "time_window": null,
       "options": {
         "filter_labels": [
@@ -36,7 +36,7 @@
       "rank": 110,
       "category_name": "container",
       "metric_name": "backendai_container_utilization",
-      "query_template": "avg by (${group_by})(backendai_container_utilization{${labels}})",
+      "query_template": "avg by (${{group_by}})(backendai_container_utilization{${{labels}}})",
       "time_window": null,
       "options": {
         "filter_labels": [
@@ -65,7 +65,7 @@
       "rank": 120,
       "category_name": "container",
       "metric_name": "backendai_container_utilization",
-      "query_template": "max by (${group_by})(backendai_container_utilization{${labels}})",
+      "query_template": "max by (${{group_by}})(backendai_container_utilization{${{labels}}})",
       "time_window": null,
       "options": {
         "filter_labels": [
@@ -94,7 +94,7 @@
       "rank": 130,
       "category_name": "container",
       "metric_name": "backendai_container_utilization",
-      "query_template": "min by (${group_by})(backendai_container_utilization{${labels}})",
+      "query_template": "min by (${{group_by}})(backendai_container_utilization{${{labels}}})",
       "time_window": null,
       "options": {
         "filter_labels": [
@@ -123,7 +123,7 @@
       "rank": 200,
       "category_name": "container",
       "metric_name": "backendai_container_utilization",
-      "query_template": "sum by (${group_by})(rate(backendai_container_utilization{${labels}}[${window}]))",
+      "query_template": "sum by (${{group_by}})(rate(backendai_container_utilization{${{labels}}}[${{window}}]))",
       "time_window": "5m",
       "options": {
         "filter_labels": [
@@ -152,7 +152,7 @@
       "rank": 210,
       "category_name": "container",
       "metric_name": "backendai_container_utilization",
-      "query_template": "avg by (${group_by})(rate(backendai_container_utilization{${labels}}[${window}]))",
+      "query_template": "avg by (${{group_by}})(rate(backendai_container_utilization{${{labels}}}[${{window}}]))",
       "time_window": "5m",
       "options": {
         "filter_labels": [
@@ -181,7 +181,7 @@
       "rank": 220,
       "category_name": "container",
       "metric_name": "backendai_container_utilization",
-      "query_template": "max by (${group_by})(rate(backendai_container_utilization{${labels}}[${window}]))",
+      "query_template": "max by (${{group_by}})(rate(backendai_container_utilization{${{labels}}}[${{window}}]))",
       "time_window": "5m",
       "options": {
         "filter_labels": [
@@ -210,7 +210,7 @@
       "rank": 230,
       "category_name": "container",
       "metric_name": "backendai_container_utilization",
-      "query_template": "min by (${group_by})(rate(backendai_container_utilization{${labels}}[${window}]))",
+      "query_template": "min by (${{group_by}})(rate(backendai_container_utilization{${{labels}}}[${{window}}]))",
       "time_window": "5m",
       "options": {
         "filter_labels": [
@@ -239,7 +239,7 @@
       "rank": 300,
       "category_name": "vllm-inference",
       "metric_name": "vllm:num_requests_running",
-      "query_template": "sum by (${group_by})(vllm:num_requests_running{${labels}})",
+      "query_template": "sum by (${{group_by}})(vllm:num_requests_running{${{labels}}})",
       "time_window": null,
       "options": {
         "filter_labels": [
@@ -257,7 +257,7 @@
       "rank": 310,
       "category_name": "vllm-inference",
       "metric_name": "vllm:num_requests_running",
-      "query_template": "avg by (${group_by})(vllm:num_requests_running{${labels}})",
+      "query_template": "avg by (${{group_by}})(vllm:num_requests_running{${{labels}}})",
       "time_window": null,
       "options": {
         "filter_labels": [
@@ -275,7 +275,7 @@
       "rank": 320,
       "category_name": "vllm-inference",
       "metric_name": "vllm:num_requests_running",
-      "query_template": "max by (${group_by})(vllm:num_requests_running{${labels}})",
+      "query_template": "max by (${{group_by}})(vllm:num_requests_running{${{labels}}})",
       "time_window": null,
       "options": {
         "filter_labels": [
@@ -293,7 +293,7 @@
       "rank": 400,
       "category_name": "vllm-inference",
       "metric_name": "vllm:num_requests_waiting",
-      "query_template": "sum by (${group_by})(vllm:num_requests_waiting{${labels}})",
+      "query_template": "sum by (${{group_by}})(vllm:num_requests_waiting{${{labels}}})",
       "time_window": null,
       "options": {
         "filter_labels": [
@@ -311,7 +311,7 @@
       "rank": 410,
       "category_name": "vllm-inference",
       "metric_name": "vllm:num_requests_waiting",
-      "query_template": "avg by (${group_by})(vllm:num_requests_waiting{${labels}})",
+      "query_template": "avg by (${{group_by}})(vllm:num_requests_waiting{${{labels}}})",
       "time_window": null,
       "options": {
         "filter_labels": [
@@ -329,7 +329,7 @@
       "rank": 420,
       "category_name": "vllm-inference",
       "metric_name": "vllm:num_requests_waiting",
-      "query_template": "max by (${group_by})(vllm:num_requests_waiting{${labels}})",
+      "query_template": "max by (${{group_by}})(vllm:num_requests_waiting{${{labels}}})",
       "time_window": null,
       "options": {
         "filter_labels": [
@@ -347,7 +347,7 @@
       "rank": 500,
       "category_name": "vllm-inference",
       "metric_name": "vllm:gpu_cache_usage_perc",
-      "query_template": "avg by (${group_by})(vllm:gpu_cache_usage_perc{${labels}})",
+      "query_template": "avg by (${{group_by}})(vllm:gpu_cache_usage_perc{${{labels}}})",
       "time_window": null,
       "options": {
         "filter_labels": [
@@ -365,7 +365,7 @@
       "rank": 510,
       "category_name": "vllm-inference",
       "metric_name": "vllm:gpu_cache_usage_perc",
-      "query_template": "max by (${group_by})(vllm:gpu_cache_usage_perc{${labels}})",
+      "query_template": "max by (${{group_by}})(vllm:gpu_cache_usage_perc{${{labels}}})",
       "time_window": null,
       "options": {
         "filter_labels": [
@@ -383,7 +383,7 @@
       "rank": 520,
       "category_name": "vllm-inference",
       "metric_name": "vllm:gpu_cache_usage_perc",
-      "query_template": "min by (${group_by})(vllm:gpu_cache_usage_perc{${labels}})",
+      "query_template": "min by (${{group_by}})(vllm:gpu_cache_usage_perc{${{labels}}})",
       "time_window": null,
       "options": {
         "filter_labels": [
@@ -401,7 +401,7 @@
       "rank": 600,
       "category_name": "vllm-inference",
       "metric_name": "vllm:request_success_total",
-      "query_template": "sum by (${group_by})(rate(vllm:request_success_total{${labels}}[${window}]))",
+      "query_template": "sum by (${{group_by}})(rate(vllm:request_success_total{${{labels}}}[${{window}}]))",
       "time_window": "5m",
       "options": {
         "filter_labels": [
@@ -419,7 +419,7 @@
       "rank": 610,
       "category_name": "vllm-inference",
       "metric_name": "vllm:request_success_total",
-      "query_template": "avg by (${group_by})(rate(vllm:request_success_total{${labels}}[${window}]))",
+      "query_template": "avg by (${{group_by}})(rate(vllm:request_success_total{${{labels}}}[${{window}}]))",
       "time_window": "5m",
       "options": {
         "filter_labels": [
@@ -437,7 +437,7 @@
       "rank": 620,
       "category_name": "vllm-inference",
       "metric_name": "vllm:request_success_total",
-      "query_template": "max by (${group_by})(rate(vllm:request_success_total{${labels}}[${window}]))",
+      "query_template": "max by (${{group_by}})(rate(vllm:request_success_total{${{labels}}}[${{window}}]))",
       "time_window": "5m",
       "options": {
         "filter_labels": [
@@ -455,7 +455,7 @@
       "rank": 700,
       "category_name": "vllm-inference",
       "metric_name": "vllm:e2e_request_latency_seconds",
-      "query_template": "avg by (${group_by})(rate(vllm:e2e_request_latency_seconds_sum{${labels}}[${window}]) / rate(vllm:e2e_request_latency_seconds_count{${labels}}[${window}]))",
+      "query_template": "avg by (${{group_by}})(rate(vllm:e2e_request_latency_seconds_sum{${{labels}}}[${{window}}]) / rate(vllm:e2e_request_latency_seconds_count{${{labels}}}[${{window}}]))",
       "time_window": "5m",
       "options": {
         "filter_labels": [
@@ -473,7 +473,7 @@
       "rank": 710,
       "category_name": "vllm-inference",
       "metric_name": "vllm:e2e_request_latency_seconds",
-      "query_template": "max by (${group_by})(rate(vllm:e2e_request_latency_seconds_sum{${labels}}[${window}]) / rate(vllm:e2e_request_latency_seconds_count{${labels}}[${window}]))",
+      "query_template": "max by (${{group_by}})(rate(vllm:e2e_request_latency_seconds_sum{${{labels}}}[${{window}}]) / rate(vllm:e2e_request_latency_seconds_count{${{labels}}}[${{window}}]))",
       "time_window": "5m",
       "options": {
         "filter_labels": [

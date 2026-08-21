@@ -1,7 +1,7 @@
 """convert_prometheus_query_preset_templates_to_dollar_placeholders
 
-The app renders ``query_template`` by substituting ``${labels}``, ``${window}``
-and ``${group_by}``; every other character is literal PromQL. The legacy
+The app renders ``query_template`` by substituting ``${{labels}}``, ``${{window}}``
+and ``${{group_by}}``; every other character is literal PromQL. The legacy
 ``str.format`` syntax (``{labels}``, ``{{{labels}}}``, escaped braces) is no
 longer supported. This migration rewrites all stored templates, including the
 seeded defaults, to the new form. The conversion helpers are a frozen copy of
@@ -9,7 +9,7 @@ the removed legacy parsing logic. Idempotent: already-converted templates are
 left untouched.
 
 Revision ID: 4b8e2f7a91d3
-Revises: f1a7c3e9b482
+Revises: f2d658cac56b
 Create Date: 2026-08-10 00:00:00.000000
 
 """
@@ -22,13 +22,13 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "4b8e2f7a91d3"
-down_revision = "f1a7c3e9b482"
+down_revision = "f2d658cac56b"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
 
 _BRACE_BLOCK_RE = re.compile(r"\{([^{}]*)\}")
-_PLACEHOLDER_RE = re.compile(r"\$\{(?:labels|window|group_by)\}")
+_PLACEHOLDER_RE = re.compile(r"\$\{\{(?:labels|window|group_by)\}\}")
 
 
 def _escape_non_placeholders(template: str) -> str:
@@ -58,7 +58,7 @@ def _escape_non_placeholders(template: str) -> str:
 
 
 def _to_dollar_placeholders(template: str) -> str:
-    """Rewrite a legacy ``str.format`` template with ``${...}`` placeholders."""
+    """Rewrite a legacy ``str.format`` template with ``${{...}}`` placeholders."""
     if _PLACEHOLDER_RE.search(template):
         return template  # already converted
     try:
@@ -69,7 +69,7 @@ def _to_dollar_placeholders(template: str) -> str:
     for literal, field, _spec, _conv in parsed:
         out += literal
         if field is not None:
-            out += "${" + field + "}"
+            out += "${{" + field + "}}"
     return out
 
 

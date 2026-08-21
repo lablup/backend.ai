@@ -83,8 +83,8 @@ class TestSessionUtilizationMetrics:
             category_id=None,
             metric_name="cpu_used",
             query_template=(
-                'avg by (${group_by}) (backendai_container_utilization{value_type="current",'
-                "${labels}})"
+                'avg by (${{group_by}}) (backendai_container_utilization{value_type="current",'
+                "${{labels}}})"
             ),
             time_window="5m",
             filter_labels=["session_id", "container_metric_name"],

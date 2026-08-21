@@ -194,7 +194,7 @@ async def prometheus_client_with_relabel(
 @pytest.fixture
 def up_model_service_preset() -> MetricPreset:
     return MetricPreset(
-        template="up{${labels}}",
+        template="up{${{labels}}}",
         labels={"service_group": LabelMatcher.exact(MODEL_SERVICE_GROUP)},
         group_by=frozenset(),
     )

@@ -73,7 +73,7 @@ class TestQueryRange:
     @pytest.fixture
     def sample_preset(self) -> MetricPreset:
         return MetricPreset(
-            template="sum(my_metric{${labels}}) by (${group_by})",
+            template="sum(my_metric{${{labels}}}) by (${{group_by}})",
             labels={
                 "container_metric_name": LabelMatcher.exact("mem"),
                 "value_type": LabelMatcher.exact("current"),
@@ -185,7 +185,7 @@ class TestQueryInstant:
     @pytest.fixture
     def sample_preset(self) -> MetricPreset:
         return MetricPreset(
-            template="sum(my_metric{${labels}}) by (${group_by})",
+            template="sum(my_metric{${{labels}}}) by (${{group_by}})",
             labels={
                 "container_metric_name": LabelMatcher.exact("mem"),
                 "value_type": LabelMatcher.exact("current"),
@@ -330,7 +330,7 @@ class TestExecutePreset:
 
         result = await prometheus_client.execute_preset(
             MetricPreset(
-                template="sum(my_metric{${labels}}) by (${group_by})",
+                template="sum(my_metric{${{labels}}}) by (${{group_by}})",
                 labels={"kernel_id": LabelMatcher.exact("kernel-1")},
                 group_by={"kernel_id"},
                 window="5m",
@@ -377,7 +377,7 @@ class TestExecutePreset:
     ) -> None:
         result = await prometheus_client.execute_preset(
             MetricPreset(
-                template="sum(my_metric{${labels}}) by (${group_by})",
+                template="sum(my_metric{${{labels}}}) by (${{group_by}})",
                 labels={"kernel_id": LabelMatcher.exact("kernel-1")},
                 group_by={"kernel_id"},
                 window="5m",
@@ -417,7 +417,7 @@ class TestTimeout:
     @pytest.fixture
     def sample_preset(self) -> MetricPreset:
         return MetricPreset(
-            template="sum(my_metric{${labels}})",
+            template="sum(my_metric{${{labels}}})",
             labels={},
             group_by=frozenset(),
         )

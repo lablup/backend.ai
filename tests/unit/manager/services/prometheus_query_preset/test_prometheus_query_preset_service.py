@@ -72,7 +72,7 @@ class TestPrometheusQueryPresetService:
             rank=0,
             category_id=None,
             metric_name="backendai_container_cpu_util",
-            query_template="rate(container_cpu_usage_seconds_total{${labels}}[${window}])",
+            query_template="rate(container_cpu_usage_seconds_total{${{labels}}}[${{window}}])",
             time_window="5m",
             filter_labels=["kernel_id", "session_id"],
             group_labels=["kernel_id"],
@@ -113,7 +113,7 @@ class TestPrometheusQueryPresetService:
             spec=PrometheusQueryPresetCreatorSpec(
                 name="cpu_usage",
                 metric_name="metric",
-                query_template="sum(metric{${labels}})",
+                query_template="sum(metric{${{labels}}})",
                 time_window=None,
                 filter_labels=[],
                 group_labels=[],
@@ -240,7 +240,7 @@ class TestPrometheusQueryPresetService:
 
         updater = Updater(
             spec=PrometheusQueryPresetUpdaterSpec(
-                query_template=OptionalState[str].update("sum(metric{${labels}})"),
+                query_template=OptionalState[str].update("sum(metric{${{labels}}})"),
             ),
             pk_value=preset_data.id,
         )
@@ -259,7 +259,7 @@ class TestPrometheusQueryPresetService:
 
         updater = Updater(
             spec=PrometheusQueryPresetUpdaterSpec(
-                query_template=OptionalState[str].update("metric{${unknown_var}}"),
+                query_template=OptionalState[str].update("metric{${{unknown_var}}}"),
             ),
             pk_value=uuid4(),
         )
@@ -563,11 +563,11 @@ class TestPrometheusQueryPresetService:
         )
 
         await service.preview_preset(
-            PreviewPresetAction(query_template="sum(rate(metric{${labels}}[${window}]))")
+            PreviewPresetAction(query_template="sum(rate(metric{${{labels}}}[${{window}}]))")
         )
 
         mock_repository.preview_template.assert_called_once_with(
-            query_template="sum(rate(metric{${labels}}[${window}]))",
+            query_template="sum(rate(metric{${{labels}}}[${{window}}]))",
             default_window="1m",
         )
 
@@ -578,7 +578,7 @@ class TestPrometheusQueryPresetService:
     ) -> None:
         mock_repository.preview_template = AsyncMock()
 
-        action = PreviewPresetAction(query_template="metric{${unknown_var}}")
+        action = PreviewPresetAction(query_template="metric{${{unknown_var}}}")
 
         with pytest.raises(InvalidMetricPresetTemplate):
             await service.preview_preset(action)

@@ -20,16 +20,20 @@ from ai.backend.common.exception import InvalidMetricPresetTemplate
 PLACEHOLDER_NAMES = frozenset({"labels", "window", "group_by"})
 
 # PromQL uses braces for label selectors, so the default `{{ }}` would collide
-# with the query language itself.
-_VARIABLE_START, _VARIABLE_END = "${", "}"
+# with the query language itself. `${{ }}` (GitHub Actions syntax) does not: a
+# lone `${` can occur in literal PromQL (a `$` regex anchor before a `{n}`
+# quantifier), while `${{` cannot.
+_VARIABLE_START, _VARIABLE_END = "${{", "}}"
 
-# Literal text and `${ placeholder }` substitution only; statements and comments
+# Literal text and `${{ placeholder }}` substitution only; statements and comments
 # reach the parser but are rejected here.
 _ALLOWED_NODE_TYPES = (nodes.Template, nodes.Output, nodes.TemplateData, nodes.Name)
 
-# Bare `{placeholder}` or any `{{{`: the pre-${} str.format syntax.
+# Bare `{placeholder}` or any `{{{`: the pre-${{ }} str.format syntax.
 _LEGACY_TEMPLATE_RE = re.compile(r"(?<![{$])\{(?:labels|window|group_by)\}(?!\})|\{\{\{")
-_PLACEHOLDER_HELP: Final[str] = ", ".join(f"${{{name}}}" for name in sorted(PLACEHOLDER_NAMES))
+_PLACEHOLDER_HELP: Final[str] = ", ".join(
+    f"{_VARIABLE_START}{name}{_VARIABLE_END}" for name in sorted(PLACEHOLDER_NAMES)
+)
 
 
 class LabelOperator(StrEnum):
@@ -73,17 +77,17 @@ def _escape_label_value(value: str) -> str:
 @dataclass(frozen=True)
 class MetricPreset:
     """PromQL query preset with a template
-    (placeholders: ``${labels}``, ``${window}``, ``${group_by}``)."""
+    (placeholders: ``${{labels}}``, ``${{window}}``, ``${{group_by}}``)."""
 
     template: str
 
-    # Injected into ${labels}
+    # Injected into ${{labels}}
     labels: Mapping[str, LabelMatcher] = field(default_factory=dict)
 
-    # Injected into ${group_by}
+    # Injected into ${{group_by}}
     group_by: Set[str] = field(default_factory=frozenset)
 
-    # Injected into ${window}
+    # Injected into ${{window}}
     window: str = ""
 
 
