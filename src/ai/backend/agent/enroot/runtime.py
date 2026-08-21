@@ -52,6 +52,7 @@ from ai.backend.agent.containerd.runtime.interface import (
 )
 from ai.backend.agent.containerd.runtime.spec import container_cgroup_fs_path
 from ai.backend.agent.enroot.registry import fetch_image_metadata
+from ai.backend.agent.network.journal_io import atomic_write
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -175,6 +176,7 @@ class EnrootRuntime(OciRuntime):
             p.mkdir(parents=True, exist_ok=True)
             if own:
                 os.chown(p, self._kernel_uid, self._kernel_gid)
+        await asyncio.to_thread(self._recover_containers)
         if self._rotator_task is None:
             self._rotator_task = asyncio.create_task(self._rotate_logs_loop())
 
@@ -423,6 +425,7 @@ class EnrootRuntime(OciRuntime):
             await self._reap(container_id)
             raise
         self._pids[container_id] = pid
+        await asyncio.to_thread(self._record_container, container_id, pid)
         # Confine the container now, while the wrapper is still blocked on the gate: every process
         # that will run the user's command is already forked, and none of it has started. Doing it
         # after start_task would let the workload run unconfined for however long the move takes.
@@ -505,6 +508,60 @@ class EnrootRuntime(OciRuntime):
         path = self._log_path(container_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         return os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+
+    # ------------------------------------------------------------------ container journal
+    def _meta_path(self, container_id: str) -> Path:
+        # Beside the gate, under the per-container state dir, so remove_container's rmtree already
+        # takes the journal entry with it.
+        return self._state_path / container_id / "container.json"
+
+    def _record_container(self, container_id: str, pid: int) -> None:
+        """Journal what a restart needs to find this container again.
+
+        enroot has no daemon and no label store: `enroot list` knows names, not our kernel labels,
+        and nothing on the host maps a container to its netns-holder PID. Without this the runtime's
+        knowledge of running containers is process memory, and an agent worker restart — which the
+        containers *survive*, being reparented to the pod's supervisor — leaves the fresh runtime
+        reporting none of them. reconstruct_resource_usage would then free every slot and the
+        orphan-kernel sweep could kill live kernels.
+        """
+        meta = {
+            "pid": pid,
+            "start_time": self._pid_start_time(pid),
+            "image": self._images.get(container_id, ""),
+            "labels": dict(self._labels.get(container_id, {})),
+        }
+        path = self._meta_path(container_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write(path, json.dumps(meta))
+
+    def _recover_containers(self) -> None:
+        """Rebuild the in-memory container tables from the journal, dropping what is no longer live."""
+        if not self._state_path.is_dir():
+            return
+        for entry in self._state_path.iterdir():
+            path = entry / "container.json"
+            try:
+                meta = json.loads(path.read_text())
+            except FileNotFoundError:
+                continue
+            except (OSError, ValueError) as e:
+                log.warning("[enroot] unreadable container journal {}: {!r}", path, e)
+                continue
+            pid = meta.get("pid")
+            if not isinstance(pid, int):
+                continue
+            # The PID must still be the same *live* process: not exited, not a zombie, and not a
+            # reused number (which is what the start time rules out).
+            if not self._alive(pid) or self._pid_start_time(pid) != meta.get("start_time"):
+                log.debug("[enroot] journal entry {} is stale; dropping", entry.name)
+                shutil.rmtree(entry, ignore_errors=True)
+                continue
+            self._pids[entry.name] = pid
+            self._images[entry.name] = str(meta.get("image") or "")
+            self._labels[entry.name] = dict(meta.get("labels") or {})
+        if self._pids:
+            log.info("[enroot] recovered {} running container(s) from the journal", len(self._pids))
 
     # ------------------------------------------------------------------ cgroup confinement
     def _confine(self, container_id: str, spec: Mapping[str, Any], top_pid: int) -> None:
@@ -767,7 +824,13 @@ class EnrootRuntime(OciRuntime):
         # which is a runc feature enroot cannot provide — see _log_hardening_disposition.
         return argv
 
-    def _ppid(self, pid: int) -> int | None:
+    @staticmethod
+    def _proc_stat_fields(pid: int) -> list[str] | None:
+        """``/proc/<pid>/stat`` from the state field on, i.e. field 3 at index 0.
+
+        Split after the LAST ``)``: field 2 is the executable name, unquoted and free to contain
+        spaces and parentheses, so a plain split() misaligns every field after it.
+        """
         try:
             content = Path(f"/proc/{pid}/stat").read_text()
         except OSError:
@@ -775,9 +838,29 @@ class EnrootRuntime(OciRuntime):
         rparen = content.rfind(")")
         if rparen < 0:
             return None
-        fields = content[rparen + 2 :].split()  # after "comm)": [state, ppid, ...]
+        return content[rparen + 2 :].split()
+
+    def _ppid(self, pid: int) -> int | None:
+        fields = self._proc_stat_fields(pid)  # index 0 == field 3 (state); ppid is field 4
+        if fields is None:
+            return None
         try:
             return int(fields[1])
+        except (IndexError, ValueError):
+            return None
+
+    def _pid_start_time(self, pid: int) -> int | None:
+        """Field 22, the process's start time in clock ticks since boot.
+
+        A PID alone does not identify a process across a restart — the kernel reuses them, and the
+        journal would then hand a recovered kernel some unrelated process to signal. The pair
+        (pid, start_time) is unique for the life of the boot.
+        """
+        fields = self._proc_stat_fields(pid)  # field 22 -> index 19
+        if fields is None:
+            return None
+        try:
+            return int(fields[19])
         except (IndexError, ValueError):
             return None
 
@@ -896,13 +979,17 @@ class EnrootRuntime(OciRuntime):
 
     # ------------------------------------------------------------------ introspection
     def _alive(self, pid: int) -> bool:
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
+        """Whether the pid is a *live* process. A zombie is not.
+
+        `os.kill(pid, 0)` succeeds for a zombie — the task is dead, only its exit status has yet to
+        be reaped — and the pod's supervisor does not reap a dead worker's orphans, so zombies do
+        linger here. Counting one as running reports a terminated container as alive to the
+        reconciler and lets the journal recover a kernel that is already gone.
+        """
+        fields = self._proc_stat_fields(pid)  # index 0 == field 3, the state character
+        if not fields:
             return False
-        except PermissionError:
-            return True
-        return True
+        return fields[0] not in ("Z", "X", "x")
 
     @override
     async def list_containers(self) -> Sequence[str]:
@@ -910,9 +997,9 @@ class EnrootRuntime(OciRuntime):
 
     @override
     async def list_container_infos(self) -> Sequence[ContainerInfo]:
-        # First pass: report from in-memory tracking. Full restart reconciliation needs an
-        # on-disk PID<->kernel map (enroot has no label store / container-list API that carries
-        # our labels) — see the change-point notes.
+        # In-memory tracking, but it survives an agent restart: open() rebuilds it from the
+        # per-container journal (enroot has no label store or container-list API that carries our
+        # labels, so the runtime has to keep that map itself). See _record_container.
         infos: list[ContainerInfo] = []
         for cid, pid in self._pids.items():
             infos.append(
