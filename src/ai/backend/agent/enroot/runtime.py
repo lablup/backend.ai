@@ -31,6 +31,7 @@ import logging
 import os
 import re
 import shutil
+import time
 from collections.abc import AsyncIterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any, Final, override
@@ -49,6 +50,7 @@ from ai.backend.agent.containerd.runtime.interface import (
     TaskEvent,
     TaskHandle,
 )
+from ai.backend.agent.containerd.runtime.spec import container_cgroup_fs_path
 from ai.backend.agent.enroot.registry import fetch_image_metadata
 from ai.backend.logging import BraceStyleAdapter
 
@@ -86,6 +88,12 @@ _TASK_START_TIMEOUT_SEC: Final = 30.0
 # nothing, and the interval is what bounds the overshoot (see _rotate_logs_loop), so keep it short.
 _LOG_ROTATE_INTERVAL_SEC: Final = 5.0
 _LOG_COPY_CHUNK: Final = 1024 * 1024
+# Presence of the unified hierarchy's controller list is what tells cgroup v2 from v1.
+_CGROUP_V2_MARKER: Final = "/sys/fs/cgroup/cgroup.controllers"
+# rmdir on a cgroup whose members are still exiting returns EBUSY; ~1s total is far more than the
+# kernel needs to reap processes that have already been SIGKILLed.
+_CGROUP_RMDIR_RETRIES: Final = 20
+_CGROUP_RMDIR_DELAY_SEC: Final = 0.05
 
 
 def _slug(image_ref: str) -> str:
@@ -415,6 +423,10 @@ class EnrootRuntime(OciRuntime):
             await self._reap(container_id)
             raise
         self._pids[container_id] = pid
+        # Confine the container now, while the wrapper is still blocked on the gate: every process
+        # that will run the user's command is already forked, and none of it has started. Doing it
+        # after start_task would let the workload run unconfined for however long the move takes.
+        await asyncio.to_thread(self._confine, container_id, spec, proc.pid)
         return TaskHandle(container_id=container_id, pid=pid)
 
     @override
@@ -493,6 +505,108 @@ class EnrootRuntime(OciRuntime):
         path = self._log_path(container_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         return os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+
+    # ------------------------------------------------------------------ cgroup confinement
+    def _confine(self, container_id: str, spec: Mapping[str, Any], top_pid: int) -> None:
+        """Put the container's whole process tree in its own cgroup, with the allocated limits.
+
+        runc does this from the OCI spec's ``linux.resources`` + ``cgroupsPath``; enroot has no
+        cgroup integration at all, so without this the container simply inherits the agent's cgroup
+        — meaning a kernel allocated 2 CPUs can saturate the node, and the agent's stats reader
+        finds nothing at the path it expects (``/sys/fs/cgroup/backend-ai/<kernel-id>``), so every
+        kernel reports no CPU or memory utilization at all. Both are the same missing cgroup.
+
+        The path comes from the containerd backend's own helper, so the reader and this writer
+        cannot disagree about where a kernel's cgroup lives.
+        """
+        cgroup = self._create_cgroup(container_id, spec)
+        if cgroup is None:
+            return
+        # Move the top process and everything under it. The netns holder — the process that will
+        # exec the user command — is in there, and children inherit the cgroup, so the workload and
+        # anything it spawns stay confined.
+        for pid in (top_pid, *self._descendant_pids(top_pid)):
+            try:
+                (cgroup / "cgroup.procs").write_text(str(pid))
+            except ProcessLookupError:
+                continue  # a transient enroot setup process that already exited
+            except OSError as e:
+                log.warning("[enroot] cannot move pid {} into {}: {!r}", pid, cgroup, e)
+
+    def _create_cgroup(self, container_id: str, spec: Mapping[str, Any]) -> Path | None:
+        """Create the kernel's cgroup and write its limits. None when this host cannot do it."""
+        if not Path(_CGROUP_V2_MARKER).exists():
+            # cgroup v1 splits every controller into its own hierarchy; the agent's stats reader
+            # composes those per-controller mount points itself. Rather than half-apply limits
+            # across trees, say plainly that this host gets none.
+            log.warning(
+                "[enroot] cgroup v1 host: per-kernel CPU/memory limits and stats are NOT applied"
+            )
+            return None
+        cgroup = container_cgroup_fs_path(container_id)
+        parent = cgroup.parent
+        try:
+            parent.mkdir(parents=True, exist_ok=True)
+            # A controller only reaches a child if the parent delegates it. Without this the leaf
+            # has no cpuset.cpus / memory.max files to write at all. `io` is not something we set,
+            # but the memory plugin reads `io.stat` on every pass and an undelegated controller
+            # means that file does not exist — which is a FileNotFoundError, i.e. no memory
+            # measurement either.
+            (parent / "cgroup.subtree_control").write_text("+cpu +cpuset +io +memory")
+            cgroup.mkdir(exist_ok=True)
+        except OSError as e:
+            log.warning("[enroot] cannot create the cgroup {}: {!r}", cgroup, e)
+            return None
+        self._write_cgroup_limits(cgroup, spec)
+        return cgroup
+
+    @staticmethod
+    def _write_cgroup_limits(cgroup: Path, spec: Mapping[str, Any]) -> None:
+        limits: list[tuple[str, str]] = []
+        if cpus := spec.get("cpuset_cpus"):
+            limits.append(("cpuset.cpus", str(cpus)))
+        if mems := spec.get("cpuset_mems"):
+            limits.append(("cpuset.mems", str(mems)))
+        memory_limit = spec.get("memory_limit")
+        if memory_limit is not None:
+            limits.append(("memory.max", str(int(memory_limit))))
+        memory_swap = spec.get("memory_swap")
+        if memory_swap is not None and memory_limit is not None:
+            # OCI (and Docker) count `memory_swap` as memory+swap combined; cgroup v2's
+            # memory.swap.max is swap ALONE. Writing the combined figure would silently grant the
+            # container its whole memory limit again as swap.
+            limits.append(("memory.swap.max", str(max(0, int(memory_swap) - int(memory_limit)))))
+        for name, value in limits:
+            try:
+                (cgroup / name).write_text(value)
+            except OSError as e:
+                log.warning("[enroot] cannot set {}={} on {}: {!r}", name, value, cgroup, e)
+
+    def _remove_cgroup(self, container_id: str) -> None:
+        """Reclaim the kernel's cgroup once its processes are gone.
+
+        An empty cgroup is only a directory, but they are never reused (the name is the kernel id),
+        so leaving them accumulates one per kernel this node has ever run.
+
+        rmdir fails with EBUSY while *any* member is still exiting, and the caller has just killed
+        them — a single attempt loses that race and leaks the directory (measured). `cgroup.kill`
+        is the v2 way to make that deterministic: it SIGKILLs every remaining member at once, and
+        the short retry then only has to outlast the kernel reaping them.
+        """
+        cgroup = container_cgroup_fs_path(container_id)
+        if not cgroup.exists():
+            return
+        with contextlib.suppress(OSError):
+            (cgroup / "cgroup.kill").write_text("1")
+        for _ in range(_CGROUP_RMDIR_RETRIES):
+            try:
+                cgroup.rmdir()
+                return
+            except FileNotFoundError:
+                return
+            except OSError:
+                time.sleep(_CGROUP_RMDIR_DELAY_SEC)
+        log.warning("[enroot] could not reclaim the cgroup {}; it will be left behind", cgroup)
 
     # ------------------------------------------------------------------ log rotation
     async def _rotate_logs_loop(self) -> None:
@@ -745,6 +859,7 @@ class EnrootRuntime(OciRuntime):
         await asyncio.to_thread(unlink_log_files, self._log_path(container_id))
         # ...and the two-phase gate (pause.sh + the `go` FIFO) under the per-container state dir.
         await asyncio.to_thread(shutil.rmtree, self._state_path / container_id, ignore_errors=True)
+        await asyncio.to_thread(self._remove_cgroup, container_id)
         self._specs.pop(container_id, None)
         self._commands.pop(container_id, None)
         self._pids.pop(container_id, None)
