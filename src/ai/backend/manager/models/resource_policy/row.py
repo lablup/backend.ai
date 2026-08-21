@@ -51,6 +51,13 @@ class KeyPairResourcePolicyRow(CreatedAtMixin, Base):
             f"max_priority >= {SESSION_PRIORITY_MIN} AND max_priority <= {SESSION_PRIORITY_MAX}",
             name="max_priority_within_session_priority_range",
         ),
+        # Partial unique index: at most one policy may be the default.
+        sa.Index(
+            "uq_keypair_resource_policies_is_default",
+            "is_default",
+            unique=True,
+            postgresql_where=sa.text("is_default"),
+        ),
     )
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
@@ -60,6 +67,9 @@ class KeyPairResourcePolicyRow(CreatedAtMixin, Base):
         unique=True,
         nullable=False,
         server_default=sa.text("uuid_generate_v4()"),
+    )
+    is_default: Mapped[bool] = mapped_column(
+        "is_default", sa.Boolean, nullable=False, server_default=sa.false()
     )
     default_for_unspecified: Mapped[DefaultForUnspecified] = mapped_column(
         "default_for_unspecified",

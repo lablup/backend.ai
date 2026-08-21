@@ -2,6 +2,7 @@
     "keypair_resource_policies": [
         {
             "name": "default",
+            "is_default": true,
             "default_for_unspecified": "UNLIMITED",
             "total_resource_slots": {},
             "max_session_lifetime": 0,

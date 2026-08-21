@@ -440,6 +440,7 @@ async def seed_data(
         await conn.execute(
             keypair_resource_policies.insert().values(
                 name="default",
+                is_default=True,
                 default_for_unspecified=DefaultForUnspecified.LIMITED,
                 total_resource_slots=ResourceSlot({}),
                 max_session_lifetime=0,

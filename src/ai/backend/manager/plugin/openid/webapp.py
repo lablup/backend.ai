@@ -28,7 +28,6 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
-from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -181,7 +180,6 @@ async def create_user_if_not_exists(
                 domain_id=domain_id,
                 project_ids=project_ids,
                 keypair_resource_policy=user_info["keypair_resource_policy"],
-                keypair_rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
             )
         )
         log.info("OPENID.WEBAPP: new user created ({})", result.user_row.email)

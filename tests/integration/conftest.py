@@ -513,6 +513,7 @@ async def resource_policy_fixture(
         await conn.execute(
             sa.insert(keypair_resource_policies).values(
                 name=policy_name,
+                is_default=True,
                 default_for_unspecified=DefaultForUnspecified.UNLIMITED,
                 total_resource_slots=ResourceSlot(),
                 max_session_lifetime=0,

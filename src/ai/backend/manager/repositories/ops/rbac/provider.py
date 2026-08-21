@@ -35,7 +35,7 @@ from ai.backend.common.data.permission.types import (
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import RBACTypeConversionError, UnreachableError
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairSecrets
+from ai.backend.manager.data.keypair.types import KeyPairSecrets
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -169,7 +169,7 @@ class FullUserCreation:
     domain_id: DomainID
     project_ids: Collection[ProjectID]
     keypair_resource_policy: str
-    keypair_rate_limit: int
+    keypair_rate_limit: int | None = None
     keypair_secrets: KeyPairSecrets | None = None
 
 
@@ -994,19 +994,16 @@ class RBACWriteOps(WriteOps):
         user_id = UserID(user_row.uuid)
         await self.assign_roles_to_user(user_id, creation_result.auto_grant_role_ids)
 
-        keypair_creator = KeyPairCreator(
-            is_active=user_row.status == UserStatus.ACTIVE,
-            is_admin=user_row.role in (UserRole.SUPERADMIN, UserRole.ADMIN),
-            resource_policy=full_creation.keypair_resource_policy,
-            rate_limit=full_creation.keypair_rate_limit,
-        )
         kp_result = await self.create_scoped(
             RBACEntityCreator(
                 spec=KeyPairCreatorSpec(
-                    creator=keypair_creator,
-                    generated_data=full_creation.keypair_secrets or generate_keypair_data(),
+                    secrets=full_creation.keypair_secrets or generate_keypair_data(),
                     user_id=user_row.uuid,
+                    is_active=user_row.status == UserStatus.ACTIVE,
+                    is_admin=user_row.role in (UserRole.SUPERADMIN, UserRole.ADMIN),
                     is_default=True,
+                    resource_policy=full_creation.keypair_resource_policy,
+                    rate_limit=full_creation.keypair_rate_limit,
                 ),
                 element_type=RBACElementType.KEYPAIR,
                 scope_ref=RBACElementRef(RBACElementType.USER, str(user_row.uuid)),

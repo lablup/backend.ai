@@ -78,7 +78,9 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
     last_used: Mapped[datetime | None] = mapped_column(
         "last_used", sa.DateTime(timezone=True), nullable=True
     )
-    rate_limit: Mapped[int | None] = mapped_column("rate_limit", sa.Integer)
+    rate_limit: Mapped[int] = mapped_column(
+        "rate_limit", sa.Integer, nullable=False, server_default=sa.text("10000")
+    )
     num_queries: Mapped[int] = mapped_column(
         "num_queries", sa.Integer, server_default="0", nullable=False
     )
@@ -123,7 +125,7 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
             created_at=self.created_at,
             modified_at=self.updated_at,
             resource_policy_name=self.resource_policy,
-            rate_limit=self.rate_limit if self.rate_limit is not None else 0,
+            rate_limit=self.rate_limit,
             ssh_public_key=self.ssh_public_key,
             ssh_private_key=self.ssh_private_key,
             dotfiles=self.dotfiles if self.dotfiles else b"\x90",

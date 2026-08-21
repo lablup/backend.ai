@@ -658,14 +658,14 @@ async def resource_policy_fixture(
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
             )
         )
-        # The user-creation flow always assigns new keypairs to the "default"
-        # keypair resource policy (DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME).
+        # A new keypair falls back to the policy marked as the default.
         # Uses on_conflict_do_nothing() for idempotency in case alembic
         # migrations already seeded the row.
         await conn.execute(
             pg_insert(keypair_resource_policies)
             .values(
                 name=default_policy_name,
+                is_default=True,
                 default_for_unspecified=DefaultForUnspecified.UNLIMITED,
                 total_resource_slots=ResourceSlot(),
                 max_session_lifetime=0,

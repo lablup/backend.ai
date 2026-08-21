@@ -39,7 +39,7 @@ from ai.backend.manager.data.user.types import (
     UserData,
     UserSearchResult,
 )
-from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
+from ai.backend.manager.errors.keypair import NoDefaultKeypairResourcePolicy
 from ai.backend.manager.errors.user import (
     KeyPairForbidden,
     KeyPairNotFound,
@@ -67,6 +67,7 @@ from ai.backend.manager.models.keypair import (
 )
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 from ai.backend.manager.models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     QueryCondition,
@@ -180,20 +181,32 @@ class UserDBSource:
             user_row = await self._get_user_by_email(session, email)
             return user_row.to_data()
 
+    async def _default_keypair_resource_policy(self, session: SASession) -> str:
+        """The name of the policy a keypair gets when nothing else names one."""
+        name = await session.scalar(
+            sa.select(KeyPairResourcePolicyRow.name).where(KeyPairResourcePolicyRow.is_default)
+        )
+        if name is None:
+            raise NoDefaultKeypairResourcePolicy()
+        return name
+
     async def create_user_validated(
         self, creator: Creator[UserRow], group_ids: list[str] | None
     ) -> UserCreateResultData:
         """
         Create a new user with default keypair and group associations.
         """
+        async with self._db.begin_readonly_session_read_committed() as session:
+            policy = await self._default_keypair_resource_policy(session)
         async with self._rbac_ops_provider.write_ops() as w:
-            return await self._create_user_with_keypair_and_groups(w, creator, group_ids)
+            return await self._create_user_with_keypair_and_groups(w, creator, group_ids, policy)
 
     async def _create_user_with_keypair_and_groups(
         self,
         w: RBACWriteOps,
         creator: Creator[UserRow],
         group_ids: list[str] | None,
+        keypair_resource_policy: str,
     ) -> UserCreateResultData:
         """Provision a user (row, default keypair, domain/project/model-store scope
         enrollments) within the caller's write ops transaction."""
@@ -225,8 +238,7 @@ class UserDBSource:
                 creation=UserScopeCreation(spec=creator.spec),
                 domain_id=domain_id,
                 project_ids=[ProjectID(UUID(gid)) for gid in group_ids or []],
-                keypair_resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
-                keypair_rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
+                keypair_resource_policy=keypair_resource_policy,
             )
         )
         return UserCreateResultData(
@@ -251,6 +263,8 @@ class UserDBSource:
         successes: list[UserCreateResultData] = []
         failures: list[BulkCreateFailure] = []
 
+        async with self._db.begin_readonly_session_read_committed() as session:
+            policy = await self._default_keypair_resource_policy(session)
         async with self._rbac_ops_provider.write_ops() as w:
             for idx, item in enumerate(items):
                 spec = cast(UserCreatorSpec, item.creator.spec)
@@ -258,7 +272,7 @@ class UserDBSource:
                     async with w.savepoint():
                         successes.append(
                             await self._create_user_with_keypair_and_groups(
-                                w, item.creator, item.group_ids
+                                w, item.creator, item.group_ids, policy
                             )
                         )
                 except Exception as e:
@@ -1150,27 +1164,18 @@ class UserDBSource:
                 )
             ).first()
 
-            if default_kp_row:
-                keypair_creator = KeyPairCreator(
-                    is_active=True,
-                    is_admin=default_kp_row.is_admin,
-                    resource_policy=default_kp_row.resource_policy,
-                    rate_limit=default_kp_row.rate_limit or DEFAULT_KEYPAIR_RATE_LIMIT,
-                )
-            else:
-                keypair_creator = KeyPairCreator(
-                    is_active=True,
-                    is_admin=False,
-                    resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
-                    rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
-                )
-
-            secrets = generate_keypair_data()
+            # A new keypair follows the user's existing default, or the marked policy.
+            fallback_policy = await self._default_keypair_resource_policy(session)
             kp_spec = KeyPairCreatorSpec(
-                creator=keypair_creator,
-                generated_data=secrets,
+                secrets=generate_keypair_data(),
                 user_id=user_uuid,
+                is_active=True,
+                is_admin=default_kp_row.is_admin if default_kp_row else False,
                 is_default=False,
+                resource_policy=(
+                    default_kp_row.resource_policy if default_kp_row else fallback_policy
+                ),
+                rate_limit=default_kp_row.rate_limit if default_kp_row else None,
             )
             rbac_kp_creator = RBACEntityCreator(
                 spec=kp_spec,
@@ -1288,12 +1293,14 @@ class UserDBSource:
             if not await session.scalar(sa.select(sa.exists().where(UserRow.uuid == user_id))):
                 raise UserNotFound(f"User {user_id} not found")
 
-            secrets = generate_keypair_data()
             kp_spec = KeyPairCreatorSpec(
-                creator=creator,
-                generated_data=secrets,
+                secrets=generate_keypair_data(),
                 user_id=user_id,
+                is_active=creator.is_active,
+                is_admin=creator.is_admin,
                 is_default=False,
+                resource_policy=creator.resource_policy,
+                rate_limit=creator.rate_limit,
             )
             rbac_kp_creator = RBACEntityCreator(
                 spec=kp_spec,
