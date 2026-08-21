@@ -3,6 +3,9 @@
 Reproduces the KeyError bug where querying images with a single project scope
 crashes when a non-global registry is associated with multiple projects.
 See: https://github.com/lablup/backend.ai/pull/10482
+
+Also covers the IndexError raised in the system scope when the caller is enrolled in no
+project, where the same loop read the global-registry permissions off an empty map.
 """
 
 from __future__ import annotations
@@ -32,10 +35,11 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.image.row import (
+    MEMBER_PERMISSIONS,
     ImagePermissionContextBuilder,
 )
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.models.rbac import ProjectScope, SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -45,6 +49,8 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -139,6 +145,8 @@ class TestImagePermissionContextNonGlobalRegistry:
                 UserRow,
                 GroupRow,
                 AssocGroupUserRow,
+                VirtualScopeRow,
+                EntityMembershipRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
                 ImageRow,
@@ -372,3 +380,26 @@ class TestImagePermissionContextNonGlobalRegistry:
         allowed_ids = set(perm_ctx.object_id_to_additional_permission_map.keys())
         assert global_image_id in allowed_ids
         assert non_global_image_id not in allowed_ids
+
+    async def test_system_scope_keeps_global_registry_images_without_project_enrollment(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        client_ctx: ClientContext,
+        global_image_id: UUID,
+    ) -> None:
+        """A caller enrolled in no project must still get the global-registry images,
+        carrying the permissions it holds in the system scope.
+
+        Before the fix, this raised IndexError from an empty per-project permission map.
+        """
+        async with db_with_cleanup.begin_readonly_session() as db_session:
+            builder = ImagePermissionContextBuilder(db_session)
+            perm_ctx = await builder.build(
+                client_ctx,
+                SystemScope(),
+                ImagePermission.READ_ATTRIBUTE,
+            )
+
+        assert perm_ctx.object_id_to_additional_permission_map == {
+            global_image_id: MEMBER_PERMISSIONS
+        }
