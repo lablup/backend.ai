@@ -25,6 +25,7 @@ translates that spec to enroot invocations. Key differences from the containerd 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -34,6 +35,12 @@ from collections.abc import AsyncIterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any, Final, override
 
+from ai.backend.agent.containerd.log_writer import (
+    LOG_FILE_COUNT,
+    max_file_size,
+    rotated_path,
+)
+from ai.backend.agent.containerd.logs import unlink_log_files
 from ai.backend.agent.containerd.runtime.interface import (
     ContainerInfo,
     ExecResult,
@@ -75,6 +82,10 @@ _SKIP_MOUNT_TYPES: Final = frozenset({
 })
 # How long create_task waits for the enroot container to reach its netns'd pause.
 _TASK_START_TIMEOUT_SEC: Final = 30.0
+# How often each live container's log is measured against the cap. A stat() per container is
+# nothing, and the interval is what bounds the overshoot (see _rotate_logs_loop), so keep it short.
+_LOG_ROTATE_INTERVAL_SEC: Final = 5.0
+_LOG_COPY_CHUNK: Final = 1024 * 1024
 
 
 def _slug(image_ref: str) -> str:
@@ -105,6 +116,12 @@ class EnrootRuntime(OciRuntime):
     # empty set here would drop every enroot container from reconstruct_resource_usage.
     _labels: dict[str, Mapping[str, str]]
     _log_root: Path | None
+    # container_logs.max_length: the total budget across the active log and its rotated siblings.
+    # 0 until configure_logging() runs (which is after open()), meaning "not configured, do not
+    # rotate" rather than "rotate at zero bytes".
+    _log_max_bytes: int
+    # The periodic in-place rotation task; see _rotate_logs_loop.
+    _rotator_task: asyncio.Task[None] | None
     # This agent's own netns inode, to tell the container's dedicated netns apart from ours.
     _agent_netns: int | None
     # The work-user uid/gid the kernel-runner drops to (LOCAL_USER_ID/GID), from container config.
@@ -134,6 +151,8 @@ class EnrootRuntime(OciRuntime):
         self._images = {}
         self._labels = {}
         self._log_root = None
+        self._log_max_bytes = 0
+        self._rotator_task = None
         self._agent_netns = None
 
     # ------------------------------------------------------------------ lifecycle
@@ -148,10 +167,16 @@ class EnrootRuntime(OciRuntime):
             p.mkdir(parents=True, exist_ok=True)
             if own:
                 os.chown(p, self._kernel_uid, self._kernel_gid)
+        if self._rotator_task is None:
+            self._rotator_task = asyncio.create_task(self._rotate_logs_loop())
 
     @override
     async def close(self) -> None:
-        pass
+        if self._rotator_task is not None:
+            self._rotator_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._rotator_task
+            self._rotator_task = None
 
     def _env(self) -> dict[str, str]:
         return {
@@ -347,9 +372,15 @@ class EnrootRuntime(OciRuntime):
 
     @override
     def configure_logging(self, launcher: Path, log_root: Path, max_total_bytes: int) -> None:
-        # enroot has no binary:// log launcher; the pause-wrapper will redirect the runner's
-        # stdio to a file under this root (tailed by get_logs).
+        # enroot has no log driver at all — no config knob, no CLI flag, nothing in its runtime
+        # library: `enroot start` execs the command with the invoker's stdio inherited (upstream's
+        # model is that the caller — Slurm, in enroot's usual pairing — owns redirection). So the
+        # `launcher` (containerd's binary:// writer, which containerd itself starts and which owns
+        # the write end) has nobody to start it here; the container writes straight to our file
+        # descriptor instead, and the size cap has to be enforced from the outside. See
+        # _rotate_logs_loop.
         self._log_root = log_root
+        self._log_max_bytes = max_total_bytes
 
     @override
     async def create_task(self, container_id: str, *, use_logger: bool = True) -> TaskHandle:
@@ -448,16 +479,98 @@ class EnrootRuntime(OciRuntime):
         with go_fifo.open("w") as f:
             f.write("go\n")
 
+    def _log_path(self, container_id: str) -> Path:
+        # The path the agent's reader expects (containerd.runtime.grpc.container_log_path); it must
+        # stay in step with it, so the log root is whatever configure_logging was handed.
+        if self._log_root is not None:
+            return self._log_root / f"{container_id}.log"
+        return self._state_path / container_id / "container.log"
+
     def _open_log(self, container_id: str) -> int:
         # enroot has no binary:// log launcher; capture the container's stdio to a file the agent
         # can tail (get_logs). Returns an fd handed to the subprocess; the caller closes its copy.
-        if self._log_root is not None:
-            self._log_root.mkdir(parents=True, exist_ok=True)
-            path = self._log_root / f"{container_id}.log"
-        else:
-            path = self._state_path / container_id / "container.log"
-            path.parent.mkdir(parents=True, exist_ok=True)
+        # O_APPEND is what makes the out-of-band rotation in _rotate_log() safe.
+        path = self._log_path(container_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
         return os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+
+    # ------------------------------------------------------------------ log rotation
+    async def _rotate_logs_loop(self) -> None:
+        """Cap each live container's log the way the containerd log writer does.
+
+        containerd gets a hard cap for free: it starts our `binary://` writer, which owns the write
+        end and simply opens a new file when the active one is full. enroot has no equivalent — the
+        container holds our file descriptor for its whole life — so the cap has to be applied from
+        outside, by watching the file and rotating it underneath the writer.
+
+        That makes the cap a *soft* one: the log can overshoot by whatever the container writes
+        between two checks. The alternative — handing the container a pipe and reading it here —
+        buys a hard cap at the price of blocking the container's stdout whenever the reader is gone,
+        and kernels are meant to outlive an agent restart. An overshooting log file is recoverable;
+        a kernel wedged on a full pipe is not.
+        """
+        while True:
+            await asyncio.sleep(_LOG_ROTATE_INTERVAL_SEC)
+            # 0 until configure_logging runs; None until then too. Nothing to cap yet.
+            if self._log_max_bytes <= 0 or self._log_root is None:
+                continue
+            # Driven by what is on disk, not by self._pids: a kernel recovered after an agent
+            # restart never went through create_task, so it has no entry there — and it is exactly
+            # the long-lived kernel whose log needs capping most. A log with no writer left just
+            # falls under the threshold and is skipped.
+            try:
+                actives = await asyncio.to_thread(sorted, self._log_root.glob("*.log"))
+            except OSError as e:
+                log.warning("[enroot] cannot list the container log root: {!r}", e)
+                continue
+            for active in actives:
+                try:
+                    await asyncio.to_thread(self._rotate_log, active, self._log_max_bytes)
+                except Exception:
+                    log.exception("[enroot] rotating {} failed", active)
+
+    @staticmethod
+    def _rotate_log(active: Path, max_total_bytes: int) -> None:
+        """Roll `active` over into `.1` once it fills, keeping the containerd file layout.
+
+        The container is writing to this exact inode and will keep doing so, which rules out the
+        usual rename-and-reopen: renaming would leave it appending to a file nobody reads. So the
+        active file is rotated *in place* — its contents are copied out to `.1`, then it is
+        truncated to zero. The container's descriptor is O_APPEND, so its next write lands at the
+        new end of file and the log continues seamlessly.
+
+        The one thing this cannot do that a writer-owned rotation can: bytes appended between the
+        copy and the truncate are dropped. The window is one copy of at most max-size bytes.
+        """
+        max_size = max_file_size(max_total_bytes)
+        try:
+            size = active.stat().st_size
+        except FileNotFoundError:
+            return
+        if size < max_size:
+            return
+        # Shift the existing rotated files along and drop the oldest, exactly as the writer does.
+        rotated_path(active, LOG_FILE_COUNT - 1).unlink(missing_ok=True)
+        for index in range(LOG_FILE_COUNT - 2, 0, -1):
+            src = rotated_path(active, index)
+            if src.exists():
+                src.rename(rotated_path(active, index + 1))
+        # Carry over only the newest max-size bytes. A burst that outruns the check interval leaves
+        # the active file well past max-size, and copying all of it would push a single rotated file
+        # over the whole budget — the total is only bounded because every file is. The bytes dropped
+        # here are the oldest, which is what the cap says to drop, and the reader serves the tail
+        # anyway. Reading a bounded amount also keeps the drop window at one max-size copy rather
+        # than chasing a container that is still writing.
+        with active.open("rb") as source, rotated_path(active, 1).open("wb") as target:
+            remaining = min(size, max_size)
+            source.seek(size - remaining)
+            while remaining > 0:
+                chunk = source.read(min(_LOG_COPY_CHUNK, remaining))
+                if not chunk:
+                    break
+                target.write(chunk)
+                remaining -= len(chunk)
+        os.truncate(active, 0)
 
     def _enroot_start_argv(
         self, container_id: str, spec: Mapping[str, Any], gate_dir: Path
@@ -626,6 +739,12 @@ class EnrootRuntime(OciRuntime):
         await self.kill_container(container_id, signal=9, all_processes=True)
         await self._reap(container_id)
         await self._run(_ENROOT_BIN, "remove", "--force", container_id)
+        # The log is as much part of the container as its rootfs — the containerd runtime unlinks it
+        # here too. The rotated siblings go with it: leaving them would keep a terminated kernel's
+        # log on disk forever, since nothing else ever revisits that path.
+        await asyncio.to_thread(unlink_log_files, self._log_path(container_id))
+        # ...and the two-phase gate (pause.sh + the `go` FIFO) under the per-container state dir.
+        await asyncio.to_thread(shutil.rmtree, self._state_path / container_id, ignore_errors=True)
         self._specs.pop(container_id, None)
         self._commands.pop(container_id, None)
         self._pids.pop(container_id, None)
