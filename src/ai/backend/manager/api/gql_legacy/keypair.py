@@ -13,6 +13,7 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
@@ -196,7 +197,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             human_readable_name="ratelimit",
         )
         try:
-            return await valkey_client.get_rolling_count(self.access_key)
+            return await valkey_client.get_rolling_count(UserID(self.user))
         finally:
             await valkey_client.close()
 

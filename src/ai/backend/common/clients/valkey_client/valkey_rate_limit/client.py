@@ -10,6 +10,7 @@ from ai.backend.common.clients.valkey_client.client import (
     create_valkey_client,
 )
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     BackoffStrategy,
@@ -44,19 +45,19 @@ _TIME_PRECISION = Decimal("1e-3")  # milliseconds
 
 
 _RATE_LIMIT_SCRIPT: Final[str] = """
-local access_key = KEYS[1]
+local key = KEYS[1]
 local now = tonumber(ARGV[1])
 local window = tonumber(ARGV[2])
 local request_id = tonumber(redis.call('INCR', '__request_id'))
 if request_id >= 1e12 then
     redis.call('SET', '__request_id', 1)
 end
-if redis.call('EXISTS', access_key) == 1 then
-    redis.call('ZREMRANGEBYSCORE', access_key, 0, now - window)
+if redis.call('EXISTS', key) == 1 then
+    redis.call('ZREMRANGEBYSCORE', key, 0, now - window)
 end
-redis.call('ZADD', access_key, now, tostring(request_id))
-redis.call('EXPIRE', access_key, window)
-return redis.call('ZCARD', access_key)
+redis.call('ZADD', key, now, tostring(request_id))
+redis.call('EXPIRE', key, window)
+return redis.call('ZCARD', key)
 """
 
 
@@ -110,14 +111,14 @@ class ValkeyRateLimitClient:
     @valkey_rate_limit_resilience.apply()
     async def execute_rate_limit_logic(
         self,
-        access_key: str,
+        user_id: UserID,
         window: int = _DEFAULT_RATE_LIMIT_EXPIRATION,
     ) -> int:
         """
         Execute the rate limiting logic for rolling counter.
         This replicates the Lua script logic using individual commands.
 
-        :param access_key: The access key to rate limit.
+        :param user_id: The user the rolling counter is keyed by.
         :param window: The time window for rate limiting in seconds.
         :return: The current count.
         """
@@ -127,7 +128,7 @@ class ValkeyRateLimitClient:
         async with self._client.client() as conn:
             result = await conn.invoke_script(
                 Script(_RATE_LIMIT_SCRIPT),
-                keys=[access_key],
+                keys=[f"user.{user_id}"],
                 args=[str(now_float), str(window)],
             )
 
@@ -135,15 +136,15 @@ class ValkeyRateLimitClient:
         return cast(int, result)
 
     @valkey_rate_limit_resilience.apply()
-    async def get_rolling_count(self, access_key: str) -> int:
+    async def get_rolling_count(self, user_id: UserID) -> int:
         """
-        Get the current rolling count for an access key.
+        Get the current rolling count of a user.
 
-        :param access_key: The access key to get the count for.
+        :param user_id: The user the rolling counter is keyed by.
         :return: The current count.
         """
         async with self._client.client() as conn:
-            return await conn.zcard(access_key)
+            return await conn.zcard(f"user.{user_id}")
 
     @valkey_rate_limit_resilience.apply()
     async def set_rate_limit_config(
