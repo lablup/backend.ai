@@ -68,7 +68,7 @@ class OpsRepository[TData]:
             data = await r.query_data(querier)
             if data is None:
                 raise EntityNotFoundError(
-                    f"{querier.row_class().__name__} {querier.pk_value()} not found"
+                    f"{querier.row_class().__name__} {querier.entity_id_value()} not found"
                 )
             return data
 

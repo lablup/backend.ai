@@ -95,15 +95,9 @@ def test_create_result_works_for_a_name_keyed_domain() -> None:
 def test_lookup_result_reports_the_id_its_key_resolved_to() -> None:
     entity_id = _PresetID(uuid.uuid4())
 
-    result: BaseLookupActionResult = LookupOpsResult(data=_PresetData(id=entity_id, name="default"))
+    result: BaseLookupActionResult = LookupOpsResult(resolved_entity_id=entity_id)
 
     assert result.entity_id() == entity_id
-
-
-def test_lookup_result_works_for_a_name_keyed_domain() -> None:
-    result = LookupOpsResult(data=_NameKeyedData(name="default"))
-
-    assert result.entity_id() == uuid.uuid5(uuid.NAMESPACE_OID, "default")
 
 
 def test_bulk_result_answers_for_every_entity_named() -> None:

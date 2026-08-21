@@ -220,7 +220,7 @@ class ResourceAllocationAdapter(BaseAdapter):
             LookupDomainAction(name=DomainName(domain_name))
         )
         result = await self._processors.session.resource_allocation.get_domain_usage.run(
-            GetDomainUsageAction(domain_id=domain.entity_id, domain_name=domain_name)
+            GetDomainUsageAction(domain_id=domain.entity_id(), domain_name=domain_name)
         )
         return DomainResourceAllocationPayload(
             domain=_scope_usage_to_node(result.usage),

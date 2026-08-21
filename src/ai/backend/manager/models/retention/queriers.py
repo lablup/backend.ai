@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.manager.data.retention.types import RetentionPolicyData
@@ -20,7 +22,12 @@ class RetentionPolicyQuerier(DataQuerier[RetentionPolicyRow, RetentionPolicyData
         return RetentionPolicyRow
 
     @override
-    def pk_value(self) -> RetentionPolicyID:
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return RetentionPolicyRow.id
+
+    @override
+    def entity_id_value(self) -> RetentionPolicyID:
         return self.policy_id
 
     @override

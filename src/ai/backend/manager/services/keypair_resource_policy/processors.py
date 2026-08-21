@@ -19,6 +19,9 @@ from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
 )
+from ai.backend.manager.services.keypair_resource_policy.actions.get import (
+    GetKeyPairResourcePolicyAction,
+)
 from ai.backend.manager.services.keypair_resource_policy.actions.global_search_keypair_resource_policies import (
     GlobalSearchKeypairResourcePoliciesAction,
 )
@@ -39,6 +42,9 @@ from ai.backend.manager.services.keypair_resource_policy.actions.update_keypair_
 class KeypairResourcePolicyProcessors:
     """Every operation runs straight against ops, so this domain has no service."""
 
+    get: SingleEntityActionProcessor[
+        GetKeyPairResourcePolicyAction, EntityOpsResult[KeyPairResourcePolicyData]
+    ]
     lookup: LookupActionProcessor[
         LookupKeypairResourcePolicyAction, LookupOpsResult[KeyPairResourcePolicyUUID]
     ]
@@ -59,6 +65,7 @@ class KeypairResourcePolicyProcessors:
     ]
 
     def __init__(self, group: ProcessorGroup[KeyPairResourcePolicyData]) -> None:
+        self.get = group.single_get_ops(GetKeyPairResourcePolicyAction)
         self.lookup = group.lookup_ops(LookupKeypairResourcePolicyAction)
         self.search = group.scope_search_ops(SearchKeypairResourcePoliciesAction)
         self.global_search = group.global_search_ops(GlobalSearchKeypairResourcePoliciesAction)

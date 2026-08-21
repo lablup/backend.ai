@@ -1108,12 +1108,12 @@ class CreateUser(graphene.Mutation):  # type: ignore[misc]
         validate_user_mutation_props(props)
 
         graph_ctx: GraphQueryContext = info.context
-        domain_data = (
+        domain_id = (
             await graph_ctx.processors.domain.lookup.run(
                 LookupDomainAction(name=DomainName(str(props.domain_name)))
             )
-        ).data
-        action: CreateUserAction = props.to_action(email, graph_ctx, domain_data.id)
+        ).entity_id()
+        action: CreateUserAction = props.to_action(email, graph_ctx, domain_id)
 
         action_result = await graph_ctx.processors.user.create_user.run(action)
         keypair = KeyPair.from_data(action_result.data.keypair)

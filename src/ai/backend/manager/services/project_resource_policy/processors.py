@@ -17,6 +17,9 @@ from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
     CreateProjectResourcePolicyAction,
 )
+from ai.backend.manager.services.project_resource_policy.actions.get import (
+    GetProjectResourcePolicyAction,
+)
 from ai.backend.manager.services.project_resource_policy.actions.lookup import (
     LookupProjectResourcePolicyAction,
 )
@@ -34,6 +37,9 @@ from ai.backend.manager.services.project_resource_policy.actions.update_project_
 class ProjectResourcePolicyProcessors:
     """Every operation runs straight against ops, so this domain has no service."""
 
+    get: SingleEntityActionProcessor[
+        GetProjectResourcePolicyAction, EntityOpsResult[ProjectResourcePolicyData]
+    ]
     lookup: LookupActionProcessor[
         LookupProjectResourcePolicyAction, LookupOpsResult[ProjectResourcePolicyUUID]
     ]
@@ -51,6 +57,7 @@ class ProjectResourcePolicyProcessors:
     ]
 
     def __init__(self, group: ProcessorGroup[ProjectResourcePolicyData]) -> None:
+        self.get = group.single_get_ops(GetProjectResourcePolicyAction)
         self.lookup = group.lookup_ops(LookupProjectResourcePolicyAction)
         self.global_search = group.global_search_ops(SearchProjectResourcePoliciesAction)
         self.global_create = group.global_create_ops(CreateProjectResourcePolicyAction)

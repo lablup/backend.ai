@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 
+from sqlalchemy.orm import InstrumentedAttribute
+
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.specs.querier import DataQuerier
@@ -13,14 +15,19 @@ from ai.backend.manager.models.specs.querier import DataQuerier
 
 @dataclass
 class RuntimeVariantPresetQuerier(DataQuerier[RuntimeVariantPresetRow, RuntimeVariantPresetData]):
-    preset_id: uuid.UUID
+    preset_id: RuntimeVariantPresetID
 
     @override
     def row_class(self) -> type[RuntimeVariantPresetRow]:
         return RuntimeVariantPresetRow
 
     @override
-    def pk_value(self) -> uuid.UUID:
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return RuntimeVariantPresetRow.id
+
+    @override
+    def entity_id_value(self) -> RuntimeVariantPresetID:
         return self.preset_id
 
     @override

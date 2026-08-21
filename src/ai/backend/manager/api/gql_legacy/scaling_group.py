@@ -852,25 +852,25 @@ class AssociateScalingGroupWithDomain(graphene.Mutation):  # type: ignore[misc]
         domain: str,
     ) -> AssociateScalingGroupWithDomain:
         graph_ctx: GraphQueryContext = info.context
-        domain_data = (
+        domain_id = (
             await graph_ctx.processors.domain.lookup.run(
                 LookupDomainAction(name=DomainName(domain))
             )
-        ).data
+        ).entity_id()
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
         action = AssociateResourceGroupWithDomainsAction(
-            domain_id=domain_data.id,
+            domain_id=domain_id,
             binder=RBACScopeBinder(
                 pairs=[
                     RBACScopeBindingPair(
                         spec=ResourceGroupForDomainCreatorSpec(
                             resource_group_id=resource_group_id,
-                            domain_id=domain_data.id,
+                            domain_id=domain_id,
                         ),
                         entity_ref=RBACElementRef(
                             RBACElementType.RESOURCE_GROUP, str(resource_group_id)
                         ),
-                        scope_ref=RBACElementRef(RBACElementType.DOMAIN, str(domain_data.id)),
+                        scope_ref=RBACElementRef(RBACElementType.DOMAIN, str(domain_id)),
                     )
                 ]
             ),
@@ -900,25 +900,25 @@ class AssociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[misc]
         domain: str,
     ) -> AssociateScalingGroupsWithDomain:
         graph_ctx: GraphQueryContext = info.context
-        domain_data = (
+        domain_id = (
             await graph_ctx.processors.domain.lookup.run(
                 LookupDomainAction(name=DomainName(domain))
             )
-        ).data
+        ).entity_id()
         resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
         action = AssociateResourceGroupWithDomainsAction(
-            domain_id=domain_data.id,
+            domain_id=domain_id,
             binder=RBACScopeBinder(
                 pairs=[
                     RBACScopeBindingPair(
                         spec=ResourceGroupForDomainCreatorSpec(
                             resource_group_id=resource_group_id,
-                            domain_id=domain_data.id,
+                            domain_id=domain_id,
                         ),
                         entity_ref=RBACElementRef(
                             RBACElementType.RESOURCE_GROUP, str(resource_group_id)
                         ),
-                        scope_ref=RBACElementRef(RBACElementType.DOMAIN, str(domain_data.id)),
+                        scope_ref=RBACElementRef(RBACElementType.DOMAIN, str(domain_id)),
                     )
                     for resource_group_id in resource_group_ids
                 ]
@@ -947,17 +947,17 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):  # type: ignore[mis
         domain: str,
     ) -> DisassociateScalingGroupWithDomain:
         graph_ctx: GraphQueryContext = info.context
-        domain_data = (
+        domain_id = (
             await graph_ctx.processors.domain.lookup.run(
                 LookupDomainAction(name=DomainName(domain))
             )
-        ).data
+        ).entity_id()
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
         action = DisassociateResourceGroupWithDomainsAction(
-            domain_id=domain_data.id,
+            domain_id=domain_id,
             unbinder=ResourceGroupDomainEntityUnbinder(
                 resource_group_ids=[resource_group_id],
-                domain_id=domain_data.id,
+                domain_id=domain_id,
             ),
         )
         await graph_ctx.processors.resource_group.disassociate_resource_group_with_domains.run(
@@ -987,17 +987,17 @@ class DisassociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[mi
         domain: str,
     ) -> DisassociateScalingGroupsWithDomain:
         graph_ctx: GraphQueryContext = info.context
-        domain_data = (
+        domain_id = (
             await graph_ctx.processors.domain.lookup.run(
                 LookupDomainAction(name=DomainName(domain))
             )
-        ).data
+        ).entity_id()
         resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
         action = DisassociateResourceGroupWithDomainsAction(
-            domain_id=domain_data.id,
+            domain_id=domain_id,
             unbinder=ResourceGroupDomainEntityUnbinder(
                 resource_group_ids=resource_group_ids,
-                domain_id=domain_data.id,
+                domain_id=domain_id,
             ),
         )
         await graph_ctx.processors.resource_group.disassociate_resource_group_with_domains.run(
@@ -1023,16 +1023,16 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):  # type: ignore
         domain: str,
     ) -> DisassociateAllScalingGroupsWithDomain:
         graph_ctx: GraphQueryContext = info.context
-        domain_data = (
+        domain_id = (
             await graph_ctx.processors.domain.lookup.run(
                 LookupDomainAction(name=DomainName(domain))
             )
-        ).data
+        ).entity_id()
         action = DisassociateResourceGroupWithDomainsAction(
-            domain_id=domain_data.id,
+            domain_id=domain_id,
             unbinder=ResourceGroupDomainEntityUnbinder(
                 resource_group_ids=None,
-                domain_id=domain_data.id,
+                domain_id=domain_id,
             ),
         )
         await graph_ctx.processors.resource_group.disassociate_resource_group_with_domains.run(

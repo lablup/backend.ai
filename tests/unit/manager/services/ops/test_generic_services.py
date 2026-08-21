@@ -21,6 +21,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainID
@@ -197,8 +198,12 @@ class _PresetQuerier(DataQuerier[RolePresetRow, _PresetData]):
         return RolePresetRow
 
     @override
-    def pk_value(self) -> uuid.UUID:
-        return self.target
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
+
+    @override
+    def entity_id_value(self) -> EntityIdentifier:
+        return RolePresetID(self.target)
 
     @override
     def to_data(self, row: RolePresetRow) -> _PresetData:
@@ -314,7 +319,7 @@ class _PresetPurger(EntityPurger[RolePresetRow, _PresetData]):
 
 
 @dataclass
-class _PresetByName(DataLookup[RolePresetRow, _PresetData]):
+class _PresetByName(DataLookup[RolePresetRow, EntityIdentifier]):
     name: str
 
     @override
@@ -326,8 +331,8 @@ class _PresetByName(DataLookup[RolePresetRow, _PresetData]):
         return [lambda: RolePresetRow.name == self.name]
 
     @override
-    def to_data(self, row: RolePresetRow) -> _PresetData:
-        return _PresetData(id=row.id, name=row.name)
+    def to_entity_id(self, row: RolePresetRow) -> EntityIdentifier:
+        return RolePresetID(row.id)
 
 
 @dataclass
@@ -748,13 +753,13 @@ class _NameKey(LookupKey):
 
 
 @dataclass
-class _LookupAction(BaseLookupAction, LookupOpsAction[RolePresetRow, _PresetData]):
+class _LookupAction(BaseLookupAction, LookupOpsAction[RolePresetRow, EntityIdentifier]):
     """Declares no target: producing one is the whole point of the run."""
 
     lookup: _PresetByName
 
     @override
-    def to_lookup(self) -> DataLookup[RolePresetRow, _PresetData]:
+    def to_lookup(self) -> DataLookup[RolePresetRow, EntityIdentifier]:
         return self.lookup
 
     @override
@@ -1361,9 +1366,10 @@ async def test_lookup_forwards_the_action_s_lookup_spec(
     service: LookupService[_PresetData] = LookupService(repository)
     lookup = _PresetByName(name="default")
 
+    repository.lookup = AsyncMock(return_value=stored.id)
+
     result = await service.execute(_LookupAction(lookup=lookup))
 
-    assert result.data == stored
     assert result.entity_id() == stored.id
     repository.lookup.assert_awaited_once_with(lookup)
 
@@ -1374,7 +1380,8 @@ async def test_lookup_runs_under_the_lookup_processor(
     # The lookup processor always puts the authentication gate first, so the run needs
     # a user in context even though the action declares no target.
     service: LookupService[_PresetData] = LookupService(repository)
-    processor: LookupActionProcessor[_LookupAction, LookupOpsResult[_PresetData]] = (
+    repository.lookup = AsyncMock(return_value=stored.id)
+    processor: LookupActionProcessor[_LookupAction, LookupOpsResult[EntityIdentifier]] = (
         LookupActionProcessor(service.execute)
     )
 

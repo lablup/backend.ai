@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.resource_slot.response import (
     SearchResourceSlotTypesResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.services.resource_slot.actions.get import GetResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.lookup import (
     LookupResourceSlotTypeAction,
 )
@@ -70,8 +71,11 @@ class ResourceSlotHandler:
         slot_name = path.parsed.slot_name
         log.info("GET_RESOURCE_SLOT_TYPE (slot_name:{})", slot_name)
 
-        action_result = await self._resource_slot.public_lookup_resource_slot_type.run(
+        resolved = await self._resource_slot.public_lookup_resource_slot_type.run(
             LookupResourceSlotTypeAction(slot_name=slot_name)
+        )
+        action_result = await self._resource_slot.public_get_resource_slot_type.run(
+            GetResourceSlotTypeAction(slot_type_id=resolved.entity_id())
         )
 
         resp = GetResourceSlotTypeResponse(

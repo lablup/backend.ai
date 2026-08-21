@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
@@ -24,7 +26,12 @@ class DeploymentPresetQuerier(
         return DeploymentRevisionPresetRow
 
     @override
-    def pk_value(self) -> DeploymentPresetID:
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return DeploymentRevisionPresetRow.id
+
+    @override
+    def entity_id_value(self) -> DeploymentPresetID:
         return self.preset_id
 
     @override

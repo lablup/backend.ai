@@ -1,10 +1,13 @@
-"""Single-row read spec of the v2 lineage: fetch by primary key."""
+"""Single-row read spec of the v2 lineage: fetch by the entity id."""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from uuid import UUID
+from typing import Any
 
+from sqlalchemy.orm import InstrumentedAttribute
+
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.models.base import Base
 
 
@@ -25,7 +28,10 @@ class DataQuerier[TRow: Base, TData](ABC):
             def row_class(self) -> type[UserRow]:
                 return UserRow
 
-            def pk_value(self) -> UUID:
+            def entity_id_column(self) -> InstrumentedAttribute[Any]:
+                return UserRow.uuid
+
+            def entity_id_value(self) -> UserID:
                 return self._user_id
 
             def to_data(self, row: UserRow) -> UserData:
@@ -37,12 +43,22 @@ class DataQuerier[TRow: Base, TData](ABC):
 
     @abstractmethod
     def row_class(self) -> type[TRow]:
-        """Return the ORM class for table access and PK detection."""
+        """Return the ORM class the row is read from."""
         raise NotImplementedError
 
     @abstractmethod
-    def pk_value(self) -> UUID | str | int:
-        """Return the primary key value identifying the target row."""
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        """Return the column that carries the entity id.
+
+        Named rather than derived from the primary key, because the two part ways: a
+        table whose key is a name (``domains.name``, ``resource_slot_types.slot_name``)
+        still identifies its entity by a uuid column beside it.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def entity_id_value(self) -> EntityIdentifier:
+        """Return the id of the entity to read."""
         raise NotImplementedError
 
     @abstractmethod

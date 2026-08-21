@@ -11,7 +11,6 @@ from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifie
 from ai.backend.manager.errors.repository import (
     AmbiguousEntityKeyError,
     EmptyOperationScopeError,
-    UnsupportedCompositePrimaryKeyError,
 )
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import OperationScope
@@ -33,14 +32,8 @@ class V2ReadOps(V2OpsBase):
     ) -> TData | None:
         """Fetch a single row by primary key and return it as its ``data/`` type."""
         row_class = querier.row_class()
-        pk_columns = list(row_class.__table__.primary_key.columns)
-        if len(pk_columns) != 1:
-            raise UnsupportedCompositePrimaryKeyError(
-                f"Querier only supports single-column primary keys "
-                f"(table: {row_class.__table__.name})",
-            )
         result = await self._sess.execute(
-            sa.select(row_class).where(pk_columns[0] == querier.pk_value())
+            sa.select(row_class).where(querier.entity_id_column() == querier.entity_id_value())
         )
         row = result.scalar_one_or_none()
         if row is None:

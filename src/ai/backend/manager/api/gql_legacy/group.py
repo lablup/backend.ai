@@ -681,12 +681,12 @@ class CreateGroup(graphene.Mutation):  # type: ignore[misc]
                 "Group name cannot be empty or whitespace and must not exceed 64 characters."
             )
 
-        domain_data = (
+        domain_id = (
             await graph_ctx.processors.domain.lookup.run(
                 LookupDomainAction(name=DomainName(props.domain_name))
             )
-        ).data
-        action = props.to_action(name, domain_data.id)
+        ).entity_id()
+        action = props.to_action(name, domain_id)
         res = await graph_ctx.processors.group.create_group.run(action)
         return cls(
             ok=True,

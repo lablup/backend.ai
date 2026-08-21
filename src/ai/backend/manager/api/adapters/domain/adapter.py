@@ -44,6 +44,7 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.services.domain.actions.create_domain_node import CreateDomainNodeAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
+from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
@@ -99,8 +100,11 @@ class DomainAdapter(BaseAdapter):
 
     async def get(self, domain_name: str) -> DomainNode:
         """Retrieve a single domain by name."""
-        result = await self._processors.domain.lookup.run(
+        resolved = await self._processors.domain.lookup.run(
             LookupDomainAction(name=DomainName(domain_name))
+        )
+        result = await self._processors.domain.get.run(
+            GetDomainAction(domain_id=resolved.entity_id())
         )
         return self._domain_data_to_node(result.data)
 

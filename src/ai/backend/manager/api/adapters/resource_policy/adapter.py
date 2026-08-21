@@ -115,6 +115,9 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
 )
+from ai.backend.manager.services.keypair_resource_policy.actions.get import (
+    GetKeyPairResourcePolicyAction,
+)
 from ai.backend.manager.services.keypair_resource_policy.actions.global_search_keypair_resource_policies import (
     GlobalSearchKeypairResourcePoliciesAction,
 )
@@ -133,6 +136,9 @@ from ai.backend.manager.services.keypair_resource_policy.actions.update_keypair_
 from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
     CreateProjectResourcePolicyAction,
 )
+from ai.backend.manager.services.project_resource_policy.actions.get import (
+    GetProjectResourcePolicyAction,
+)
 from ai.backend.manager.services.project_resource_policy.actions.lookup import (
     LookupProjectResourcePolicyAction,
 )
@@ -148,6 +154,7 @@ from ai.backend.manager.services.project_resource_policy.actions.update_project_
 from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
     CreateUserResourcePolicyAction,
 )
+from ai.backend.manager.services.user_resource_policy.actions.get import GetUserResourcePolicyAction
 from ai.backend.manager.services.user_resource_policy.actions.global_search_user_resource_policies import (
     GlobalSearchUserResourcePoliciesAction,
 )
@@ -196,8 +203,11 @@ class ResourcePolicyAdapter(BaseAdapter):
     # ── Keypair Resource Policy ──
 
     async def admin_get_keypair_resource_policy(self, name: str) -> KeypairResourcePolicyNode:
-        result = await self._processors.keypair_resource_policy.lookup.run(
+        resolved = await self._processors.keypair_resource_policy.lookup.run(
             LookupKeypairResourcePolicyAction(name=name)
+        )
+        result = await self._processors.keypair_resource_policy.get.run(
+            GetKeyPairResourcePolicyAction(policy_id=resolved.entity_id())
         )
         return self._keypair_policy_data_to_node(result.data)
 
@@ -368,8 +378,11 @@ class ResourcePolicyAdapter(BaseAdapter):
     # ── User Resource Policy ──
 
     async def admin_get_user_resource_policy(self, name: str) -> UserResourcePolicyNode:
-        result = await self._processors.user_resource_policy.lookup.run(
+        resolved = await self._processors.user_resource_policy.lookup.run(
             LookupUserResourcePolicyAction(name=name)
+        )
+        result = await self._processors.user_resource_policy.get.run(
+            GetUserResourcePolicyAction(policy_id=resolved.entity_id())
         )
         return self._user_policy_data_to_node(result.data)
 
@@ -490,8 +503,11 @@ class ResourcePolicyAdapter(BaseAdapter):
     # ── Project Resource Policy ──
 
     async def admin_get_project_resource_policy(self, name: str) -> ProjectResourcePolicyNode:
-        result = await self._processors.project_resource_policy.lookup.run(
+        resolved = await self._processors.project_resource_policy.lookup.run(
             LookupProjectResourcePolicyAction(name=name)
+        )
+        result = await self._processors.project_resource_policy.get.run(
+            GetProjectResourcePolicyAction(policy_id=resolved.entity_id())
         )
         return self._project_policy_data_to_node(result.data)
 

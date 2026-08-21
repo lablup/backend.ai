@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.manager.data.role_preset.types import RolePresetData
@@ -20,7 +22,12 @@ class RolePresetQuerier(DataQuerier[RolePresetRow, RolePresetData]):
         return RolePresetRow
 
     @override
-    def pk_value(self) -> RolePresetID:
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
+
+    @override
+    def entity_id_value(self) -> RolePresetID:
         return self.preset_id
 
     @override

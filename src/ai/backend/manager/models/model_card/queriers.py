@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
-from uuid import UUID
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.manager.data.model_card.types import ModelCardData
@@ -23,7 +24,12 @@ class ModelCardQuerier(DataQuerier[ModelCardRow, ModelCardData]):
         return ModelCardRow
 
     @override
-    def pk_value(self) -> UUID:
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return ModelCardRow.id
+
+    @override
+    def entity_id_value(self) -> ModelCardID:
         return self.model_card_id
 
     @override

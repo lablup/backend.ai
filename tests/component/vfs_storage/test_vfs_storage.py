@@ -263,8 +263,7 @@ class TestVFSStorageCRUD:
         """Resolve a VFS storage name into the storage it names."""
         action = LookupVFSStorageAction(name=target_vfs_storage["name"])
         result = await vfs_storage_processors.lookup.run(action)
-        assert result.data.id == target_vfs_storage["id"]
-        assert result.data.name == target_vfs_storage["name"]
+        assert result.entity_id() == target_vfs_storage["id"]
 
     async def test_get_vfs_storage_by_name_via_http(
         self,

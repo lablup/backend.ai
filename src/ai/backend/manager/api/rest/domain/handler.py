@@ -41,6 +41,7 @@ from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.updaters import DomainSoftDeleteUpdater
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
+from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
@@ -107,9 +108,10 @@ class DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         log.info("GET_DOMAIN (ak:{}, d:{})", ctx.access_key, path.parsed.domain_name)
-        action_result = await self._domain.lookup.run(
+        resolved = await self._domain.lookup.run(
             LookupDomainAction(name=DomainName(path.parsed.domain_name))
         )
+        action_result = await self._domain.get.run(GetDomainAction(domain_id=resolved.entity_id()))
 
         resp = GetDomainResponse(domain=self._adapter.convert_to_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

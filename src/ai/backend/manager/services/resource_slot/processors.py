@@ -15,11 +15,15 @@ from ai.backend.manager.actions.v2.ops.result import (
     LookupOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
-from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    PublicSingleEntityActionProcessor,
+    SingleEntityActionProcessor,
+)
 from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.resource_slot.actions.create import CreateResourceSlotTypeAction
+from ai.backend.manager.services.resource_slot.actions.get import GetResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.get_agent_resource_by_slot import (
     GetAgentResourceBySlotAction,
     GetAgentResourceBySlotResult,
@@ -72,6 +76,9 @@ class ResourceSlotProcessors:
     search_resource_allocations: GlobalActionProcessor[
         GlobalSearchResourceAllocationsAction, GlobalSearchResourceAllocationsResult
     ]
+    public_get_resource_slot_type: PublicSingleEntityActionProcessor[
+        GetResourceSlotTypeAction, EntityOpsResult[ResourceSlotTypeData]
+    ]
     public_lookup_resource_slot_type: LookupActionProcessor[
         LookupResourceSlotTypeAction,
         LookupOpsResult[ResourceSlotTypeUUID],
@@ -119,6 +126,7 @@ class ResourceSlotProcessors:
         self.search_resource_allocations = session.global_scope(
             GlobalSearchResourceAllocationsAction, service.search_resource_allocations
         )
+        self.public_get_resource_slot_type = slot_type.public_get_ops(GetResourceSlotTypeAction)
         self.public_lookup_resource_slot_type = slot_type.public_lookup_ops(
             LookupResourceSlotTypeAction
         )

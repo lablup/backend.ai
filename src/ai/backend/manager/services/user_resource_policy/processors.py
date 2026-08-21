@@ -19,6 +19,7 @@ from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
     CreateUserResourcePolicyAction,
 )
+from ai.backend.manager.services.user_resource_policy.actions.get import GetUserResourcePolicyAction
 from ai.backend.manager.services.user_resource_policy.actions.global_search_user_resource_policies import (
     GlobalSearchUserResourcePoliciesAction,
 )
@@ -39,6 +40,9 @@ from ai.backend.manager.services.user_resource_policy.actions.update_user_resour
 class UserResourcePolicyProcessors:
     """Every operation runs straight against ops, so this domain has no service."""
 
+    get: SingleEntityActionProcessor[
+        GetUserResourcePolicyAction, EntityOpsResult[UserResourcePolicyData]
+    ]
     lookup: LookupActionProcessor[
         LookupUserResourcePolicyAction, LookupOpsResult[UserResourcePolicyUUID]
     ]
@@ -59,6 +63,7 @@ class UserResourcePolicyProcessors:
     ]
 
     def __init__(self, group: ProcessorGroup[UserResourcePolicyData]) -> None:
+        self.get = group.single_get_ops(GetUserResourcePolicyAction)
         self.lookup = group.lookup_ops(LookupUserResourcePolicyAction)
         self.search = group.scope_search_ops(SearchUserResourcePoliciesAction)
         self.global_search = group.global_search_ops(GlobalSearchUserResourcePoliciesAction)

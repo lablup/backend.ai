@@ -16,7 +16,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     SearchGlobalOpsAction,
 )
 from ai.backend.manager.data.group.types import GroupData
-from ai.backend.manager.models.group.queriers import GroupQuerier
+from ai.backend.manager.models.group.queriers import ProjectQuerier
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.group.searchers import GroupSearcher
 from ai.backend.manager.models.scopes import OperationScope
@@ -123,5 +123,5 @@ class GetProjectAction(GetSingleEntityOpsAction[GroupRow, GroupData]):
         return "get_project"
 
     @override
-    def to_querier(self) -> GroupQuerier:
-        return GroupQuerier(project_id=self.project_id)
+    def to_querier(self) -> ProjectQuerier:
+        return ProjectQuerier(project_id=self.project_id)

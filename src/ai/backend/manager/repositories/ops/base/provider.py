@@ -45,7 +45,6 @@ from ai.backend.manager.repositories.base import (
     DataBatchUpdater,
     DataCreator,
     DataPurger,
-    DataQuerier,
     DataUpdater,
     DataUpserter,
     DependentCreatorSpec,
@@ -119,22 +118,6 @@ class ReadOps:
     async def query[TRow: Base](self, querier: Querier[TRow]) -> QuerierResult[TRow] | None:
         """Fetch a single row by primary key."""
         return await execute_querier(self._sess, querier)
-
-    async def query_data[TRow: Base, TData](
-        self, querier: DataQuerier[TRow, TData]
-    ) -> TData | None:
-        """Fetch a single row by primary key and return it as its ``data/`` type.
-
-        Converting counterpart of :meth:`query`, mirroring what :meth:`search_with_scopes`
-        does for lists: the querier carries its own conversion, so the ORM row is
-        consumed here and never reaches the caller.
-        """
-        result = await execute_querier(
-            self._sess, Querier(row_class=querier.row_class(), pk_value=querier.pk_value())
-        )
-        if result is None:
-            return None
-        return querier.to_data(result.row)
 
     async def batch_query_in_global(
         self,

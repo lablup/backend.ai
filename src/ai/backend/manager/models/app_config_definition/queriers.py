@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
 from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
@@ -20,7 +22,12 @@ class AppConfigDefinitionQuerier(DataQuerier[AppConfigDefinitionRow, AppConfigDe
         return AppConfigDefinitionRow
 
     @override
-    def pk_value(self) -> AppConfigDefinitionID:
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return AppConfigDefinitionRow.id
+
+    @override
+    def entity_id_value(self) -> AppConfigDefinitionID:
         return self.definition_id
 
     @override

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 from ai.backend.manager.data.app_config.types import AppConfigFragmentData
@@ -20,7 +22,12 @@ class AppConfigFragmentQuerier(DataQuerier[AppConfigFragmentRow, AppConfigFragme
         return AppConfigFragmentRow
 
     @override
-    def pk_value(self) -> AppConfigFragmentID:
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return AppConfigFragmentRow.id
+
+    @override
+    def entity_id_value(self) -> AppConfigFragmentID:
         return self.fragment_id
 
     @override

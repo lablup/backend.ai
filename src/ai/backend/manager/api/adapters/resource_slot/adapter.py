@@ -77,6 +77,7 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.agent.actions.lookup import LookupAgentAction
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.resource_slot.actions.create import CreateResourceSlotTypeAction
+from ai.backend.manager.services.resource_slot.actions.get import GetResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.get_agent_resource_by_slot import (
     GetAgentResourceBySlotAction,
 )
@@ -489,8 +490,11 @@ class ResourceSlotAdapter(BaseAdapter):
 
     async def get_slot_type(self, slot_name: str) -> ResourceSlotTypeNode:
         """Retrieve a single resource slot type by slot name."""
-        action_result = await self._processors.resource_slot.public_lookup_resource_slot_type.run(
+        resolved = await self._processors.resource_slot.public_lookup_resource_slot_type.run(
             LookupResourceSlotTypeAction(slot_name=slot_name)
+        )
+        action_result = await self._processors.resource_slot.public_get_resource_slot_type.run(
+            GetResourceSlotTypeAction(slot_type_id=resolved.entity_id())
         )
         return self._slot_type_data_to_node(action_result.data)
 
@@ -532,7 +536,7 @@ class ResourceSlotAdapter(BaseAdapter):
             LookupDomainAction(name=DomainName(domain_name))
         )
         action_result = await self._processors.resource_slot.get_domain_resource_overview.run(
-            GetDomainResourceOverviewAction(domain_id=domain.entity_id, domain_name=domain_name)
+            GetDomainResourceOverviewAction(domain_id=domain.entity_id(), domain_name=domain_name)
         )
         occupancy = action_result.item
         return ActiveResourceOverviewInfoDTO(

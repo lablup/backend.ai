@@ -28,6 +28,7 @@ from ai.backend.manager.dto.response import (
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.vfs_storage.searchers import VFSStorageSearcher
+from ai.backend.manager.services.vfs_storage.actions.get import GetVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.lookup import (
     LookupVFSStorageAction,
@@ -98,8 +99,9 @@ class VFSStorageHandler:
 
         log.info("Download request for file: {} from storage: {}", filepath, storage_name)
 
-        action_result = await self._vfs_storage.lookup.run(
-            LookupVFSStorageAction(name=storage_name)
+        resolved = await self._vfs_storage.lookup.run(LookupVFSStorageAction(name=storage_name))
+        action_result = await self._vfs_storage.get.run(
+            GetVFSStorageAction(storage_id=resolved.entity_id())
         )
 
         manager_client = self._vfs_storage.get_manager_facing_client(action_result.data.host)
@@ -134,8 +136,9 @@ class VFSStorageHandler:
 
         log.info("Get storage request for storage: {}", storage_name)
 
-        action_result = await self._vfs_storage.lookup.run(
-            LookupVFSStorageAction(name=storage_name)
+        resolved = await self._vfs_storage.lookup.run(LookupVFSStorageAction(name=storage_name))
+        action_result = await self._vfs_storage.get.run(
+            GetVFSStorageAction(storage_id=resolved.entity_id())
         )
 
         storage_data = action_result.data
@@ -185,8 +188,9 @@ class VFSStorageHandler:
 
         log.info("List files request for directory: {} from storage: {}", directory, storage_name)
 
-        action_result = await self._vfs_storage.lookup.run(
-            LookupVFSStorageAction(name=storage_name)
+        resolved = await self._vfs_storage.lookup.run(LookupVFSStorageAction(name=storage_name))
+        action_result = await self._vfs_storage.get.run(
+            GetVFSStorageAction(storage_id=resolved.entity_id())
         )
 
         manager_client = self._vfs_storage.get_manager_facing_client(action_result.data.host)

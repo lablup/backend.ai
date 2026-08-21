@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
@@ -28,7 +30,12 @@ class PrometheusQueryPresetCategoryQuerier(
         return PrometheusQueryPresetCategoryRow
 
     @override
-    def pk_value(self) -> PrometheusQueryPresetCategoryID:
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return PrometheusQueryPresetCategoryRow.id
+
+    @override
+    def entity_id_value(self) -> PrometheusQueryPresetCategoryID:
         return self.category_id
 
     @override

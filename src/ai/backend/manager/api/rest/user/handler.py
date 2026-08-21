@@ -112,14 +112,14 @@ class UserHandler:
             )
         )
 
-        domain_data = (
+        domain_id = (
             await self._domain.lookup.run(
                 LookupDomainAction(name=DomainName(body.parsed.domain_name))
             )
-        ).data
+        ).entity_id()
         action_result = await self._user.create_user.run(
             CreateUserAction(
-                domain_id=domain_data.id,
+                domain_id=domain_id,
                 creator=creator,
                 group_ids=body.parsed.group_ids,
             )

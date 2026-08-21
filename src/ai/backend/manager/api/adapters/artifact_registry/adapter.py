@@ -44,10 +44,13 @@ class ArtifactRegistryAdapter(BaseAdapter):
             return self._data_to_dto(action_result.result)
         if registry_name is None:
             raise InvalidAPIParameters("One of (`registry_id` or `registry_name`) is required")
-        lookup_result = await self._processors.artifact_registry.lookup.run(
+        resolved = await self._processors.artifact_registry.lookup.run(
             LookupArtifactRegistryAction(name=registry_name)
         )
-        return self._data_to_dto(lookup_result.data)
+        action_result = await self._processors.artifact_registry.get_registry_meta.run(
+            GetArtifactRegistryMetaAction(registry_id=resolved.entity_id())
+        )
+        return self._data_to_dto(action_result.result)
 
     async def get_registry_metas(
         self, registry_ids: list[uuid.UUID]

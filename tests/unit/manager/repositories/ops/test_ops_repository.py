@@ -19,6 +19,7 @@ from typing import Any, override
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.role_preset import (
     RolePresetID,
@@ -148,8 +149,12 @@ class _PresetQuerier(DataQuerier[RolePresetRow, RolePresetData]):
         return RolePresetRow
 
     @override
-    def pk_value(self) -> uuid.UUID:
-        return self.target
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
+
+    @override
+    def entity_id_value(self) -> RolePresetID:
+        return RolePresetID(self.target)
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
@@ -223,7 +228,7 @@ class _PresetView(EntityData):
 
 
 @dataclass
-class _PresetByName(DataLookup[RolePresetRow, RolePresetData]):
+class _PresetByName(DataLookup[RolePresetRow, RolePresetID]):
     """Resolves a preset by its name, the way a lookup action would."""
 
     name: str
@@ -237,8 +242,8 @@ class _PresetByName(DataLookup[RolePresetRow, RolePresetData]):
         return [lambda: RolePresetRow.name == self.name]
 
     @override
-    def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+    def to_entity_id(self, row: RolePresetRow) -> RolePresetID:
+        return RolePresetID(row.id)
 
 
 @dataclass
@@ -327,7 +332,7 @@ class TestLookup:
     ) -> None:
         found = await repository.lookup(_PresetByName(name="default"))
 
-        assert found.id == preset.id
+        assert found == preset.id
 
     async def test_an_unmatched_key_raises(self, repository: OpsRepository[RolePresetData]) -> None:
         with pytest.raises(EntityNotFoundError):

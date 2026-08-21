@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
@@ -20,7 +22,12 @@ class ObjectStorageQuerier(DataQuerier[ObjectStorageRow, ObjectStorageData]):
         return ObjectStorageRow
 
     @override
-    def pk_value(self) -> ObjectStorageID:
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return ObjectStorageRow.id
+
+    @override
+    def entity_id_value(self) -> ObjectStorageID:
         return self.storage_id
 
     @override

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
@@ -20,7 +22,12 @@ class VFSStorageQuerier(DataQuerier[VFSStorageRow, VFSStorageData]):
         return VFSStorageRow
 
     @override
-    def pk_value(self) -> VFSStorageID:
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return VFSStorageRow.id
+
+    @override
+    def entity_id_value(self) -> VFSStorageID:
         return self.storage_id
 
     @override

@@ -35,6 +35,7 @@ from ai.backend.manager.services.domain.actions.create_domain_dotfile import (
 from ai.backend.manager.services.domain.actions.delete_domain_dotfile import (
     DeleteDomainDotfileAction,
 )
+from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.actions.update_domain_dotfile import (
     UpdateDomainDotfileAction,
@@ -74,7 +75,8 @@ class DomainConfigHandler:
     ) -> APIResponse:
         params = query.parsed
         log.info("DOMAINCONFIG.LIST_OR_GET(domain:{})", params.domain)
-        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
+        resolved = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
+        target = await self._domain.get.run(GetDomainAction(domain_id=resolved.entity_id()))
         entries = DotfileEntries.unpack(target.data.dotfiles)
         if params.path:
             entry = entries.get(params.path)

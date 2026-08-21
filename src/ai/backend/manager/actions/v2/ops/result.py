@@ -96,7 +96,7 @@ class LookupOpsResult[TEntityID: EntityIdentifier](BaseLookupActionResult):
     resolved_entity_id: TEntityID
 
     @override
-    def entity_id(self) -> EntityIdentifier:
+    def entity_id(self) -> TEntityID:
         return self.resolved_entity_id
 
 

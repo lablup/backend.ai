@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
 from ai.backend.manager.data.app_config.types import AppConfigAllowListData
@@ -20,7 +22,12 @@ class AppConfigAllowListQuerier(DataQuerier[AppConfigAllowListRow, AppConfigAllo
         return AppConfigAllowListRow
 
     @override
-    def pk_value(self) -> AppConfigAllowListID:
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return AppConfigAllowListRow.id
+
+    @override
+    def entity_id_value(self) -> AppConfigAllowListID:
         return self.allow_list_id
 
     @override
