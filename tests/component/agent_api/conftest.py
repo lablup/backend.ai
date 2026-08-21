@@ -136,7 +136,7 @@ async def agent_fixture(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 region="local",
-                resource_group=resource_group_name,
+                scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 schedulable=True,
                 available_slots=ResourceSlot({"cpu": "4", "mem": "8589934592"}),

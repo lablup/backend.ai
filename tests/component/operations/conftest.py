@@ -121,7 +121,7 @@ async def agent_fixture(
             sa.insert(agents).values(
                 id=agent_id,
                 region="local",
-                resource_group=resource_group_name,
+                scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 available_slots=ResourceSlot(),
                 occupied_slots=ResourceSlot(),

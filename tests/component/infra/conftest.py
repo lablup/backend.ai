@@ -316,7 +316,7 @@ async def resource_preset_fixture(
                 name=preset_name,
                 resource_slots=resource_slots,
                 shared_memory=None,
-                resource_group_name=None,
+                scaling_group_name=None,
             )
         )
     yield {"id": str(preset_id), "name": preset_name}
