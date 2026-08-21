@@ -26,16 +26,18 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import gzip
 import hashlib
 import json
 import logging
 import os
 import re
 import shutil
+import tarfile
 import time
 from collections.abc import AsyncIterator, Mapping, Sequence
 from pathlib import Path
-from typing import Any, Final, override
+from typing import IO, Any, Final, cast, override
 
 from ai.backend.agent.containerd.log_writer import (
     LOG_FILE_COUNT,
@@ -53,6 +55,7 @@ from ai.backend.agent.containerd.runtime.interface import (
 )
 from ai.backend.agent.containerd.runtime.spec import container_cgroup_fs_path
 from ai.backend.agent.enroot.registry import fetch_image_metadata
+from ai.backend.agent.enroot.registry import push_image as fetch_push
 from ai.backend.agent.network.journal_io import atomic_write
 from ai.backend.logging import BraceStyleAdapter
 
@@ -99,6 +102,38 @@ _CGROUP_RMDIR_DELAY_SEC: Final = 0.05
 # Docker's default ShmSize, used when the session did not ask for one.
 _DEFAULT_SHM_BYTES: Final = 64 * 1024 * 1024
 _SQSH_DIGEST_CHUNK: Final = 4 * 1024 * 1024
+
+
+class _HashingWriter:
+    """Pass-through writer that digests everything written to it."""
+
+    def __init__(self, stream: Any, digest: Any) -> None:
+        self._stream = stream
+        self._digest = digest
+
+    def write(self, data: bytes) -> int:
+        self._digest.update(data)
+        return int(self._stream.write(data))
+
+
+def _write_layer(rootfs: Path, layer_path: Path) -> str:
+    """Tar+gzip ``rootfs`` into ``layer_path``; return the tar's UNCOMPRESSED sha256.
+
+    That digest is the config's ``rootfs.diff_ids`` entry, and it has to be taken as the tar is
+    produced — recomputing it later would mean decompressing the whole layer again.
+
+    ``mtime=0`` on the gzip wrapper keeps the layer byte-identical across runs of the same rootfs,
+    so re-pushing an unchanged image is a no-op the registry can dedupe.
+    """
+    diff = hashlib.sha256()
+    with layer_path.open("wb") as raw:
+        with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as gz:
+            # Stream mode ("w|") only ever calls write() on the fileobj, which is all
+            # _HashingWriter provides.
+            sink = cast(IO[bytes], _HashingWriter(gz, diff))
+            with tarfile.open(fileobj=sink, mode="w|") as tar:
+                tar.add(rootfs, arcname=".", recursive=True)
+    return f"sha256:{diff.hexdigest()}"
 
 
 def _slug(image_ref: str) -> str:
@@ -322,13 +357,23 @@ class EnrootRuntime(OciRuntime):
         # `enroot import` produces the .sqsh. Registry auth flows through ENROOT_* credentials
         # (or ~/.docker/config.json); wire `auth` into an ENROOT credential file in a later pass.
         sqsh = self._sqsh(image_ref)
-        rc, _out, err = await self._run(
-            _ENROOT_BIN, "import", "-o", str(sqsh), f"docker://{image_ref}"
-        )
-        if rc != 0:
-            raise RuntimeError(
-                f"enroot import failed for {image_ref}: {err.decode(errors='replace')}"
+        # `enroot import` has no --force and refuses to overwrite, so a re-pull — which is exactly
+        # what check_image asks for when the local digest has gone stale — would fail outright on
+        # an image the node already has. Import beside it and swap: os.replace is atomic, so a
+        # crashed or killed pull also cannot leave a truncated .sqsh behind for image_exists() to
+        # report as present.
+        staging = sqsh.with_name(f".pull-{os.getpid()}-{sqsh.name}")
+        try:
+            rc, _out, err = await self._run(
+                _ENROOT_BIN, "import", "-o", str(staging), f"docker://{image_ref}"
             )
+            if rc != 0:
+                raise RuntimeError(
+                    f"enroot import failed for {image_ref}: {err.decode(errors='replace')}"
+                )
+            await asyncio.to_thread(os.replace, staging, sqsh)
+        finally:
+            staging.unlink(missing_ok=True)
         # A `.sqsh` cannot be queried for OCI config, so record the identity scan_images/check_image
         # need — config-blob digest (Docker's `Id`, the manager's image_id) + kernel-spec/base-distro
         # labels + architecture + entrypoint — from the registry. A failed probe leaves them null
@@ -342,6 +387,11 @@ class EnrootRuntime(OciRuntime):
                 "architecture": meta.architecture if meta else "",
                 "labels": dict(meta.labels) if meta else {},
                 "entrypoint": meta.entrypoint if meta else None,
+                # Needed to republish a commit faithfully: an image that loses the base's Cmd,
+                # PATH/LANG or working directory is not the same image.
+                "cmd": meta.cmd if meta else None,
+                "env": meta.env if meta else None,
+                "working_dir": meta.working_dir if meta else None,
             })
         )
 
@@ -377,9 +427,83 @@ class EnrootRuntime(OciRuntime):
 
     @override
     async def push_image(self, image_ref: str, *, auth: Mapping[str, str] | None = None) -> None:
-        # enroot has no push. The commit/customized-image flow would need `enroot export` + a
-        # separate skopeo/oras upload; unsupported in the first pass.
-        raise NotImplementedError("enroot backend does not support push_image")
+        """Publish a local `.sqsh` to a registry as an ordinary single-layer image.
+
+        Neither sibling backend does this itself — Docker delegates to dockerd, containerd to its
+        Transfer service — but enroot has no daemon to delegate to, and its images are squashfs
+        rather than OCI tar layers. So the rootfs is unpacked, retarred as one gzipped layer, and
+        uploaded through the registry v2 API (see :mod:`.registry`). One layer is the honest shape:
+        `enroot export` snapshots a whole rootfs, not a stack of diffs.
+
+        Without this the customized-image round trip stops after commit — the image exists on the
+        node that made it and can never be scheduled anywhere else.
+        """
+        sqsh = self._sqsh(image_ref)
+        if not sqsh.exists():
+            raise RuntimeError(f"no local image to push for {image_ref}")
+        meta = self._read_meta(image_ref) or {}
+        workdir = self._state_path / f".push-{_slug(image_ref)}"
+        try:
+            layer_path, diff_id = await self._build_layer(sqsh, workdir)
+            await fetch_push(
+                image_ref,
+                layer_path=layer_path,
+                layer_diff_id=diff_id,
+                config=self._image_config(meta),
+                auth=auth,
+            )
+        finally:
+            await asyncio.to_thread(shutil.rmtree, workdir, ignore_errors=True)
+
+    @staticmethod
+    def _image_config(meta: Mapping[str, Any]) -> dict[str, Any]:
+        """The image config document, rebuilt from the sidecar. ``rootfs`` is the pusher's."""
+        config: dict[str, Any] = {"Labels": dict(meta.get("labels") or {})}
+        if entrypoint := meta.get("entrypoint"):
+            config["Entrypoint"] = list(entrypoint)
+        if cmd := meta.get("cmd"):
+            config["Cmd"] = list(cmd)
+        if env := meta.get("env"):
+            config["Env"] = list(env)
+        if working_dir := meta.get("working_dir"):
+            config["WorkingDir"] = str(working_dir)
+        return {
+            "architecture": meta.get("architecture") or "amd64",
+            "os": "linux",
+            "config": config,
+            "history": [{"created_by": "backend.ai enroot commit"}],
+        }
+
+    async def _build_layer(self, sqsh: Path, workdir: Path) -> tuple[Path, str]:
+        """Unpack the squashfs and retar it as one gzipped layer; return (path, uncompressed digest).
+
+        Run as the agent (not the kernel uid): unsquashfs only restores the recorded ownership when
+        it is root, and the recorded ownership is right — `enroot export` remaps the rootless
+        container's uids back, so a file the container's root wrote is `root/root` in the `.sqsh`
+        even though it is uid 1000 on the host.
+        """
+        await asyncio.to_thread(shutil.rmtree, workdir, ignore_errors=True)
+        rootfs = workdir / "rootfs"
+        rootfs.parent.mkdir(parents=True, exist_ok=True)
+        rc, _out, err = await self._run_as_agent(
+            "unsquashfs", "-no-progress", "-d", str(rootfs), str(sqsh)
+        )
+        if rc != 0:
+            raise RuntimeError(f"unsquashfs failed for {sqsh}: {err.decode(errors='replace')}")
+        layer_path = workdir / "layer.tar.gz"
+        return layer_path, await asyncio.to_thread(_write_layer, rootfs, layer_path)
+
+    async def _run_as_agent(self, *argv: str) -> tuple[int, bytes, bytes]:
+        """Like ``_run`` but WITHOUT the uid drop — for the few steps that need the agent's own
+        privileges (restoring file ownership out of a squashfs)."""
+        proc = await asyncio.create_subprocess_exec(
+            *argv,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=self._process_env(),
+        )
+        stdout, stderr = await proc.communicate()
+        return proc.returncode or 0, stdout, stderr
 
     @override
     async def export_image(self, image_ref: str, dest_path: Path) -> None:
@@ -391,8 +515,13 @@ class EnrootRuntime(OciRuntime):
 
     @override
     async def image_entrypoint(self, image_ref: str) -> list[str] | None:
+        # What the image runs by default: its Entrypoint, or its Cmd when it has none. (Sidecars
+        # written before the two were separated carry the collapsed value under `entrypoint`, so
+        # this reads them unchanged.)
         meta = self._read_meta(image_ref)
-        return meta.get("entrypoint") if meta else None
+        if not meta:
+            return None
+        return meta.get("entrypoint") or meta.get("cmd")
 
     # ------------------------------------------------------------------ container lifecycle
     @override
@@ -1076,7 +1205,7 @@ class EnrootRuntime(OciRuntime):
     ) -> None:
         # enroot's analog of a rootfs snapshot is `enroot export` (produces a new .sqsh).
         rc, _out, err = await self._run(
-            _ENROOT_BIN, "export", "--output", str(self._sqsh(target_ref)), container_id
+            _ENROOT_BIN, "export", "--force", "--output", str(self._sqsh(target_ref)), container_id
         )
         if rc != 0:
             raise RuntimeError(
@@ -1101,6 +1230,9 @@ class EnrootRuntime(OciRuntime):
                 "architecture": base.get("architecture") or "",
                 "labels": {**(base.get("labels") or {}), **(labels or {})},
                 "entrypoint": base.get("entrypoint"),
+                "cmd": base.get("cmd"),
+                "env": base.get("env"),
+                "working_dir": base.get("working_dir"),
             })
         )
 

@@ -9,10 +9,13 @@ enough of the registry v2 API to read a manifest and its config blob; auth reuse
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import json
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import aiohttp
@@ -34,6 +37,12 @@ _INDEX_MEDIA_TYPES = frozenset({
     "application/vnd.oci.image.index.v1+json",
     "application/vnd.docker.distribution.manifest.list.v2+json",
 })
+# Push in Docker schema2 rather than OCI: it is what every registry and every runtime in this
+# stack (docker, containerd, enroot's own `import docker://`) accepts without configuration.
+_MANIFEST_MEDIA_TYPE = "application/vnd.docker.distribution.manifest.v2+json"
+_CONFIG_MEDIA_TYPE = "application/vnd.docker.container.image.v1+json"
+_LAYER_MEDIA_TYPE = "application/vnd.docker.image.rootfs.diff.tar.gzip"
+_BLOB_UPLOAD_CHUNK = 4 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -41,7 +50,13 @@ class ImageMetadata:
     config_digest: str
     architecture: str
     labels: Mapping[str, str]
+    # Entrypoint and Cmd are kept APART. Collapsing them loses the difference between "always
+    # runs this" and "runs this unless told otherwise", and republishing a Cmd as an Entrypoint
+    # silently changes what `docker run <image> <cmd>` means.
     entrypoint: list[str] | None
+    cmd: list[str] | None
+    env: list[str] | None
+    working_dir: str | None
 
 
 @dataclass(frozen=True)
@@ -134,12 +149,14 @@ async def _fetch_one(
             "application/vnd.oci.image.config.v1+json",
         )
     cfg = config.get("config") or {}
-    entrypoint = cfg.get("Entrypoint") or cfg.get("Cmd")
     return ImageMetadata(
         config_digest=config_digest,
         architecture=str(config.get("architecture") or architecture),
         labels=dict(cfg.get("Labels") or {}),
-        entrypoint=list(entrypoint) if entrypoint else None,
+        entrypoint=list(cfg["Entrypoint"]) if cfg.get("Entrypoint") else None,
+        cmd=list(cfg["Cmd"]) if cfg.get("Cmd") else None,
+        env=list(cfg["Env"]) if cfg.get("Env") else None,
+        working_dir=str(cfg["WorkingDir"]) if cfg.get("WorkingDir") else None,
     )
 
 
@@ -161,3 +178,158 @@ async def _resolve_index(
                 _MANIFEST_ACCEPT,
             )
     raise RuntimeError(f"no {architecture}/linux manifest in index for {ref.repo}:{ref.reference}")
+
+
+async def push_image(
+    canonical: str,
+    *,
+    layer_path: Path,
+    layer_diff_id: str,
+    config: Mapping[str, Any],
+    auth: Mapping[str, str] | None,
+) -> str:
+    """Publish a single-layer image and return its manifest digest.
+
+    ``layer_path`` is a gzipped tar of the whole rootfs and ``layer_diff_id`` its *uncompressed*
+    digest, which is what the config's ``rootfs.diff_ids`` records — the manifest references the
+    compressed blob, the config the uncompressed one, and a registry will reject a mismatch.
+
+    A committed enroot image is one squashed layer by nature: `enroot export` produces a full
+    rootfs snapshot, not a stack of diffs, so there is nothing to preserve layering from.
+    """
+    ref = _parse_ref(canonical)
+    # Own the rootfs stanza rather than trusting the caller to pair it correctly: the manifest
+    # references the COMPRESSED layer digest and the config the UNCOMPRESSED one, and a registry
+    # rejects the image if they are crossed. Keeping both in one place makes that unmixable.
+    full_config = {**config, "rootfs": {"type": "layers", "diff_ids": [layer_diff_id]}}
+    config_bytes = json.dumps(full_config, separators=(",", ":"), sort_keys=True).encode()
+    config_digest = f"sha256:{hashlib.sha256(config_bytes).hexdigest()}"
+    layer_size = layer_path.stat().st_size
+    layer_digest = await asyncio.to_thread(_file_digest, layer_path)
+    manifest = {
+        "schemaVersion": 2,
+        "mediaType": _MANIFEST_MEDIA_TYPE,
+        "config": {
+            "mediaType": _CONFIG_MEDIA_TYPE,
+            "digest": config_digest,
+            "size": len(config_bytes),
+        },
+        "layers": [
+            {"mediaType": _LAYER_MEDIA_TYPE, "digest": layer_digest, "size": layer_size},
+        ],
+    }
+    manifest_bytes = json.dumps(manifest, separators=(",", ":")).encode()
+
+    schemes = ("http",) if ref.insecure else ("https", "http")
+    last_err: Exception | None = None
+    for scheme in schemes:
+        try:
+            await _push_one(
+                ref,
+                scheme,
+                dict(auth or {}),
+                config_bytes,
+                config_digest,
+                layer_path,
+                layer_digest,
+                manifest_bytes,
+            )
+            return f"sha256:{hashlib.sha256(manifest_bytes).hexdigest()}"
+        except Exception as e:
+            last_err = e
+    raise RuntimeError(f"pushing {canonical} failed: {last_err}") from last_err
+
+
+def _file_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as f:
+        while chunk := f.read(_BLOB_UPLOAD_CHUNK):
+            digest.update(chunk)
+    return f"sha256:{digest.hexdigest()}"
+
+
+async def _push_one(
+    ref: _Ref,
+    scheme: str,
+    credentials: Mapping[str, Any],
+    config_bytes: bytes,
+    config_digest: str,
+    layer_path: Path,
+    layer_digest: str,
+    manifest_bytes: bytes,
+) -> None:
+    registry_url = _registry_url(ref, scheme)
+    # A push token is a different scope from a pull one; asking for pull as well keeps the HEAD
+    # blob checks below on the same token.
+    async with aiohttp.ClientSession() as sess:
+        req_kwargs = await login(
+            sess, registry_url, dict(credentials), scope=f"repository:{ref.repo}:push,pull"
+        )
+        base = registry_url / "v2" / ref.repo
+        await _upload_blob(sess, base, req_kwargs, layer_digest, body=layer_path)
+        await _upload_blob(sess, base, req_kwargs, config_digest, body=config_bytes)
+        headers = {**dict(req_kwargs.get("headers", {})), "Content-Type": _MANIFEST_MEDIA_TYPE}
+        kwargs = {k: v for k, v in req_kwargs.items() if k != "headers"}
+        async with sess.put(
+            base / "manifests" / ref.reference, data=manifest_bytes, headers=headers, **kwargs
+        ) as resp:
+            if resp.status >= 400:
+                raise RuntimeError(
+                    f"manifest PUT failed ({resp.status}): {(await resp.text())[:400]}"
+                )
+
+
+async def _upload_blob(
+    sess: aiohttp.ClientSession,
+    base: yarl.URL,
+    req_kwargs: Mapping[str, Any],
+    digest: str,
+    *,
+    body: Path | bytes,
+) -> None:
+    """Upload one blob, skipping it when the registry already has it.
+
+    Monolithic: open a session, then PUT the whole body with `?digest=`. The chunked flow exists
+    for resumability, which a commit does not need — and every registry accepts this form.
+    """
+    headers = dict(req_kwargs.get("headers", {}))
+    kwargs = {k: v for k, v in req_kwargs.items() if k != "headers"}
+    async with sess.head(base / "blobs" / digest, headers=headers, **kwargs) as resp:
+        if resp.status == 200:
+            log.debug("[enroot] registry already has {}", digest)
+            return
+    async with sess.post(base / "blobs" / "uploads" / "", headers=headers, **kwargs) as resp:
+        if resp.status not in (200, 202):
+            raise RuntimeError(f"blob upload POST failed ({resp.status}): {await resp.text()}")
+        location = resp.headers.get("Location")
+    if not location:
+        raise RuntimeError("blob upload POST returned no Location")
+    # The Location may be absolute or registry-relative; join handles both.
+    upload_url = base.join(yarl.URL(location)).update_query({"digest": digest})
+    if isinstance(body, Path):
+        size = body.stat().st_size
+        with body.open("rb") as f:
+            await _put_blob(sess, upload_url, f, size, headers, kwargs, digest)
+    else:
+        await _put_blob(sess, upload_url, body, len(body), headers, kwargs, digest)
+
+
+async def _put_blob(
+    sess: aiohttp.ClientSession,
+    url: yarl.URL,
+    body: Any,
+    size: int,
+    headers: Mapping[str, str],
+    kwargs: Mapping[str, Any],
+    digest: str,
+) -> None:
+    put_headers = {
+        **headers,
+        "Content-Type": "application/octet-stream",
+        "Content-Length": str(size),
+    }
+    async with sess.put(url, data=body, headers=put_headers, **kwargs) as resp:
+        if resp.status not in (200, 201, 202):
+            raise RuntimeError(
+                f"blob PUT failed for {digest} ({resp.status}): {(await resp.text())[:400]}"
+            )
