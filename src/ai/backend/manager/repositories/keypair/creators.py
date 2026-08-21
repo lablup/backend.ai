@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
+from ai.backend.manager.errors.keypair import KeypairResourcePolicyNotFound
+from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base import CreatorSpec
 
 
@@ -22,6 +26,17 @@ class KeyPairCreatorSpec(CreatorSpec[KeyPairRow]):
     is_default: bool
     resource_policy: str
     rate_limit: int | None = None
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return (
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                constraint_name="fk_keypairs_resource_policy_keypair_resource_policies",
+                error=KeypairResourcePolicyNotFound(self.resource_policy),
+            ),
+        )
 
     @override
     def build_row(self) -> KeyPairRow:
