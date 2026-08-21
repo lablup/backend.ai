@@ -82,7 +82,7 @@ class TestPrometheusQueryPresetRepository:
                 id=preset_id,
                 name="container_cpu_rate",
                 metric_name="backendai_container_utilization",
-                query_template="sum by ({group_by})(rate({metric_name}{{{labels}}}[{window}]))",
+                query_template="sum by (${{group_by}})(rate({metric_name}{${{labels}}}[${{window}}]))",
                 time_window="5m",
                 options=PresetOptions(
                     filter_labels=["container_metric_name", "kernel_id"],
@@ -127,7 +127,7 @@ class TestPrometheusQueryPresetRepository:
     ) -> None:
         name = "gpu_memory_usage"
         metric_name = "backendai_gpu_memory"
-        query_template = "avg({metric_name}{{{labels}}})"
+        query_template = "avg({metric_name}{${{labels}}})"
         time_window = "10m"
         filter_labels = ["kernel_id", "device_id"]
         group_labels = ["kernel_id"]
@@ -302,12 +302,12 @@ class TestPrometheusQueryPresetRepositoryPreview:
         canned_response: PrometheusResponse,
     ) -> None:
         result = await repository.preview_template(
-            query_template="sum(rate(metric{{{labels}}}[{window}]))",
+            query_template="sum(rate(metric{${{labels}}}[${{window}}]))",
             default_window="5m",
         )
 
         prometheus_client.preview_query_template.assert_called_once_with(
-            query_template="sum(rate(metric{{{labels}}}[{window}]))",
+            query_template="sum(rate(metric{${{labels}}}[${{window}}]))",
             default_window="5m",
         )
         assert result is canned_response

@@ -29,6 +29,7 @@ from ai.backend.manager.api.rest.v2.prometheus_query_preset.registry import (
     register_v2_prometheus_query_preset_routes,
 )
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
 from ai.backend.manager.models.prometheus_query_preset_category import (
@@ -81,6 +82,7 @@ def prometheus_query_preset_processors(
         repository=repo,
         prometheus_client=prometheus_client_mock,
         default_timewindow="5m",
+        template_renderer=PromQLTemplateRenderer(),
     )
     return PrometheusQueryPresetProcessors(
         service=service,

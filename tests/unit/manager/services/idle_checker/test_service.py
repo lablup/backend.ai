@@ -96,7 +96,7 @@ class TestIdleCheckerSpecLabelValidation:
             rank=0,
             category_id=None,
             metric_name="backendai_container_utilization",
-            query_template="sum by ({group_by})(backendai_container_utilization{{{labels}}})",
+            query_template="sum by (${{group_by}})(backendai_container_utilization{${{labels}}})",
             time_window="5m",
             filter_labels=["container_metric_name", "session_id"],
             group_labels=["session_id", "device"],

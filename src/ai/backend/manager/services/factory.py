@@ -4,6 +4,7 @@ from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry import ProcessorDependencies, ProcessorRegistry
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
@@ -315,6 +316,7 @@ def create_services(args: ServiceArgs) -> Services:
             repository=repositories.prometheus_query_preset.repository,
             prometheus_client=args.prometheus_client,
             default_timewindow=args.config_provider.config.metric.timewindow,
+            template_renderer=PromQLTemplateRenderer(),
         ),
         prometheus_query_preset_category=PrometheusQueryPresetCategoryService(
             repository=repositories.prometheus_query_preset_category.repository,

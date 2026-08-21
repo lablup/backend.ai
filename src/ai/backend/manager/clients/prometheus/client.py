@@ -29,7 +29,7 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     KernelLiveStatBatchResult,
     MetricResultValue,
 )
-from ai.backend.manager.clients.prometheus.preset import MetricPreset
+from ai.backend.manager.clients.prometheus.preset import MetricPreset, PromQLTemplateRenderer
 
 DEFAULT_TIMEOUT_SECONDS: float = 30.0
 
@@ -42,6 +42,7 @@ class PrometheusClient:
     _timeout: aiohttp.ClientTimeout
     _container_metric_query_builder: ContainerMetricQueryBuilder
     _container_live_stat_query_builder: ContainerLiveStatQueryBuilder
+    _template_renderer: PromQLTemplateRenderer
 
     def __init__(
         self,
@@ -57,6 +58,7 @@ class PrometheusClient:
         self._timeout = aiohttp.ClientTimeout(total=timeout)
         self._container_metric_query_builder = container_metric_query_builder
         self._container_live_stat_query_builder = container_live_stat_query_builder
+        self._template_renderer = PromQLTemplateRenderer()
 
     async def fetch_available_container_metric_names(self) -> list[str]:
         query = self._container_metric_query_builder.get_container_metric_metadata_query()
@@ -149,7 +151,7 @@ class PrometheusClient:
         Returns:
             PrometheusResponse with query results.
         """
-        query = preset.render()
+        query = self._template_renderer.render(preset)
         form_data = aiohttp.FormData({
             "query": query,
             "start": time_range.start,
@@ -174,7 +176,7 @@ class PrometheusClient:
         Returns:
             PrometheusResponse with query results.
         """
-        query = preset.render()
+        query = self._template_renderer.render(preset)
         form_fields: dict[str, str] = {"query": query}
         if time is not None:
             form_fields["time"] = time
