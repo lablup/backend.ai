@@ -209,7 +209,9 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
     async def test_init_creates_docker_client(self, memory_plugin: MemoryPlugin) -> None:
         """Verify init() creates a Docker client instance."""
         with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
-            mock_docker_cls.return_value = AsyncMock()
+            mock_docker = AsyncMock()
+            mock_docker.system.info.return_value = {"DockerRootDir": "/var/lib/docker"}
+            mock_docker_cls.return_value = mock_docker
             await memory_plugin.init()
             mock_docker_cls.assert_called_once()
             assert memory_plugin._docker is not None
