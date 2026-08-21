@@ -466,9 +466,11 @@ class InstallReport(Static):
                 - Password: `{harbor.admin_password}`
 
                 The Harbor instance is also pre-registered as a Backend.AI
-                container registry named `local-harbor` (project `library`)
-                with the same admin credentials, so it appears in
-                `mgr image rescan` / the manager UI as soon as you start it.
+                container registry named `{harbor.hostname}:{harbor.http_port}`
+                (project `library`) with the same admin credentials, so it
+                appears in `mgr image rescan` / the manager UI as soon as you
+                start it. Push images to it with
+                `docker push {harbor.hostname}:{harbor.http_port}/library/<image>:<tag>`.
 
                 Note: Harbor may take 30-60 seconds to become fully ready
                 after `./dev harbor start`.
