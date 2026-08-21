@@ -180,6 +180,8 @@ class EnrootRuntime(OciRuntime):
             p.mkdir(parents=True, exist_ok=True)
             if own:
                 os.chown(p, self._kernel_uid, self._kernel_gid)
+        if own:
+            await asyncio.to_thread(self._own_existing_artifacts)
         await asyncio.to_thread(self._recover_containers)
         await asyncio.to_thread(self._sweep_orphan_cgroups)
         if self._rotator_task is None:
@@ -192,6 +194,40 @@ class EnrootRuntime(OciRuntime):
             with contextlib.suppress(asyncio.CancelledError):
                 await self._rotator_task
             self._rotator_task = None
+
+    def _own_existing_artifacts(self) -> None:
+        """Hand the enroot artifacts an earlier run left behind to the kernel uid.
+
+        Owning the roots is not enough for a tree that has been used before. An `enroot import`
+        run as **root** — which is what this backend did before it went rootless, and what any
+        deployment making that switch will have on disk — leaves its layer blobs `root:root 0640`.
+        The kernel-uid enroot then finds those layers in cache, cannot read them, and the pull dies
+        in the middle with `tar: Cannot open: Permission denied` (measured), which says nothing
+        about ownership.
+
+        Only the flat, cheap parts: every cache blob, and the top-level `.sqsh` / `.json` in the
+        data path. NOT the container rootfs directories under the data path — those hold tens of
+        thousands of files each and are created by the kernel-uid enroot anyway.
+        """
+        targets = [*self._cache_path.iterdir()]
+        targets += [p for p in self._data_path.iterdir() if p.suffix in (".sqsh", ".json")]
+        handed_over = 0
+        for path in targets:
+            try:
+                if path.stat().st_uid == self._kernel_uid:
+                    continue
+                os.chown(path, self._kernel_uid, self._kernel_gid)
+                handed_over += 1
+            except OSError as e:
+                log.warning(
+                    "[enroot] cannot hand over {} to uid {}: {!r}", path, self._kernel_uid, e
+                )
+        if handed_over:
+            log.info(
+                "[enroot] handed {} pre-existing artifact(s) over to uid {}",
+                handed_over,
+                self._kernel_uid,
+            )
 
     def _env(self) -> dict[str, str]:
         return {
