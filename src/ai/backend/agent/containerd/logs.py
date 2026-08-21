@@ -58,6 +58,37 @@ def unlink_log_files(active: Path) -> None:
         path.unlink(missing_ok=True)
 
 
+def read_tail_plan(active: Path, max_bytes: int) -> list[tuple[Path, int, int]]:
+    """Which bytes make up the log's last ``max_bytes``, as ``(path, offset, length)`` in
+    reading order (oldest first).
+
+    The log is a *set* of files — the active one plus the rotated `.1`, `.2`, ... — so its tail
+    spans several of them. Walk newest -> oldest taking the tail of each until the budget is spent,
+    then hand the pieces back oldest-first so a caller can either read them all at once
+    (`read_log_tail`) or stream them without holding the log in memory (the log collector). Both
+    readers go through this, so neither can drift from the other on what "the log" is.
+    """
+    plan: list[tuple[Path, int, int]] = []
+    remaining = max_bytes
+    for path in rotated_paths(active):
+        if remaining <= 0:
+            break
+        try:
+            size = path.stat().st_size
+        except FileNotFoundError:
+            continue  # this log has not rotated that far yet
+        except OSError as e:
+            log.warning("cannot stat container log {}: {!r}", path, e)
+            continue
+        take = min(size, remaining)
+        if take <= 0:
+            continue
+        plan.append((path, size - take, take))
+        remaining -= take
+    plan.reverse()
+    return plan
+
+
 def read_log_tail(active: Path, max_bytes: int) -> bytes:
     """The last ``max_bytes`` of the log, oldest rotated file through to the active one.
 
@@ -66,24 +97,17 @@ def read_log_tail(active: Path, max_bytes: int) -> bytes:
     rotated log is almost nothing.
     """
     chunks: list[bytes] = []
-    remaining = max_bytes
-    # Walk newest -> oldest, taking the tail of each, and stop once we have enough.
-    for path in rotated_paths(active):
-        if remaining <= 0:
-            break
+    for path, offset, length in read_tail_plan(active, max_bytes):
         try:
             with path.open("rb") as f:
-                size = f.seek(0, os.SEEK_END)
-                take = min(size, remaining)
-                f.seek(size - take, os.SEEK_SET)
-                chunks.append(f.read(take))
-                remaining -= take
+                f.seek(offset, os.SEEK_SET)
+                chunks.append(f.read(length))
         except FileNotFoundError:
-            continue  # this log has not rotated that far yet
+            continue  # rotated out from under us between the plan and the read
         except OSError as e:
             log.warning("cannot read container log {}: {!r}", path, e)
             continue
-    return b"".join(reversed(chunks))
+    return b"".join(chunks)
 
 
 def write_logger_launcher(path: Path) -> Path:

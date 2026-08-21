@@ -48,7 +48,7 @@ from ai.backend.agent.agent import (
 from ai.backend.agent.config.unified import ContainerSandboxType, ScratchType
 from ai.backend.agent.containerd.apparmor import ensure_profile_loaded
 from ai.backend.agent.containerd.dns import resolve_container_dns
-from ai.backend.agent.containerd.logs import write_logger_launcher
+from ai.backend.agent.containerd.logs import read_tail_plan, write_logger_launcher
 from ai.backend.agent.containerd.runtime.spec import (
     _DEFAULT_CAPS,
     container_cgroup_fs_path,
@@ -179,24 +179,38 @@ _LOG_COLLECTION_TIMEOUT = 60.0
 _LOG_READ_CHUNK = 256 * 1024
 
 
-async def _read_container_log(container_id: str) -> AsyncGenerator[bytes, None]:
-    """Yield the finished shim log file's bytes for collect_logs. Empty (yields nothing) when the
-    task wrote no log or the file is already gone — collect_logs handles a zero-length stream."""
-    path = container_log_path(container_id)
+async def _read_container_log(container_id: str, max_bytes: int) -> AsyncGenerator[bytes, None]:
+    """Yield the finished log's bytes for collect_logs. Empty (yields nothing) when the task wrote
+    no log or the files are already gone — collect_logs handles a zero-length stream.
 
-    def _read(handle: Any) -> bytes:
-        data: bytes = handle.read(_LOG_READ_CHUNK)
+    The log is the whole rotated set, not just the active file: rotation is what bounds it, so by
+    the time a talkative kernel is cleaned the active file holds only whatever landed since the
+    last rollover — 514 bytes, in one measured case, for a kernel that had logged megabytes. That
+    is also what `get_logs` serves, and the persisted log disagreeing with the live one is a
+    reporting bug, not a size policy. Docker's `container.log()` spans its rotated files too.
+    """
+    plan = await asyncio.to_thread(read_tail_plan, container_log_path(container_id), max_bytes)
+
+    def _read(handle: Any, size: int) -> bytes:
+        data: bytes = handle.read(size)
         return data
 
-    try:
-        handle = await asyncio.to_thread(path.open, "rb")
-    except FileNotFoundError:
-        return
-    try:
-        while chunk := await asyncio.to_thread(_read, handle):
-            yield chunk
-    finally:
-        await asyncio.to_thread(handle.close)
+    for path, offset, length in plan:
+        try:
+            handle = await asyncio.to_thread(path.open, "rb")
+        except FileNotFoundError:
+            continue  # rotated out from under us between the plan and the read
+        try:
+            await asyncio.to_thread(handle.seek, offset)
+            remaining = length
+            while remaining > 0:
+                chunk = await asyncio.to_thread(_read, handle, min(_LOG_READ_CHUNK, remaining))
+                if not chunk:
+                    break
+                yield chunk
+                remaining -= len(chunk)
+        finally:
+            await asyncio.to_thread(handle.close)
 
 
 # tmpfs quota for the MEMORY scratch, in MiB. The Docker backend passes the same literal.
@@ -2313,13 +2327,13 @@ class ContainerdAgent(
         restarting: bool,
     ) -> None:
         # Persist the terminated kernel's logs before anything removes them. remove_container
-        # unlinks the shim log file, so a manager query for a dead kernel's logs would otherwise
+        # unlinks the log files, so a manager query for a dead kernel's logs would otherwise
         # find nothing (the Docker backend collects them the same way, from container.log). The
-        # shim log is a finished file here — no follow stream — so we just read it in chunks.
+        # log is finished here — no follow stream — so we just read it in chunks.
         #
-        # Gate on the log file still existing: clean_kernel can fire more than once for a kernel,
-        # and remove_container (below) unlinks the file. collect_logs *always* emits a
-        # DoSyncKernelLogs event, even for an empty read — so a second clean, after the file is
+        # Gate on the active log still existing: clean_kernel can fire more than once for a kernel,
+        # and remove_container (below) unlinks the whole set. collect_logs *always* emits a
+        # DoSyncKernelLogs event, even for an empty read — so a second clean, after the files are
         # gone, would sync an empty log and OVERWRITE the good one the first clean persisted. (The
         # Docker backend is implicitly guarded: its second collect hits a 404 and is skipped.)
         if (
@@ -2330,7 +2344,11 @@ class ContainerdAgent(
             try:
                 async with asyncio.timeout(_LOG_COLLECTION_TIMEOUT):
                     await self.collect_logs(
-                        kernel_id, str(container_id), _read_container_log(str(container_id))
+                        kernel_id,
+                        str(container_id),
+                        _read_container_log(
+                            str(container_id), int(self.local_config.container_logs.max_length)
+                        ),
                     )
             except Exception:
                 log.exception("clean_kernel(k:{}): collecting container logs failed", kernel_id)

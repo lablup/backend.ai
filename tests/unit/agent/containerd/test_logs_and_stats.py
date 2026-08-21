@@ -32,19 +32,37 @@ async def _drain(gen: Any) -> bytes:
     return bytes(out)
 
 
+_MAX = 10 * 1024 * 1024
+
+
 class TestReadContainerLog:
     async def test_reads_the_whole_shim_log(self, log_root: Path) -> None:
         (log_root / "c1.log").write_bytes(b"line one\nline two\n")
-        assert await _drain(_read_container_log("c1")) == b"line one\nline two\n"
+        assert await _drain(_read_container_log("c1", _MAX)) == b"line one\nline two\n"
 
     async def test_reads_a_log_larger_than_one_chunk(self, log_root: Path) -> None:
         payload = b"x" * (600 * 1024)  # spans several _LOG_READ_CHUNK reads
         (log_root / "c1.log").write_bytes(payload)
-        assert await _drain(_read_container_log("c1")) == payload
+        assert await _drain(_read_container_log("c1", _MAX)) == payload
 
     async def test_absent_log_yields_nothing(self, log_root: Path) -> None:
         # a task that wrote no log, or whose file is already gone, is not an error
-        assert await _drain(_read_container_log("never-ran")) == b""
+        assert await _drain(_read_container_log("never-ran", _MAX)) == b""
+
+    async def test_reads_across_the_rotated_files_oldest_first(self, log_root: Path) -> None:
+        # The log is the whole rotated set. Reading only the active file would persist whatever
+        # happens to be left since the last rollover — near-nothing for a busy kernel — while
+        # get_logs served the full window, so the two disagreed on what the kernel had logged.
+        (log_root / "c1.log.2").write_bytes(b"oldest\n")
+        (log_root / "c1.log.1").write_bytes(b"middle\n")
+        (log_root / "c1.log").write_bytes(b"newest\n")
+        assert await _drain(_read_container_log("c1", _MAX)) == b"oldest\nmiddle\nnewest\n"
+
+    async def test_serves_at_most_max_bytes_from_the_tail(self, log_root: Path) -> None:
+        (log_root / "c1.log.1").write_bytes(b"aaaaaaaa")
+        (log_root / "c1.log").write_bytes(b"bbbbbbbb")
+        # 12 of the 16 bytes: the newest 8, plus the last 4 of the rotated one.
+        assert await _drain(_read_container_log("c1", 12)) == b"aaaabbbbbbbb"
 
 
 class TestCleanKernelCollectsLogs:
@@ -71,6 +89,7 @@ class TestCleanKernelCollectsLogs:
                 container=SimpleNamespace(
                     scratch_root=Path("/nonexistent-scratch"), scratch_type=None
                 ),
+                container_logs=SimpleNamespace(max_length=_MAX),
                 debug=SimpleNamespace(skip_container_deletion=False),
             ),
         )
