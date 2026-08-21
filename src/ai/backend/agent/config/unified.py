@@ -1166,11 +1166,16 @@ class OverridableAgentConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Unique identifier for this agent instance. "
-                "If not specified, a random UUID is generated. In multi-agent mode, "
-                "each agent must have a unique ID. Used for tracking, logging, and management."
+                "If not specified, it is detected automatically on startup: the cloud "
+                "instance ID on AWS, Azure and GCP, or 'i-<hostname>' otherwise. "
+                "Because that value follows the host identity, renaming the host changes "
+                "the agent ID and the manager registers it as a separate new agent; "
+                "set this field explicitly to pin the ID. "
+                "In multi-agent mode, each agent must have a unique ID. "
+                "Used for tracking, logging, and management."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="agent-local-1", prod="agent-prod-001"),
+            example=ConfigExample(local="i-local-agent-01", prod="i-node01"),
         ),
     ]
     agent_sock_port: Annotated[
