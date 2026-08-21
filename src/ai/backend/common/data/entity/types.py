@@ -184,6 +184,9 @@ class EntityData(ABC):
     An abstract method rather than an ``id`` field: several domains key on a name
     (``domains.name``, ``scaling_groups.name``, ``keypairs.access_key``) and map it to
     an ``EntityID`` themselves.
+
+    MUST carry the columns of its own domain's row and nothing else: no relationship,
+    no joined value. Rationale: ``manager/data/KNOWLEDGE.md``.
     """
 
     @abstractmethod
@@ -198,4 +201,7 @@ class FieldData(ABC):
     Deliberately not an :class:`EntityData`: a field row carries no membership of its
     own, so what a result names is the entity owning it, not the row. The owning entity
     is read by the lookup every field operation runs first, not off this value.
+
+    MUST carry the columns of its own domain's row and nothing else: no relationship,
+    no joined value. Rationale: ``manager/data/KNOWLEDGE.md``.
     """

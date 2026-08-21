@@ -22,23 +22,14 @@ dataclasses (established pattern); for new code, do not add re-exports — impor
 - Do NOT import from `manager/models/`, `manager/repositories/`, `manager/services/`, or external frameworks (`pydantic`,
   `sqlalchemy`, `aiohttp`).
 
-## A row projection mirrors one row
+## `EntityData` / `FieldData` carries what its own domain's row holds
 
-Two kinds of type live here, and only the first takes this rule:
-
-- **Row projection** — what a `Row.to_data()` returns. It carries its own table's
-  columns and nothing else. Another entity is named by its foreign-key value
-  (`channel_id`), never embedded.
-- **Composite** — assembled by a repository, service or adapter from several
-  reads. It may nest row projections, because nothing converts a single row into
-  it.
-
-A row projection that nests another entity forces the conversion to read a
-relationship, which forces an ORM `relationship()` and an eager load on every
-read that produces it — and puts the domain out of reach of the single-entity
-read/write specs (`models/specs/`). Assemble the composition one layer up
-instead: a GraphQL field resolver over a dataloader, or a repository method that
-joins and returns the pair.
+- Its own row's columns only. Reading a relationship or carrying a joined value is not
+  allowed; another entity is named by its foreign-key value (`channel_id`).
+- A composite type that inherits neither is the exception.
+- A value spanning several rows is served by a repository in the service layer, not
+  folded into ops. Where a calculation is involved or many rows are, it becomes a
+  repository method of that domain.
 
 ## Legacy distinction
 
