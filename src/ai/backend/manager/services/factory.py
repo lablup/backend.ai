@@ -79,6 +79,7 @@ from ai.backend.manager.actions.registry.types import (
     ProcessorDependencies,
 )
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotData
@@ -368,6 +369,7 @@ def create_services(args: ServiceArgs) -> Services:
             prometheus_client=args.prometheus_client,
             default_timewindow=args.config_provider.config.metric.timewindow,
             template_renderer=PromQLTemplateRenderer(),
+            ops_repository=OpsRepository(repositories.v2_ops_provider),
         ),
         resource_preset=ResourcePresetService(
             repositories.resource_preset.repository,

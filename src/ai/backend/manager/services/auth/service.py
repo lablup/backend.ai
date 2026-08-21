@@ -16,9 +16,9 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionInner,
     LoginSessionTokenData,
 )
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters, UserResourcePolicyNotFound
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import AccessKey, SecretKey, SSHPrivateKey, SSHPublicKey
 from ai.backend.logging.utils import BraceStyleAdapter

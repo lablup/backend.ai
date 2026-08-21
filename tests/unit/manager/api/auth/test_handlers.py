@@ -22,6 +22,7 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.api_handlers import BodyParam, QueryParam
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
     GetRoleRequest,
@@ -33,7 +34,6 @@ from ai.backend.common.dto.manager.auth.request import (
     UploadSSHKeypairRequest,
     VerifyAuthRequest,
 )
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.middleware.auth import (

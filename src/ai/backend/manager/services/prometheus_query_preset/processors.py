@@ -39,7 +39,9 @@ from ai.backend.manager.services.prometheus_query_preset.service import (
 class PrometheusQueryPresetProcessors:
     """The catalog CRUD runs against ops; what reads before writing or calls Prometheus stays."""
 
-    global_create_preset: GlobalActionProcessor[CreatePresetAction, CreatePresetActionResult]
+    global_create_preset: GlobalActionProcessor[
+        CreatePresetAction, CreatedEntityOpsResult[PrometheusQueryPresetData]
+    ]
     public_get_preset: PublicSingleEntityActionProcessor[
         GetPresetAction, EntityOpsResult[PrometheusQueryPresetData]
     ]
@@ -58,7 +60,10 @@ class PrometheusQueryPresetProcessors:
         group: ProcessorGroup[PrometheusQueryPresetData],
         service: PrometheusQueryPresetService,
     ) -> None:
-            CreatePresetAction, service.create_preset
+        # The create validates its query template, so it keeps a service method.
+        self.global_create_preset = group.global_scope(CreatePresetAction, service.create_preset)
+        self.public_get_preset = group.public_get_ops(GetPresetAction)
+        self.public_search_presets = group.public_search_ops(SearchPresetsAction)
         self.purge_preset = group.entity_purge_ops(PurgePresetAction)
         self.update_preset = group.single_entity(UpdatePresetAction, service.update_preset)
         self.global_preview_preset = group.global_scope(PreviewPresetAction, service.preview_preset)

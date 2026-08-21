@@ -3,6 +3,7 @@ from typing import cast
 
 from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.prometheus.preset import (
     LabelMatcher,
@@ -13,16 +14,15 @@ from ai.backend.manager.data.prometheus_query_preset import (
     ExecutePresetOptions,
     PrometheusQueryPresetData,
 )
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
-)
-from ai.backend.manager.repositories.prometheus_query_preset.creators import (
-    PrometheusQueryPresetCreatorSpec,
 )
 from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
     PrometheusQueryPresetUpdaterSpec,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions import (
+    CreatePresetAction,
     ExecutePresetAction,
     ExecutePresetActionResult,
     PreviewPresetAction,
@@ -39,6 +39,7 @@ class PrometheusQueryPresetService:
     _prometheus_client: PrometheusClient
     _default_timewindow: str
     _template_renderer: PromQLTemplateRenderer
+    _ops_repository: OpsRepository[PrometheusQueryPresetData]
 
     def __init__(
         self,
@@ -46,17 +47,21 @@ class PrometheusQueryPresetService:
         prometheus_client: PrometheusClient,
         default_timewindow: str,
         template_renderer: PromQLTemplateRenderer,
+        ops_repository: OpsRepository[PrometheusQueryPresetData],
     ) -> None:
         self._repository = repository
         self._prometheus_client = prometheus_client
         self._default_timewindow = default_timewindow
         self._template_renderer = template_renderer
+        self._ops_repository = ops_repository
 
-    async def create_preset(self, action: CreatePresetAction) -> CreatePresetActionResult:
-        spec = cast(PrometheusQueryPresetCreatorSpec, action.creator.spec)
-        self._template_renderer.validate(spec.query_template)
-        preset_data = await self._repository.create(action.creator)
-        return CreatePresetActionResult(preset=preset_data)
+    async def create_preset(
+        self, action: CreatePresetAction
+    ) -> CreatedEntityOpsResult[PrometheusQueryPresetData]:
+        self._template_renderer.validate(action.creator.query_template)
+        return CreatedEntityOpsResult(
+            data=await self._ops_repository.create_global_entity(action.to_creator())
+        )
 
     async def update_preset(self, action: UpdatePresetAction) -> UpdatePresetActionResult:
         spec = cast(PrometheusQueryPresetUpdaterSpec, action.updater.spec)
