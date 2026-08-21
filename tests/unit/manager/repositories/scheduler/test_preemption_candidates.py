@@ -118,7 +118,6 @@ async def _create_extra_user(
         await db_sess.flush()
         db_sess.add(
             KeyPairRow(
-                user_id=email,
                 access_key=access_key,
                 secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
                 is_active=True,

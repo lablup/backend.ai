@@ -591,7 +591,6 @@ async def assigned_users(
             )
             await conn.execute(
                 sa.insert(keypairs).values(
-                    user_id=email,
                     access_key=ak,
                     secret_key=secrets.token_hex(20),
                     is_active=True,

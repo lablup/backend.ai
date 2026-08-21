@@ -181,7 +181,6 @@ async def test_user(
         await sess.flush()
         sess.add(
             KeyPairRow(
-                user_id=email,
                 access_key="TESTKEY",
                 secret_key="TESTSECRET",
                 is_active=True,

@@ -55,8 +55,8 @@ def _make_mock_user(resource_policy: str = _DEFAULT_RESOURCE_POLICY) -> MagicMoc
     return mock_user
 
 
-def _make_mock_keypair_row() -> MagicMock:
-    """Create a mock keypair row."""
+def _make_mock_keypair() -> MagicMock:
+    """The keypair data a default-keypair read answers with."""
     mock_keypair = MagicMock()
     mock_keypair.access_key = "AKIAIOSFODNN7EXAMPLE"
     mock_keypair.secret_key = "secret"
@@ -246,7 +246,7 @@ class TestMaxConcurrentLoginsEnforcement:
             await auth_service._create_login_session(
                 action=_make_action(force=case.force_evict_oldest),
                 user=_make_mock_user(),
-                keypair_row=_make_mock_keypair_row(),
+                keypair=_make_mock_keypair(),
                 live_sessions=_make_live_sessions(case.existing_active_sessions),
                 auth_config=_make_auth_config(),
                 login_client_type_id=uuid4(),
@@ -347,7 +347,7 @@ class TestMaxConcurrentLoginsEnforcement:
         result = await auth_service._create_login_session(
             action=_make_action(force=case.force_evict_oldest),
             user=_make_mock_user(),
-            keypair_row=_make_mock_keypair_row(),
+            keypair=_make_mock_keypair(),
             live_sessions=_make_live_sessions(case.existing_active_sessions),
             auth_config=_make_auth_config(),
             login_client_type_id=uuid4(),

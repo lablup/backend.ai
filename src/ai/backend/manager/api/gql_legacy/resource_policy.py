@@ -134,9 +134,9 @@ class KeyPairResourcePolicy(graphene.ObjectType):  # type: ignore[misc]
             sa.select(keypair_resource_policies)
             .select_from(j)
             .where(
-                keypairs.c.user_id
+                keypairs.c.user
                 == (
-                    sa.select(keypairs.c.user_id)
+                    sa.select(keypairs.c.user)
                     .select_from(keypairs)
                     .where(keypairs.c.access_key == access_key)
                     .as_scalar()

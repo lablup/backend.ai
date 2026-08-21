@@ -526,7 +526,6 @@ class TestDomainNestedSearchIntegration:
 
             for email, user_uuid in keypair_data:
                 keypair = KeyPairRow(
-                    user_id=email,
                     access_key=uuid.uuid4().hex[:20],
                     secret_key=uuid.uuid4().hex[:20],
                     user=user_uuid,

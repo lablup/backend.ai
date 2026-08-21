@@ -147,7 +147,6 @@ class TestVfolderSearchInProject:
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="test@example.com",
                     user=user_id,
                     access_key="TESTKEY00000000",
                     secret_key="test-secret",

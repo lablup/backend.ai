@@ -309,7 +309,6 @@ class TestVFolderOwnershipTransferRBACCleanup:
             db_sess.add(user_role_row)
 
             keypair = KeyPairRow(
-                user_id=email,
                 user=user_uuid,
                 access_key=f"AK{user_uuid.hex[:18].upper()}",
                 secret_key=f"SK{user_uuid.hex[:38]}",

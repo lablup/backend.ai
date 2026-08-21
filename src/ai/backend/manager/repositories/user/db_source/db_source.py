@@ -1170,7 +1170,6 @@ class UserDBSource:
                 creator=keypair_creator,
                 generated_data=secrets,
                 user_id=user_uuid,
-                email=user_row.email,
                 is_default=False,
             )
             rbac_kp_creator = RBACEntityCreator(
@@ -1286,14 +1285,7 @@ class UserDBSource:
     ) -> GeneratedKeyPairData:
         """Admin creates a keypair for a given user."""
         async with self._db.begin_session() as session:
-            user_row = (
-                await session.scalars(
-                    sa.select(UserRow)
-                    .where(UserRow.uuid == user_id)
-                    .options(load_only(UserRow.email))
-                )
-            ).first()
-            if not user_row:
+            if not await session.scalar(sa.select(sa.exists().where(UserRow.uuid == user_id))):
                 raise UserNotFound(f"User {user_id} not found")
 
             secrets = generate_keypair_data()
@@ -1301,7 +1293,6 @@ class UserDBSource:
                 creator=creator,
                 generated_data=secrets,
                 user_id=user_id,
-                email=user_row.email,
                 is_default=False,
             )
             rbac_kp_creator = RBACEntityCreator(

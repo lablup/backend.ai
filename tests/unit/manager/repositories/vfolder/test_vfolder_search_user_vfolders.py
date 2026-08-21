@@ -165,7 +165,6 @@ class TestVfolderSearchUserVfolders:
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="usera@example.com",
                     user=user_a_id,
                     access_key="TESTKEY0000000A",
                     secret_key="test-secret-a",
@@ -177,7 +176,6 @@ class TestVfolderSearchUserVfolders:
             )
             db_sess.add(
                 KeyPairRow(
-                    user_id="userb@example.com",
                     user=user_b_id,
                     access_key="TESTKEY0000000B",
                     secret_key="test-secret-b",
@@ -372,7 +370,6 @@ class TestVfolderSearchUserVfolders:
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="test@example.com",
                     user=user_id,
                     access_key="TESTKEY0000000M",
                     secret_key="test-secret-m",
@@ -588,7 +585,6 @@ class TestVfolderSearchUserVfolders:
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="usera@example.com",
                     user=user_a_id,
                     access_key="TESTKEY0000000P",
                     secret_key="test-secret-p",
@@ -600,7 +596,6 @@ class TestVfolderSearchUserVfolders:
             )
             db_sess.add(
                 KeyPairRow(
-                    user_id="userb@example.com",
                     user=user_b_id,
                     access_key="TESTKEY0000000Q",
                     secret_key="test-secret-q",

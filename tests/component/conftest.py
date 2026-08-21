@@ -931,7 +931,6 @@ async def admin_user_fixture(
         )
         await conn.execute(
             sa.insert(keypairs).values(
-                user_id=email,
                 access_key=data.keypair.access_key,
                 secret_key=data.keypair.secret_key,
                 is_active=True,
@@ -1042,7 +1041,6 @@ async def regular_user_fixture(
         )
         await conn.execute(
             sa.insert(keypairs).values(
-                user_id=email,
                 access_key=data.keypair.access_key,
                 secret_key=data.keypair.secret_key,
                 is_active=True,

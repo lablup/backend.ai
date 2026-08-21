@@ -18,15 +18,20 @@ class KeyPairCreatorSpec(CreatorSpec[KeyPairRow]):
     creator: KeyPairCreator
     generated_data: KeyPairSecrets
     user_id: uuid.UUID
-    email: str
     is_default: bool
 
     @override
     def build_row(self) -> KeyPairRow:
-        return KeyPairRow.from_creator(
-            self.creator,
-            self.generated_data,
-            self.user_id,
-            self.email,
-            self.is_default,
+        return KeyPairRow(
+            user=self.user_id,
+            access_key=self.generated_data.access_key,
+            secret_key=self.generated_data.secret_key,
+            is_active=self.creator.is_active,
+            is_admin=self.creator.is_admin,
+            is_default=self.is_default,
+            resource_policy=self.creator.resource_policy,
+            rate_limit=self.creator.rate_limit,
+            num_queries=0,
+            ssh_public_key=self.generated_data.ssh_public_key,
+            ssh_private_key=self.generated_data.ssh_private_key,
         )

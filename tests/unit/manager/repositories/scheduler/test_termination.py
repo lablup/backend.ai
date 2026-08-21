@@ -276,7 +276,6 @@ class TestKernelTermination:
                 access_key=access_key,
                 secret_key=secret_key,
                 user=test_user_uuid,
-                user_id=str(test_user_uuid),
                 is_active=True,
                 is_admin=False,
                 resource_policy=test_keypair_resource_policy_name,

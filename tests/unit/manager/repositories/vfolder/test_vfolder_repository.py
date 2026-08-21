@@ -588,7 +588,6 @@ class TestVfolderRepositoryAllowedVfolderHosts:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 KeyPairRow(
-                    user_id=f"test-{test_user.hex[:8]}@example.com",
                     user=test_user,
                     access_key=f"AK{test_user.hex[:14]}",
                     secret_key="test-secret",

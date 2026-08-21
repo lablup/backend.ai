@@ -191,7 +191,6 @@ class TestSessionSearchInProject:
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="test@example.com",
                     user=user_id,
                     access_key=access_key,
                     secret_key="test-secret",

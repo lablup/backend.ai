@@ -198,7 +198,6 @@ class TestPersistentNetworkNotRecreated:
 
             db_sess.add(
                 KeyPairRow(
-                    user_id=f"net-test-{uuid.uuid4().hex[:8]}@test.com",
                     access_key=access_key,
                     secret_key=SecretKey(f"SK{uuid.uuid4().hex[:38]}"),
                     is_active=True,

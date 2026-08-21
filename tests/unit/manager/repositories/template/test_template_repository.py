@@ -211,7 +211,6 @@ class TestTemplateRepository:
         access_key = f"AKIATEST{uuid.uuid4().hex[:12].upper()}"
         async with db_with_cleanup.begin_session() as session:
             keypair = KeyPairRow(
-                user_id="testuser",
                 access_key=access_key,
                 secret_key="testsecretkey1234567890",
                 is_active=True,

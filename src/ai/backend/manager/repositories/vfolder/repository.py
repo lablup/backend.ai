@@ -2176,7 +2176,7 @@ class VfolderRepository:
         # Step 1: Get target user info and their allowed hosts
         async with self._db.begin_readonly_session() as session:
             conn = await session.connection()
-            j = sa.join(users, keypairs, users.c.email == keypairs.c.user_id)
+            j = sa.join(users, keypairs, users.c.uuid == keypairs.c.user)
             db_query = (
                 sa.select(users.c.uuid, users.c.domain_name, keypairs.c.resource_policy)
                 .select_from(j)

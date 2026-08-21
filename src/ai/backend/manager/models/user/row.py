@@ -311,20 +311,6 @@ class UserRow(LifecycleTimestampsMixin, Base):
             raise ObjectNotFound(f"User with id {user_uuid} not found")
         return rows[0]
 
-    def get_default_keypair_row(self) -> KeyPairRow | None:
-        keypair_candidate: KeyPairRow | None = None
-        default_keypair_row = self.default_keypair
-        if default_keypair_row is None:
-            keypair_rows = self.keypairs
-            active_keypairs = [row for row in keypair_rows if row.is_active]
-            for row in active_keypairs:
-                if keypair_candidate is None or not keypair_candidate.is_admin:
-                    keypair_candidate = row
-                    break
-        else:
-            keypair_candidate = default_keypair_row
-        return keypair_candidate
-
     def to_model_serving_user_data(self) -> ModelServingUserData:
         return ModelServingUserData(
             uuid=self.uuid,

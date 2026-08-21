@@ -263,7 +263,6 @@ class TestAuthRepository:
             keypair = KeyPairRow(
                 access_key=access_key,
                 secret_key="test_secret_key",
-                user_id=email,
                 user=user_uuid,
                 is_active=True,
                 resource_policy=keypair_resource_policy.name,
@@ -556,23 +555,22 @@ class TestAuthRepository:
             assert keypair.ssh_public_key == update_public_key
             assert keypair.ssh_private_key == update_private_key
 
-    async def test_get_user_row_by_uuid(
+    async def test_default_keypair(
         self, auth_repository: AuthRepository, sample_user_data: UserTestData
     ) -> None:
-        """Test getting user row by UUID"""
-        result = await auth_repository.get_user_row_by_uuid(sample_user_data.uuid)
+        """The user's active keypair comes back as data, not a row."""
+        result = await auth_repository.default_keypair(sample_user_data.uuid)
 
         assert result is not None
-        assert isinstance(result, UserRow)
-        assert result.uuid == sample_user_data.uuid
-        assert result.email == sample_user_data.email
+        assert result.access_key == sample_user_data.access_key
+        assert result.user_id == sample_user_data.uuid
 
-    async def test_get_user_row_by_uuid_not_found(self, auth_repository: AuthRepository) -> None:
-        """Test getting user row by UUID when user doesn't exist"""
+    async def test_default_keypair_user_not_found(self, auth_repository: AuthRepository) -> None:
+        """An unknown user is refused rather than answered with None."""
         non_existent_uuid = UUID("99999999-9999-9999-9999-999999999999")
 
         with pytest.raises(UserNotFound):
-            await auth_repository.get_user_row_by_uuid(non_existent_uuid)
+            await auth_repository.default_keypair(non_existent_uuid)
 
     async def test_get_current_time(self, auth_repository: AuthRepository) -> None:
         """Test getting current time from database"""

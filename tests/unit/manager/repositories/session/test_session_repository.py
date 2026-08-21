@@ -225,7 +225,6 @@ class TestSessionRepository:
 
             # Create keypair
             keypair = KeyPairRow(
-                user_id="test@example.com",
                 user=user_id,
                 access_key=access_key,
                 secret_key="test-secret-key",
@@ -513,7 +512,6 @@ class TestSessionRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 KeyPairRow(
-                    user_id="test@example.com",
                     user=session_with_kernel.user_id,
                     access_key=other_key,
                     secret_key="other-secret-key",
@@ -722,7 +720,6 @@ class TestBatchPopulateSessionOccupiedSlots:
             await db_sess.flush()
 
             keypair = KeyPairRow(
-                user_id="test@example.com",
                 user=user_id,
                 access_key=access_key,
                 secret_key="test-secret-key",

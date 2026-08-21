@@ -175,7 +175,6 @@ class TestVfolderSearchFilter:
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="usera@example.com",
                     user=user_a_id,
                     access_key="TESTKEYCLONE000A",
                     secret_key="test-secret-ca",
@@ -187,7 +186,6 @@ class TestVfolderSearchFilter:
             )
             db_sess.add(
                 KeyPairRow(
-                    user_id="userb@example.com",
                     user=user_b_id,
                     access_key="TESTKEYCLONE000B",
                     secret_key="test-secret-cb",

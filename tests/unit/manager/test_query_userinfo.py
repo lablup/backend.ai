@@ -204,7 +204,6 @@ class TestQueryUserinfo:
             await sess.flush()
             sess.add(
                 KeyPairRow(
-                    user_id=user_email,
                     access_key=access_key,
                     secret_key="secret",
                     user=user_uuid,
@@ -331,7 +330,6 @@ class TestQueryUserinfo:
             await sess.flush()
             sess.add(
                 KeyPairRow(
-                    user_id=user_email,
                     access_key=ak,
                     secret_key="secret",
                     user=user_uuid,
@@ -365,7 +363,6 @@ class TestQueryUserinfo:
             await sess.flush()
             sess.add(
                 KeyPairRow(
-                    user_id=admin_email,
                     access_key=admin_ak,
                     secret_key="secret",
                     user=admin_uuid,
@@ -606,7 +603,6 @@ class TestQueryUserinfoFromSession:
             await sess.flush()
             sess.add(
                 KeyPairRow(
-                    user_id=user_email,
                     access_key=access_key,
                     secret_key="secret",
                     user=user_uuid,

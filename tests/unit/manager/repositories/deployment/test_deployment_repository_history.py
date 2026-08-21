@@ -336,15 +336,9 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Get user email for user_id field
-            user_result = await db_sess.execute(
-                sa.select(UserRow.email).where(UserRow.uuid == test_user_uuid)
-            )
-            user_email = user_result.scalar_one()
-
             keypair = KeyPairRow(
                 access_key=access_key,
                 secret_key="dummy-secret",
-                user_id=user_email,
                 user=test_user_uuid,
                 is_active=True,
                 resource_policy=test_keypair_resource_policy_name,
@@ -755,15 +749,9 @@ class TestUpdateRouteStatusBulkWithHistory:
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Get user email for user_id field
-            user_result = await db_sess.execute(
-                sa.select(UserRow.email).where(UserRow.uuid == test_user_uuid)
-            )
-            user_email = user_result.scalar_one()
-
             keypair = KeyPairRow(
                 access_key=access_key,
                 secret_key="dummy-secret",
-                user_id=user_email,
                 user=test_user_uuid,
                 is_active=True,
                 resource_policy=test_keypair_resource_policy_name,

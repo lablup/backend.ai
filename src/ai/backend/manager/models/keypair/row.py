@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import base64
 import secrets
-import uuid
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, Self, TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 import sqlalchemy as sa
 from cryptography.hazmat.backends import default_backend as crypto_default_backend
@@ -19,7 +18,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey, SecretKey
-from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData, KeyPairSecrets
+from ai.backend.manager.data.keypair.types import KeyPairData, KeyPairSecrets
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.base import (
     GUID,
@@ -64,9 +63,6 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
         unique=True,
         nullable=False,
         server_default=sa.text("uuid_generate_v4()"),
-    )
-    user_id: Mapped[str] = mapped_column(
-        "user_id", sa.String(length=256), index=True, nullable=False
     )
     access_key: Mapped[AccessKey] = mapped_column(
         "access_key", sa.String(length=20), primary_key=True
@@ -114,51 +110,6 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
     user_row: Mapped[UserRow] = relationship(
         "UserRow", back_populates="keypairs", foreign_keys=[user]
     )
-
-    @property
-    def mapping(self) -> dict[str, object]:
-        return {
-            "user_id": self.user_id,
-            "access_key": self.access_key,
-            "secret_key": self.secret_key,
-            "is_active": self.is_active,
-            "is_admin": self.is_admin,
-            "created_at": self.created_at,
-            "modified_at": self.updated_at,
-            "last_used": self.last_used,
-            "rate_limit": self.rate_limit,
-            "num_queries": self.num_queries,
-            "ssh_public_key": self.ssh_public_key,
-            "ssh_private_key": self.ssh_private_key,
-            "user": self.user,
-            "resource_policy": self.resource_policy,
-            "dotfiles": self.dotfiles,
-            "bootstrap_script": self.bootstrap_script,
-        }
-
-    @classmethod
-    def from_creator(
-        cls,
-        creator: KeyPairCreator,
-        generated_data: KeyPairSecrets,
-        user_id: uuid.UUID,
-        email: str,
-        is_default: bool,
-    ) -> Self:
-        return cls(
-            user_id=email,
-            user=user_id,
-            access_key=generated_data.access_key,
-            secret_key=generated_data.secret_key,
-            is_active=creator.is_active,
-            is_admin=creator.is_admin,
-            is_default=is_default,
-            resource_policy=creator.resource_policy,
-            rate_limit=creator.rate_limit,
-            num_queries=0,
-            ssh_public_key=generated_data.ssh_public_key,
-            ssh_private_key=generated_data.ssh_private_key,
-        )
 
     def to_data(self) -> KeyPairData:
         return KeyPairData(
@@ -227,23 +178,6 @@ def generate_ssh_keypair() -> tuple[str, str]:
     public_key = f"{public_key.rstrip()}\n"
     private_key = f"{private_key.rstrip()}\n"
     return (public_key, private_key)
-
-
-def prepare_new_keypair(user_email: str, creator: KeyPairCreator) -> dict[str, object]:
-    ak, sk = generate_keypair()
-    pubkey, privkey = generate_ssh_keypair()
-    return {
-        "user_id": user_email,
-        "access_key": ak,
-        "secret_key": sk,
-        "is_active": creator.is_active,
-        "is_admin": creator.is_admin,
-        "resource_policy": creator.resource_policy,
-        "rate_limit": creator.rate_limit,
-        "num_queries": 0,
-        "ssh_public_key": pubkey,
-        "ssh_private_key": privkey,
-    }
 
 
 def generate_keypair_data() -> KeyPairSecrets:

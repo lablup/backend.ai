@@ -342,7 +342,6 @@ class TestDoIdleCheck:
                     access_key=access_key,
                     secret_key=SecretKey(f"SK{uuid.uuid4().hex[:38]}"),
                     user=user_uuid,
-                    user_id=str(user_uuid),
                     is_active=True,
                     is_admin=False,
                     is_default=is_default,

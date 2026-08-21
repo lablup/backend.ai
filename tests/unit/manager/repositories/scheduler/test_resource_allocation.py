@@ -295,7 +295,6 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 KeyPairRow(
-                    user_id=f"test-user-{uuid.uuid4().hex[:8]}@test.com",
                     access_key=access_key,
                     secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
                     is_active=True,

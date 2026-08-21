@@ -10,7 +10,6 @@ from typing import Any, cast
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
@@ -29,6 +28,7 @@ from ai.backend.manager.data.auth.login_session_types import (
 )
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserCreationData, UserData
 from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.errors.auth import (
     AccessKeyNotFound,
     AuthorizationFailed,
@@ -223,7 +223,9 @@ class AuthDBSource:
 
             # Deactivate keypairs
             keypair_query = (
-                keypairs.update().values(is_active=False).where(keypairs.c.user_id == email)
+                keypairs.update()
+                .values(is_active=False)
+                .where(keypairs.c.user.in_(sa.select(users.c.uuid).where(users.c.email == email)))
             )
             await conn.execute(keypair_query)
 
@@ -536,21 +538,22 @@ class AuthDBSource:
         )
 
     @auth_db_source_resilience.apply()
-    async def fetch_user_row_by_uuid(self, user_uuid: UUID) -> UserRow:
-        """Fetch user row by UUID from database."""
+    async def fetch_default_keypair(self, user_uuid: UUID) -> KeyPairData | None:
+        """Read the keypair a user authorizes with.
+
+        The one marked default, or else the oldest active one. ``None`` when the user
+        holds no active keypair.
+        """
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            user_query = (
-                sa.select(UserRow)
-                .where(UserRow.uuid == user_uuid)
-                .options(
-                    joinedload(UserRow.default_keypair).joinedload(KeyPairRow.resource_policy_row),
-                    selectinload(UserRow.keypairs).joinedload(KeyPairRow.resource_policy_row),
-                )
-            )
-            user_row = await db_session.scalar(user_query)
-            if user_row is None:
+            if not await db_session.scalar(sa.select(sa.exists().where(UserRow.uuid == user_uuid))):
                 raise UserNotFound(extra_data=user_uuid)
-            return user_row
+            row = await db_session.scalar(
+                sa.select(KeyPairRow)
+                .where((KeyPairRow.user == user_uuid) & KeyPairRow.is_active)
+                .order_by(KeyPairRow.is_default.desc(), KeyPairRow.created_at)
+                .limit(1)
+            )
+            return row.to_data() if row is not None else None
 
     @auth_db_source_resilience.apply()
     async def fetch_current_time(self) -> datetime:

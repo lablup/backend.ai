@@ -341,7 +341,6 @@ class TestStreamRepository:
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="owner@example.com",
                     user=user_uuid,
                     access_key=active_access_key,
                     secret_key="active-secret",
@@ -353,7 +352,6 @@ class TestStreamRepository:
             )
             db_sess.add(
                 KeyPairRow(
-                    user_id="owner@example.com",
                     user=user_uuid,
                     access_key=inactive_access_key,
                     secret_key="inactive-secret",
@@ -365,7 +363,6 @@ class TestStreamRepository:
             )
             db_sess.add(
                 KeyPairRow(
-                    user_id="other@example.com",
                     user=other_user_uuid,
                     access_key=other_user_access_key,
                     secret_key="other-secret",

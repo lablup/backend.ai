@@ -237,7 +237,6 @@ async def expired_password_user(
         )
         await conn.execute(
             sa.insert(keypairs).values(
-                user_id=email,
                 access_key=data.access_key,
                 secret_key=data.secret_key,
                 is_active=True,
@@ -367,7 +366,6 @@ async def cross_domain_fixture(
         )
         await conn.execute(
             sa.insert(keypairs).values(
-                user_id=admin_email,
                 access_key=admin_data.keypair.access_key,
                 secret_key=admin_data.keypair.secret_key,
                 is_active=True,
@@ -410,7 +408,6 @@ async def cross_domain_fixture(
         )
         await conn.execute(
             sa.insert(keypairs).values(
-                user_id=user_email,
                 access_key=user_data.keypair.access_key,
                 secret_key=user_data.keypair.secret_key,
                 is_active=True,

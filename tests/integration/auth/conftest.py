@@ -82,7 +82,6 @@ async def auth_user_fixture(
         )
         await conn.execute(
             sa.insert(keypairs).values(
-                user_id=email,
                 access_key=data.access_key,
                 secret_key=data.secret_key,
                 is_active=True,

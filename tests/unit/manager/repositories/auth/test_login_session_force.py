@@ -148,7 +148,6 @@ class TestLoginSessionForce:
             keypair = KeyPairRow(
                 access_key=access_key,
                 secret_key="test_secret_key",
-                user_id=email,
                 user=user_uuid,
                 is_active=True,
                 is_default=True,

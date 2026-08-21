@@ -1186,12 +1186,8 @@ class TestScalingGroupRepositoryDB:
             )
             db_sess.add(keypair_policy)
 
-            owner_email = await db_sess.scalar(
-                sa.select(UserRow.email).where(UserRow.uuid == test_user_uuid)
-            )
             keypair = KeyPairRow(
                 user=test_user_uuid,
-                user_id=owner_email,
                 access_key=access_key,
                 secret_key=f"SK{uuid.uuid4().hex}",
                 is_active=True,
