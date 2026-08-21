@@ -4,13 +4,13 @@ from dataclasses import dataclass, field
 from typing import Any, override
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
-class GroupUpdaterSpec(UpdaterSpec[GroupRow]):
+class ProjectUpdaterSpec(UpdaterSpec[ProjectRow]):
     """UpdaterSpec for group updates."""
 
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
@@ -31,8 +31,8 @@ class GroupUpdaterSpec(UpdaterSpec[GroupRow]):
 
     @property
     @override
-    def row_class(self) -> type[GroupRow]:
-        return GroupRow
+    def row_class(self) -> type[ProjectRow]:
+        return ProjectRow
 
     @override
     def build_values(self) -> dict[str, Any]:

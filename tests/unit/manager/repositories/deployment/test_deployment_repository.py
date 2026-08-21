@@ -71,11 +71,11 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -216,7 +216,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -442,7 +442,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -1451,7 +1451,7 @@ class TestDeploymentRevisionOperations:
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,  # UserRow.default_keypair relationship target
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -1607,7 +1607,7 @@ class TestDeploymentRevisionOperations:
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -2233,7 +2233,7 @@ class TestDeploymentPolicyOperations:
                 RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 EndpointRow,
                 ReplicaGroupRow,
@@ -2370,7 +2370,7 @@ class TestDeploymentPolicyOperations:
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -2572,7 +2572,7 @@ class TestSearchDeploymentPolicies:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 EndpointRow,
                 ReplicaGroupRow,
@@ -2692,7 +2692,7 @@ class TestSearchDeploymentPolicies:
     ) -> uuid.UUID:
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -2959,7 +2959,7 @@ class TestRouteOperations:
                 RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 EndpointRow,
                 ReplicaGroupRow,
@@ -3097,7 +3097,7 @@ class TestRouteOperations:
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -3361,7 +3361,7 @@ class TestDeploymentRepositoryDuplicateName:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -3490,10 +3490,10 @@ class TestDeploymentRepositoryDuplicateName:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
         default_project_policy: ProjectResourcePolicyRow,
-    ) -> GroupRow:
+    ) -> ProjectRow:
         """Create test group (project)."""
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=uuid.uuid4(),
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.name,
@@ -3512,10 +3512,10 @@ class TestDeploymentRepositoryDuplicateName:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
         default_project_policy: ProjectResourcePolicyRow,
-    ) -> GroupRow:
+    ) -> ProjectRow:
         """Create a different group (project) for cross-project tests."""
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=uuid.uuid4(),
                 name=f"different-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.name,
@@ -3596,7 +3596,7 @@ class TestDeploymentRepositoryDuplicateName:
         self,
         name: str,
         domain: DomainRow,
-        group: GroupRow,
+        group: ProjectRow,
         resource_group: ResourceGroupRow,
         user: UserRow,
         image_id: uuid.UUID | None = None,
@@ -3631,7 +3631,7 @@ class TestDeploymentRepositoryDuplicateName:
         self,
         deployment_repository: DeploymentRepository,
         test_domain: DomainRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_scaling_group: ResourceGroupRow,
         test_user: UserRow,
         test_image_id: uuid.UUID,
@@ -3667,8 +3667,8 @@ class TestDeploymentRepositoryDuplicateName:
         self,
         deployment_repository: DeploymentRepository,
         test_domain: DomainRow,
-        test_group: GroupRow,
-        different_group: GroupRow,
+        test_group: ProjectRow,
+        different_group: ProjectRow,
         test_scaling_group: ResourceGroupRow,
         test_user: UserRow,
         test_image_id: uuid.UUID,
@@ -3705,7 +3705,7 @@ class TestDeploymentRepositoryDuplicateName:
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_scaling_group: ResourceGroupRow,
         test_user: UserRow,
         test_image_id: uuid.UUID,
@@ -3750,7 +3750,7 @@ class TestDeploymentRepositoryDuplicateName:
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_scaling_group: ResourceGroupRow,
         test_user: UserRow,
         test_image_id: uuid.UUID,
@@ -3789,7 +3789,7 @@ class TestDeploymentRepositoryDuplicateName:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_scaling_group: ResourceGroupRow,
     ) -> tuple[uuid.UUID, uuid.UUID]:
         """Seed two endpoints sharing (name, domain, project) — one CREATED and
@@ -3864,7 +3864,7 @@ class TestDeploymentRepositoryDuplicateName:
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_scaling_group: ResourceGroupRow,
     ) -> None:
         """``activate_revision`` records the deploy intent on the endpoint.
@@ -3937,7 +3937,7 @@ class TestDeploymentRepositoryDuplicateName:
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_scaling_group: ResourceGroupRow,
     ) -> None:
         """``clear_deploying_revision`` wipes the deploy intent: the endpoint's
@@ -4001,7 +4001,7 @@ class TestDeploymentRepositoryDuplicateName:
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_scaling_group: ResourceGroupRow,
     ) -> None:
         """Destroying an endpoint also wipes its access tokens in the same

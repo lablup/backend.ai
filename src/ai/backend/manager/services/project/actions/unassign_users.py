@@ -5,9 +5,9 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
-from ai.backend.manager.data.group.types import UnassignUserFailure
+from ai.backend.manager.data.project.types import UnassignUserFailure
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
+from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
 
 
 @dataclass(frozen=True)

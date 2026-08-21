@@ -16,8 +16,8 @@ from ai.backend.manager.errors.resource import DomainDeletionFailed
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.purgers import DomainKernelPurger, DomainPurger
 from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater, DomainUpdater
-from ai.backend.manager.models.group.creators import GroupCreator
-from ai.backend.manager.models.group.row import ProjectType
+from ai.backend.manager.models.project.creators import ProjectCreator
+from ai.backend.manager.models.project.row import ProjectType
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.db_source import DomainDBSource
@@ -54,7 +54,7 @@ class DomainRepository:
         async with self._v2_ops.write_ops() as w:
             data = await w.create_role_managed_entity(creator)
             await w.create_role_managed_entity(
-                GroupCreator(
+                ProjectCreator(
                     name="model-store",
                     domain_id=data.id,
                     domain_name=data.name,

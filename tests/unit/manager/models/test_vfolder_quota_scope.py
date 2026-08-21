@@ -23,10 +23,10 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -81,7 +81,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 VFolderRow,
                 ContainerRegistryRow,
@@ -328,7 +328,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
         group_uuid = uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_uuid,
                 name=f"test_group_{group_uuid.hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -441,7 +441,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
         other_group_id = uuid4()
         async with db_with_cleanup.begin_session() as session:
             session.add(
-                GroupRow(
+                ProjectRow(
                     id=other_group_id,
                     name=f"other_group_{other_group_id.hex[:8]}",
                     domain_name=test_domain.domain_name,

@@ -14,7 +14,7 @@ from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
     UniqueConstraintViolationError,
 )
-from ai.backend.manager.models.group import GroupRow, ProjectType
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -23,7 +23,7 @@ from ai.backend.manager.repositories.base import CreatorSpec
 
 
 @dataclass
-class GroupCreatorSpec(CreatorSpec[GroupRow]):
+class ProjectCreatorSpec(CreatorSpec[ProjectRow]):
     """CreatorSpec for group creation."""
 
     name: str
@@ -66,8 +66,8 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
         )
 
     @override
-    def build_row(self) -> GroupRow:
-        return GroupRow(
+    def build_row(self) -> ProjectRow:
+        return ProjectRow(
             name=self.name,
             domain_name=self.domain_name,
             type=self.type or ProjectType.GENERAL,

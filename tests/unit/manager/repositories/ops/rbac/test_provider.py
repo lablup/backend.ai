@@ -49,8 +49,8 @@ from ai.backend.manager.errors.repository import (
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -2024,7 +2024,7 @@ async def scope_name_seed(
             KeyPairResourcePolicyRow,
             UserRow,
             KeyPairRow,
-            GroupRow,
+            ProjectRow,
         ],
     ):
         unique = uuid.uuid4().hex[:8]
@@ -2061,7 +2061,7 @@ async def scope_name_seed(
             ])
             await db_sess.flush()
             db_sess.add_all([
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=project_name,
                     domain_name=domain_name,

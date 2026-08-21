@@ -120,12 +120,12 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.group import GroupRow, association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
+from ai.backend.manager.models.project import ProjectRow, association_groups_users
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -152,9 +152,9 @@ from ai.backend.manager.repositories.db.engine import (
     connect_database,
     create_async_engine,
 )
-from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -776,7 +776,7 @@ async def group_fixture(
     group_name = f"group-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description=f"Test group {group_name}",
@@ -817,7 +817,9 @@ async def group_fixture(
                 VirtualScopeRow.__table__.c.scope_id == group_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )
 
 
 class VirtualScopeSeeder:
@@ -1436,7 +1438,7 @@ def auth_processors(
     repo = AuthRepository(database_engine)
     user_resource_policy_repository = UserResourcePolicyRepository(database_engine)
     user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
-    group_repository = GroupRepository(
+    group_repository = ProjectRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
         config_provider,

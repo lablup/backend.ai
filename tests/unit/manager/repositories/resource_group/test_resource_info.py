@@ -20,11 +20,11 @@ from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_group import (
     ResourceGroupOpts,
@@ -128,7 +128,7 @@ class TestResourceInfo:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 SessionRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -467,7 +467,7 @@ class TestResourceInfo:
             db_sess.add(user)
 
             # Create group
-            group = GroupRow(
+            group = ProjectRow(
                 id=test_group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group",

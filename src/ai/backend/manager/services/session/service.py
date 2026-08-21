@@ -94,7 +94,7 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.session import (
     DEAD_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
@@ -431,7 +431,7 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
-        project: GroupRow = session.group
+        project: ProjectRow = session.group
         if not project.container_registry:
             raise InvalidAPIParameters(
                 "Project not ready to convert session image (registry configuration not populated)"

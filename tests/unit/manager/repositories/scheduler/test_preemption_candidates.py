@@ -33,8 +33,8 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
@@ -142,7 +142,7 @@ async def _create_extra_project(
     group_id = uuid.uuid4()
     async with db.begin_session() as db_sess:
         db_sess.add(
-            GroupRow(
+            ProjectRow(
                 id=group_id,
                 name=f"extra-group-{uuid.uuid4().hex[:8]}",
                 description="Extra test group",

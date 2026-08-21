@@ -54,7 +54,7 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
-from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
@@ -146,7 +146,7 @@ class AuthService:
     _valkey_session_client: ValkeySessionClient
     _user_resource_policy_repository: UserResourcePolicyRepository
     _user_repository: UserRepository
-    _group_repository: GroupRepository
+    _group_repository: ProjectRepository
     _ssh_key_validator: SSHKeyValidator
 
     def __init__(
@@ -157,7 +157,7 @@ class AuthService:
         valkey_session_client: ValkeySessionClient,
         user_resource_policy_repository: UserResourcePolicyRepository,
         user_repository: UserRepository,
-        group_repository: GroupRepository,
+        group_repository: ProjectRepository,
         ssh_key_validator: SSHKeyValidator,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx

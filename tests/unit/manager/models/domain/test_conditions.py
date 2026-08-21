@@ -13,7 +13,7 @@ from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.clauses import QueryCondition
@@ -29,11 +29,11 @@ from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.orders import DomainOrders
 from ai.backend.manager.models.domain.searchers import DomainSearcher
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
@@ -74,7 +74,7 @@ _WITH_TABLES: list[TableOrORM] = [
     UserRoleRow,
     UserRow,
     KeyPairRow,
-    GroupRow,
+    ProjectRow,
     ContainerRegistryRow,
     ImageRow,
     VFolderRow,
@@ -201,10 +201,10 @@ class TestDomainConditionsProjectNestedFilters:
         """Combined helper wraps raw column conditions into single EXISTS."""
 
         def cond_is_active() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.is_active == True  # noqa: E712
+            return ProjectRow.is_active == True  # noqa: E712
 
         def cond_name_like() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.name.like("%test%")
+            return ProjectRow.name.like("%test%")
 
         conditions: list[QueryCondition] = [cond_is_active, cond_name_like]
         combined = DomainConditions.exists_project_combined(conditions)
@@ -484,7 +484,7 @@ class TestDomainNestedSearchIntegration:
                 ),
             ]:
                 gid = uuid.uuid4()
-                group = GroupRow(
+                group = ProjectRow(
                     id=gid,
                     name=proj_name,
                     description="test project",

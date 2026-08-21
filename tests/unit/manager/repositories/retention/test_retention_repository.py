@@ -64,11 +64,11 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.event_log.row import EventLogRow
-from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
@@ -224,7 +224,7 @@ async def _seed_scope(engine: ExtendedAsyncSAEngine) -> _Scope:
             )
         )
         sess.add(
-            GroupRow(
+            ProjectRow(
                 id=scope.group_id,
                 name="retention-group",
                 description=None,
@@ -541,7 +541,7 @@ class TestSessionsRetention:
                 ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 SessionRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -619,7 +619,7 @@ class TestSessionsRetention:
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=scope.group_id,
                     name="retention-group",
                     description=None,
@@ -921,7 +921,7 @@ class TestDeploymentsRetention:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 ResourceGroupRow,
-                GroupRow,
+                ProjectRow,
                 EndpointRow,
                 DeploymentPolicyRow,
                 EndpointTokenRow,
@@ -957,7 +957,7 @@ class TestDeploymentsRetention:
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=scope.group_id,
                     name="retention-group",
                     description=None,
@@ -1129,7 +1129,7 @@ class TestDeploymentsTerminalChildCleanup:
                 ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 SessionRow,
                 EndpointRow,
                 ReplicaGroupRow,
@@ -1197,7 +1197,7 @@ class TestDeploymentsTerminalChildCleanup:
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=scope.group_id,
                     name="retention-group",
                     description=None,
@@ -1367,7 +1367,7 @@ class TestDeploymentsSessionGroupCleanup:
                 ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 SessionGroupRow,
                 SessionRow,
                 EndpointRow,

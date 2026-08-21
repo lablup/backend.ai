@@ -629,7 +629,7 @@ def privileged_mutation(
         async def wrapped(
             cls: type, root: Any, info: graphene.ResolveInfo, *args: Any, **kwargs: Any
         ) -> Any:
-            from ai.backend.manager.models.group import groups  # , association_groups_users
+            from ai.backend.manager.models.project import groups  # , association_groups_users
             from ai.backend.manager.models.user import UserRole
 
             ctx: GraphQueryContext = info.context

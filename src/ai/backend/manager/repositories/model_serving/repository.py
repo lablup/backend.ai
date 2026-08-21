@@ -59,9 +59,9 @@ from ai.backend.manager.models.endpoint import (
     EndpointRow,
     EndpointTokenRow,
 )
-from ai.backend.manager.models.group import resolve_group_name_or_id
 from ai.backend.manager.models.image import ImageAlias, ImageIdentifier, ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import resolve_group_name_or_id
 from ai.backend.manager.models.resource_group import resource_groups
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow

@@ -26,9 +26,9 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.resource_slot import (
@@ -85,7 +85,7 @@ class TestReconcileAgentResources:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 ResourceGroupRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -168,7 +168,7 @@ class TestReconcileAgentResources:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
@@ -484,7 +484,7 @@ class TestOrphanedAllocationCleanup:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 ResourceGroupRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -570,7 +570,7 @@ class TestOrphanedAllocationCleanup:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
@@ -958,7 +958,7 @@ class TestTerminalSessionKernelReconciliation:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 ResourceGroupRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -1042,7 +1042,7 @@ class TestTerminalSessionKernelReconciliation:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,

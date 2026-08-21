@@ -56,8 +56,8 @@ from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -283,7 +283,7 @@ class RBACWriteOps(WriteOps):
     _scope_rows: ClassVar[Mapping[ScopeType, type[ScopeSource]]] = {
         CONTAINER_REGISTRY_SCOPE_TYPE: ContainerRegistryRow,
         DOMAIN_SCOPE_TYPE: DomainRow,
-        PROJECT_SCOPE_TYPE: GroupRow,
+        PROJECT_SCOPE_TYPE: ProjectRow,
         RESOURCE_GROUP_SCOPE_TYPE: ResourceGroupRow,
         USER_SCOPE_TYPE: UserRow,
     }
@@ -1042,11 +1042,11 @@ class RBACWriteOps(WriteOps):
         """``project_ids`` narrowed to the domain's real projects, plus the domain's
         model-store projects that every user joins."""
         stmt = (
-            sa.select(GroupRow.id)
-            .join(DomainRow, DomainRow.name == GroupRow.domain_name)
+            sa.select(ProjectRow.id)
+            .join(DomainRow, DomainRow.name == ProjectRow.domain_name)
             .where(
                 DomainRow.id == domain_id,
-                sa.or_(GroupRow.id.in_(project_ids), GroupRow.type == ProjectType.MODEL_STORE),
+                sa.or_(ProjectRow.id.in_(project_ids), ProjectRow.type == ProjectType.MODEL_STORE),
             )
         )
         return [ProjectID(row) for row in (await self._sess.scalars(stmt)).all()]

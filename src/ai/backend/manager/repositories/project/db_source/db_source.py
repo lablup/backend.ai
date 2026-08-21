@@ -26,8 +26,8 @@ from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.group.types import (
-    GroupData,
+from ai.backend.manager.data.project.types import (
+    ProjectData,
     UnassignUserFailure,
     UnassignUsersResult,
 )
@@ -39,16 +39,16 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
-from ai.backend.manager.models.group import groups
-from ai.backend.manager.models.group.row import (
-    GroupRow,
-)
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     LIVE_STATUS,
     RESOURCE_USAGE_KERNEL_STATUSES,
     KernelRow,
     kernels,
+)
+from ai.backend.manager.models.project import groups
+from ai.backend.manager.models.project.row import (
+    ProjectRow,
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
@@ -73,19 +73,6 @@ from ai.backend.manager.repositories.base.querier import (
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityPurger,
 )
-from ai.backend.manager.repositories.group.purgers import (
-    GroupEndpointBatchPurgerSpec,
-    GroupKernelBatchPurgerSpec,
-    GroupSessionBatchPurgerSpec,
-    ProjectPurgerSpec,
-    SessionByIdsBatchPurgerSpec,
-)
-from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
-from ai.backend.manager.repositories.group.types import (
-    DomainProjectOperationScope,
-    GroupSearchResult,
-    UserProjectOperationScope,
-)
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
     RBACOpsProvider,
@@ -94,12 +81,25 @@ from ai.backend.manager.repositories.ops.rbac.provider import (
     ScopeUserMember,
 )
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
+from ai.backend.manager.repositories.project.purgers import (
+    ProjectEndpointBatchPurgerSpec,
+    ProjectKernelBatchPurgerSpec,
+    ProjectPurgerSpec,
+    ProjectSessionBatchPurgerSpec,
+    SessionByIdsBatchPurgerSpec,
+)
+from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
+from ai.backend.manager.repositories.project.types import (
+    DomainProjectOperationScope,
+    ProjectSearchResult,
+    UserProjectOperationScope,
+)
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class GroupDBSource:
+class ProjectDBSource:
     _db: ExtendedAsyncSAEngine
     _rbac_ops_provider: RBACOpsProvider
 
@@ -128,7 +128,7 @@ class GroupDBSource:
         so this stays on the legacy write ops.
         """
         async with self._rbac_ops_provider.write_ops() as w:
-            existing_group = await w.query(Querier(row_class=GroupRow, pk_value=project_id))
+            existing_group = await w.query(Querier(row_class=ProjectRow, pk_value=project_id))
             if existing_group is None:
                 raise ProjectNotFound(f"Group not found: {project_id}")
             if user_update_mode == "add":
@@ -148,7 +148,7 @@ class GroupDBSource:
         """Users among ``user_ids`` that belong to the project's domain and are not
         yet members of the project."""
         project_domain_subq = (
-            sa.select(GroupRow.domain_name).where(GroupRow.id == project_id).scalar_subquery()
+            sa.select(ProjectRow.domain_name).where(ProjectRow.id == project_id).scalar_subquery()
         )
         query = (
             sa.select(UserRow)
@@ -400,8 +400,8 @@ class GroupDBSource:
                 )
 
             await self._delete_group_endpoints(w, group_id)
-            await w.batch_purge(BatchPurger(spec=GroupKernelBatchPurgerSpec(group_id=group_id)))
-            await w.batch_purge(BatchPurger(spec=GroupSessionBatchPurgerSpec(group_id=group_id)))
+            await w.batch_purge(BatchPurger(spec=ProjectKernelBatchPurgerSpec(group_id=group_id)))
+            await w.batch_purge(BatchPurger(spec=ProjectSessionBatchPurgerSpec(group_id=group_id)))
 
             # Finally delete the group itself as a scope: the row, its RBAC
             # entries, and its virtual scope node.
@@ -515,7 +515,7 @@ class GroupDBSource:
         session_ids = [row.session for row in session_ids_result.rows if row.session is not None]
 
         # Delete endpoints first (routings are CASCADE deleted automatically)
-        await w.batch_purge(BatchPurger(spec=GroupEndpointBatchPurgerSpec(project_id=group_id)))
+        await w.batch_purge(BatchPurger(spec=ProjectEndpointBatchPurgerSpec(project_id=group_id)))
 
         # Delete sessions using the collected IDs
         if session_ids:
@@ -643,20 +643,20 @@ class GroupDBSource:
                 [EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=user_id)],
             )
 
-    async def get_project(self, project_id: UUID) -> GroupData:
+    async def get_project(self, project_id: UUID) -> ProjectData:
         """Get a single project by UUID.
 
         Args:
             project_id: UUID of the project.
 
         Returns:
-            GroupData for the project.
+            ProjectData for the project.
 
         Raises:
             ProjectNotFound: If project does not exist.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            result = await db_sess.execute(sa.select(GroupRow).where(GroupRow.id == project_id))
+            result = await db_sess.execute(sa.select(ProjectRow).where(ProjectRow.id == project_id))
             row = result.scalar_one_or_none()
             if row is None:
                 raise ProjectNotFound(f"Project {project_id} not found")
@@ -677,10 +677,10 @@ class GroupDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(
-                sa.select(GroupRow.id).where(
-                    GroupRow.domain_name == domain_name,
-                    GroupRow.name == project_name,
-                    GroupRow.is_active.is_(True),
+                sa.select(ProjectRow.id).where(
+                    ProjectRow.domain_name == domain_name,
+                    ProjectRow.name == project_name,
+                    ProjectRow.is_active.is_(True),
                 )
             )
             project_id = result.scalar_one_or_none()
@@ -691,22 +691,22 @@ class GroupDBSource:
     async def search_projects(
         self,
         querier: BatchQuerier,
-    ) -> GroupSearchResult:
+    ) -> ProjectSearchResult:
         """Search all projects (admin only).
 
         Args:
             querier: Contains conditions, orders, and pagination.
 
         Returns:
-            GroupSearchResult with items, total_count, and pagination flags.
+            ProjectSearchResult with items, total_count, and pagination flags.
         """
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(GroupRow)
+            query = sa.select(ProjectRow)
             result = await execute_batch_querier(db_sess, query, querier)
 
             items = [row.GroupRow.to_data() for row in result.rows]
 
-            return GroupSearchResult(
+            return ProjectSearchResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
@@ -717,7 +717,7 @@ class GroupDBSource:
         self,
         scope: DomainProjectOperationScope,
         querier: BatchQuerier,
-    ) -> GroupSearchResult:
+    ) -> ProjectSearchResult:
         """Search projects within a domain.
 
         Args:
@@ -725,15 +725,15 @@ class GroupDBSource:
             querier: Contains conditions, orders, and pagination.
 
         Returns:
-            GroupSearchResult with items, total_count, and pagination flags.
+            ProjectSearchResult with items, total_count, and pagination flags.
         """
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(GroupRow)
+            query = sa.select(ProjectRow)
             result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             items = [row.GroupRow.to_data() for row in result.rows]
 
-            return GroupSearchResult(
+            return ProjectSearchResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
@@ -744,7 +744,7 @@ class GroupDBSource:
         self,
         scope: UserProjectOperationScope,
         querier: BatchQuerier,
-    ) -> GroupSearchResult:
+    ) -> ProjectSearchResult:
         """Search projects a user is member of.
 
         Membership comes from the projects' virtual scopes; the scope supplies
@@ -755,15 +755,15 @@ class GroupDBSource:
             querier: Contains conditions, orders, and pagination.
 
         Returns:
-            GroupSearchResult with items, total_count, and pagination flags.
+            ProjectSearchResult with items, total_count, and pagination flags.
         """
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(GroupRow).select_from(GroupRow)
+            query = sa.select(ProjectRow).select_from(ProjectRow)
             result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             items = [row.GroupRow.to_data() for row in result.rows]
 
-            return GroupSearchResult(
+            return ProjectSearchResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,

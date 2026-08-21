@@ -23,7 +23,7 @@ from ai.backend.manager.errors.resource import (
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
@@ -152,7 +152,7 @@ class ProjectUsageBucketOperationScope(OperationScope):
                 error=DomainNotFound(self.domain_name),
             ),
             ExistenceCheck(
-                column=GroupRow.id,
+                column=ProjectRow.id,
                 value=self.project_id,
                 error=ProjectNotFound(extra_data={"project_id": str(self.project_id)}),
             ),
@@ -200,7 +200,7 @@ class UserUsageBucketOperationScope(OperationScope):
                 error=DomainNotFound(self.domain_name),
             ),
             ExistenceCheck(
-                column=GroupRow.id,
+                column=ProjectRow.id,
                 value=self.project_id,
                 error=ProjectNotFound(extra_data={"project_id": str(self.project_id)}),
             ),

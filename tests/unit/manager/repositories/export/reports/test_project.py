@@ -24,7 +24,7 @@ from ai.backend.manager.models.association_container_registries_groups import (
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_group import (
     ResourceGroupForProjectRow,
     ResourceGroupOpts,
@@ -81,8 +81,8 @@ class TestProjectReportDefinition:
         assert PROJECT_REPORT.name == "Projects"
 
     def test_select_from_is_group_table(self) -> None:
-        """select_from should be GroupRow table."""
-        assert PROJECT_REPORT.select_from is GroupRow.__table__
+        """select_from should be ProjectRow table."""
+        assert PROJECT_REPORT.select_from is ProjectRow.__table__
 
     def test_total_field_count(self) -> None:
         """Should have 28 fields total."""
@@ -278,7 +278,7 @@ class TestBuildProjectQueryWithRealReport:
         )
 
         # Should be the base table, not a Join
-        assert query.select_from is GroupRow.__table__
+        assert query.select_from is ProjectRow.__table__
 
     def test_resource_policy_fields_add_one_join(self, adapter: ExportAdapter) -> None:
         """Selecting resource policy fields should add 1 JOIN."""
@@ -752,7 +752,7 @@ class TestProjectExportExecuteStreamingDB:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                GroupRow,
+                ProjectRow,
                 ResourceGroupRow,
                 ResourceGroupForProjectRow,
                 ContainerRegistryRow,
@@ -800,7 +800,7 @@ class TestProjectExportExecuteStreamingDB:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
@@ -980,7 +980,7 @@ class TestProjectExportExecuteStreamingDB:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id2,
                     name="project-no-registry",
                     domain_name=project_with_rg_and_registry.domain_name,
@@ -1024,7 +1024,7 @@ class TestGlobalContainerRegistryExport:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                GroupRow,
+                ProjectRow,
                 ResourceGroupRow,
                 ResourceGroupForProjectRow,
                 ContainerRegistryRow,
@@ -1072,7 +1072,7 @@ class TestGlobalContainerRegistryExport:
                 )
             )
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
@@ -1080,7 +1080,7 @@ class TestGlobalContainerRegistryExport:
                 )
             )
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=unassociated_project_id,
                     name="test-project-unassociated",
                     domain_name=domain_name,

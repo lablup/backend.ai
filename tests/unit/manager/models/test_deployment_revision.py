@@ -35,11 +35,11 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
@@ -97,7 +97,7 @@ class TestDeploymentRevisionRow:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 VFolderRow,
                 ContainerRegistryRow,
@@ -228,10 +228,10 @@ class TestDeploymentRevisionRow:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
         test_project_resource_policy: ProjectResourcePolicyRow,
-    ) -> AsyncGenerator[GroupRow, None]:
+    ) -> AsyncGenerator[ProjectRow, None]:
         """Create test group."""
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=uuid.uuid4(),
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group",
@@ -325,7 +325,7 @@ class TestDeploymentRevisionRow:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_user: UserRow,
         test_image: ImageRow,
         test_scaling_group: ResourceGroupRow,

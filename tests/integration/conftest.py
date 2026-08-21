@@ -53,11 +53,11 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.composer import DependencyInput, ManagerDependencyComposer
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import DomainRow, domains
-from ai.backend.manager.models.group import GroupRow, association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.project import ProjectRow, association_groups_users
 from ai.backend.manager.models.resource_group import resource_groups, sgroups_for_domains
 from ai.backend.manager.models.resource_group.row import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy import (
@@ -591,7 +591,7 @@ async def group_fixture(
     group_name = f"group-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description=f"Test group {group_name}",
@@ -602,7 +602,9 @@ async def group_fixture(
         )
     yield group_id
     async with db_engine.begin() as conn:
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )
 
 
 @pytest.fixture()

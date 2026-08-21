@@ -28,10 +28,10 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -66,7 +66,7 @@ ALL_ROWS: list[TableOrORM] = [
     UserRoleRow,
     UserRow,
     KeyPairRow,
-    GroupRow,
+    ProjectRow,
     AssociationScopesEntitiesRow,
     VirtualScopeRow,
     EntityMembershipRow,
@@ -212,7 +212,7 @@ class TestQueryUserinfo:
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=group_name,
                     domain_name=domain_name,
@@ -271,7 +271,7 @@ class TestQueryUserinfo:
         name = f"other-group-{uuid.uuid4().hex[:8]}"
         async with db.begin_session() as sess:
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=uuid.uuid4(),
                     name=name,
                     domain_name=seed.domain_name,
@@ -611,7 +611,7 @@ class TestQueryUserinfoFromSession:
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=group_name,
                     domain_name=domain_name,

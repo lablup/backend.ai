@@ -91,11 +91,11 @@ from ai.backend.manager.models.base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.network import NetworkRow, NetworkType
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -479,7 +479,7 @@ class SessionRow(CreatedAtMixin, Base):
     group_id: Mapped[ProjectID] = mapped_column(
         "group_id", GUID(ProjectID), sa.ForeignKey("groups.id"), nullable=False
     )
-    group: Mapped[GroupRow] = relationship("GroupRow")
+    group: Mapped[ProjectRow] = relationship("ProjectRow")
     user_uuid: Mapped[UserID] = mapped_column(
         "user_uuid", GUID(UserID), server_default=sa.text("uuid_generate_v4()"), nullable=False
     )
@@ -1535,9 +1535,9 @@ class ComputeSessionPermissionContextBuilder(
         result = ComputeSessionPermissionContext()
 
         _project_stmt = (
-            sa.select(GroupRow)
-            .where(GroupRow.domain_name == domain_name)
-            .options(load_only(GroupRow.id))
+            sa.select(ProjectRow)
+            .where(ProjectRow.domain_name == domain_name)
+            .options(load_only(ProjectRow.id))
         )
         for row in await self.db_session.scalars(_project_stmt):
             _row = row

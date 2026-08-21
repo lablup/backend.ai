@@ -27,10 +27,10 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
@@ -100,7 +100,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 SessionRow,
                 EndpointRow,
@@ -359,7 +359,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -513,7 +513,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 SessionRow,
                 EndpointRow,
@@ -772,7 +772,7 @@ class TestUpdateRouteStatusBulkWithHistory:
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -953,7 +953,7 @@ class TestDeploymentHistoryMergeLogic:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 SessionRow,
                 EndpointRow,
@@ -1067,7 +1067,7 @@ class TestDeploymentHistoryMergeLogic:
 
             # Create group
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
@@ -1272,7 +1272,7 @@ class TestRouteHistoryMergeLogic:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 SessionRow,
                 EndpointRow,
@@ -1387,7 +1387,7 @@ class TestRouteHistoryMergeLogic:
 
             # Create group
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,

@@ -3,16 +3,16 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import DeleteSingleEntityOpsAction
-from ai.backend.manager.data.group.types import GroupData
-from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.group.updaters import GroupSoftDeleteUpdater
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.project.updaters import ProjectSoftDeleteUpdater
 
 
 @dataclass(frozen=True)
-class DeleteProjectAction(DeleteSingleEntityOpsAction[GroupRow, GroupData]):
+class DeleteProjectAction(DeleteSingleEntityOpsAction[ProjectRow, ProjectData]):
     """Retire one project."""
 
-    updater: GroupSoftDeleteUpdater
+    updater: ProjectSoftDeleteUpdater
 
     @override
     def entity_id(self) -> EntityIdentifier:
@@ -24,5 +24,5 @@ class DeleteProjectAction(DeleteSingleEntityOpsAction[GroupRow, GroupData]):
         return "delete_project"
 
     @override
-    def to_updater(self) -> GroupSoftDeleteUpdater:
+    def to_updater(self) -> ProjectSoftDeleteUpdater:
         return self.updater

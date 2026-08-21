@@ -20,7 +20,6 @@ from ai.backend.manager.repositories.etcd_config.repositories import EtcdConfigR
 from ai.backend.manager.repositories.events.repositories import EventsRepositories
 from ai.backend.manager.repositories.export.repositories import ExportRepositories
 from ai.backend.manager.repositories.fair_share.repositories import FairShareRepositories
-from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.huggingface_registry.repositories import (
     HuggingFaceRegistryRepositories,
 )
@@ -37,6 +36,7 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.repositories import (
     PermissionControllerRepositories,
 )
+from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepositories,
 )
@@ -87,7 +87,7 @@ class Repositories:
     etcd_config: EtcdConfigRepositories
     export: ExportRepositories
     fair_share: FairShareRepositories
-    group: GroupRepositories
+    project: ProjectRepositories
     idle_checker: IdleCheckerRepositories
     image: ImageRepositories
     manager_admin: ManagerAdminRepositories
@@ -134,7 +134,7 @@ class Repositories:
         etcd_config_repositories = EtcdConfigRepositories.create(args)
         export_repositories = ExportRepositories.create(args)
         fair_share_repositories = FairShareRepositories.create(args)
-        group_repositories = GroupRepositories.create(args)
+        project_repositories = ProjectRepositories.create(args)
         idle_checker_repositories = IdleCheckerRepositories.create(args)
         image_repositories = ImageRepositories.create(args)
         manager_admin_repositories = ManagerAdminRepositories.create(args)
@@ -182,7 +182,7 @@ class Repositories:
             etcd_config=etcd_config_repositories,
             export=export_repositories,
             fair_share=fair_share_repositories,
-            group=group_repositories,
+            project=project_repositories,
             idle_checker=idle_checker_repositories,
             image=image_repositories,
             manager_admin=manager_admin_repositories,

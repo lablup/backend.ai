@@ -15,22 +15,22 @@ from ai.backend.manager.actions.v2.ops.base import (
     OperationScopeOpsAction,
     SearchGlobalOpsAction,
 )
-from ai.backend.manager.data.group.types import GroupData
-from ai.backend.manager.models.group.queriers import ProjectQuerier
-from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.group.searchers import GroupSearcher
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.models.project.queriers import ProjectQuerier
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.project.searchers import ProjectSearcher
 from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.repositories.group.types import (
+from ai.backend.manager.repositories.project.types import (
     DomainProjectOperationScope,
     UserProjectOperationScope,
 )
 
 
 @dataclass(frozen=True)
-class GlobalSearchProjectsAction(SearchGlobalOpsAction[GroupRow, GroupData]):
+class GlobalSearchProjectsAction(SearchGlobalOpsAction[ProjectRow, ProjectData]):
     """Page through every project in the installation."""
 
-    searcher: GroupSearcher
+    searcher: ProjectSearcher
 
     @override
     @classmethod
@@ -43,16 +43,16 @@ class GlobalSearchProjectsAction(SearchGlobalOpsAction[GroupRow, GroupData]):
         return "global_search_projects"
 
     @override
-    def to_searcher(self) -> GroupSearcher:
+    def to_searcher(self) -> ProjectSearcher:
         return self.searcher
 
 
 @dataclass(frozen=True)
-class SearchProjectsByDomainAction(OperationScopeOpsAction[GroupRow, GroupData]):
+class SearchProjectsByDomainAction(OperationScopeOpsAction[ProjectRow, ProjectData]):
     """Page through the projects of a domain."""
 
     domain_id: DomainID
-    searcher: GroupSearcher
+    searcher: ProjectSearcher
 
     @override
     @classmethod
@@ -73,16 +73,16 @@ class SearchProjectsByDomainAction(OperationScopeOpsAction[GroupRow, GroupData])
         return "search_projects_by_domain"
 
     @override
-    def to_searcher(self) -> GroupSearcher:
+    def to_searcher(self) -> ProjectSearcher:
         return self.searcher
 
 
 @dataclass(frozen=True)
-class SearchProjectsByUserAction(OperationScopeOpsAction[GroupRow, GroupData]):
+class SearchProjectsByUserAction(OperationScopeOpsAction[ProjectRow, ProjectData]):
     """Page through the projects a user belongs to."""
 
     user_id: UserID
-    searcher: GroupSearcher
+    searcher: ProjectSearcher
 
     @override
     @classmethod
@@ -103,12 +103,12 @@ class SearchProjectsByUserAction(OperationScopeOpsAction[GroupRow, GroupData]):
         return "search_projects_by_user"
 
     @override
-    def to_searcher(self) -> GroupSearcher:
+    def to_searcher(self) -> ProjectSearcher:
         return self.searcher
 
 
 @dataclass(frozen=True)
-class GetProjectAction(GetSingleEntityOpsAction[GroupRow, GroupData]):
+class GetProjectAction(GetSingleEntityOpsAction[ProjectRow, ProjectData]):
     """Read one project by its id."""
 
     project_id: ProjectID

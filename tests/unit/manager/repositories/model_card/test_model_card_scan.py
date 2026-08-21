@@ -30,12 +30,12 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -89,7 +89,7 @@ class TestModelCardScanResourceRequirements:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -206,9 +206,9 @@ class TestModelCardScanResourceRequirements:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
         test_project_resource_policy: ProjectResourcePolicyRow,
-    ) -> GroupRow:
+    ) -> ProjectRow:
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=uuid.uuid4(),
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group",
@@ -256,7 +256,7 @@ class TestModelCardScanResourceRequirements:
         name: str,
         test_domain: DomainRow,
         test_user: UserRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_vfolder: VFolderRow,
         min_resource: list[ResourceRequirementEntry],
     ) -> ModelCardScanUpserterSpec:
@@ -287,7 +287,7 @@ class TestModelCardScanResourceRequirements:
         db_source: ModelCardDBSource,
         test_domain: DomainRow,
         test_user: UserRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_vfolder: VFolderRow,
     ) -> None:
         spec = self._build_scan_spec(
@@ -331,7 +331,7 @@ class TestModelCardScanResourceRequirements:
         db_source: ModelCardDBSource,
         test_domain: DomainRow,
         test_user: UserRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_vfolder: VFolderRow,
     ) -> None:
         # Re-running scan with the same input must NOT duplicate child rows.
@@ -370,7 +370,7 @@ class TestModelCardScanResourceRequirements:
         db_source: ModelCardDBSource,
         test_domain: DomainRow,
         test_user: UserRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_vfolder: VFolderRow,
     ) -> None:
         # If the model definition changes its min_resource between scans,
@@ -429,7 +429,7 @@ class TestModelCardScanResourceRequirements:
         db_source: ModelCardDBSource,
         test_domain: DomainRow,
         test_user: UserRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_vfolder: VFolderRow,
     ) -> None:
         # Once the scan populates requirements, the relational division SQL

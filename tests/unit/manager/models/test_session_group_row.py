@@ -19,8 +19,8 @@ from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementEnforcement,
 )
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
@@ -115,7 +115,7 @@ class TestSessionGroupRow:
                 KeyPairResourcePolicyRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 SessionGroupRow,
                 SessionRow,
             ],
@@ -153,7 +153,7 @@ class TestSessionGroupRow:
             resource_policy=user_policy.name,
             domain_id=domain_id,
         )
-        project = GroupRow(
+        project = ProjectRow(
             id=uuid.uuid4(),
             name=f"test-group-{uuid.uuid4().hex[:8]}",
             domain_name=domain.name,

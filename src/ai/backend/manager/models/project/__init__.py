@@ -1,8 +1,8 @@
 from .row import (
     MAXIMUM_DOTFILE_SIZE,
     AssocGroupUserRow,
-    GroupDotfile,
-    GroupRow,
+    ProjectDotfile,
+    ProjectRow,
     ProjectType,
     association_groups_users,
     groups,
@@ -23,8 +23,8 @@ from .row import (
 __all__ = (
     "MAXIMUM_DOTFILE_SIZE",
     "AssocGroupUserRow",
-    "GroupDotfile",
-    "GroupRow",
+    "ProjectDotfile",
+    "ProjectRow",
     "ProjectType",
     "association_groups_users",
     "groups",

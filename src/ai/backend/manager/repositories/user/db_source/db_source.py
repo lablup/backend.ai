@@ -51,10 +51,6 @@ from ai.backend.manager.errors.user import (
 )
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
-from ai.backend.manager.models.group import (
-    GroupRow,
-    ProjectType,
-)
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     RESOURCE_USAGE_KERNEL_STATUSES,
@@ -64,6 +60,10 @@ from ai.backend.manager.models.keypair import (
     KeyPairRow,
     generate_keypair_data,
     keypairs,
+)
+from ai.backend.manager.models.project import (
+    ProjectRow,
+    ProjectType,
 )
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
@@ -856,11 +856,11 @@ class UserDBSource:
         member_ref = EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=UserID(user_uuid))
         async with self._rbac_ops_provider.write_ops() as w:
             target_result = await w.batch_query_in_global(
-                sa.select(GroupRow.id).where(
-                    GroupRow.domain_name == domain_name,
+                sa.select(ProjectRow.id).where(
+                    ProjectRow.domain_name == domain_name,
                     sa.or_(
-                        GroupRow.id.in_([UUID(gid) for gid in group_ids]),
-                        GroupRow.type == ProjectType.MODEL_STORE,
+                        ProjectRow.id.in_([UUID(gid) for gid in group_ids]),
+                        ProjectRow.type == ProjectType.MODEL_STORE,
                     ),
                 ),
                 BatchQuerier(pagination=NoPagination()),

@@ -21,11 +21,11 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.domain.purgers import DomainKernelPurger, DomainPurger
-from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
@@ -70,7 +70,7 @@ class TestDomainPurgersIntegration:
                 ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 SessionRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -160,11 +160,11 @@ class TestDomainPurgersIntegration:
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_domain: DomainFixtureData,
         project_resource_policy: str,
-    ) -> GroupRow:
+    ) -> ProjectRow:
         """Create a test group."""
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as session:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group for integration tests",
@@ -185,7 +185,7 @@ class TestDomainPurgersIntegration:
     async def sample_sessions(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_group: GroupRow,
+        sample_group: ProjectRow,
         sample_domain: DomainFixtureData,
         sample_user: UserRow,
     ) -> list[SessionRow]:
@@ -239,7 +239,7 @@ class TestDomainPurgersIntegration:
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_sessions: list[SessionRow],
         sample_domain: DomainFixtureData,
-        sample_group: GroupRow,
+        sample_group: ProjectRow,
         sample_user: UserRow,
     ) -> list[KernelRow]:
         """Create test kernels belonging to sessions in the domain."""
@@ -367,7 +367,7 @@ class TestDomainPurgersIntegration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_domain: DomainFixtureData,
-        sample_group: GroupRow,
+        sample_group: ProjectRow,
     ) -> None:
         """DomainPurger raises DomainHasGroups while groups remain bound."""
         domain_name = sample_domain.domain_name

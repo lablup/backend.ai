@@ -30,9 +30,9 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -109,7 +109,7 @@ class TestShareVfolderWithUsersMembership:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 VFolderPermissionRow,
                 AssociationScopesEntitiesRow,
@@ -185,7 +185,7 @@ class TestShareVfolderWithUsersMembership:
         gid = uuid4()
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=gid,
                     name=f"proj-{gid.hex[:8]}",
                     domain_name=domain_fixture.domain_name,
@@ -408,7 +408,7 @@ class TestShareVfolderWithUsersMembership:
         gid = uuid4()
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=gid,
                     name=f"other-{gid.hex[:8]}",
                     domain_name=domain_fixture.domain_name,

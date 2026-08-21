@@ -37,8 +37,8 @@ from ai.backend.common.data.entity.types import ScopeID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.group.types import GroupData, ProjectType
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
+from ai.backend.manager.data.project.types import ProjectData, ProjectType
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.association_container_registries_groups import (
@@ -82,14 +82,14 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def _get_association_container_registries_groups_join_condition() -> sa.ColumnElement[bool]:
-    return GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)
+    return ProjectRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)
 
 
 __all__: Sequence[str] = (
     "MAXIMUM_DOTFILE_SIZE",
     "AssocGroupUserRow",
-    "GroupDotfile",
-    "GroupRow",
+    "ProjectDotfile",
+    "ProjectRow",
     "ProjectType",
     "association_groups_users",
     "groups",
@@ -144,7 +144,7 @@ class AssocGroupUserRow(Base):
 association_groups_users = AssocGroupUserRow.__table__
 
 
-class GroupRow(LifecycleTimestampsMixin, Base):
+class ProjectRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "groups"
     __table_args__ = (
         sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
@@ -221,8 +221,8 @@ class GroupRow(LifecycleTimestampsMixin, Base):
     def scope_name_expr(cls) -> SQLColumnExpression[str]:
         return cls.name
 
-    def to_data(self) -> GroupData:
-        return GroupData(
+    def to_data(self) -> ProjectData:
+        return ProjectData(
             id=self.id,
             name=self.name,
             description=self.description,
@@ -245,10 +245,10 @@ class GroupRow(LifecycleTimestampsMixin, Base):
         session: AsyncSession,
         project_id: uuid.UUID,
         load_resource_policy: bool = False,
-    ) -> GroupRow:
-        query = sa.select(GroupRow).filter(GroupRow.id == project_id)
+    ) -> ProjectRow:
+        query = sa.select(ProjectRow).filter(ProjectRow.id == project_id)
         if load_resource_policy:
-            query = query.options(selectinload(GroupRow.resource_policy_row))
+            query = query.options(selectinload(ProjectRow.resource_policy_row))
         row = await session.scalar(query)
         if not row:
             raise NoResultFound
@@ -257,7 +257,7 @@ class GroupRow(LifecycleTimestampsMixin, Base):
 
     @classmethod
     def load_resource_policy(cls) -> _AbstractLoad:
-        return joinedload(GroupRow.resource_policy_row)
+        return joinedload(ProjectRow.resource_policy_row)
 
     @classmethod
     async def query_by_condition(
@@ -266,25 +266,25 @@ class GroupRow(LifecycleTimestampsMixin, Base):
         options: Sequence[QueryOption] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
-    ) -> Sequence[GroupRow]:
+    ) -> Sequence[ProjectRow]:
         """
         Args:
             condition: QueryCondition.
             options: A sequence of query options.
             db: Database engine.
         Returns:
-            A list of GroupRow instances that match the condition.
+            A list of ProjectRow instances that match the condition.
         Raises:
             EmptySQLCondition: If the condition is empty.
         """
-        query_stmt = sa.select(GroupRow)
+        query_stmt = sa.select(ProjectRow)
         for cond in conditions:
             query_stmt = cond(query_stmt)
 
         for option in options:
             query_stmt = option(query_stmt)
 
-        async def fetch(db_session: AsyncSession) -> Sequence[GroupRow]:
+        async def fetch(db_session: AsyncSession) -> Sequence[ProjectRow]:
             return (await db_session.scalars(query_stmt)).all()
 
         async with db.connect() as db_conn:
@@ -300,14 +300,14 @@ class GroupRow(LifecycleTimestampsMixin, Base):
         project_id: uuid.UUID,
         *,
         db: ExtendedAsyncSAEngine,
-    ) -> GroupRow:
+    ) -> ProjectRow:
         """
         Query a project by its ID with related resource policies.
         Args:
             project_id: The ID of the project.
             db: Database engine.
         Returns:
-            The GroupRow instance that matches the project ID.
+            The ProjectRow instance that matches the project ID.
         Raises:
             ObjectNotFound: If the project not found.
         """
@@ -322,15 +322,15 @@ class GroupRow(LifecycleTimestampsMixin, Base):
 
 
 # NOTE: Deprecated legacy table reference for backward compatibility.
-# Use GroupRow class directly for new code.
-groups = GroupRow.__table__
+# Use ProjectRow class directly for new code.
+groups = ProjectRow.__table__
 
 
 def by_id(project_id: uuid.UUID) -> QueryCondition:
     def _by_id(
         query_stmt: sa.sql.Select[Any],
     ) -> sa.sql.Select[Any]:
-        return query_stmt.where(GroupRow.id == project_id)
+        return query_stmt.where(ProjectRow.id == project_id)
 
     return _by_id
 
@@ -391,7 +391,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
         return self._container_registry
 
     @classmethod
-    def from_row(cls, row: GroupRow, permissions: Iterable[ProjectPermission]) -> Self:
+    def from_row(cls, row: ProjectRow, permissions: Iterable[ProjectPermission]) -> Self:
         return cls(
             id=row.id,
             name=row.name,
@@ -482,7 +482,7 @@ async def resolve_groups(
     return [row.id for row in rows]
 
 
-class GroupDotfile(TypedDict):
+class ProjectDotfile(TypedDict):
     data: str
     path: str
     perm: str
@@ -491,7 +491,7 @@ class GroupDotfile(TypedDict):
 async def query_group_dotfiles(
     db_conn: SAConnection,
     group_id: GUID[uuid.UUID] | uuid.UUID,
-) -> tuple[list[GroupDotfile], int]:
+) -> tuple[list[ProjectDotfile], int]:
     query = sa.select(groups.c.dotfiles).select_from(groups).where(groups.c.id == group_id)
     packed_dotfile = await db_conn.scalar(query)
     if packed_dotfile is None:
@@ -533,7 +533,7 @@ type WhereClauseType = (
 
 
 @dataclass
-class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, GroupRow, uuid.UUID]):
+class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, ProjectRow, uuid.UUID]):
     registry_id_to_additional_permission_map: dict[uuid.UUID, frozenset[ProjectPermission]] = field(
         default_factory=dict
     )
@@ -553,21 +553,21 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
 
             cond = _OR_coalesce(
                 cond,
-                GroupRow.association_container_registries_groups_rows.any(
+                ProjectRow.association_container_registries_groups_rows.any(
                     AssociationContainerRegistriesGroupsRow.registry_id == registry_id
                 ),
             )
         if self.domain_name_to_permission_map:
             cond = _OR_coalesce(
-                cond, GroupRow.domain_name.in_(self.domain_name_to_permission_map.keys())
+                cond, ProjectRow.domain_name.in_(self.domain_name_to_permission_map.keys())
             )
         if self.object_id_to_additional_permission_map:
             cond = _OR_coalesce(
-                cond, GroupRow.id.in_(self.object_id_to_additional_permission_map.keys())
+                cond, ProjectRow.id.in_(self.object_id_to_additional_permission_map.keys())
             )
         if self.object_id_to_overriding_permission_map:
             cond = _OR_coalesce(
-                cond, GroupRow.id.in_(self.object_id_to_overriding_permission_map.keys())
+                cond, ProjectRow.id.in_(self.object_id_to_overriding_permission_map.keys())
             )
         return cond
 
@@ -576,10 +576,12 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
         cond = self.query_condition
         if cond is None:
             return None
-        return sa.select(GroupRow).where(cond)
+        return sa.select(ProjectRow).where(cond)
 
     @override
-    async def calculate_final_permission(self, rbac_obj: GroupRow) -> frozenset[ProjectPermission]:
+    async def calculate_final_permission(
+        self, rbac_obj: ProjectRow
+    ) -> frozenset[ProjectPermission]:
         project_row = rbac_obj
         project_id = project_row.id
         permissions: frozenset[ProjectPermission] = frozenset()
@@ -711,9 +713,9 @@ async def get_projects(
         if query_stmt is None:
             return []
         if project_id is not None:
-            query_stmt = query_stmt.where(GroupRow.id == project_id)
+            query_stmt = query_stmt.where(ProjectRow.id == project_id)
         if project_name is not None:
-            query_stmt = query_stmt.where(GroupRow.name == project_name)
+            query_stmt = query_stmt.where(ProjectRow.name == project_name)
         result: list[ProjectModel] = []
         async for row in await db_session.stream_scalars(query_stmt):
             permissions = await permission_ctx.calculate_final_permission(row)

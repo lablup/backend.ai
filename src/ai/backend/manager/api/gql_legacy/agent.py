@@ -37,11 +37,11 @@ from ai.backend.manager.models.agent import (
     agents,
     get_permission_ctx,
 )
-from ai.backend.manager.models.group import AssocGroupUserRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.project import AssocGroupUserRow
 from ai.backend.manager.models.rbac import (
     ScopeType,
 )

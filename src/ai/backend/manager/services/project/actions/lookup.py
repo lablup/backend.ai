@@ -8,8 +8,8 @@ from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
-from ai.backend.manager.models.group.lookups import ProjectNameInDomainLookup
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.project.lookups import ProjectNameInDomainLookup
+from ai.backend.manager.models.project.row import ProjectRow
 
 
 @dataclass(frozen=True)
@@ -29,7 +29,7 @@ class ProjectNameInDomainKey(LookupKey):
 
 
 @dataclass
-class LookupProjectAction(LookupEntityOpsAction[GroupRow, ProjectID]):
+class LookupProjectAction(LookupEntityOpsAction[ProjectRow, ProjectID]):
     """Resolve a project's domain-scoped name into the project it names."""
 
     domain_name: DomainName

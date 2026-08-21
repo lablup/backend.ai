@@ -67,8 +67,8 @@ from ai.backend.manager.models.base import (
     StrEnumType,
     metadata,
 )
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -138,7 +138,7 @@ def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
 
 
 def _get_group_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    return GroupRow.id == foreign(VFolderRow.group)
+    return ProjectRow.id == foreign(VFolderRow.group)
 
 
 class VFolderPermissionValidator(t.Trafaret):
@@ -380,8 +380,8 @@ class VFolderRow(LifecycleTimestampsMixin, Base):
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
     )
-    group_row: Mapped[GroupRow | None] = relationship(
-        "GroupRow",
+    group_row: Mapped[ProjectRow | None] = relationship(
+        "ProjectRow",
         primaryjoin=_get_group_row_join_condition,
     )
 
@@ -551,7 +551,7 @@ async def query_accessible_vfolders(
     extra_vf_group_conds: Any = None,
     allowed_status_set: VFolderStatusSet | None = None,
 ) -> Sequence[Mapping[str, Any]]:
-    from ai.backend.manager.models.group import groups
+    from ai.backend.manager.models.project import groups
     from ai.backend.manager.models.user import users
 
     if allowed_vfolder_types is None:
@@ -690,7 +690,7 @@ async def query_accessible_vfolders(
             grps = result.fetchall()
             group_ids = [g.scope_id for g in grps]
             # Include MODEL_STORE projects in the same domain for cross-project model access
-            from ai.backend.manager.data.group.types import ProjectType
+            from ai.backend.manager.data.project.types import ProjectType
 
             model_store_query = sa.select(groups.c.id).where(
                 sa.and_(
@@ -764,7 +764,7 @@ async def get_allowed_vfolder_hosts_by_group(
     If the requester is a domain admin, gather all `allowed_vfolder_hosts` of the domain groups.
     """
     from ai.backend.manager.models.domain import domains
-    from ai.backend.manager.models.group import groups
+    from ai.backend.manager.models.project import groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -804,7 +804,7 @@ async def get_allowed_vfolder_hosts_by_user(
     All available `allowed_vfolder_hosts` of groups which requester associated will be merged.
     """
     from ai.backend.manager.models.domain import domains
-    from ai.backend.manager.models.group import groups
+    from ai.backend.manager.models.project import groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -1019,8 +1019,8 @@ async def ensure_quota_scope_accessible_by_user(
         raise InvalidAPIParameters
 
     # Lookup group table to match if quota is scoped to the group
-    group_query = sa.select(GroupRow).where(GroupRow.id == quota_scope.scope_id)
-    quota_scope_group: GroupRow | None = await conn.scalar(group_query)
+    group_query = sa.select(ProjectRow).where(ProjectRow.id == quota_scope.scope_id)
+    quota_scope_group: ProjectRow | None = await conn.scalar(group_query)
     if quota_scope_group:
         match user["role"]:
             case UserRole.SUPERADMIN:
@@ -1328,12 +1328,12 @@ class VFolderPermissionContextBuilder(
         result = VFolderPermissionContext()
 
         _project_stmt = (
-            sa.select(GroupRow)
+            sa.select(ProjectRow)
             .where(
-                GroupRow.domain_name == domain_name,
-                user_scope_membership_exists(PROJECT_SCOPE_TYPE, GroupRow.id, ctx.user_id),
+                ProjectRow.domain_name == domain_name,
+                user_scope_membership_exists(PROJECT_SCOPE_TYPE, ProjectRow.id, ctx.user_id),
             )
-            .options(load_only(GroupRow.id))
+            .options(load_only(ProjectRow.id))
         )
         for row in await self.db_session.scalars(_project_stmt):
             _row = row

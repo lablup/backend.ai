@@ -39,9 +39,9 @@ from ai.backend.manager.api.rest.userconfig.handler import UserConfigHandler
 from ai.backend.manager.api.rest.userconfig.registry import register_userconfig_routes
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
-from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.domain.processors import DomainProcessors
@@ -89,7 +89,7 @@ def server_module_registries(
             MagicMock(),
             MagicMock(),
             MagicMock(
-                repository=GroupRepository(
+                repository=ProjectRepository(
                     database_engine, v2_ops, MagicMock(), MagicMock(), MagicMock()
                 )
             ),

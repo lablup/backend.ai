@@ -42,11 +42,11 @@ from ai.backend.manager.api.rest.v2.project.registry import register_v2_project_
 from ai.backend.manager.api.rest.v2.rbac.handler import V2RBACHandler
 from ai.backend.manager.api.rest.v2.rbac.registry import register_v2_rbac_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.permission.status import RoleStatus
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -57,13 +57,13 @@ from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
-from ai.backend.manager.repositories.group.repositories import GroupRepositories
-from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.model_card.repository import ModelCardRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
+from ai.backend.manager.repositories.project.repositories import ProjectRepositories
+from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.services.model_card.service import ModelCardService
 from ai.backend.manager.services.permission_contoller.processors import (
@@ -117,14 +117,14 @@ def group_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ProjectProcessors:
     """Real ProjectProcessors with real RBAC enforcement."""
-    repo = GroupRepository(
+    repo = ProjectRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
         config_provider,
         valkey_clients.stat,
         storage_manager,
     )
-    repositories = GroupRepositories(repository=repo)
+    repositories = ProjectRepositories(repository=repo)
     service = ProjectService(
         storage_manager=storage_manager,
         config_provider=config_provider,
@@ -143,7 +143,7 @@ def permission_controller_processors(
 ) -> PermissionControllerProcessors:
     """Real PermissionControllerProcessors for role assign/revoke SDK calls."""
     perm_repo = PermissionControllerRepository(database_engine)
-    group_repo = GroupRepository(
+    group_repo = ProjectRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
         config_provider,
@@ -199,7 +199,7 @@ async def model_store_project_fixture(
     project_id = uuid.uuid4()
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=project_id,
                 name=f"model-store-{secrets.token_hex(6)}",
                 description="Test MODEL_STORE project",
@@ -244,7 +244,9 @@ async def model_store_project_fixture(
                 VirtualScopeRow.__table__.c.scope_id == project_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == project_id)
+        )
 
 
 @pytest.fixture()
@@ -257,7 +259,7 @@ async def second_project_fixture(
     project_id = uuid.uuid4()
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=project_id,
                 name=f"model-store-b-{secrets.token_hex(6)}",
                 description="Second MODEL_STORE project",
@@ -302,7 +304,9 @@ async def second_project_fixture(
                 VirtualScopeRow.__table__.c.scope_id == project_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == project_id)
+        )
 
 
 @pytest.fixture()

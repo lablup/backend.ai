@@ -18,11 +18,11 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -70,7 +70,7 @@ class TestTemplateRepository:
                 ProjectResourcePolicyRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AssocGroupUserRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -249,7 +249,7 @@ class TestTemplateRepository:
         group_id = uuid.uuid4()
         group_name = f"test-group-{group_id.hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=group_name,
                 description="Test group",

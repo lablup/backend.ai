@@ -9,7 +9,7 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
-from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
@@ -17,14 +17,14 @@ from ai.backend.manager.models.condition_utils import (
     make_string_in_factory,
 )
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import AssocGroupUserRow
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.project import AssocGroupUserRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.user import UserRow
 
-__all__ = ("GroupConditions",)
+__all__ = ("ProjectConditions",)
 
 
-class GroupConditions:
+class ProjectConditions:
     """Query conditions for filtering groups/projects."""
 
     # ==================== Name Filters ====================
@@ -33,9 +33,9 @@ class GroupConditions:
     def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = GroupRow.name.ilike(f"%{spec.value}%")
+                condition = ProjectRow.name.ilike(f"%{spec.value}%")
             else:
-                condition = GroupRow.name.like(f"%{spec.value}%")
+                condition = ProjectRow.name.like(f"%{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -46,9 +46,9 @@ class GroupConditions:
     def by_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = sa.func.lower(GroupRow.name) == spec.value.lower()
+                condition = sa.func.lower(ProjectRow.name) == spec.value.lower()
             else:
-                condition = GroupRow.name == spec.value
+                condition = ProjectRow.name == spec.value
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -59,9 +59,9 @@ class GroupConditions:
     def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = GroupRow.name.ilike(f"{spec.value}%")
+                condition = ProjectRow.name.ilike(f"{spec.value}%")
             else:
-                condition = GroupRow.name.like(f"{spec.value}%")
+                condition = ProjectRow.name.like(f"{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -72,16 +72,16 @@ class GroupConditions:
     def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = GroupRow.name.ilike(f"%{spec.value}")
+                condition = ProjectRow.name.ilike(f"%{spec.value}")
             else:
-                condition = GroupRow.name.like(f"%{spec.value}")
+                condition = ProjectRow.name.like(f"%{spec.value}")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
 
         return inner
 
-    by_name_in = staticmethod(make_string_in_factory(GroupRow.name))
+    by_name_in = staticmethod(make_string_in_factory(ProjectRow.name))
 
     # ==================== Domain Name Filters ====================
 
@@ -89,9 +89,9 @@ class GroupConditions:
     def by_domain_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = GroupRow.domain_name.ilike(f"%{spec.value}%")
+                condition = ProjectRow.domain_name.ilike(f"%{spec.value}%")
             else:
-                condition = GroupRow.domain_name.like(f"%{spec.value}%")
+                condition = ProjectRow.domain_name.like(f"%{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -102,9 +102,9 @@ class GroupConditions:
     def by_domain_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = sa.func.lower(GroupRow.domain_name) == spec.value.lower()
+                condition = sa.func.lower(ProjectRow.domain_name) == spec.value.lower()
             else:
-                condition = GroupRow.domain_name == spec.value
+                condition = ProjectRow.domain_name == spec.value
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -115,9 +115,9 @@ class GroupConditions:
     def by_domain_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = GroupRow.domain_name.ilike(f"{spec.value}%")
+                condition = ProjectRow.domain_name.ilike(f"{spec.value}%")
             else:
-                condition = GroupRow.domain_name.like(f"{spec.value}%")
+                condition = ProjectRow.domain_name.like(f"{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -128,30 +128,30 @@ class GroupConditions:
     def by_domain_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = GroupRow.domain_name.ilike(f"%{spec.value}")
+                condition = ProjectRow.domain_name.ilike(f"%{spec.value}")
             else:
-                condition = GroupRow.domain_name.like(f"%{spec.value}")
+                condition = ProjectRow.domain_name.like(f"%{spec.value}")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
 
         return inner
 
-    by_domain_name_in = staticmethod(make_string_in_factory(GroupRow.domain_name))
+    by_domain_name_in = staticmethod(make_string_in_factory(ProjectRow.domain_name))
 
     # ==================== Type Filters ====================
 
     @staticmethod
     def by_type_equals(project_type: ProjectType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.type == project_type
+            return ProjectRow.type == project_type
 
         return inner
 
     @staticmethod
     def by_type_in(types: Collection[ProjectType]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.type.in_(types)
+            return ProjectRow.type.in_(types)
 
         return inner
 
@@ -160,7 +160,7 @@ class GroupConditions:
     @staticmethod
     def by_is_active(is_active: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.is_active == is_active
+            return ProjectRow.is_active == is_active
 
         return inner
 
@@ -178,7 +178,7 @@ class GroupConditions:
         """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            condition = GroupRow.id == spec.value
+            condition = ProjectRow.id == spec.value
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -197,7 +197,7 @@ class GroupConditions:
         """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            condition = GroupRow.id.in_(spec.values)
+            condition = ProjectRow.id.in_(spec.values)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -211,7 +211,7 @@ class GroupConditions:
         """Filter by created_at < datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.created_at < dt
+            return ProjectRow.created_at < dt
 
         return inner
 
@@ -220,7 +220,7 @@ class GroupConditions:
         """Filter by created_at > datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.created_at > dt
+            return ProjectRow.created_at > dt
 
         return inner
 
@@ -229,7 +229,7 @@ class GroupConditions:
         """Filter by created_at == datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.created_at == dt
+            return ProjectRow.created_at == dt
 
         return inner
 
@@ -238,7 +238,7 @@ class GroupConditions:
         """Filter by modified_at < datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.updated_at < dt
+            return ProjectRow.updated_at < dt
 
         return inner
 
@@ -247,7 +247,7 @@ class GroupConditions:
         """Filter by modified_at > datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.updated_at > dt
+            return ProjectRow.updated_at > dt
 
         return inner
 
@@ -256,7 +256,7 @@ class GroupConditions:
         """Filter by modified_at == datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.updated_at == dt
+            return ProjectRow.updated_at == dt
 
         return inner
 
@@ -271,9 +271,9 @@ class GroupConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             subquery = (
-                sa.select(GroupRow.created_at).where(GroupRow.id == cursor_id).scalar_subquery()
+                sa.select(ProjectRow.created_at).where(ProjectRow.id == cursor_id).scalar_subquery()
             )
-            return GroupRow.created_at < subquery
+            return ProjectRow.created_at < subquery
 
         return inner
 
@@ -286,9 +286,9 @@ class GroupConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             subquery = (
-                sa.select(GroupRow.created_at).where(GroupRow.id == cursor_id).scalar_subquery()
+                sa.select(ProjectRow.created_at).where(ProjectRow.id == cursor_id).scalar_subquery()
             )
-            return GroupRow.created_at > subquery
+            return ProjectRow.created_at > subquery
 
         return inner
 
@@ -299,7 +299,7 @@ class GroupConditions:
         *domain_conditions: sa.sql.expression.ColumnElement[bool],
     ) -> sa.sql.expression.ColumnElement[bool]:
         """EXISTS subquery: Group → Domain with given conditions."""
-        subq = sa.select(sa.literal(1)).where(DomainRow.name == GroupRow.domain_name)
+        subq = sa.select(sa.literal(1)).where(DomainRow.name == ProjectRow.domain_name)
         for cond in domain_conditions:
             subq = subq.where(cond)
         return sa.exists(subq)
@@ -313,7 +313,7 @@ class GroupConditions:
                 cond = DomainRow.description.like(f"%{spec.value}%")
             if spec.negated:
                 cond = sa.not_(cond)
-            return GroupConditions._exists_domain(cond)
+            return ProjectConditions._exists_domain(cond)
 
         return inner
 
@@ -326,20 +326,20 @@ class GroupConditions:
                 cond = DomainRow.description == spec.value
             if spec.negated:
                 cond = sa.not_(cond)
-            return GroupConditions._exists_domain(cond)
+            return ProjectConditions._exists_domain(cond)
 
         return inner
 
     @staticmethod
     def by_domain_is_active(is_active: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupConditions._exists_domain(DomainRow.is_active == is_active)
+            return ProjectConditions._exists_domain(DomainRow.is_active == is_active)
 
         return inner
 
     by_domain_description_in = staticmethod(
         make_nested_string_in_factory(
-            DomainRow.description, lambda c: GroupConditions._exists_domain(c)
+            DomainRow.description, lambda c: ProjectConditions._exists_domain(c)
         )
     )
 
@@ -351,7 +351,7 @@ class GroupConditions:
         """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subq = sa.select(sa.literal(1)).where(DomainRow.name == GroupRow.domain_name)
+            subq = sa.select(sa.literal(1)).where(DomainRow.name == ProjectRow.domain_name)
             for cond in domain_conditions:
                 subq = subq.where(cond())
             return sa.exists(subq)
@@ -374,7 +374,7 @@ class GroupConditions:
                     AssocGroupUserRow.user_id == UserRow.uuid,
                 )
             )
-            .where(AssocGroupUserRow.group_id == GroupRow.id)
+            .where(AssocGroupUserRow.group_id == ProjectRow.id)
         )
         for cond in user_conditions:
             subq = subq.where(cond)
@@ -386,7 +386,7 @@ class GroupConditions:
             condition = UserRow.uuid == spec.value
             if spec.negated:
                 condition = sa.not_(condition)
-            return GroupConditions._exists_user(condition)
+            return ProjectConditions._exists_user(condition)
 
         return inner
 
@@ -396,7 +396,7 @@ class GroupConditions:
             condition = UserRow.uuid.in_(spec.values)
             if spec.negated:
                 condition = sa.not_(condition)
-            return GroupConditions._exists_user(condition)
+            return ProjectConditions._exists_user(condition)
 
         return inner
 
@@ -409,7 +409,7 @@ class GroupConditions:
                 cond = UserRow.username.like(f"%{spec.value}%")
             if spec.negated:
                 cond = sa.not_(cond)
-            return GroupConditions._exists_user(cond)
+            return ProjectConditions._exists_user(cond)
 
         return inner
 
@@ -422,7 +422,7 @@ class GroupConditions:
                 cond = UserRow.username == spec.value
             if spec.negated:
                 cond = sa.not_(cond)
-            return GroupConditions._exists_user(cond)
+            return ProjectConditions._exists_user(cond)
 
         return inner
 
@@ -435,7 +435,7 @@ class GroupConditions:
                 cond = UserRow.username.like(f"{spec.value}%")
             if spec.negated:
                 cond = sa.not_(cond)
-            return GroupConditions._exists_user(cond)
+            return ProjectConditions._exists_user(cond)
 
         return inner
 
@@ -448,7 +448,7 @@ class GroupConditions:
                 cond = UserRow.username.like(f"%{spec.value}")
             if spec.negated:
                 cond = sa.not_(cond)
-            return GroupConditions._exists_user(cond)
+            return ProjectConditions._exists_user(cond)
 
         return inner
 
@@ -461,7 +461,7 @@ class GroupConditions:
                 cond = UserRow.email.like(f"%{spec.value}%")
             if spec.negated:
                 cond = sa.not_(cond)
-            return GroupConditions._exists_user(cond)
+            return ProjectConditions._exists_user(cond)
 
         return inner
 
@@ -474,7 +474,7 @@ class GroupConditions:
                 cond = UserRow.email == spec.value
             if spec.negated:
                 cond = sa.not_(cond)
-            return GroupConditions._exists_user(cond)
+            return ProjectConditions._exists_user(cond)
 
         return inner
 
@@ -487,7 +487,7 @@ class GroupConditions:
                 cond = UserRow.email.like(f"{spec.value}%")
             if spec.negated:
                 cond = sa.not_(cond)
-            return GroupConditions._exists_user(cond)
+            return ProjectConditions._exists_user(cond)
 
         return inner
 
@@ -500,23 +500,23 @@ class GroupConditions:
                 cond = UserRow.email.like(f"%{spec.value}")
             if spec.negated:
                 cond = sa.not_(cond)
-            return GroupConditions._exists_user(cond)
+            return ProjectConditions._exists_user(cond)
 
         return inner
 
     by_user_username_in = staticmethod(
-        make_nested_string_in_factory(UserRow.username, lambda c: GroupConditions._exists_user(c))
+        make_nested_string_in_factory(UserRow.username, lambda c: ProjectConditions._exists_user(c))
     )
     by_user_email_in = staticmethod(
-        make_nested_string_in_factory(UserRow.email, lambda c: GroupConditions._exists_user(c))
+        make_nested_string_in_factory(UserRow.email, lambda c: ProjectConditions._exists_user(c))
     )
 
     @staticmethod
     def by_user_is_active(is_active: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if is_active:
-                return GroupConditions._exists_user(UserRow.status == UserStatus.ACTIVE)
-            return GroupConditions._exists_user(UserRow.status != UserStatus.ACTIVE)
+                return ProjectConditions._exists_user(UserRow.status == UserStatus.ACTIVE)
+            return ProjectConditions._exists_user(UserRow.status != UserStatus.ACTIVE)
 
         return inner
 
@@ -534,7 +534,7 @@ class GroupConditions:
                         AssocGroupUserRow.user_id == UserRow.uuid,
                     )
                 )
-                .where(AssocGroupUserRow.group_id == GroupRow.id)
+                .where(AssocGroupUserRow.group_id == ProjectRow.id)
             )
             for cond in user_conditions:
                 subq = subq.where(cond())

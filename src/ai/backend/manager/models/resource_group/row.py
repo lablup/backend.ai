@@ -51,8 +51,8 @@ from ai.backend.manager.models.base import (
     Base,
     PydanticColumn,
 )
-from ai.backend.manager.models.group import resolve_group_name_or_id, resolve_groups
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
+from ai.backend.manager.models.project import resolve_group_name_or_id, resolve_groups
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -696,7 +696,7 @@ class ResourceGroupPermissionContextBuilder(
         ctx: ClientContext,
         scope: ProjectScope,
     ) -> ResourceGroupPermissionContext:
-        from ai.backend.manager.models.group import GroupRow
+        from ai.backend.manager.models.project import ProjectRow
 
         project_permissions = await self.calculate_permission(ctx, scope)
         if not project_permissions:
@@ -704,10 +704,10 @@ class ResourceGroupPermissionContextBuilder(
             return ResourceGroupPermissionContext()
 
         stmt = (
-            sa.select(GroupRow)
-            .where(GroupRow.id == scope.project_id)
+            sa.select(ProjectRow)
+            .where(ProjectRow.id == scope.project_id)
             .options(
-                selectinload(GroupRow.sgroup_for_groups_rows).selectinload(
+                selectinload(ProjectRow.sgroup_for_groups_rows).selectinload(
                     ResourceGroupForProjectRow.sgroup_row
                 )
             )

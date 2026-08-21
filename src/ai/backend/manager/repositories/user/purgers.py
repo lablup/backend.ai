@@ -11,8 +11,8 @@ from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.error_log.row import ErrorLogRow
-from ai.backend.manager.models.group import AssocGroupUserRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import AssocGroupUserRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )

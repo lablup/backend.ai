@@ -13,9 +13,9 @@ from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
@@ -53,7 +53,7 @@ async def database_with_usage_tables(
             UserRoleRow,
             UserRow,
             KeyPairRow,
-            GroupRow,
+            ProjectRow,
             AgentRow,
             DomainUsageBucketRow,
             ProjectUsageBucketRow,
@@ -178,11 +178,11 @@ async def project_id(
     domain_fixture: DomainFixtureData,
     project_resource_policy: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
-    """Create GroupRow and return its ID."""
+    """Create ProjectRow and return its ID."""
     group_id = uuid.uuid4()
     async with database_with_usage_tables.begin_session() as db_sess:
         db_sess.add(
-            GroupRow(
+            ProjectRow(
                 id=group_id,
                 name="test-project",
                 domain_name=domain_fixture.domain_name,

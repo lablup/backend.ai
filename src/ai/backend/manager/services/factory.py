@@ -266,7 +266,7 @@ def create_services(args: ServiceArgs) -> Services:
             args.storage_manager,
             args.config_provider,
             args.valkey_stat_client,
-            repositories.group,
+            repositories.project,
         ),
         user=UserService(
             args.storage_manager,
@@ -392,7 +392,7 @@ def create_services(args: ServiceArgs) -> Services:
             valkey_session_client=args.valkey_session_client,
             user_resource_policy_repository=repositories.user_resource_policy.repository,
             user_repository=repositories.user.repository,
-            group_repository=repositories.group.repository,
+            group_repository=repositories.project.repository,
             ssh_key_validator=args.ssh_key_validator,
         ),
         notification=NotificationService(
@@ -408,7 +408,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         permission_controller=PermissionControllerService(
             repository=repositories.permission_controller.repository,
-            group_repository=repositories.group.repository,
+            group_repository=repositories.project.repository,
             rbac_action_registry=RBAC_ACTION_REGISTRY,
         ),
         vfs_storage=VFSStorageService(

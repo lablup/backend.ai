@@ -11,26 +11,26 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 
 __all__ = (
-    "GroupSearchResult",
+    "ProjectSearchResult",
     "DomainProjectOperationScope",
     "UserProjectOperationScope",
 )
 
 
 @dataclass
-class GroupSearchResult:
+class ProjectSearchResult:
     """Result from searching groups/projects."""
 
-    items: list[GroupData]
+    items: list[ProjectData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
@@ -48,7 +48,7 @@ class DomainProjectOperationScope(OperationScope):
 
     @override
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for GroupRow.
+        """Convert scope to a query condition for ProjectRow.
 
         Groups reference their domain by name, so the domain UUID is resolved
         to the name via a scalar subquery.
@@ -56,7 +56,7 @@ class DomainProjectOperationScope(OperationScope):
         domain_id = self.domain_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.domain_name == (
+            return ProjectRow.domain_name == (
                 sa.select(DomainRow.name).where(DomainRow.id == domain_id).scalar_subquery()
             )
 
@@ -93,7 +93,7 @@ class UserProjectOperationScope(OperationScope):
         user_uuid = self.user_uuid
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return user_scope_membership_exists(PROJECT_SCOPE_TYPE, GroupRow.id, user_uuid)
+            return user_scope_membership_exists(PROJECT_SCOPE_TYPE, ProjectRow.id, user_uuid)
 
         return inner
 

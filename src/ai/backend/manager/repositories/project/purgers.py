@@ -12,8 +12,8 @@ from ai.backend.common.data.permission.types import EntityType, RBACElementType,
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ProjectHasActiveKernelsError
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -26,7 +26,7 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
 
 
 @dataclass
-class GroupKernelBatchPurgerSpec(BatchPurgerSpec[KernelRow]):
+class ProjectKernelBatchPurgerSpec(BatchPurgerSpec[KernelRow]):
     """PurgerSpec for deleting all kernels belonging to a group."""
 
     group_id: UUID
@@ -51,7 +51,7 @@ class GroupKernelBatchPurgerSpec(BatchPurgerSpec[KernelRow]):
 
 
 @dataclass
-class GroupSessionBatchPurgerSpec(BatchPurgerSpec[SessionRow]):
+class ProjectSessionBatchPurgerSpec(BatchPurgerSpec[SessionRow]):
     """PurgerSpec for deleting all sessions belonging to a group."""
 
     group_id: UUID
@@ -81,7 +81,7 @@ class SessionByIdsBatchPurgerSpec(BatchPurgerSpec[SessionRow]):
 
 
 @dataclass
-class GroupEndpointBatchPurgerSpec(BatchPurgerSpec[EndpointRow]):
+class ProjectEndpointBatchPurgerSpec(BatchPurgerSpec[EndpointRow]):
     """PurgerSpec for deleting all endpoints belonging to a group."""
 
     project_id: UUID
@@ -96,14 +96,14 @@ class GroupEndpointBatchPurgerSpec(BatchPurgerSpec[EndpointRow]):
 
 
 @dataclass
-class ProjectPurgerSpec(RBACEntityPurgerSpec[GroupRow]):
+class ProjectPurgerSpec(RBACEntityPurgerSpec[ProjectRow]):
     """PurgerSpec for deleting a single group with RBAC scope/permission cleanup."""
 
     project_id: ProjectID
 
     @override
-    def row_class(self) -> type[GroupRow]:
-        return GroupRow
+    def row_class(self) -> type[ProjectRow]:
+        return ProjectRow
 
     @override
     def pk_value(self) -> UUID:

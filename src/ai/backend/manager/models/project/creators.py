@@ -11,19 +11,19 @@ from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
+from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
     UniqueConstraintViolationError,
 )
-from ai.backend.manager.models.group.row import GroupRow, ProjectType
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.specs.creator import RoleManagedEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
-class GroupCreator(RoleManagedEntityCreator[GroupRow, GroupData]):
+class ProjectCreator(RoleManagedEntityCreator[ProjectRow, ProjectData]):
     """Registers a project under a domain."""
 
     name: str
@@ -40,15 +40,15 @@ class GroupCreator(RoleManagedEntityCreator[GroupRow, GroupData]):
     dotfiles: bytes | None = None
 
     @override
-    def entity_id(self, row: GroupRow) -> EntityIdentifier:
+    def entity_id(self, row: ProjectRow) -> EntityIdentifier:
         return ProjectID(row.id)
 
     @override
-    def member_of(self, row: GroupRow) -> Collection[EntityIdentifier]:
+    def member_of(self, row: ProjectRow) -> Collection[EntityIdentifier]:
         return (self.domain_id,)
 
     @override
-    def template_value(self, row: GroupRow) -> ScopeTemplateValue:
+    def template_value(self, row: ProjectRow) -> ScopeTemplateValue:
         return ScopeTemplateValue(id=row.id, name=row.name, type=PROJECT_SCOPE_TYPE)
 
     @override
@@ -78,8 +78,8 @@ class GroupCreator(RoleManagedEntityCreator[GroupRow, GroupData]):
         )
 
     @override
-    def build_row(self) -> GroupRow:
-        return GroupRow(
+    def build_row(self) -> ProjectRow:
+        return ProjectRow(
             name=self.name,
             domain_name=self.domain_name,
             type=self.type or ProjectType.GENERAL,
@@ -94,5 +94,5 @@ class GroupCreator(RoleManagedEntityCreator[GroupRow, GroupData]):
         )
 
     @override
-    def to_data(self, row: GroupRow) -> GroupData:
+    def to_data(self, row: ProjectRow) -> ProjectData:
         return row.to_data()

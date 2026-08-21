@@ -100,10 +100,10 @@ from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.data.user.types import UserStatus as DataUserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain.conditions import DomainConditions
-from ai.backend.manager.models.group.conditions import GroupConditions
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.conditions import KeypairConditions, KeypairOrders
 from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.user.conditions import UserConditions
 from ai.backend.manager.models.user.orders import UserOrders
@@ -1346,16 +1346,16 @@ class UserAdapter(BaseAdapter):
         if project_filter.name is not None:
             condition = self.convert_string_filter(
                 project_filter.name,
-                contains_factory=GroupConditions.by_name_contains,
-                equals_factory=GroupConditions.by_name_equals,
-                starts_with_factory=GroupConditions.by_name_starts_with,
-                ends_with_factory=GroupConditions.by_name_ends_with,
-                in_factory=GroupConditions.by_name_in,
+                contains_factory=ProjectConditions.by_name_contains,
+                equals_factory=ProjectConditions.by_name_equals,
+                starts_with_factory=ProjectConditions.by_name_starts_with,
+                ends_with_factory=ProjectConditions.by_name_ends_with,
+                in_factory=ProjectConditions.by_name_in,
             )
             if condition is not None:
                 raw_conditions.append(condition)
         if project_filter.is_active is not None:
-            raw_conditions.append(GroupConditions.by_is_active(project_filter.is_active))
+            raw_conditions.append(ProjectConditions.by_is_active(project_filter.is_active))
         if not raw_conditions:
             return []
         return [UserConditions.exists_project_combined(raw_conditions)]

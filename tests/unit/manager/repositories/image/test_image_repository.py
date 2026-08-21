@@ -23,11 +23,11 @@ from ai.backend.common.types import BinarySize, KernelId, ResourceSlot, SessionI
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 from ai.backend.manager.models.image.conditions import ImageConditions
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -456,7 +456,7 @@ class TestImageRepositoryLastUsedAt:
                 KeyPairResourcePolicyRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -575,8 +575,8 @@ class TestImageRepositoryLastUsedAt:
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain: DomainRow,
         group_policy: ProjectResourcePolicyRow,
-    ) -> GroupRow:
-        group = GroupRow(
+    ) -> ProjectRow:
+        group = ProjectRow(
             id=uuid4(),
             name=f"test-group-{uuid4().hex[:8]}",
             domain_name=domain.name,
@@ -648,7 +648,7 @@ class TestImageRepositoryLastUsedAt:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         user: UserRow,
-        group: GroupRow,
+        group: ProjectRow,
         domain: DomainRow,
         resource_group: str,
     ) -> CreateKernelForImageFunc:

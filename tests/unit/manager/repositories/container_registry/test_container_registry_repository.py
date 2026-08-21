@@ -34,10 +34,10 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -138,7 +138,7 @@ class TestContainerRegistryRepository:
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
@@ -210,7 +210,7 @@ class TestContainerRegistryRepository:
 
             # Create 2 groups
             for i in range(2):
-                group = GroupRow(
+                group = ProjectRow(
                     name=f"test-group-{i}-{sample_domain.domain_name}",
                     domain_name=sample_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
@@ -468,7 +468,7 @@ class TestContainerRegistryRepository:
 
             # Create 2 groups
             for i in range(2):
-                group = GroupRow(
+                group = ProjectRow(
                     name=f"test-group-for-registry-{i}-{registry_name}",
                     domain_name=domain_name,
                     total_resource_slots=ResourceSlot(),
@@ -948,7 +948,7 @@ class TestContainerRegistryRepository:
 
             # Create 3 groups and associate them
             for i in range(3):
-                group = GroupRow(
+                group = ProjectRow(
                     name=f"test-group-{i}-{sample_domain.domain_name}-assoc",
                     domain_name=sample_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
@@ -1075,7 +1075,7 @@ class TestContainerRegistryRepository:
 
             # Create 4 groups
             for i in range(4):
-                group = GroupRow(
+                group = ProjectRow(
                     name=f"test-group-{i}-{sample_domain.domain_name}-partial",
                     domain_name=sample_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
@@ -1355,7 +1355,7 @@ class TestSearchContainerRegistries:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,

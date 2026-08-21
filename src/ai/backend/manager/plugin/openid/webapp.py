@@ -29,8 +29,8 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -152,9 +152,9 @@ async def create_user_if_not_exists(
         domain_id = DomainID(domain_result.rows[0].id)
 
         project_result = await w.batch_query_in_global(
-            sa.select(GroupRow.id).where(
-                GroupRow.domain_name == user_data["domain_name"],
-                GroupRow.name == user_info["project"],
+            sa.select(ProjectRow.id).where(
+                ProjectRow.domain_name == user_data["domain_name"],
+                ProjectRow.name == user_info["project"],
             ),
             BatchQuerier(pagination=NoPagination()),
         )

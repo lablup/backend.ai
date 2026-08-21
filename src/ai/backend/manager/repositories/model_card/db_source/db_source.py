@@ -22,7 +22,6 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
 from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
 from ai.backend.common.types import VFolderID, VFolderUsageMode
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.model_card.types import (
     BulkModelCardDeleteFailure,
     BulkModelCardDeleteResultData,
@@ -30,6 +29,7 @@ from ai.backend.manager.data.model_card.types import (
     ResourceRequirementEntry,
     VFolderScanData,
 )
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.resource import (
     InvalidProjectTypeForModelCard,
     ModelCardNotFound,
@@ -37,8 +37,8 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -311,7 +311,7 @@ class ModelCardDBSource:
 
     async def get_scan_target_vfolders(self, project_id: UUID) -> list[VFolderScanData]:
         async with self._db.begin_readonly_session() as session:
-            project_stmt = sa.select(GroupRow.type).where(GroupRow.id == project_id)
+            project_stmt = sa.select(ProjectRow.type).where(ProjectRow.id == project_id)
             project_type = (await session.execute(project_stmt)).scalar_one_or_none()
             if project_type is None:
                 raise ProjectNotFound(str(project_id))

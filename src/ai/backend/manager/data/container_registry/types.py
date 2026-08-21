@@ -40,7 +40,7 @@ class PerProjectContainerRegistryInfo:
     """Container registry info resolved from a project's container_registry config.
 
     Unlike ContainerRegistryData, all fields are non-nullable because
-    the data is validated during the lookup process (GroupRow → ContainerRegistryRow).
+    the data is validated during the lookup process (ProjectRow → ContainerRegistryRow).
     """
 
     id: ContainerRegistryID

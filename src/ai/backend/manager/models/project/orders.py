@@ -8,57 +8,57 @@ import sqlalchemy as sa
 
 from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import AssocGroupUserRow
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.project import AssocGroupUserRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.user import UserRow
 
-__all__ = ("GroupOrders",)
+__all__ = ("ProjectOrders",)
 
 
-class GroupOrders:
+class ProjectOrders:
     """Query orders for sorting groups/projects."""
 
     @staticmethod
     def id(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return GroupRow.id.asc()
-        return GroupRow.id.desc()
+            return ProjectRow.id.asc()
+        return ProjectRow.id.desc()
 
     @staticmethod
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return GroupRow.name.asc()
-        return GroupRow.name.desc()
+            return ProjectRow.name.asc()
+        return ProjectRow.name.desc()
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return GroupRow.created_at.asc()
-        return GroupRow.created_at.desc()
+            return ProjectRow.created_at.asc()
+        return ProjectRow.created_at.desc()
 
     @staticmethod
     def modified_at(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return GroupRow.updated_at.asc()
-        return GroupRow.updated_at.desc()
+            return ProjectRow.updated_at.asc()
+        return ProjectRow.updated_at.desc()
 
     @staticmethod
     def domain_name(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return GroupRow.domain_name.asc()
-        return GroupRow.domain_name.desc()
+            return ProjectRow.domain_name.asc()
+        return ProjectRow.domain_name.desc()
 
     @staticmethod
     def type(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return GroupRow.type.asc()
-        return GroupRow.type.desc()
+            return ProjectRow.type.asc()
+        return ProjectRow.type.desc()
 
     @staticmethod
     def is_active(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return GroupRow.is_active.asc()
-        return GroupRow.is_active.desc()
+            return ProjectRow.is_active.asc()
+        return ProjectRow.is_active.desc()
 
     # ==================== Domain Nested Orders ====================
 
@@ -69,24 +69,24 @@ class GroupOrders:
         """Scalar subquery selecting a Domain column correlated to current Group."""
         return (
             sa.select(column)
-            .where(DomainRow.name == GroupRow.domain_name)
-            .correlate(GroupRow)
+            .where(DomainRow.name == ProjectRow.domain_name)
+            .correlate(ProjectRow)
             .scalar_subquery()
         )
 
     @staticmethod
     def by_domain_name(ascending: bool = True) -> QueryOrder:
-        subq = GroupOrders._scalar_domain(DomainRow.name)
+        subq = ProjectOrders._scalar_domain(DomainRow.name)
         return subq.asc() if ascending else subq.desc()
 
     @staticmethod
     def by_domain_is_active(ascending: bool = True) -> QueryOrder:
-        subq = GroupOrders._scalar_domain(DomainRow.is_active)
+        subq = ProjectOrders._scalar_domain(DomainRow.is_active)
         return subq.asc() if ascending else subq.desc()
 
     @staticmethod
     def by_domain_created_at(ascending: bool = True) -> QueryOrder:
-        subq = GroupOrders._scalar_domain(DomainRow.created_at)
+        subq = ProjectOrders._scalar_domain(DomainRow.created_at)
         return subq.asc() if ascending else subq.desc()
 
     # ==================== User Nested Orders ====================
@@ -105,17 +105,17 @@ class GroupOrders:
                     AssocGroupUserRow.user_id == UserRow.uuid,
                 )
             )
-            .where(AssocGroupUserRow.group_id == GroupRow.id)
-            .correlate(GroupRow)
+            .where(AssocGroupUserRow.group_id == ProjectRow.id)
+            .correlate(ProjectRow)
             .scalar_subquery()
         )
 
     @staticmethod
     def by_user_username(ascending: bool = True) -> QueryOrder:
-        subq = GroupOrders._scalar_user_min(UserRow.username)
+        subq = ProjectOrders._scalar_user_min(UserRow.username)
         return subq.asc() if ascending else subq.desc()
 
     @staticmethod
     def by_user_email(ascending: bool = True) -> QueryOrder:
-        subq = GroupOrders._scalar_user_min(UserRow.email)
+        subq = ProjectOrders._scalar_user_min(UserRow.email)
         return subq.asc() if ascending else subq.desc()

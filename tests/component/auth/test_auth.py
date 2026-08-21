@@ -47,9 +47,9 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import DomainRow, domains
-from ai.backend.manager.models.group import GroupRow, association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.project import ProjectRow, association_groups_users
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -134,7 +134,7 @@ async def signup_default_project(
     data = _SignupDefaultProjectData(project_id=ProjectID(uuid.uuid4()), cleanup_emails=[])
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=data.project_id,
                 name="default",
                 description="Default project for signup binding test",
@@ -184,7 +184,7 @@ async def signup_default_project(
             )
         )
         await conn.execute(
-            GroupRow.__table__.delete().where(GroupRow.__table__.c.id == data.project_id),
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == data.project_id),
         )
 
 
@@ -307,7 +307,7 @@ async def cross_domain_fixture(
             )
         )
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description=f"Cross-domain test group {group_name}",
@@ -460,7 +460,9 @@ async def cross_domain_fixture(
                 VirtualScopeRow.__table__.c.scope_id == group_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )
         await conn.execute(domains.delete().where(domains.c.name == domain_name))
 
 

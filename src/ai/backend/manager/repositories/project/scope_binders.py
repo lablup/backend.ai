@@ -14,7 +14,7 @@ from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
     RBACScopeEntityUnbinder,
 )
-from ai.backend.manager.repositories.group.purgers import UsersForProjectPurgerSpec
+from ai.backend.manager.repositories.project.purgers import UsersForProjectPurgerSpec
 
 
 @dataclass

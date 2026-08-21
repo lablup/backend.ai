@@ -35,9 +35,9 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.resource_slot import (

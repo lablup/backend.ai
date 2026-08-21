@@ -261,7 +261,7 @@ class ExportAdapter(BaseFilterAdapter):
         """Build select_from clause with dynamic LEFT JOINs.
 
         Args:
-            base_table: Base table (e.g., GroupRow.__table__)
+            base_table: Base table (e.g., ProjectRow.__table__)
             joins: List of JoinDef to apply
 
         Returns:

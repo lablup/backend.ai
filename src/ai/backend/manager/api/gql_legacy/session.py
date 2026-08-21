@@ -47,11 +47,11 @@ from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.idle import ReportInfo
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac import ScopeType, SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.session import (
@@ -128,7 +128,7 @@ _queryfilter_fieldspec: FieldSpecType = {
     "project_id": ("group_id", None),
     "user_id": ("user_uuid", None),
     "full_name": (ORMFieldItem(UserRow.full_name), None),
-    "group_name": (ORMFieldItem(GroupRow.name), None),
+    "group_name": (ORMFieldItem(ProjectRow.name), None),
     "user_email": (ORMFieldItem(UserRow.email), None),
     "access_key": ("access_key", None),
     "scaling_group": ("scaling_group_name", None),
@@ -1271,8 +1271,8 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         elif isinstance(status, str):
             status_list = [SessionStatus[s] for s in status.split(",")]
         j = (
-            # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
-            sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id)
+            # joins with ProjectRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
+            sa.join(SessionRow, ProjectRow, SessionRow.group_id == ProjectRow.id)
             .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
             .join(KernelRow, SessionRow.id == KernelRow.session_id)
         )
@@ -1312,15 +1312,15 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         elif isinstance(status, str):
             status_list = [SessionStatus[s] for s in status.split(",")]
         j = (
-            # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
-            sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
+            # joins with ProjectRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
+            sa.join(SessionRow, ProjectRow, SessionRow.group_id == ProjectRow.id).join(
                 UserRow, SessionRow.user_uuid == UserRow.uuid
             )
         )
         query = (
             sa.select(
                 SessionRow,
-                agg_to_array(GroupRow.name).label("group_name"),
+                agg_to_array(ProjectRow.name).label("group_name"),
                 UserRow.email,
                 UserRow.full_name,
             )
@@ -1361,13 +1361,13 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         access_key: str | None = None,
     ) -> Sequence[ComputeSession | None]:
-        j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
+        j = sa.join(SessionRow, ProjectRow, SessionRow.group_id == ProjectRow.id).join(
             UserRow, SessionRow.user_uuid == UserRow.uuid
         )
         query = (
             sa.select(
                 SessionRow,
-                GroupRow.name.label("group_name"),
+                ProjectRow.name.label("group_name"),
                 UserRow.email,
                 UserRow.full_name,
             )

@@ -29,9 +29,9 @@ from ai.backend.manager.errors.idle_checker import (
 )
 from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -76,7 +76,7 @@ class TestIdleCheckerAssignmentRepository:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,
-                GroupRow,
+                ProjectRow,
                 UserRow,
                 ResourceGroupRow,
                 RoleRow,
@@ -152,7 +152,7 @@ class TestIdleCheckerAssignmentRepository:
             )
             await db_sess.flush()
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=f"project-{project_id.hex[:8]}",
                     domain_name=f"domain-{domain_id.hex[:8]}",

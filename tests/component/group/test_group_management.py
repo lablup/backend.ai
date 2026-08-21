@@ -46,9 +46,9 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow, ImageType
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.session import SessionRow, SessionStatus
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
@@ -68,7 +68,7 @@ async def test_group_for_deletion(
     group_name = f"delete-test-{secrets.token_hex(4)}"
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description=f"Group for deletion test {group_name}",
@@ -110,7 +110,9 @@ async def test_group_for_deletion(
                 VirtualScopeRow.__table__.c.scope_id == group_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )
 
 
 @pytest.fixture()
@@ -134,7 +136,7 @@ async def group_with_vfolder_mounted(
     async with db_engine.begin() as conn:
         # Create group
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description="Group with mounted vfolder",
@@ -248,7 +250,9 @@ async def group_with_vfolder_mounted(
                 VirtualScopeRow.__table__.c.scope_id == group_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )
 
 
 @pytest.fixture()
@@ -271,7 +275,7 @@ async def group_with_active_kernel(
     async with db_engine.begin() as conn:
         # Create group
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description="Group with active kernel",
@@ -369,7 +373,9 @@ async def group_with_active_kernel(
                 VirtualScopeRow.__table__.c.scope_id == group_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )
 
 
 @pytest.fixture()
@@ -391,7 +397,7 @@ async def group_with_active_endpoint(
     async with db_engine.begin() as conn:
         # Create group
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description="Group with active endpoint",
@@ -488,7 +494,9 @@ async def group_with_active_endpoint(
                 VirtualScopeRow.__table__.c.scope_id == group_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )
 
 
 @pytest.fixture()
@@ -505,7 +513,7 @@ async def multiple_test_groups(
         for i in range(5):
             group_id = uuid.uuid4()
             await conn.execute(
-                sa.insert(GroupRow.__table__).values(
+                sa.insert(ProjectRow.__table__).values(
                     id=group_id,
                     name=f"search-test-{unique}-{i}",
                     description=f"Search test group {i}",
@@ -552,7 +560,7 @@ async def multiple_test_groups(
                 )
             )
             await conn.execute(
-                GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id)
+                ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
             )
 
 
@@ -620,8 +628,8 @@ class TestGroupPurge:
         # Verify group is completely removed from DB
         async with db_engine.begin() as conn:
             query_result = await conn.execute(
-                sa.select(GroupRow.__table__).where(
-                    GroupRow.__table__.c.id == test_group_for_deletion
+                sa.select(ProjectRow.__table__).where(
+                    ProjectRow.__table__.c.id == test_group_for_deletion
                 )
             )
             row = query_result.fetchone()
@@ -709,8 +717,8 @@ class TestGroupSearch:
         # Get actual name of one of the test groups
         async with db_engine.begin() as conn:
             query_result = await conn.execute(
-                sa.select(GroupRow.__table__.c.name).where(
-                    GroupRow.__table__.c.id == multiple_test_groups[0]
+                sa.select(ProjectRow.__table__.c.name).where(
+                    ProjectRow.__table__.c.id == multiple_test_groups[0]
                 )
             )
             group_name = query_result.scalar_one()

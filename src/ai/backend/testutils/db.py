@@ -95,7 +95,7 @@ async def with_tables(
 
     Example:
         async def test_something(database_connection):
-            async with with_tables(database_connection, [DomainRow, UserRow, GroupRow]):
+            async with with_tables(database_connection, [DomainRow, UserRow, ProjectRow]):
                 ...
 
         # With association tables:

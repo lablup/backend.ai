@@ -18,20 +18,20 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.group.types import GroupData, UnassignUsersResult
+from ai.backend.manager.data.project.types import ProjectData, UnassignUsersResult
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import InvalidUserUpdateMode, ProjectNotFound
-from ai.backend.manager.models.group.updaters import GroupDotfilesUpdater, GroupUpdater
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater, ProjectUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.group.db_source import GroupDBSource
-from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.project.db_source import ProjectDBSource
+from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-group_repository_resilience = Resilience(
+project_repository_resilience = Resilience(
     policies=[
         MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.GROUP_REPOSITORY)),
         RetryPolicy(
@@ -46,8 +46,8 @@ group_repository_resilience = Resilience(
 )
 
 
-class GroupRepository:
-    _db_source: GroupDBSource
+class ProjectRepository:
+    _db_source: ProjectDBSource
     _config_provider: ManagerConfigProvider
     _valkey_stat_client: ValkeyStatClient
     _storage_manager: StorageSessionManager
@@ -60,20 +60,20 @@ class GroupRepository:
         valkey_stat_client: ValkeyStatClient,
         storage_manager: StorageSessionManager,
     ) -> None:
-        self._db_source = GroupDBSource(db)
+        self._db_source = ProjectDBSource(db)
         self._v2_ops = v2_ops_provider
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
         self._storage_manager = storage_manager
 
-    @group_repository_resilience.apply()
+    @project_repository_resilience.apply()
     async def modify_validated(
         self,
         project_id: ProjectID,
-        updater: GroupUpdater,
+        updater: ProjectUpdater,
         user_update_mode: str | None = None,
         user_uuids: list[uuid.UUID] | None = None,
-    ) -> GroupData | None:
+    ) -> ProjectData | None:
         """Modify a project, optionally rewriting its membership first."""
         if user_update_mode not in (None, "add", "remove"):
             raise InvalidUserUpdateMode("invalid user_update_mode")
@@ -84,8 +84,8 @@ class GroupRepository:
         async with self._v2_ops.write_ops() as w:
             return await w.update_data(updater)
 
-    @group_repository_resilience.apply()
-    async def update_dotfiles(self, updater: GroupDotfilesUpdater) -> GroupData:
+    @project_repository_resilience.apply()
+    async def update_dotfiles(self, updater: ProjectDotfilesUpdater) -> ProjectData:
         """Replace a project's packed dotfile entries."""
         async with self._v2_ops.write_ops() as w:
             data = await w.update_data(updater)
@@ -93,7 +93,7 @@ class GroupRepository:
                 raise ProjectNotFound(f"Project not found: {updater.target_id_value()}")
             return data
 
-    @group_repository_resilience.apply()
+    @project_repository_resilience.apply()
     async def get_container_stats_for_period(
         self,
         start_date: datetime,
@@ -109,7 +109,7 @@ class GroupRepository:
             group_ids,
         )
 
-    @group_repository_resilience.apply()
+    @project_repository_resilience.apply()
     async def fetch_project_resource_usage(
         self,
         start_date: datetime,
@@ -119,12 +119,12 @@ class GroupRepository:
         """Fetch resource usage data for projects."""
         return await self._db_source.fetch_project_resource_usage(start_date, end_date, project_ids)
 
-    @group_repository_resilience.apply()
+    @project_repository_resilience.apply()
     async def purge_group(self, group_id: uuid.UUID) -> bool:
         """Completely remove a group and all its associated data."""
         return await self._db_source.purge_group(group_id, self._storage_manager)
 
-    @group_repository_resilience.apply()
+    @project_repository_resilience.apply()
     async def assign_users_to_project(
         self, project_id: UUID, user_ids: list[UUID], role_id: UUID
     ) -> list[UserData]:
@@ -136,14 +136,14 @@ class GroupRepository:
             ProjectID(project_id), [UserID(uid) for uid in user_ids], role_id
         )
 
-    @group_repository_resilience.apply()
+    @project_repository_resilience.apply()
     async def unassign_users_from_project(
         self, unbinder: UserProjectEntityUnbinder
     ) -> UnassignUsersResult:
         """Remove users from a project and return unassigned users and failures."""
         return await self._db_source.unassign_users_from_project(unbinder)
 
-    @group_repository_resilience.apply()
+    @project_repository_resilience.apply()
     async def bind_user_to_project(self, user_id: UUID, project_id: UUID) -> None:
         """Add a user to a project via the RBAC scope binding (ASE).
 
@@ -151,27 +151,27 @@ class GroupRepository:
         """
         await self._db_source.bind_user_to_project(UserID(user_id), ProjectID(project_id))
 
-    @group_repository_resilience.apply()
+    @project_repository_resilience.apply()
     async def unbind_user_from_project(self, user_id: UUID, project_id: UUID) -> None:
         """Remove a user from a project (RBAC scope binding only)."""
         await self._db_source.unbind_user_from_project(UserID(user_id), ProjectID(project_id))
 
-    @group_repository_resilience.apply()
-    async def get_project(self, project_id: UUID) -> GroupData:
+    @project_repository_resilience.apply()
+    async def get_project(self, project_id: UUID) -> ProjectData:
         """Get a single project by UUID.
 
         Args:
             project_id: UUID of the project.
 
         Returns:
-            GroupData for the project.
+            ProjectData for the project.
 
         Raises:
             ProjectNotFound: If project does not exist.
         """
         return await self._db_source.get_project(project_id)
 
-    @group_repository_resilience.apply()
+    @project_repository_resilience.apply()
     async def project_id_by_name_in_domain(
         self, domain_name: str, project_name: str
     ) -> ProjectID | None:

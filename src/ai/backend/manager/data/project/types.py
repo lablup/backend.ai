@@ -43,7 +43,7 @@ class ProjectType(enum.StrEnum):
 
 
 @dataclass
-class GroupData(EntityData):
+class ProjectData(EntityData):
     id: uuid.UUID = field(compare=False)
     name: str
     description: str | None
@@ -112,7 +112,7 @@ class ProjectMemberRoleSpec:
 
 
 @dataclass
-class GroupModifier(PartialModifier):
+class ProjectModifier(PartialModifier):
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(
         default_factory=TriState[str].nop,

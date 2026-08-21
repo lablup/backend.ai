@@ -19,7 +19,7 @@ from ai.backend.manager.models.condition_utils import (
     make_string_in_factory,
 )
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
 
@@ -763,8 +763,8 @@ class UserConditions:
             .select_from(
                 sa.join(
                     AssocGroupUserRow.__table__,
-                    GroupRow.__table__,
-                    AssocGroupUserRow.group_id == GroupRow.id,
+                    ProjectRow.__table__,
+                    AssocGroupUserRow.group_id == ProjectRow.id,
                 )
             )
             .where(AssocGroupUserRow.user_id == UserRow.uuid)
@@ -777,9 +777,9 @@ class UserConditions:
     def by_project_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                cond = GroupRow.name.ilike(f"%{spec.value}%")
+                cond = ProjectRow.name.ilike(f"%{spec.value}%")
             else:
-                cond = GroupRow.name.like(f"%{spec.value}%")
+                cond = ProjectRow.name.like(f"%{spec.value}%")
             if spec.negated:
                 cond = sa.not_(cond)
             return UserConditions._exists_project(cond)
@@ -790,9 +790,9 @@ class UserConditions:
     def by_project_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                cond = sa.func.lower(GroupRow.name) == spec.value.lower()
+                cond = sa.func.lower(ProjectRow.name) == spec.value.lower()
             else:
-                cond = GroupRow.name == spec.value
+                cond = ProjectRow.name == spec.value
             if spec.negated:
                 cond = sa.not_(cond)
             return UserConditions._exists_project(cond)
@@ -802,12 +802,12 @@ class UserConditions:
     @staticmethod
     def by_project_is_active(is_active: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserConditions._exists_project(GroupRow.is_active == is_active)
+            return UserConditions._exists_project(ProjectRow.is_active == is_active)
 
         return inner
 
     by_project_name_in = staticmethod(
-        make_nested_string_in_factory(GroupRow.name, lambda c: UserConditions._exists_project(c))
+        make_nested_string_in_factory(ProjectRow.name, lambda c: UserConditions._exists_project(c))
     )
 
     @staticmethod
@@ -820,8 +820,8 @@ class UserConditions:
                 .select_from(
                     sa.join(
                         AssocGroupUserRow.__table__,
-                        GroupRow.__table__,
-                        AssocGroupUserRow.group_id == GroupRow.id,
+                        ProjectRow.__table__,
+                        AssocGroupUserRow.group_id == ProjectRow.id,
                     )
                 )
                 .where(AssocGroupUserRow.user_id == UserRow.uuid)

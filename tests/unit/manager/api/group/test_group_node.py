@@ -23,7 +23,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.api.gql_legacy.group import CreateGroup, GroupNode
-from ai.backend.manager.data.group.types import GroupData, ProjectType
+from ai.backend.manager.data.project.types import ProjectData, ProjectType
 from ai.backend.manager.models.user import UserRole
 
 
@@ -45,9 +45,9 @@ class TestCreateGroupMutation:
     """
 
     @pytest.fixture
-    def group_data_response(self) -> GroupData:
-        """GroupData returned from CreateGroup action."""
-        return GroupData(
+    def group_data_response(self) -> ProjectData:
+        """ProjectData returned from CreateGroup action."""
+        return ProjectData(
             id=uuid4(),
             name="test-group",
             description="Test group",
@@ -67,7 +67,7 @@ class TestCreateGroupMutation:
         )
 
     @pytest.fixture
-    def mock_graph_ctx(self, group_data_response: GroupData) -> MagicMock:
+    def mock_graph_ctx(self, group_data_response: ProjectData) -> MagicMock:
         """GraphQueryContext mock with processors and user context."""
 
         ctx = MagicMock()
@@ -185,7 +185,7 @@ class TestGroupNodeQuery:
 
     @pytest.fixture
     def mock_group_row(self) -> MagicMock:
-        """GroupRow mock with VFolderHostPermissionMap (contains sets).
+        """ProjectRow mock with VFolderHostPermissionMap (contains sets).
 
         This simulates what VFolderHostPermissionColumn.process_result_value() returns
         when loading data from the database.

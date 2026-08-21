@@ -19,10 +19,10 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
@@ -84,7 +84,7 @@ class TestSessionUniqueNamePerUser:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 VFolderRow,
                 ContainerRegistryRow,
@@ -223,9 +223,9 @@ class TestSessionUniqueNamePerUser:
         database_with_tables: ExtendedAsyncSAEngine,
         domain: DomainRow,
         group_policy: ProjectResourcePolicyRow,
-    ) -> AsyncGenerator[GroupRow, None]:
+    ) -> AsyncGenerator[ProjectRow, None]:
         """Create test group."""
-        group = GroupRow(
+        group = ProjectRow(
             id=uuid.uuid4(),
             name=f"test-group-{uuid.uuid4().hex[:8]}",
             domain_name=domain.name,
@@ -243,7 +243,7 @@ class TestSessionUniqueNamePerUser:
         self,
         database_with_tables: ExtendedAsyncSAEngine,
         user_one: UserData,
-        group: GroupRow,
+        group: ProjectRow,
         domain: DomainRow,
         resource_group: ResourceGroupRow,
         test_config: TestConfig,

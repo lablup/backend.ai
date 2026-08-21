@@ -37,7 +37,7 @@ from ai.backend.common.dto.manager.domain import (
 )
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.resource_group import (
     ResourceGroupOpts,
     resource_groups,

@@ -4,7 +4,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.errors.resource import ProjectNotFound
-from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 

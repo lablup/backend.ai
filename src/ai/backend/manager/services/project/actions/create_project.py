@@ -6,17 +6,17 @@ from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.entity.types import EntityType, ScopeRef
 from ai.backend.manager.actions.v2.ops.base import CreateRoleManagedEntityOpsAction
-from ai.backend.manager.data.group.types import GroupData
-from ai.backend.manager.models.group.creators import GroupCreator
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.models.project.creators import ProjectCreator
+from ai.backend.manager.models.project.row import ProjectRow
 
 
 @dataclass(frozen=True)
-class CreateProjectAction(CreateRoleManagedEntityOpsAction[GroupRow, GroupData]):
+class CreateProjectAction(CreateRoleManagedEntityOpsAction[ProjectRow, ProjectData]):
     """Register a project under a domain."""
 
     domain_id: DomainID
-    creator: GroupCreator
+    creator: ProjectCreator
 
     @override
     @classmethod
@@ -33,5 +33,5 @@ class CreateProjectAction(CreateRoleManagedEntityOpsAction[GroupRow, GroupData])
         return "create_project"
 
     @override
-    def to_creator(self) -> GroupCreator:
+    def to_creator(self) -> ProjectCreator:
         return self.creator

@@ -72,8 +72,8 @@ from ai.backend.manager.models.base import (
     StructuredJSONColumn,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -1174,8 +1174,8 @@ class ImagePermissionContextBuilder(
         _ctx: ClientContext,
         scope: UserScope,
     ) -> list[ProjectScope]:
-        project_ids_stmt = sa.select(GroupRow.id).where(
-            user_scope_membership_exists(PROJECT_SCOPE_TYPE, GroupRow.id, scope.user_id)
+        project_ids_stmt = sa.select(ProjectRow.id).where(
+            user_scope_membership_exists(PROJECT_SCOPE_TYPE, ProjectRow.id, scope.user_id)
         )
         project_ids = await self.db_session.scalars(project_ids_stmt)
 
@@ -1186,19 +1186,19 @@ class ImagePermissionContextBuilder(
         _ctx: ClientContext,
         scope: DomainScope,
     ) -> list[ProjectScope]:
-        from ai.backend.manager.models.group import GroupRow
+        from ai.backend.manager.models.project import ProjectRow
 
-        stmt = sa.select(GroupRow.id).where(GroupRow.domain_name == scope.domain_name)
+        stmt = sa.select(ProjectRow.id).where(ProjectRow.domain_name == scope.domain_name)
         project_ids = await self.db_session.scalars(stmt)
         return [ProjectScope(project_id=proj_id) for proj_id in project_ids]
 
     async def _verify_project_scope_and_calculate_permission(
         self, ctx: ClientContext, scope: ProjectScope
     ) -> frozenset[ImagePermission]:
-        from ai.backend.manager.models.group import GroupRow
+        from ai.backend.manager.models.project import ProjectRow
 
-        group_query_stmt = sa.select(GroupRow).where(GroupRow.id == scope.project_id)
-        group_row = cast(GroupRow | None, await self.db_session.scalar(group_query_stmt))
+        group_query_stmt = sa.select(ProjectRow).where(ProjectRow.id == scope.project_id)
+        group_row = cast(ProjectRow | None, await self.db_session.scalar(group_query_stmt))
         if group_row is None:
             raise InvalidScope(f"Project not found (project_id: {scope.project_id})")
 

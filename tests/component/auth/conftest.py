@@ -29,10 +29,10 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
+from ai.backend.manager.models.project import association_groups_users
 from ai.backend.manager.models.user import users
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.testutils.fixtures import DomainFixtureData

@@ -17,14 +17,14 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import DotfileEntries
 from ai.backend.manager.models.domain.row import verify_dotfile_name
-from ai.backend.manager.models.group.updaters import GroupDotfilesUpdater
+from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater
 from ai.backend.manager.models.resource_usage import (
     ProjectResourceUsage,
     parse_resource_usage_groups,
     parse_total_resource_group,
 )
-from ai.backend.manager.repositories.group.repositories import GroupRepositories
-from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.project.repositories import ProjectRepositories
+from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.services.project.actions.assign_users_to_project import (
     AssignUsersToProjectAction,
     AssignUsersToProjectActionResult,
@@ -69,14 +69,14 @@ class ProjectService:
     _config_provider: ManagerConfigProvider
     _valkey_stat_client: ValkeyStatClient
     _storage_manager: StorageSessionManager
-    _group_repository: GroupRepository
+    _group_repository: ProjectRepository
 
     def __init__(
         self,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
         valkey_stat_client: ValkeyStatClient,
-        group_repositories: GroupRepositories,
+        group_repositories: ProjectRepositories,
     ) -> None:
         self._storage_manager = storage_manager
         self._config_provider = config_provider
@@ -210,5 +210,5 @@ class ProjectService:
 
     async def _write_dotfiles(self, project_id: ProjectID, entries: DotfileEntries) -> None:
         await self._group_repository.update_dotfiles(
-            GroupDotfilesUpdater(project_id=project_id, dotfiles=entries.pack())
+            ProjectDotfilesUpdater(project_id=project_id, dotfiles=entries.pack())
         )

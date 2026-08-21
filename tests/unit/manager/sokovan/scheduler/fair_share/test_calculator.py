@@ -1060,7 +1060,7 @@ class TestDomainNameResolution:
 
     Verifies that domain_name is correctly resolved from:
     1. fair_shares (existing record) - primary source
-    2. project_domain_names (GroupRow lookup) - fallback
+    2. project_domain_names (ProjectRow lookup) - fallback
     3. Empty string - when project is deleted and no source available
     """
 

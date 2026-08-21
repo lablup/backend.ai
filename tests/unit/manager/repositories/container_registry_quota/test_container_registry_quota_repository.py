@@ -25,7 +25,7 @@ from ai.backend.manager.models.agent import AgentRow
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
@@ -97,7 +97,7 @@ class TestPerProjectRegistryQuotaRepository:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
             ],
         ):
@@ -168,7 +168,7 @@ class TestPerProjectRegistryQuotaRepository:
             )
             session.add(registry)
 
-            group = GroupRow(
+            group = ProjectRow(
                 name=f"test-group-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
@@ -207,7 +207,7 @@ class TestPerProjectRegistryQuotaRepository:
     ) -> _ProjectWithoutRegistry:
         """Pre-created project with no container_registry configured."""
         async with db_with_cleanup.begin_session() as session:
-            group = GroupRow(
+            group = ProjectRow(
                 name=f"test-group-no-reg-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
@@ -230,7 +230,7 @@ class TestPerProjectRegistryQuotaRepository:
     ) -> _ProjectWithInvalidRegistry:
         """Pre-created project with empty container_registry dict (missing required keys)."""
         async with db_with_cleanup.begin_session() as session:
-            group = GroupRow(
+            group = ProjectRow(
                 name=f"test-group-invalid-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
@@ -253,7 +253,7 @@ class TestPerProjectRegistryQuotaRepository:
     ) -> _ProjectWithOrphanedRegistry:
         """Pre-created project whose container_registry config points to a non-existent registry."""
         async with db_with_cleanup.begin_session() as session:
-            group = GroupRow(
+            group = ProjectRow(
                 name=f"test-group-orphan-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
@@ -292,7 +292,7 @@ class TestPerProjectRegistryQuotaRepository:
             )
             session.add(registry)
 
-            group = GroupRow(
+            group = ProjectRow(
                 name=f"test-group-minimal-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),

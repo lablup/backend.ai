@@ -137,10 +137,10 @@ from ai.backend.manager.models.endpoint import (
     EndpointRow,
     EndpointTokenRow,
 )
-from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.project import ProjectRow, groups
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow, resource_groups
 from ai.backend.manager.models.resource_slot.row import (
@@ -1538,10 +1538,10 @@ class DeploymentDBSource:
         group_name: str,
     ) -> uuid.UUID | None:
         """Private method to resolve group ID."""
-        query = sa.select(GroupRow.id).where(
+        query = sa.select(ProjectRow.id).where(
             sa.and_(
-                GroupRow.domain_name == domain_name,
-                GroupRow.name == group_name,
+                ProjectRow.domain_name == domain_name,
+                ProjectRow.name == group_name,
             )
         )
         result = await db_sess.execute(query)

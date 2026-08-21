@@ -19,8 +19,8 @@ from ai.backend.common.exception import UserNotFound
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
-from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.auth import AccessKeyNotFound, GroupMembershipNotFoundError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -30,11 +30,11 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -113,7 +113,7 @@ class TestAuthRepository:
                 RolePermissionPresetRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AssocGroupUserRow,
                 AssociationScopesEntitiesRow,
                 ContainerRegistryRow,
@@ -324,14 +324,14 @@ class TestAuthRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_user_data: UserTestData,
         project_resource_policy: ResourcePolicyTestData,
-    ) -> AsyncGenerator[GroupData, None]:
+    ) -> AsyncGenerator[ProjectData, None]:
         """Create a sample group with user membership for testing"""
         group_id = uuid.uuid4()
         group_name = f"test-group-{uuid.uuid4()}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Create test group
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=group_name,
                 description="Test Group",
@@ -361,7 +361,7 @@ class TestAuthRepository:
             )
             await db_sess.refresh(group)
 
-            group_data = GroupData(
+            group_data = ProjectData(
                 id=group.id,
                 name=group.name,
                 description=group.description,
@@ -383,7 +383,7 @@ class TestAuthRepository:
         self,
         auth_repository: AuthRepository,
         sample_user_data: UserTestData,
-        sample_group_data: GroupData,
+        sample_group_data: ProjectData,
     ) -> None:
         """Test successful group membership retrieval"""
         result = await auth_repository.get_group_membership(

@@ -26,8 +26,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow, SessionIdleCheckRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
@@ -58,7 +58,7 @@ class TestSessionIdleCheckRow:
                 DomainRow,
                 UserResourcePolicyRow,
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 ResourceGroupRow,
                 SessionRow,
                 IdleCheckerRow,
@@ -97,7 +97,7 @@ class TestSessionIdleCheckRow:
                 )
             )
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="session-idle-check-project",
                     description=None,

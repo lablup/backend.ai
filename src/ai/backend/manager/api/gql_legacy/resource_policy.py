@@ -790,13 +790,13 @@ class ProjectResourcePolicy(graphene.ObjectType):  # type: ignore[misc]
         ctx: GraphQueryContext,
         project_uuids: Sequence[uuid.UUID],
     ) -> Sequence[ProjectResourcePolicy]:
-        from ai.backend.manager.models.group import GroupRow
+        from ai.backend.manager.models.project import ProjectRow
 
         query = (
-            sa.select(GroupRow)
-            .where(GroupRow.id.in_(project_uuids))
-            .order_by(GroupRow.resource_policy)
-            .options(selectinload(GroupRow.resource_policy_row))
+            sa.select(ProjectRow)
+            .where(ProjectRow.id.in_(project_uuids))
+            .order_by(ProjectRow.resource_policy)
+            .options(selectinload(ProjectRow.resource_policy_row))
         )
         async with ctx.db.begin_readonly_session() as sess:
             return [

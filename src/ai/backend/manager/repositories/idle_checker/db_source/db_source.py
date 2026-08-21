@@ -34,13 +34,13 @@ from ai.backend.manager.errors.idle_checker import (
 )
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.idle_checker.conditions import SessionIdleCheckConditions
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_group.conditions import ResourceGroupConditions
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.scopes import OperationScope
@@ -146,7 +146,7 @@ class IdleCheckerDBSource:
                     result = await w.batch_query_in_global(sa.select(DomainRow), querier)
                     scope_exists = bool(result.rows)
                 case ScopeType.PROJECT:
-                    row = await w.query(Querier(row_class=GroupRow, pk_value=spec.scope_id))
+                    row = await w.query(Querier(row_class=ProjectRow, pk_value=spec.scope_id))
                     scope_exists = row is not None
                 case ScopeType.RESOURCE_GROUP:
                     querier = BatchQuerier(

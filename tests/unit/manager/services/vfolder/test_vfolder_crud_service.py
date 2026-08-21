@@ -20,7 +20,7 @@ from ai.backend.common.types import (
     QuotaScopeType,
     VFolderUsageMode,
 )
-from ai.backend.manager.data.group.types import ProjectResourceInfo
+from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     VFolderAccessInfo,
@@ -40,7 +40,7 @@ from ai.backend.manager.errors.storage import (
     VFolderInvalidParameter,
     VFolderNotFound,
 )
-from ai.backend.manager.models.group import ProjectType
+from ai.backend.manager.models.project import ProjectType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import VFolderPermission
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository

@@ -13,7 +13,6 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentInput,
@@ -21,15 +20,16 @@ from ai.backend.manager.data.permission.role import (
 )
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -50,18 +50,18 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
-from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
 )
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.project.db_source import ProjectDBSource
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestRoleAssignment:
     """Tests for PermissionDBSource.revoke_role project remaining count
-    and GroupDBSource.bind/unbind_user_to_project."""
+    and ProjectDBSource.bind/unbind_user_to_project."""
 
     @pytest.fixture
     def test_password_info(self) -> PasswordInfo:
@@ -89,7 +89,7 @@ class TestRoleAssignment:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AssociationScopesEntitiesRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -164,7 +164,7 @@ class TestRoleAssignment:
                 )
             )
             session.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=f"test-project-{project_id.hex[:8]}",
                     description="Test project",
@@ -284,8 +284,8 @@ class TestRoleAssignment:
         return PermissionDBSource(db=db_with_cleanup)
 
     @pytest.fixture
-    def group_db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> GroupDBSource:
-        return GroupDBSource(db=db_with_cleanup)
+    def group_db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ProjectDBSource:
+        return ProjectDBSource(db=db_with_cleanup)
 
     # --- revoke_role remaining count ---
 
@@ -346,12 +346,12 @@ class TestRoleAssignment:
         )
         assert result.project_remaining_roles == []
 
-    # --- GroupDBSource.bind/unbind_user_to_project ---
+    # --- ProjectDBSource.bind/unbind_user_to_project ---
 
     async def test_bind_user_to_project_creates_associations(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         user_1: uuid.UUID,
         test_project: uuid.UUID,
     ) -> None:
@@ -372,7 +372,7 @@ class TestRoleAssignment:
     async def test_bind_user_to_project_does_not_bind_project_into_user_scope(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         user_1: uuid.UUID,
         test_project: uuid.UUID,
     ) -> None:
@@ -417,7 +417,7 @@ class TestRoleAssignment:
     async def test_bind_user_to_project_skips_if_already_bound(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         user_1: uuid.UUID,
         test_project: uuid.UUID,
     ) -> None:
@@ -439,7 +439,7 @@ class TestRoleAssignment:
     async def test_unbind_user_from_project_removes_associations(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         user_1: uuid.UUID,
         test_project: uuid.UUID,
     ) -> None:

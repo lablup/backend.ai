@@ -19,10 +19,10 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
@@ -90,7 +90,7 @@ class TestResourceUsageHistoryRepository:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -188,7 +188,7 @@ class TestResourceUsageHistoryRepository:
             db_sess.add(policy)
             await db_sess.flush()
 
-            group = GroupRow(
+            group = ProjectRow(
                 id=project_id,
                 name=f"test-project-{project_id.hex[:8]}",
                 domain_name=test_domain.domain_name,

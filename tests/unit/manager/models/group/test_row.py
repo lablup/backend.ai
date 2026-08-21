@@ -16,8 +16,8 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.group.row import resolve_group_name_or_id
+from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.project.row import resolve_group_name_or_id
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -44,7 +44,7 @@ class TestResolveGroupNameOrId:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                GroupRow,
+                ProjectRow,
             ],
         ):
             yield database_connection
@@ -101,7 +101,7 @@ class TestResolveGroupNameOrId:
         """Create a test group and return its UUID."""
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as session:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name="test-group",
                 description="Test group",

@@ -27,9 +27,9 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import DomainRow, domains
-from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.kernel import kernels
+from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, resource_groups
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import users

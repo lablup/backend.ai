@@ -7,17 +7,17 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.manager.data.group.types import GroupData
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
 @dataclass
-class GroupSearcher(Searcher[GroupRow, GroupData]):
+class ProjectSearcher(Searcher[ProjectRow, ProjectData]):
     @override
     def build_select(self) -> sa.sql.Select[Any]:
-        return sa.select(GroupRow)
+        return sa.select(ProjectRow)
 
     @override
-    def to_data(self, row: GroupRow) -> GroupData:
+    def to_data(self, row: ProjectRow) -> ProjectData:
         return row.to_data()

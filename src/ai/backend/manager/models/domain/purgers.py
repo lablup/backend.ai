@@ -19,11 +19,11 @@ from ai.backend.manager.errors.resource import (
     DomainHasUsers,
 )
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel.row import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KernelRow,
 )
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.specs.purger import DataBatchPurger, EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.user import UserRow
@@ -56,7 +56,7 @@ class DomainPurger(EntityPurger[DomainRow, DomainData]):
                 error=DomainHasUsers("There are users bound to the domain. Remove users first."),
             ),
             ConflictCheck(
-                condition=lambda: GroupRow.domain_name == self.name,
+                condition=lambda: ProjectRow.domain_name == self.name,
                 error=DomainHasGroups("There are groups bound to the domain. Remove groups first."),
             ),
         )

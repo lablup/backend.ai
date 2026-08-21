@@ -35,11 +35,11 @@ from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -97,7 +97,7 @@ class TestSessionRepository:
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 KeyPairRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -208,7 +208,7 @@ class TestSessionRepository:
             db_sess.add(user)
 
             # Create group
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name="test-group",
                 description="Test group",
@@ -604,7 +604,7 @@ class TestBatchPopulateSessionOccupiedSlots:
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 KeyPairRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -705,7 +705,7 @@ class TestBatchPopulateSessionOccupiedSlots:
             )
             db_sess.add(user)
 
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name="test-group",
                 description="Test group",
@@ -936,7 +936,7 @@ class TestGetTemplateInfoById:
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 SessionTemplateRow,
                 KeyPairRow,
                 ContainerRegistryRow,

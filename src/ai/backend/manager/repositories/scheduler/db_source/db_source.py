@@ -72,7 +72,6 @@ from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceede
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow, domains, query_domain_dotfiles
-from ai.backend.manager.models.group import GroupRow, query_group_dotfiles
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import (
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -80,6 +79,7 @@ from ai.backend.manager.models.kernel import (
 )
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.project import ProjectRow, query_group_dotfiles
 from ai.backend.manager.models.resource_group import ResourceGroupRow, query_allowed_sgroups
 from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
@@ -846,9 +846,9 @@ class ScheduleDBSource:
 
         project_result = await db_sess.execute(
             sa.select(
-                GroupRow.id,
-                GroupRow.total_resource_slots,
-            ).where(GroupRow.id.in_(pending_sessions.project_ids))
+                ProjectRow.id,
+                ProjectRow.total_resource_slots,
+            ).where(ProjectRow.id.in_(pending_sessions.project_ids))
         )
 
         for row in project_result:

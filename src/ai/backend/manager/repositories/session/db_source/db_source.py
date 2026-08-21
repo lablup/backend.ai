@@ -38,10 +38,10 @@ from ai.backend.manager.errors.kernel import (
     TooManySessionsMatched,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.resource_group import resource_groups
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow

@@ -55,8 +55,8 @@ from ai.backend.manager.data.kernel.types import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.agent import AgentRow
-    from ai.backend.manager.models.group import GroupRow
     from ai.backend.manager.models.image import ImageRow
+    from ai.backend.manager.models.project import ProjectRow
     from ai.backend.manager.models.session import SessionRow
     from ai.backend.manager.models.user import UserRow
 
@@ -438,7 +438,7 @@ class KernelRow(CreatedAtMixin, Base):
         foreign_keys="KernelRow.image_id",
     )
     agent_row: Mapped[AgentRow | None] = relationship("AgentRow")
-    group_row: Mapped[GroupRow] = relationship("GroupRow")
+    group_row: Mapped[ProjectRow] = relationship("ProjectRow")
     user_row: Mapped[UserRow] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,

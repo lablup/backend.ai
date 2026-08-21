@@ -27,7 +27,6 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.user.types import (
     UserData,
 )
-from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.minilang import (
@@ -38,6 +37,7 @@ from ai.backend.manager.models.minilang import (
 )
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.project import ProjectRow, groups
 from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
     INACTIVE_USER_STATUSES,
@@ -114,8 +114,8 @@ def _project_membership_join(base_table: sa.Table | sa.sql.Join) -> sa.sql.Join:
         ms,
         base_table.c.uuid == ms.c.user_id,
     ).join(
-        GroupRow,
-        GroupRow.id == ms.c.scope_id,
+        ProjectRow,
+        ProjectRow.id == ms.c.scope_id,
     )
 
 
@@ -264,7 +264,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
     _external_table_filters: Mapping[str, ExternalTableFilterSpec] = {
         "project_name": ExternalTableFilterSpec(
             field_name="project_name",
-            target_table=GroupRow.__table__,
+            target_table=ProjectRow.__table__,
             target_column="name",
             join_builder=_project_membership_join,
         ),
@@ -449,7 +449,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult[GroupNode]:
-        from ai.backend.manager.models.group import GroupRow
+        from ai.backend.manager.models.project import ProjectRow
 
         from .group import GroupNode
 
@@ -473,8 +473,8 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
             page_size,
         ) = generate_sql_info_for_gql_connection(
             info,
-            GroupRow,
-            GroupRow.id,
+            ProjectRow,
+            ProjectRow.id,
             _filter_arg,
             _order_expr,
             offset,
@@ -483,14 +483,14 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
             before=before,
             last=last,
         )
-        membership_filter = user_scope_membership_exists(PROJECT_SCOPE_TYPE, GroupRow.id, self.id)
+        membership_filter = user_scope_membership_exists(PROJECT_SCOPE_TYPE, ProjectRow.id, self.id)
         prj_query = query.where(membership_filter)
         cnt_query = cnt_query.where(membership_filter)
         result: list[GroupNode] = []
         async with graph_ctx.db.begin_readonly_session() as db_session:
             total_cnt = await db_session.scalar(cnt_query)
             async for row in await db_session.stream_scalars(prj_query):
-                prj_row = cast(GroupRow, row)
+                prj_row = cast(ProjectRow, row)
                 result.append(GroupNode.from_row(graph_ctx, prj_row))
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 

@@ -11,7 +11,7 @@ from ai.backend.manager.actions.v2.ops.result import (
 )
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
-from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.services.project.actions.assign_users_to_project import (
     AssignUsersToProjectAction,
     AssignUsersToProjectActionResult,
@@ -63,17 +63,17 @@ from ai.backend.manager.services.project.service import ProjectService
 
 class ProjectProcessors:
     lookup: LookupActionProcessor[LookupProjectAction, LookupOpsResult[ProjectID]]
-    get_project: SingleEntityActionProcessor[GetProjectAction, EntityOpsResult[GroupData]]
-    global_search: GlobalActionProcessor[GlobalSearchProjectsAction, BatchOpsResult[GroupData]]
+    get_project: SingleEntityActionProcessor[GetProjectAction, EntityOpsResult[ProjectData]]
+    global_search: GlobalActionProcessor[GlobalSearchProjectsAction, BatchOpsResult[ProjectData]]
     search_projects_by_domain: ScopeActionProcessor[
-        SearchProjectsByDomainAction, ScopedBatchOpsResult[GroupData]
+        SearchProjectsByDomainAction, ScopedBatchOpsResult[ProjectData]
     ]
     search_projects_by_user: ScopeActionProcessor[
-        SearchProjectsByUserAction, ScopedBatchOpsResult[GroupData]
+        SearchProjectsByUserAction, ScopedBatchOpsResult[ProjectData]
     ]
-    create_project: ScopeActionProcessor[CreateProjectAction, CreatedEntityOpsResult[GroupData]]
-    delete_project: SingleEntityActionProcessor[DeleteProjectAction, EntityOpsResult[GroupData]]
-    restore_project: SingleEntityActionProcessor[RestoreProjectAction, EntityOpsResult[GroupData]]
+    create_project: ScopeActionProcessor[CreateProjectAction, CreatedEntityOpsResult[ProjectData]]
+    delete_project: SingleEntityActionProcessor[DeleteProjectAction, EntityOpsResult[ProjectData]]
+    restore_project: SingleEntityActionProcessor[RestoreProjectAction, EntityOpsResult[ProjectData]]
     update_project: SingleEntityActionProcessor[UpdateProjectAction, UpdateProjectActionResult]
     purge_project: SingleEntityActionProcessor[PurgeProjectAction, PurgeProjectActionResult]
     usage_per_month: GlobalActionProcessor[UsagePerMonthAction, UsagePerMonthActionResult]
@@ -96,7 +96,7 @@ class ProjectProcessors:
 
     def __init__(
         self,
-        group: ProcessorGroup[GroupData],
+        group: ProcessorGroup[ProjectData],
         group_service: ProjectService,
     ) -> None:
         self.lookup = group.public_lookup_ops(LookupProjectAction)

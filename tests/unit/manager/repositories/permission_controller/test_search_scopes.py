@@ -22,10 +22,10 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.conditions import (
     DomainScopeConditions,
@@ -91,7 +91,7 @@ class TestSearchDomainScopes:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -353,7 +353,7 @@ class TestSearchProjectScopes:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -426,7 +426,7 @@ class TestSearchProjectScopes:
 
             for name in project_names:
                 project_id = uuid.uuid4()
-                project = GroupRow(
+                project = ProjectRow(
                     id=project_id,
                     name=name,
                     description=f"Test project: {name}",
@@ -454,7 +454,7 @@ class TestSearchProjectScopes:
         async with db_with_scope_tables.begin_session() as db_sess:
             for i in range(15):
                 project_id = uuid.uuid4()
-                project = GroupRow(
+                project = ProjectRow(
                     id=project_id,
                     name=f"project-{i:02d}",
                     description=f"Test project {i}",
@@ -571,7 +571,7 @@ class TestSearchUserScopes:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -791,7 +791,7 @@ class TestSearchGlobalScope:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -842,7 +842,7 @@ class TestSearchScopesEmptyResult:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,

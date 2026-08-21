@@ -11,15 +11,15 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.group.types import GroupData
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
-class GroupUpdater(DataUpdater[GroupRow, GroupData]):
+class ProjectUpdater(DataUpdater[ProjectRow, ProjectData]):
     """Edits a project's settings."""
 
     project_id: ProjectID
@@ -42,12 +42,12 @@ class GroupUpdater(DataUpdater[GroupRow, GroupData]):
 
     @property
     @override
-    def row_class(self) -> type[GroupRow]:
-        return GroupRow
+    def row_class(self) -> type[ProjectRow]:
+        return ProjectRow
 
     @override
     def target_id_column(self) -> InstrumentedAttribute[Any]:
-        return GroupRow.id
+        return ProjectRow.id
 
     @override
     def target_id_value(self) -> UUID:
@@ -75,12 +75,12 @@ class GroupUpdater(DataUpdater[GroupRow, GroupData]):
         return ()
 
     @override
-    def to_data(self, row: GroupRow) -> GroupData:
+    def to_data(self, row: ProjectRow) -> ProjectData:
         return row.to_data()
 
 
 @dataclass
-class GroupDotfilesUpdater(DataUpdater[GroupRow, GroupData]):
+class ProjectDotfilesUpdater(DataUpdater[ProjectRow, ProjectData]):
     """Replaces the packed dotfile entries a project hands to its sessions."""
 
     project_id: ProjectID
@@ -88,12 +88,12 @@ class GroupDotfilesUpdater(DataUpdater[GroupRow, GroupData]):
 
     @property
     @override
-    def row_class(self) -> type[GroupRow]:
-        return GroupRow
+    def row_class(self) -> type[ProjectRow]:
+        return ProjectRow
 
     @override
     def target_id_column(self) -> InstrumentedAttribute[Any]:
-        return GroupRow.id
+        return ProjectRow.id
 
     @override
     def target_id_value(self) -> UUID:
@@ -109,24 +109,24 @@ class GroupDotfilesUpdater(DataUpdater[GroupRow, GroupData]):
         return ()
 
     @override
-    def to_data(self, row: GroupRow) -> GroupData:
+    def to_data(self, row: ProjectRow) -> ProjectData:
         return row.to_data()
 
 
 @dataclass
-class GroupSoftDeleteUpdater(DataUpdater[GroupRow, GroupData]):
+class ProjectSoftDeleteUpdater(DataUpdater[ProjectRow, ProjectData]):
     """Retires a project by clearing its active flag."""
 
     project_id: ProjectID
 
     @property
     @override
-    def row_class(self) -> type[GroupRow]:
-        return GroupRow
+    def row_class(self) -> type[ProjectRow]:
+        return ProjectRow
 
     @override
     def target_id_column(self) -> InstrumentedAttribute[Any]:
-        return GroupRow.id
+        return ProjectRow.id
 
     @override
     def target_id_value(self) -> UUID:
@@ -142,24 +142,24 @@ class GroupSoftDeleteUpdater(DataUpdater[GroupRow, GroupData]):
         return ()
 
     @override
-    def to_data(self, row: GroupRow) -> GroupData:
+    def to_data(self, row: ProjectRow) -> ProjectData:
         return row.to_data()
 
 
 @dataclass
-class GroupRestoreUpdater(DataUpdater[GroupRow, GroupData]):
+class ProjectRestoreUpdater(DataUpdater[ProjectRow, ProjectData]):
     """Puts a retired project back in service."""
 
     project_id: ProjectID
 
     @property
     @override
-    def row_class(self) -> type[GroupRow]:
-        return GroupRow
+    def row_class(self) -> type[ProjectRow]:
+        return ProjectRow
 
     @override
     def target_id_column(self) -> InstrumentedAttribute[Any]:
-        return GroupRow.id
+        return ProjectRow.id
 
     @override
     def target_id_value(self) -> UUID:
@@ -175,5 +175,5 @@ class GroupRestoreUpdater(DataUpdater[GroupRow, GroupData]):
         return ()
 
     @override
-    def to_data(self, row: GroupRow) -> GroupData:
+    def to_data(self, row: ProjectRow) -> ProjectData:
         return row.to_data()

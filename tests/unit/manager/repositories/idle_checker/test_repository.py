@@ -31,12 +31,12 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.idle_checker import IdleCheckerNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
@@ -93,7 +93,7 @@ class JudgmentRows:
 
 def _expired_check_scope_rows(
     scope: ScopeFixture,
-) -> tuple[ProjectResourcePolicyRow, DomainRow, GroupRow, ResourceGroupRow]:
+) -> tuple[ProjectResourcePolicyRow, DomainRow, ProjectRow, ResourceGroupRow]:
     return (
         ProjectResourcePolicyRow(
             name=f"{scope.domain_name}-policy",
@@ -107,7 +107,7 @@ def _expired_check_scope_rows(
             description=None,
             is_active=True,
         ),
-        GroupRow(
+        ProjectRow(
             id=scope.project_id,
             name=f"{scope.domain_name}-project",
             description=None,
@@ -207,7 +207,7 @@ class TestFetchJudgmentBatch:
                 DomainRow,
                 UserResourcePolicyRow,
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 ResourceGroupRow,
                 SessionRow,
                 IdleCheckerRow,
@@ -860,7 +860,7 @@ class TestFetchExpiredIdleChecks:
                 DomainRow,
                 UserResourcePolicyRow,
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 ResourceGroupRow,
                 SessionRow,
                 IdleCheckerRow,
@@ -1047,7 +1047,7 @@ class TestSessionIdleCheckExclusion:
                 DomainRow,
                 UserResourcePolicyRow,
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 ResourceGroupRow,
                 SessionRow,
                 IdleCheckerRow,

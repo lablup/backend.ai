@@ -30,12 +30,12 @@ from ai.backend.manager.models.association_container_registries_groups import (
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.image.row import (
     ImagePermissionContextBuilder,
 )
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
@@ -79,7 +79,7 @@ class TestImagePermissionContextNonGlobalRegistry:
         project_id = uuid4()
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=name,
                     domain_name=domain.domain_name,
@@ -138,7 +138,7 @@ class TestImagePermissionContextNonGlobalRegistry:
                 KeyPairResourcePolicyRow,
                 KeyPairRow,
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 AssocGroupUserRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,

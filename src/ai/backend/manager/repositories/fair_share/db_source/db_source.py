@@ -45,7 +45,7 @@ from ai.backend.manager.models.fair_share import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.resource_usage_history import (
@@ -367,7 +367,7 @@ class FairShareDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             # Step 1: Check project existence and get domain_name (no RG membership required)
-            project_query = sa.select(GroupRow.domain_name).where(GroupRow.id == project_id)
+            project_query = sa.select(ProjectRow.domain_name).where(ProjectRow.id == project_id)
             project_result = await db_sess.execute(project_query)
             project_row = project_result.one_or_none()
             if project_row is None:
@@ -413,7 +413,7 @@ class FairShareDBSource:
         """Search project fair shares with pagination."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(ProjectFairShareRow).outerjoin(
-                GroupRow, ProjectFairShareRow.project_id == GroupRow.id
+                ProjectRow, ProjectFairShareRow.project_id == ProjectRow.id
             )
             result = await execute_batch_querier(db_sess, query, querier)
 
@@ -462,16 +462,16 @@ class FairShareDBSource:
             # Build LEFT JOIN query: all projects LEFT JOIN fair_share (filtered by resource_group)
             query = (
                 sa.select(
-                    GroupRow.id.label("project_id"),
-                    GroupRow.domain_name.label("domain_name"),
+                    ProjectRow.id.label("project_id"),
+                    ProjectRow.domain_name.label("domain_name"),
                     ProjectFairShareRow,
                 )
-                .select_from(GroupRow)
-                .join(DomainRow, GroupRow.domain_name == DomainRow.name)
+                .select_from(ProjectRow)
+                .join(DomainRow, ProjectRow.domain_name == DomainRow.name)
                 .outerjoin(
                     ProjectFairShareRow,
                     sa.and_(
-                        GroupRow.id == ProjectFairShareRow.project_id,
+                        ProjectRow.id == ProjectFairShareRow.project_id,
                         ProjectFairShareRow.resource_group_id == scope.resource_group_id,
                     ),
                 )
@@ -652,9 +652,9 @@ class FairShareDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             # Step 1: Check user-project association and get domain_name
             assoc_query = (
-                sa.select(GroupRow.domain_name)
+                sa.select(ProjectRow.domain_name)
                 .select_from(AssocGroupUserRow)
-                .join(GroupRow, AssocGroupUserRow.group_id == GroupRow.id)
+                .join(ProjectRow, AssocGroupUserRow.group_id == ProjectRow.id)
                 .where(
                     AssocGroupUserRow.group_id == project_id,
                     AssocGroupUserRow.user_id == user_uuid,
@@ -712,9 +712,9 @@ class FairShareDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = (
-                sa.select(GroupRow.domain_name)
+                sa.select(ProjectRow.domain_name)
                 .select_from(AssocGroupUserRow)
-                .join(GroupRow, GroupRow.id == AssocGroupUserRow.group_id)
+                .join(ProjectRow, ProjectRow.id == AssocGroupUserRow.group_id)
                 .where(
                     sa.and_(
                         AssocGroupUserRow.group_id == project_id,
@@ -735,7 +735,7 @@ class FairShareDBSource:
             domain_name if project exists, None otherwise.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(GroupRow.domain_name).where(GroupRow.id == project_id)
+            query = sa.select(ProjectRow.domain_name).where(ProjectRow.id == project_id)
             result = await db_sess.execute(query)
             return result.scalar_one_or_none()
 
@@ -823,7 +823,7 @@ class FairShareDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             # Build LEFT JOIN query:
             # Users via project membership LEFT JOIN fair_share (filtered by resource_group)
-            # Path: AssocGroupUserRow -> GroupRow -> DomainRow -> UserRow -> LEFT JOIN UserFairShareRow
+            # Path: AssocGroupUserRow -> ProjectRow -> DomainRow -> UserRow -> LEFT JOIN UserFairShareRow
             query = (
                 sa.select(
                     AssocGroupUserRow.user_id.label("user_uuid"),
@@ -832,8 +832,8 @@ class FairShareDBSource:
                     UserFairShareRow,
                 )
                 .select_from(AssocGroupUserRow)
-                .join(GroupRow, AssocGroupUserRow.group_id == GroupRow.id)
-                .join(DomainRow, GroupRow.domain_name == DomainRow.name)
+                .join(ProjectRow, AssocGroupUserRow.group_id == ProjectRow.id)
+                .join(DomainRow, ProjectRow.domain_name == DomainRow.name)
                 .join(UserRow, AssocGroupUserRow.user_id == UserRow.uuid)
                 .outerjoin(
                     UserFairShareRow,
@@ -1228,7 +1228,7 @@ class FairShareDBSource:
         db_sess: SASession,
         project_ids: set[uuid.UUID],
     ) -> dict[uuid.UUID, str]:
-        """Fetch domain_name for projects from GroupRow.
+        """Fetch domain_name for projects from ProjectRow.
 
         Args:
             db_sess: Database session
@@ -1239,7 +1239,9 @@ class FairShareDBSource:
         """
         if not project_ids:
             return {}
-        query = sa.select(GroupRow.id, GroupRow.domain_name).where(GroupRow.id.in_(project_ids))
+        query = sa.select(ProjectRow.id, ProjectRow.domain_name).where(
+            ProjectRow.id.in_(project_ids)
+        )
         result = await db_sess.execute(query)
         return {row.id: row.domain_name for row in result}
 

@@ -35,11 +35,11 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import AssociationScopesEntitiesRow, RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
@@ -138,7 +138,7 @@ class TestScalingGroupRepositoryDB:
                 UserRow,
                 KeyPairRow,
                 ResourceGroupForKeypairsRow,  # depends on ResourceGroupRow and KeyPairRow
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -405,7 +405,7 @@ class TestScalingGroupRepositoryDB:
             db_sess.add(user)
 
             # Create group
-            group = GroupRow(
+            group = ProjectRow(
                 id=test_group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group for cascade delete",

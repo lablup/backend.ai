@@ -59,9 +59,9 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -74,12 +74,12 @@ from ai.backend.manager.models.virtual_scope.entity_membership import EntityMemb
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.group.repositories import GroupRepositories
-from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
+from ai.backend.manager.repositories.project.repositories import ProjectRepositories
+from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
@@ -126,14 +126,14 @@ def group_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ProjectProcessors:
     """Real DB-backed ProjectProcessors with real RBAC validators."""
-    repo = GroupRepository(
+    repo = ProjectRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
         config_provider,
         valkey_clients.stat,
         storage_manager,
     )
-    repositories = GroupRepositories(repository=repo)
+    repositories = ProjectRepositories(repository=repo)
     service = ProjectService(
         storage_manager=storage_manager,
         config_provider=config_provider,
@@ -175,7 +175,7 @@ def permission_controller_processors(
     """Real PermissionControllerProcessors for rbac.assign_role / revoke_role SDK calls."""
     perm_repo = PermissionControllerRepository(database_engine)
     storage_mock = AsyncMock()
-    group_repo = GroupRepository(
+    group_repo = ProjectRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
         config_provider,
@@ -339,7 +339,7 @@ async def target_project_fixture(
     project_id = uuid.uuid4()
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=project_id,
                 name=f"target-project-{secrets.token_hex(6)}",
                 description="Primary test project for membership scenarios",
@@ -380,7 +380,9 @@ async def target_project_fixture(
                 VirtualScopeRow.__table__.c.scope_id == project_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == project_id)
+        )
 
 
 @pytest.fixture()
@@ -393,7 +395,7 @@ async def other_project_fixture(
     project_id = uuid.uuid4()
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=project_id,
                 name=f"other-project-{secrets.token_hex(6)}",
                 description="Secondary test project",
@@ -434,7 +436,9 @@ async def other_project_fixture(
                 VirtualScopeRow.__table__.c.scope_id == project_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == project_id)
+        )
 
 
 @pytest.fixture()

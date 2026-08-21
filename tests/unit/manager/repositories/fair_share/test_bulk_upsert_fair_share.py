@@ -21,8 +21,8 @@ from ai.backend.manager.models.fair_share import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
@@ -102,7 +102,7 @@ class TestBulkUpsertDomainFairShare:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
@@ -412,7 +412,7 @@ class TestBulkUpsertProjectFairShare:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
@@ -474,7 +474,7 @@ class TestBulkUpsertProjectFairShare:
             await db_sess.flush()
 
             for pid in project_ids:
-                group = GroupRow(
+                group = ProjectRow(
                     id=pid,
                     name=f"test-project-{pid.hex[:8]}",
                     domain_name=domain_name,
@@ -541,7 +541,7 @@ class TestBulkUpsertProjectFairShare:
             await db_sess.flush()
 
             for pid in project_ids:
-                group = GroupRow(
+                group = ProjectRow(
                     id=pid,
                     name=f"test-project-{pid.hex[:8]}",
                     domain_name=domain_name,
@@ -666,7 +666,7 @@ class TestBulkUpsertUserFairShare:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
@@ -739,7 +739,7 @@ class TestBulkUpsertUserFairShare:
             db_sess.add(user_policy)
             await db_sess.flush()
 
-            group = GroupRow(
+            group = ProjectRow(
                 id=project_id,
                 name=f"test-project-{project_id.hex[:8]}",
                 domain_name=domain_name,
@@ -840,7 +840,7 @@ class TestBulkUpsertUserFairShare:
             db_sess.add(user_policy)
             await db_sess.flush()
 
-            group = GroupRow(
+            group = ProjectRow(
                 id=project_id,
                 name=f"test-project-{project_id.hex[:8]}",
                 domain_name=domain_name,
@@ -953,7 +953,7 @@ class TestBulkUpsertUserFairShare:
             db_sess.add(user_policy)
             await db_sess.flush()
 
-            group = GroupRow(
+            group = ProjectRow(
                 id=project_id,
                 name=f"test-project-{project_id.hex[:8]}",
                 domain_name=domain_name,

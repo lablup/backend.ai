@@ -37,8 +37,8 @@ from ai.backend.manager.models.fair_share.conditions import (
     RGProjectFairShareConditions,
     RGUserFairShareConditions,
 )
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_group import (
     ResourceGroupForDomainRow,
@@ -101,7 +101,7 @@ class TestSearchDomainFairSharesEntityBased:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ResourceGroupForProjectRow,
                 AssocGroupUserRow,
                 AgentRow,  # Required for _fetch_available_slots()
@@ -673,7 +673,7 @@ class TestSearchProjectFairSharesEntityBased:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ResourceGroupForProjectRow,
                 AssocGroupUserRow,
                 AgentRow,  # Required for _fetch_available_slots()
@@ -766,7 +766,7 @@ class TestSearchProjectFairSharesEntityBased:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=f"test-project-{project_id.hex[:8]}",
                     domain_name=domain_name,
@@ -816,7 +816,7 @@ class TestSearchProjectFairSharesEntityBased:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=f"test-project-{project_id.hex[:8]}",
                     domain_name=domain_name,
@@ -1001,7 +1001,7 @@ class TestSearchProjectFairSharesEntityBased:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=f"no-rg-project-{project_id.hex[:8]}",
                     domain_name=domain_name,
@@ -1064,7 +1064,7 @@ class TestSearchUserFairSharesEntityBased:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ResourceGroupForProjectRow,
                 AssocGroupUserRow,
                 AgentRow,  # Required for _fetch_available_slots()
@@ -1148,7 +1148,7 @@ class TestSearchUserFairSharesEntityBased:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=f"test-project-{project_id.hex[:8]}",
                     domain_name=domain_name,

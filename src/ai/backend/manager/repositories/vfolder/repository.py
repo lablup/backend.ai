@@ -26,7 +26,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.group.types import ProjectResourceInfo
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
@@ -39,6 +38,7 @@ from ai.backend.manager.data.permission.types import (
     RoleSource,
     ScopeType,
 )
+from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     UserWithVFolderHostPermissions,
@@ -72,10 +72,10 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent import agents
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -296,8 +296,8 @@ class VfolderRepository:
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             if group_uuid:
-                group_row: GroupRow | None = await db_session.scalar(
-                    sa.select(GroupRow).where(GroupRow.id == group_uuid)
+                group_row: ProjectRow | None = await db_session.scalar(
+                    sa.select(ProjectRow).where(ProjectRow.id == group_uuid)
                 )
                 if group_row is None:
                     raise ProjectNotFound(f"Project with {group_uuid} not found.")
@@ -391,10 +391,10 @@ class VfolderRepository:
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             if group_uuid:
-                group_row: GroupRow | None = await db_session.scalar(
-                    sa.select(GroupRow)
-                    .where(GroupRow.id == group_uuid)
-                    .options(selectinload(GroupRow.resource_policy_row))
+                group_row: ProjectRow | None = await db_session.scalar(
+                    sa.select(ProjectRow)
+                    .where(ProjectRow.id == group_uuid)
+                    .options(selectinload(ProjectRow.resource_policy_row))
                 )
                 if group_row is None:
                     raise ProjectNotFound(f"Project with {group_uuid} not found.")
@@ -1124,19 +1124,21 @@ class VfolderRepository:
         async with self._db.begin_readonly_session_read_committed() as session:
             if isinstance(group_id_or_name, str):
                 query = (
-                    sa.select(GroupRow)
+                    sa.select(ProjectRow)
                     .where(
-                        (GroupRow.domain_name == domain_name) & (GroupRow.name == group_id_or_name)
+                        (ProjectRow.domain_name == domain_name)
+                        & (ProjectRow.name == group_id_or_name)
                     )
-                    .options(selectinload(GroupRow.resource_policy_row))
+                    .options(selectinload(ProjectRow.resource_policy_row))
                 )
             else:  # UUID
                 query = (
-                    sa.select(GroupRow)
+                    sa.select(ProjectRow)
                     .where(
-                        (GroupRow.domain_name == domain_name) & (GroupRow.id == group_id_or_name)
+                        (ProjectRow.domain_name == domain_name)
+                        & (ProjectRow.id == group_id_or_name)
                     )
-                    .options(selectinload(GroupRow.resource_policy_row))
+                    .options(selectinload(ProjectRow.resource_policy_row))
                 )
 
             result = await session.execute(query)

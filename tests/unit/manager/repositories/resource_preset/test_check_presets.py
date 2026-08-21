@@ -49,11 +49,11 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -130,7 +130,7 @@ class TestCheckPresetsOccupiedSlots:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -306,7 +306,7 @@ class TestCheckPresetsOccupiedSlots:
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{group_id.hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -346,7 +346,7 @@ class TestCheckPresetsOccupiedSlots:
         """Get group name from group ID"""
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             group_result = await db_sess.execute(
-                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
+                sa.select(ProjectRow.name).where(ProjectRow.id == test_group_id)
             )
             group_name = group_result.scalar_one()
 
@@ -718,7 +718,7 @@ class TestCheckPresetsOccupiedSlots:
         # Get group name for the API call
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             group_result = await db_sess.execute(
-                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
+                sa.select(ProjectRow.name).where(ProjectRow.id == test_group_id)
             )
             group_name = group_result.scalar_one()
 
@@ -854,7 +854,7 @@ class TestCheckPresetsOccupiedSlots:
         # Test: Repository.check_presets should include TERMINATING kernels
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             group_result = await db_sess.execute(
-                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
+                sa.select(ProjectRow.name).where(ProjectRow.id == test_group_id)
             )
             group_name = group_result.scalar_one()
 
@@ -982,7 +982,7 @@ class TestCheckPresetsOccupiedSlots:
         # Test: Repository.check_presets should ignore PENDING kernels
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             group_result = await db_sess.execute(
-                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
+                sa.select(ProjectRow.name).where(ProjectRow.id == test_group_id)
             )
             group_name = group_result.scalar_one()
 
@@ -1158,7 +1158,7 @@ class TestCheckPresetsOccupiedSlots:
         # Test: Repository.check_presets should use ACTUAL kernel occupied slots, not cached agent value
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             group_result = await db_sess.execute(
-                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
+                sa.select(ProjectRow.name).where(ProjectRow.id == test_group_id)
             )
             group_name = group_result.scalar_one()
 
@@ -1253,7 +1253,7 @@ class TestCheckPresetsZeroValues:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -1462,7 +1462,7 @@ class TestCheckPresetsZeroValues:
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-zero-{group_id.hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -1653,7 +1653,7 @@ class TestCheckPresetsZeroValues:
         # Get group name for the API call
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             group_result = await db_sess.execute(
-                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
+                sa.select(ProjectRow.name).where(ProjectRow.id == test_group_id)
             )
             group_name = group_result.scalar_one()
 

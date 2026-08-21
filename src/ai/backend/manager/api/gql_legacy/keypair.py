@@ -306,7 +306,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
     ) -> int:
         from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-        from ai.backend.manager.models.group.row import groups
+        from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
         from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
@@ -344,7 +344,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         order: str | None = None,
     ) -> Sequence[KeyPair]:
         from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-        from ai.backend.manager.models.group.row import groups
+        from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
         from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
@@ -397,7 +397,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         is_active: bool | None = None,
     ) -> Sequence[Sequence[KeyPair | None]]:
         from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-        from ai.backend.manager.models.group.row import groups
+        from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
         from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
@@ -441,7 +441,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
     ) -> Sequence[KeyPair | None]:
         from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-        from ai.backend.manager.models.group.row import groups
+        from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
         from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 

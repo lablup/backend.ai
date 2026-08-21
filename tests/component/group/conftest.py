@@ -20,7 +20,7 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
@@ -29,9 +29,9 @@ from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRo
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
-from ai.backend.manager.repositories.group.repositories import GroupRepositories
-from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.project.repositories import ProjectRepositories
+from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.service.container_registry.harbor import (
     AbstractPerProjectContainerRegistryQuotaService,
 )
@@ -99,9 +99,9 @@ def group_repository(
     config_provider: ManagerConfigProvider,
     storage_manager: StorageSessionManager,
     valkey_clients: ValkeyClients,
-) -> GroupRepository:
-    """Provide a GroupRepository backed by the real test database."""
-    return GroupRepository(
+) -> ProjectRepository:
+    """Provide a ProjectRepository backed by the real test database."""
+    return ProjectRepository(
         db=database_engine,
         v2_ops_provider=V2DBOpsProvider(database_engine),
         config_provider=config_provider,
@@ -112,13 +112,13 @@ def group_repository(
 
 @pytest.fixture()
 def group_service(
-    group_repository: GroupRepository,
+    group_repository: ProjectRepository,
     storage_manager: StorageSessionManager,
     config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
 ) -> ProjectService:
     """Provide a ProjectService backed by the real test database."""
-    group_repositories = GroupRepositories(repository=group_repository)
+    group_repositories = ProjectRepositories(repository=group_repository)
     return ProjectService(
         storage_manager=storage_manager,
         config_provider=config_provider,
@@ -138,7 +138,7 @@ async def target_group(
     group_name = f"group-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description=f"Test group {group_name}",
@@ -179,4 +179,6 @@ async def target_group(
                 VirtualScopeRow.__table__.c.scope_id == group_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )

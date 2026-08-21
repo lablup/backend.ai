@@ -13,7 +13,7 @@ import pytest
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
-from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
@@ -22,9 +22,9 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -57,7 +57,7 @@ class TestVfolderSearchUserVfolders:
                 KeyPairResourcePolicyRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -188,7 +188,7 @@ class TestVfolderSearchUserVfolders:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="project-a",
                     domain_name=domain_name,
@@ -382,7 +382,7 @@ class TestVfolderSearchUserVfolders:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="project-mixed",
                     domain_name=domain_name,
@@ -608,7 +608,7 @@ class TestVfolderSearchUserVfolders:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="project-perm",
                     domain_name=domain_name,

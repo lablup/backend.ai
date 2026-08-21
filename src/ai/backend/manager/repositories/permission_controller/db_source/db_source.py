@@ -81,7 +81,7 @@ from ai.backend.manager.errors.role_invitation import (
     RoleInvitationNotFound,
 )
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -379,7 +379,7 @@ class PermissionDBSource:
             await db_session.flush()
 
             # Used by PermissionControllerService.revoke_role() to decide whether
-            # to call GroupDBSource.unbind_user_from_project().
+            # to call ProjectDBSource.unbind_user_from_project().
             # TODO: remove this query when unbind_user_from_project() is retired
             # (i.e. association_groups_users is fully migrated to
             # association_scopes_entities).
@@ -813,7 +813,7 @@ class PermissionDBSource:
     ) -> ScopeListResult:
         """Search all projects using BatchQuerier."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(GroupRow.id, GroupRow.name)
+            query = sa.select(ProjectRow.id, ProjectRow.name)
 
             result = await execute_batch_querier(
                 db_sess,
