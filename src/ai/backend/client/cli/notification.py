@@ -34,7 +34,7 @@ from ai.backend.common.dto.manager.notification import (
     ValidateNotificationChannelRequest,
 )
 
-from .extensions import pass_ctx_obj
+from .extensions import output_option, pass_ctx_obj
 from .notification_utils import print_notification_schema
 from .pretty import print_done, print_fail
 from .types import CLIContext
@@ -55,6 +55,7 @@ def channel() -> None:
 
 @channel.command("list")
 @pass_ctx_obj
+@output_option
 @click.option("--enabled-only", is_flag=True, help="Only list enabled channels")
 def list_channels_cmd(ctx: CLIContext, enabled_only: bool) -> None:
     """
@@ -87,6 +88,7 @@ def list_channels_cmd(ctx: CLIContext, enabled_only: bool) -> None:
 
 @channel.command("info")
 @pass_ctx_obj
+@output_option
 @click.argument("channel_id", type=str)
 def info_channel_cmd(ctx: CLIContext, channel_id: str) -> None:
     """
@@ -107,6 +109,7 @@ def info_channel_cmd(ctx: CLIContext, channel_id: str) -> None:
 
 @channel.command("create")
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str)
 @click.option(
     "--channel-type",
@@ -192,6 +195,7 @@ def create_channel_cmd(
 
 @channel.command("update")
 @pass_ctx_obj
+@output_option
 @click.argument("channel_id", type=str)
 @click.option("--name", type=str, default=None, help="Update channel name")
 @click.option(
@@ -289,6 +293,7 @@ def update_channel_cmd(
 
 @channel.command("delete")
 @pass_ctx_obj
+@output_option
 @click.argument("channel_id", type=str)
 def delete_channel_cmd(ctx: CLIContext, channel_id: str) -> None:
     """
@@ -312,6 +317,7 @@ def delete_channel_cmd(ctx: CLIContext, channel_id: str) -> None:
 
 @channel.command("validate")
 @pass_ctx_obj
+@output_option
 @click.argument("channel_id", type=str)
 @click.option(
     "--data",
@@ -376,6 +382,7 @@ def rule() -> None:
 
 @rule.command("types")
 @pass_ctx_obj
+@output_option
 def list_rule_types_cmd(ctx: CLIContext) -> None:
     """
     List all available notification rule types with their schemas.
@@ -406,6 +413,7 @@ def list_rule_types_cmd(ctx: CLIContext) -> None:
 
 @rule.command("schema")
 @pass_ctx_obj
+@output_option
 @click.argument("rule_type", type=str)
 def rule_type_schema_cmd(ctx: CLIContext, rule_type: str) -> None:
     """
@@ -428,6 +436,7 @@ def rule_type_schema_cmd(ctx: CLIContext, rule_type: str) -> None:
 
 @rule.command("list")
 @pass_ctx_obj
+@output_option
 @click.option("--enabled-only", is_flag=True, help="Only list enabled rules")
 @click.option(
     "--rule-types",
@@ -473,6 +482,7 @@ def list_rules_cmd(ctx: CLIContext, enabled_only: bool, rule_types: tuple[str, .
 
 @rule.command("info")
 @pass_ctx_obj
+@output_option
 @click.argument("rule_id", type=str)
 def info_rule_cmd(ctx: CLIContext, rule_id: str) -> None:
     """
@@ -493,6 +503,7 @@ def info_rule_cmd(ctx: CLIContext, rule_id: str) -> None:
 
 @rule.command("create")
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str)
 @click.argument("rule_type", type=str)
 @click.argument("channel_id", type=str)
@@ -559,6 +570,7 @@ def create_rule_cmd(
 
 @rule.command("update")
 @pass_ctx_obj
+@output_option
 @click.argument("rule_id", type=str)
 @click.option("--name", type=str, default=None, help="Update rule name")
 @click.option("--description", type=str, default=None, help="Update rule description")
@@ -619,6 +631,7 @@ def update_rule_cmd(
 
 @rule.command("delete")
 @pass_ctx_obj
+@output_option
 @click.argument("rule_id", type=str)
 def delete_rule_cmd(ctx: CLIContext, rule_id: str) -> None:
     """
@@ -642,6 +655,7 @@ def delete_rule_cmd(ctx: CLIContext, rule_id: str) -> None:
 
 @rule.command("validate")
 @pass_ctx_obj
+@output_option
 @click.argument("rule_id", type=str)
 @click.option(
     "--data",

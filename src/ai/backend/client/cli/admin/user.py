@@ -10,7 +10,7 @@ import click
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.params import BoolExprType, CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.pretty import print_fail, print_info
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.exceptions import BackendAPIError
@@ -29,6 +29,7 @@ def user() -> None:
 
 @user.command()
 @pass_ctx_obj
+@output_option
 @click.option("-e", "--email", type=str, default=None, help="Email of a user to display.")
 def info(ctx: CLIContext, email: str) -> None:
     """
@@ -63,6 +64,7 @@ def info(ctx: CLIContext, email: str) -> None:
 
 @user.command()
 @pass_ctx_obj
+@output_option
 @click.option(
     "-s",
     "--status",
@@ -185,6 +187,7 @@ def list(
 
 @user.command(aliases=["create"])
 @pass_ctx_obj
+@output_option
 @click.argument("domain_name", type=str, metavar="DOMAIN_NAME")
 @click.argument("email", type=str, metavar="EMAIL")
 @click.argument("password", type=str, metavar="PASSWORD")
@@ -379,6 +382,7 @@ def add(
 
 @user.command()
 @pass_ctx_obj
+@output_option
 @click.argument("email", type=str, metavar="EMAIL")
 @click.option(
     "-p",
@@ -596,6 +600,7 @@ def update(
 
 @user.command()
 @pass_ctx_obj
+@output_option
 @click.argument("email", type=str, metavar="EMAIL")
 def delete(ctx: CLIContext, email: str) -> None:
     """
@@ -631,6 +636,7 @@ def delete(ctx: CLIContext, email: str) -> None:
 
 @user.command()
 @pass_ctx_obj
+@output_option
 @click.argument("email", type=str, metavar="EMAIL")
 @click.option(
     "--purge-shared-vfolders",

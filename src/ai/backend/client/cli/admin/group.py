@@ -7,7 +7,7 @@ import click
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.params import BoolExprType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.pretty import print_info
 from ai.backend.client.cli.types import CLIContext
 
@@ -24,6 +24,7 @@ def group() -> None:
 
 @group.command()
 @pass_ctx_obj
+@output_option
 @click.argument("id_or_name", type=str)
 def info(ctx: CLIContext, id_or_name: str) -> None:
     """
@@ -66,6 +67,7 @@ def info(ctx: CLIContext, id_or_name: str) -> None:
 
 @group.command()
 @pass_ctx_obj
+@output_option
 @click.option(
     "-d", "--domain-name", type=str, default=None, help="Domain name to list groups belongs to it."
 )
@@ -88,6 +90,7 @@ def list(ctx: CLIContext, domain_name: str | None) -> None:
 
 @group.command()
 @pass_ctx_obj
+@output_option
 @click.argument("domain_name", type=str, metavar="DOMAIN_NAME")
 @click.argument("name", type=str, metavar="NAME")
 @click.option("-d", "--description", type=str, default="", help="Description of new group.")
@@ -155,6 +158,7 @@ def add(
 
 @group.command()
 @pass_ctx_obj
+@output_option
 @click.argument("gid", type=str, metavar="GROUP_ID")
 @click.option(
     "-n",
@@ -244,6 +248,7 @@ def update(
 
 @group.command()
 @pass_ctx_obj
+@output_option
 @click.argument("gid", type=str, metavar="GROUP_ID")
 def delete(ctx: CLIContext, gid: str) -> None:
     """
@@ -280,6 +285,7 @@ def delete(ctx: CLIContext, gid: str) -> None:
 
 @group.command()
 @pass_ctx_obj
+@output_option
 @click.argument("gid", type=str, metavar="GROUP_ID")
 def purge(ctx: CLIContext, gid: str) -> None:
     """
@@ -319,6 +325,7 @@ def purge(ctx: CLIContext, gid: str) -> None:
 
 @group.command()
 @pass_ctx_obj
+@output_option
 @click.argument("gid", type=str, metavar="GROUP_ID")
 @click.argument("user_uuids", type=str, metavar="USER_UUIDS", nargs=-1)
 def add_users(ctx: CLIContext, gid: str, user_uuids: Sequence[str]) -> None:
@@ -358,6 +365,7 @@ def add_users(ctx: CLIContext, gid: str, user_uuids: Sequence[str]) -> None:
 
 @group.command()
 @pass_ctx_obj
+@output_option
 @click.argument("gid", type=str, metavar="GROUP_ID")
 @click.argument("user_uuids", type=str, metavar="USER_UUIDS", nargs=-1)
 def remove_users(ctx: CLIContext, gid: str, user_uuids: Sequence[str]) -> None:

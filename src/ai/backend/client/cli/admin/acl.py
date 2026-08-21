@@ -1,7 +1,7 @@
 import sys
 
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 
 from . import admin
@@ -16,6 +16,7 @@ def permission() -> None:
 
 @permission.command()
 @pass_ctx_obj
+@output_option
 def list(ctx: CLIContext) -> None:
     """
     List atomic permissions.

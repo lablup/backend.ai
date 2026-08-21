@@ -6,7 +6,7 @@ from typing import Any, cast
 import click
 
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.output.fields import network_fields
@@ -29,6 +29,7 @@ def network() -> None:
 
 @network.command()
 @pass_ctx_obj
+@output_option
 @click.argument("project", type=str, metavar="PROJECT_ID_OR_NAME")
 @click.argument("name", type=str, metavar="NAME")
 @click.option("-d", "--driver", default=None, help="Set the network driver.")
@@ -63,6 +64,7 @@ def create(ctx: CLIContext, project: str, name: str, driver: str | None) -> None
 
 @network.command()
 @pass_ctx_obj
+@output_option
 @click.option(
     "-f",
     "--format",
@@ -112,6 +114,7 @@ def list(
 
 @network.command()
 @pass_ctx_obj
+@output_option
 @click.argument("network", type=str, metavar="NETWORK_ID_OR_NAME")
 @click.option(
     "-f",
@@ -150,6 +153,7 @@ def get(ctx: CLIContext, network: str, format: str | None) -> None:
 
 @network.command()
 @pass_ctx_obj
+@output_option
 @click.argument("network", type=str, metavar="NETWORK_ID_OR_NAME")
 def delete(ctx: CLIContext, network: str) -> None:
     with Session() as session:

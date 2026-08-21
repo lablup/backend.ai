@@ -4,7 +4,7 @@ import click
 
 from ai.backend.cli.params import BoolExprType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 
 from . import admin
@@ -19,6 +19,7 @@ def keypair() -> None:
 
 @keypair.command()
 @pass_ctx_obj
+@output_option
 def info(ctx: CLIContext) -> None:
     """
     Show the server-side information of the currently configured access key.
@@ -51,6 +52,7 @@ def info(ctx: CLIContext) -> None:
 
 @keypair.command()
 @pass_ctx_obj
+@output_option
 @click.option(
     "-u",
     "--user-id",
@@ -123,6 +125,7 @@ def list(
 
 @keypair.command()
 @pass_ctx_obj
+@output_option
 @click.argument("user-id", type=str, default=None, metavar="USERID")
 @click.argument("resource-policy", type=str, default=None, metavar="RESOURCE_POLICY")
 @click.option(
@@ -195,6 +198,7 @@ def add(
 
 @keypair.command()
 @pass_ctx_obj
+@output_option
 @click.argument("access_key", type=str, metavar="ACCESSKEY")
 @click.option(
     "--resource-policy",
@@ -269,6 +273,7 @@ def update(
 
 @keypair.command()
 @pass_ctx_obj
+@output_option
 @click.argument("access-key", type=str, metavar="ACCESSKEY")
 def delete(ctx: CLIContext, access_key: str) -> None:
     """
@@ -305,6 +310,7 @@ def delete(ctx: CLIContext, access_key: str) -> None:
 
 @keypair.command()
 @pass_ctx_obj
+@output_option
 @click.argument("access-key", type=str, metavar="ACCESSKEY")
 def activate(ctx: CLIContext, access_key: str) -> None:
     """
@@ -341,6 +347,7 @@ def activate(ctx: CLIContext, access_key: str) -> None:
 
 @keypair.command()
 @pass_ctx_obj
+@output_option
 @click.argument("access-key", type=str, metavar="ACCESSKEY")
 def deactivate(ctx: CLIContext, access_key: str) -> None:
     """

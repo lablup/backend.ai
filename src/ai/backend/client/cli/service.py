@@ -22,7 +22,7 @@ from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.dto.manager.session.types import MountOption
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
-from .extensions import pass_ctx_obj
+from .extensions import output_option, pass_ctx_obj
 from .pretty import ProgressBarWithSpinner, print_done, print_fail, print_warn
 from .types import CLIContext
 
@@ -71,6 +71,7 @@ def service() -> None:
 
 @service.command()
 @pass_ctx_obj
+@output_option
 @click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
@@ -106,6 +107,7 @@ def list(
 
 @service.command()
 @pass_ctx_obj
+@output_option
 @click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
 def info(ctx: CLIContext, service_name_or_id: str) -> None:
     """
@@ -138,6 +140,7 @@ def info(ctx: CLIContext, service_name_or_id: str) -> None:
 
 @service.command()
 @pass_ctx_obj
+@output_option
 @click.argument("image", metavar="IMAGE", type=str)
 @click.argument("model_name_or_id", metavar="MODEL_NAME_OR_ID", type=str)
 @click.argument("initial_session_count", metavar="COUNT", type=int)
@@ -376,6 +379,7 @@ def create(
 
 @service.command()
 @pass_ctx_obj
+@output_option
 @click.argument("image", metavar="IMAGE", type=str)
 @click.argument("model_name_or_id", metavar="MODEL_NAME_OR_ID", type=str)
 @click.option("-t", "--name", metavar="NAME", type=str, default=None)
@@ -602,6 +606,7 @@ def try_start(
 
 @service.command()
 @pass_ctx_obj
+@output_option
 @click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
 def rm(ctx: CLIContext, service_name_or_id: str) -> None:
     """
@@ -621,6 +626,7 @@ def rm(ctx: CLIContext, service_name_or_id: str) -> None:
 
 @service.command()
 @pass_ctx_obj
+@output_option
 @click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
 def sync(ctx: CLIContext, service_name_or_id: str) -> None:
     """
@@ -641,6 +647,7 @@ def sync(ctx: CLIContext, service_name_or_id: str) -> None:
 
 @service.command()
 @pass_ctx_obj
+@output_option
 @click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
 @click.argument("target_count", metavar="COUNT", type=int)
 def scale(
@@ -667,6 +674,7 @@ def scale(
 
 @service.command()
 @pass_ctx_obj
+@output_option
 @click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
 @click.argument("duration", metavar="DURATION", type=str)
 @click.option("-q", "--quiet", is_flag=True)
@@ -699,6 +707,7 @@ def generate_token(
 
 @service.command()
 @pass_ctx_obj
+@output_option
 @click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
 def get_endpoint(ctx: CLIContext, service_name_or_id: str) -> None:
     """
@@ -719,6 +728,7 @@ def get_endpoint(ctx: CLIContext, service_name_or_id: str) -> None:
 
 @service.command()
 @pass_ctx_obj
+@output_option
 @click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
 @click.argument("route_id", metavar="ROUTE_ID", type=click.UUID)
 @click.argument("ratio", metavar="RATIO", type=float)
@@ -748,6 +758,7 @@ def update_traffic_ratio(
 
 @service.command()
 @pass_ctx_obj
+@output_option
 @click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
 @click.argument("route_id", metavar="ROUTE_ID", type=click.UUID)
 @click.argument("ratio", metavar="RATIO", type=float)

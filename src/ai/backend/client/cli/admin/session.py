@@ -10,7 +10,7 @@ import click
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.pretty import print_fail
 from ai.backend.client.cli.session.lifecycle import session as user_session
 from ai.backend.client.cli.types import CLIContext
@@ -32,6 +32,7 @@ def session() -> None:
 
 def _list_cmd(name: str = "list", docs: str | None = None) -> Callable[..., None]:
     @pass_ctx_obj
+    @output_option
     @click.option(
         "-s",
         "--status",
@@ -237,6 +238,7 @@ session.command()(_list_cmd())
 
 def _info_cmd(docs: str | None = None) -> Callable[..., None]:
     @pass_ctx_obj
+    @output_option
     @click.argument("session_id", metavar="SESSID")
     def info(ctx: CLIContext, session_id: str) -> None:
         """

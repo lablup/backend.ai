@@ -14,7 +14,7 @@ from ai.backend.cli.types import ExitCode
 from ai.backend.common.cli import EnumChoice
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 
-from .extensions import pass_ctx_obj
+from .extensions import output_option, pass_ctx_obj
 from .pretty import print_done, print_fail
 from .types import CLIContext
 
@@ -29,6 +29,7 @@ def deployment() -> None:
 
 @deployment.command("create")
 @pass_ctx_obj
+@output_option
 @click.option(
     "-f",
     "--file",
@@ -93,6 +94,7 @@ def create_deployment_cmd(
 
 @deployment.command("list")
 @pass_ctx_obj
+@output_option
 @click.option("--project-id", type=str, default=None, help="Filter by project ID")
 @click.option("--limit", type=int, default=50, help="Maximum items to return")
 @click.option("--offset", type=int, default=0, help="Number of items to skip")
@@ -148,6 +150,7 @@ def list_deployments_cmd(
 
 @deployment.command("info")
 @pass_ctx_obj
+@output_option
 @click.argument("deployment_id", type=str)
 def info_deployment_cmd(ctx: CLIContext, deployment_id: str) -> None:
     """Display detailed information of a deployment."""
@@ -168,6 +171,7 @@ def info_deployment_cmd(ctx: CLIContext, deployment_id: str) -> None:
 
 @deployment.command("update")
 @pass_ctx_obj
+@output_option
 @click.argument("deployment_id", type=str)
 @click.option("--name", type=str, default=None, help="Update deployment name")
 @click.option("--replicas", type=int, default=None, help="Update replica count")
@@ -197,6 +201,7 @@ def update_deployment_cmd(
 
 @deployment.command("destroy")
 @pass_ctx_obj
+@output_option
 @click.argument("deployment_id", type=str)
 @click.confirmation_option(prompt="Are you sure you want to destroy this deployment?")
 def destroy_deployment_cmd(ctx: CLIContext, deployment_id: str) -> None:
@@ -228,6 +233,7 @@ def revision() -> None:
 
 @revision.command("add")
 @pass_ctx_obj
+@output_option
 @click.argument("deployment_id", type=click.UUID)
 @click.option(
     "-f",
@@ -293,6 +299,7 @@ def add_revision_cmd(
 
 @revision.command("list")
 @pass_ctx_obj
+@output_option
 @click.argument("deployment_id", type=str)
 @click.option("--limit", type=int, default=50, help="Maximum items to return")
 @click.option("--offset", type=int, default=0, help="Number of items to skip")
@@ -331,6 +338,7 @@ def list_revisions_cmd(
 
 @revision.command("info")
 @pass_ctx_obj
+@output_option
 @click.argument("deployment_id", type=str)
 @click.argument("revision_id", type=str)
 def info_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str) -> None:
@@ -351,6 +359,7 @@ def info_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str) -> 
 
 @revision.command("activate")
 @pass_ctx_obj
+@output_option
 @click.argument("deployment_id", type=str)
 @click.argument("revision_id", type=str)
 def activate_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str) -> None:
@@ -374,6 +383,7 @@ def activate_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str)
 
 @revision.command("deactivate")
 @pass_ctx_obj
+@output_option
 @click.argument("deployment_id", type=str)
 @click.argument("revision_id", type=str)
 def deactivate_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str) -> None:
@@ -405,6 +415,7 @@ def route() -> None:
 
 @route.command("list")
 @pass_ctx_obj
+@output_option
 @click.argument("deployment_id", type=str)
 @click.option("--limit", type=int, default=50, help="Maximum items to return")
 @click.option("--offset", type=int, default=0, help="Number of items to skip")
@@ -445,6 +456,7 @@ def list_routes_cmd(
 
 @route.command("traffic")
 @pass_ctx_obj
+@output_option
 @click.argument("deployment_id", type=str)
 @click.argument("route_id", type=str)
 @click.option("--activate", "traffic_status", flag_value="active", help="Enable traffic")
@@ -497,6 +509,7 @@ def policy() -> None:
 
 @policy.command("info")
 @pass_ctx_obj
+@output_option
 @click.argument("deployment_id", type=click.UUID)
 def info_policy_cmd(ctx: CLIContext, deployment_id: UUID) -> None:
     """Display the deployment policy."""
@@ -530,6 +543,7 @@ def info_policy_cmd(ctx: CLIContext, deployment_id: UUID) -> None:
 
 @policy.command("update")
 @pass_ctx_obj
+@output_option
 @click.argument("deployment_id", type=click.UUID)
 @click.option(
     "--strategy",

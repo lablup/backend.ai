@@ -4,7 +4,7 @@ import sys
 import click
 
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.pretty import (
     ProgressBarWithSpinner,
     print_done,
@@ -27,6 +27,7 @@ def image() -> None:
 
 @image.command()
 @pass_ctx_obj
+@output_option
 @click.option("--operation", is_flag=True, help="Get operational images only")
 def list(ctx: CLIContext, operation: bool) -> None:
     """

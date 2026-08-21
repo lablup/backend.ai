@@ -9,7 +9,7 @@ from pathlib import Path
 import click
 
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 
 from . import admin
@@ -26,6 +26,7 @@ def export() -> None:
 
 @export.command()
 @pass_ctx_obj
+@output_option
 def list_reports(ctx: CLIContext) -> None:
     """
     List all available export reports.

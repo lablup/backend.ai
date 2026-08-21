@@ -4,7 +4,7 @@ from collections.abc import Sequence
 import click
 
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 
 from . import admin
@@ -38,6 +38,7 @@ def prometheus_query_definition() -> None:
 
 @prometheus_query_definition.command()
 @pass_ctx_obj
+@output_option
 @click.option("--filter-name", type=str, default=None, help="Filter by name (contains match).")
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
 @click.option("--limit", type=int, default=20, help="Maximum items to return.")
@@ -96,6 +97,7 @@ def search(ctx: CLIContext, filter_name: str | None, offset: int, limit: int) ->
 
 @prometheus_query_definition.command()
 @pass_ctx_obj
+@output_option
 @click.argument("definition_id", type=str)
 def info(ctx: CLIContext, definition_id: str) -> None:
     """Show details of a prometheus query definition."""
@@ -136,6 +138,7 @@ def info(ctx: CLIContext, definition_id: str) -> None:
 
 @prometheus_query_definition.command()
 @pass_ctx_obj
+@output_option
 @click.option("--name", type=str, required=True, help="Definition name.")
 @click.option("--metric-name", type=str, required=True, help="Prometheus metric name.")
 @click.option("--query-template", type=str, required=True, help="PromQL template.")
@@ -207,6 +210,7 @@ def add(
 
 @prometheus_query_definition.command()
 @pass_ctx_obj
+@output_option
 @click.argument("definition_id", type=str)
 @click.option("--name", type=str, default=None, help="New definition name.")
 @click.option("--metric-name", type=str, default=None, help="New Prometheus metric name.")
@@ -301,6 +305,7 @@ def modify(
 
 @prometheus_query_definition.command()
 @pass_ctx_obj
+@output_option
 @click.argument("definition_id", type=str)
 @click.confirmation_option(prompt="Are you sure you want to delete this definition?")
 def delete(ctx: CLIContext, definition_id: str) -> None:
@@ -335,6 +340,7 @@ def delete(ctx: CLIContext, definition_id: str) -> None:
 
 @prometheus_query_definition.command()
 @pass_ctx_obj
+@output_option
 @click.argument("definition_id", type=str)
 @click.option("--start", type=str, default=None, help="Start time (ISO8601).")
 @click.option("--end", type=str, default=None, help="End time (ISO8601).")

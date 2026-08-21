@@ -9,7 +9,7 @@ from uuid import UUID
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.fair_share import fair_share
 from ai.backend.client.cli.types import CLIContext
 
@@ -25,6 +25,7 @@ def domain() -> None:
 
 @domain.command("get")
 @pass_ctx_obj
+@output_option
 @click.argument("resource_group", type=str)
 @click.argument("domain_name", type=str)
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
@@ -67,6 +68,7 @@ def domain_get_cmd(
 
 @domain.command("list")
 @pass_ctx_obj
+@output_option
 @click.option("--resource-group", type=str, default=None, help="Filter by resource group")
 @click.option("--domain-name", type=str, default=None, help="Filter by domain name")
 @click.option("--limit", type=int, default=20, help="Maximum number of records to return")
@@ -159,6 +161,7 @@ def domain_list_cmd(
 
 @domain.command("set-weight")
 @pass_ctx_obj
+@output_option
 @click.argument("resource_group", type=str)
 @click.argument("domain_name", type=str)
 @click.option(
@@ -213,6 +216,7 @@ def project() -> None:
 
 @project.command("get")
 @pass_ctx_obj
+@output_option
 @click.argument("resource_group", type=str)
 @click.argument("project_id", type=str)
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
@@ -258,6 +262,7 @@ def project_get_cmd(
 
 @project.command("list")
 @pass_ctx_obj
+@output_option
 @click.option("--resource-group", type=str, default=None, help="Filter by resource group")
 @click.option("--project-id", type=str, default=None, help="Filter by project ID")
 @click.option("--domain-name", type=str, default=None, help="Filter by domain name")
@@ -354,6 +359,7 @@ def project_list_cmd(
 
 @project.command("set-weight")
 @pass_ctx_obj
+@output_option
 @click.argument("resource_group", type=str)
 @click.argument("project_id", type=str)
 @click.option(
@@ -417,6 +423,7 @@ def user() -> None:
 
 @user.command("get")
 @pass_ctx_obj
+@output_option
 @click.argument("resource_group", type=str)
 @click.argument("project_id", type=str)
 @click.argument("user_uuid", type=str)
@@ -465,6 +472,7 @@ def user_get_cmd(
 
 @user.command("list")
 @pass_ctx_obj
+@output_option
 @click.option("--resource-group", type=str, default=None, help="Filter by resource group")
 @click.option("--user-uuid", type=str, default=None, help="Filter by user UUID")
 @click.option("--project-id", type=str, default=None, help="Filter by project ID")
@@ -565,6 +573,7 @@ def user_list_cmd(
 
 @user.command("set-weight")
 @pass_ctx_obj
+@output_option
 @click.argument("resource_group", type=str)
 @click.argument("project_id", type=str)
 @click.argument("user_uuid", type=str)
@@ -631,6 +640,7 @@ def resource_group() -> None:
 
 @resource_group.command("update-spec")
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str)
 @click.option(
     "--half-life-days",
@@ -728,6 +738,7 @@ def resource_group_update_spec_cmd(
 
 @resource_group.command("spec")
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str)
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def resource_group_spec_cmd(
@@ -762,6 +773,7 @@ def resource_group_spec_cmd(
 
 @resource_group.command("specs")
 @pass_ctx_obj
+@output_option
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def resource_group_specs_cmd(
     ctx: CLIContext,
@@ -818,6 +830,7 @@ def rg_domain() -> None:
 
 @rg_domain.command("get")
 @pass_ctx_obj
+@output_option
 @click.argument("resource_group", type=str)
 @click.argument("domain_name", type=str)
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
@@ -860,6 +873,7 @@ def rg_domain_get_cmd(
 
 @rg_domain.command("list")
 @pass_ctx_obj
+@output_option
 @click.argument("resource_group", type=str)
 @click.option("--domain-name", type=str, default=None, help="Filter by domain name")
 @click.option("--limit", type=int, default=20, help="Maximum number of records to return")
@@ -961,6 +975,7 @@ def rg_project() -> None:
 
 @rg_project.command("get")
 @pass_ctx_obj
+@output_option
 @click.argument("resource_group", type=str)
 @click.argument("domain_name", type=str)
 @click.argument("project_id", type=str)
@@ -1008,6 +1023,7 @@ def rg_project_get_cmd(
 
 @rg_project.command("list")
 @pass_ctx_obj
+@output_option
 @click.argument("resource_group", type=str)
 @click.argument("domain_name", type=str)
 @click.option("--project-id", type=str, default=None, help="Filter by project ID")
@@ -1114,6 +1130,7 @@ def rg_user() -> None:
 
 @rg_user.command("get")
 @pass_ctx_obj
+@output_option
 @click.argument("resource_group", type=str)
 @click.argument("domain_name", type=str)
 @click.argument("project_id", type=str)
@@ -1164,6 +1181,7 @@ def rg_user_get_cmd(
 
 @rg_user.command("list")
 @pass_ctx_obj
+@output_option
 @click.argument("resource_group", type=str)
 @click.argument("domain_name", type=str)
 @click.argument("project_id", type=str)
@@ -1273,6 +1291,7 @@ def rg_domain_usage() -> None:
 
 @rg_domain_usage.command("list")
 @pass_ctx_obj
+@output_option
 @click.argument("resource_group", type=str)
 @click.option("--domain-name", type=str, default=None, help="Filter by domain name")
 @click.option(
@@ -1382,6 +1401,7 @@ def rg_project_usage() -> None:
 
 @rg_project_usage.command("list")
 @pass_ctx_obj
+@output_option
 @click.argument("resource_group", type=str)
 @click.argument("domain_name", type=str)
 @click.option("--project-id", type=str, default=None, help="Filter by project ID (UUID)")
@@ -1496,6 +1516,7 @@ def rg_user_usage() -> None:
 
 @rg_user_usage.command("list")
 @pass_ctx_obj
+@output_option
 @click.argument("resource_group", type=str)
 @click.argument("domain_name", type=str)
 @click.argument("project_id", type=str)

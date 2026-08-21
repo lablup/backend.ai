@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 import click
 
-from .extensions import pass_ctx_obj
+from .extensions import output_option, pass_ctx_obj
 from .types import CLIContext
 
 if TYPE_CHECKING:
@@ -280,6 +280,7 @@ def session() -> None:
 
 @session.command("list")
 @pass_ctx_obj
+@output_option
 @click.option("--session-id", type=str, default=None, help="Filter by session ID")
 @click.option("--phase", type=str, default=None, help="Filter by phase (contains)")
 @click.option(
@@ -431,6 +432,7 @@ def deployment() -> None:
 
 @deployment.command("list")
 @pass_ctx_obj
+@output_option
 @click.option("--deployment-id", type=str, default=None, help="Filter by deployment ID")
 @click.option("--phase", type=str, default=None, help="Filter by phase (contains)")
 @click.option(
@@ -582,6 +584,7 @@ def route() -> None:
 
 @route.command("list")
 @pass_ctx_obj
+@output_option
 @click.option("--route-id", type=str, default=None, help="Filter by route ID")
 @click.option("--deployment-id", type=str, default=None, help="Filter by deployment ID")
 @click.option("--phase", type=str, default=None, help="Filter by phase (contains)")

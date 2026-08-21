@@ -5,7 +5,7 @@ import sys
 import click
 
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.output.fields import storage_fields
 from ai.backend.client.session import Session
@@ -22,6 +22,7 @@ def storage() -> None:
 
 @storage.command()
 @pass_ctx_obj
+@output_option
 @click.argument("vfolder_host")
 def info(ctx: CLIContext, vfolder_host: str) -> None:
     """
@@ -51,6 +52,7 @@ def info(ctx: CLIContext, vfolder_host: str) -> None:
 
 @storage.command()
 @pass_ctx_obj
+@output_option
 @click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")

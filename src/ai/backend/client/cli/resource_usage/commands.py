@@ -8,7 +8,7 @@ from uuid import UUID
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.resource_usage import resource_usage
 from ai.backend.client.cli.types import CLIContext
 
@@ -24,6 +24,7 @@ def domain() -> None:
 
 @domain.command("list")
 @pass_ctx_obj
+@output_option
 @click.option("--resource-group", type=str, default=None, help="Filter by resource group")
 @click.option("--domain-name", type=str, default=None, help="Filter by domain name")
 @click.option("--limit", type=int, default=20, help="Maximum number of records to return")
@@ -126,6 +127,7 @@ def project() -> None:
 
 @project.command("list")
 @pass_ctx_obj
+@output_option
 @click.option("--resource-group", type=str, default=None, help="Filter by resource group")
 @click.option("--project-id", type=str, default=None, help="Filter by project ID")
 @click.option("--domain-name", type=str, default=None, help="Filter by domain name")
@@ -232,6 +234,7 @@ def user() -> None:
 
 @user.command("list")
 @pass_ctx_obj
+@output_option
 @click.option("--resource-group", type=str, default=None, help="Filter by resource group")
 @click.option("--user-uuid", type=str, default=None, help="Filter by user UUID")
 @click.option("--project-id", type=str, default=None, help="Filter by project ID")

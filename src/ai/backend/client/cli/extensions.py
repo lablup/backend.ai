@@ -3,6 +3,7 @@ from collections.abc import Callable, Mapping
 from functools import update_wrapper
 from typing import Any, Concatenate, ParamSpec, TypeVar
 
+import click
 from click import get_current_context
 
 from ai.backend.cli.types import CliContextInfo
@@ -39,7 +40,33 @@ T = TypeVar("T")
 P = ParamSpec("P")
 
 
+def _override_output_mode(
+    ctx: click.Context, _param: click.Parameter, value: str | None
+) -> str | None:
+    """Let a subcommand's own ``--output`` take precedence over the root-level one."""
+    if value is not None:
+        match ctx.find_root().obj:
+            case CliContextInfo(info=info):
+                info["output"] = value
+    return value
+
+
+# Apply next to `pass_ctx_obj`, which supplies the `CLIContext` the value is read through.
+# Do NOT apply to a command declaring its own `--output` (`admin export -o/--output PATH`):
+# Click registers both silently and leaves one dead in its long-option table.
+output_option = click.option(
+    "--output",
+    type=click.Choice([OutputMode.JSON.value, OutputMode.CONSOLE.value]),
+    default=None,
+    expose_value=False,
+    callback=_override_output_mode,
+    help="Set the output style of this command's result, overriding the root-level one.",
+)
+
+
 def pass_ctx_obj[**P, T](f: Callable[Concatenate[CLIContext, P], T]) -> Callable[P, T]:
+    """Pass the :class:`CLIContext` as the first argument of the decorated command callback."""
+
     def new_func(*args: P.args, **kwargs: P.kwargs) -> T:
         obj = get_current_context().obj
         match obj:

@@ -22,7 +22,7 @@ from ai.backend.client.func.vfolder import _default_list_fields
 from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.bgtask.types import BgtaskStatus
 
-from .extensions import pass_ctx_obj
+from .extensions import output_option, pass_ctx_obj
 from .pretty import (
     ProgressBarWithSpinner,
     print_done,
@@ -487,6 +487,7 @@ def cp(filenames: tuple[str, ...]) -> None:
 
 @vfolder.command()
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str)
 @click.argument("paths", type=str, nargs=-1)
 @click.option(
@@ -952,6 +953,7 @@ def update_options(name: str, permission: str | None, set_cloneable: bool | None
 
 @vfolder.command()
 @pass_ctx_obj
+@output_option
 @click.option(
     "--filter",
     "filter_",
@@ -1034,6 +1036,7 @@ def list_own(
 
 @vfolder.command()
 @pass_ctx_obj
+@output_option
 @click.option(
     "--filter",
     "filter_",
@@ -1116,6 +1119,7 @@ def list_invited(
 
 @vfolder.command()
 @pass_ctx_obj
+@output_option
 @click.option(
     "--filter",
     "filter_",

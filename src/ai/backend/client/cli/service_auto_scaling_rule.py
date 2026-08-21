@@ -8,7 +8,7 @@ import click
 
 from ai.backend.cli.params import OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.service import get_service_id
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.exceptions import BackendAPIError
@@ -36,6 +36,7 @@ def auto_scaling_rule() -> None:
 
 @auto_scaling_rule.command()
 @pass_ctx_obj
+@output_option
 @click.argument("service", type=str, metavar="SERVICE_NAME_OR_ID")
 @click.option(
     "--metric-source",
@@ -96,6 +97,7 @@ def create(
 
 @auto_scaling_rule.command()
 @pass_ctx_obj
+@output_option
 @click.argument("service", type=str, metavar="SERVICE_NAME_OR_ID")
 @click.option(
     "-f",
@@ -150,6 +152,7 @@ def list(
 
 @auto_scaling_rule.command()
 @pass_ctx_obj
+@output_option
 @click.argument("rule", type=click.UUID, metavar="RULE_ID")
 @click.option(
     "-f",
@@ -181,6 +184,7 @@ def get(ctx: CLIContext, rule: UUID, format: str) -> None:
 
 @auto_scaling_rule.command()
 @pass_ctx_obj
+@output_option
 @click.argument("rule", type=click.UUID, metavar="RULE_ID")
 @click.option(
     "--metric-source",
@@ -255,6 +259,7 @@ def update(
 
 @auto_scaling_rule.command()
 @pass_ctx_obj
+@output_option
 @click.argument("rule", type=click.UUID, metavar="RULE_ID")
 def delete(ctx: CLIContext, rule: UUID) -> None:
     """Remove the given auto-scaling rule."""
