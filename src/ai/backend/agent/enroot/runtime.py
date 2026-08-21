@@ -95,6 +95,8 @@ _CGROUP_V2_MARKER: Final = "/sys/fs/cgroup/cgroup.controllers"
 # kernel needs to reap processes that have already been SIGKILLed.
 _CGROUP_RMDIR_RETRIES: Final = 20
 _CGROUP_RMDIR_DELAY_SEC: Final = 0.05
+# Docker's default ShmSize, used when the session did not ask for one.
+_DEFAULT_SHM_BYTES: Final = 64 * 1024 * 1024
 
 
 def _slug(image_ref: str) -> str:
@@ -426,6 +428,7 @@ class EnrootRuntime(OciRuntime):
             raise
         self._pids[container_id] = pid
         await asyncio.to_thread(self._record_container, container_id, pid)
+        await self._set_hostname(pid, spec.get("hostname"))
         # Confine the container now, while the wrapper is still blocked on the gate: every process
         # that will run the user's command is already forked, and none of it has started. Doing it
         # after start_task would let the workload run unconfined for however long the move takes.
@@ -508,6 +511,36 @@ class EnrootRuntime(OciRuntime):
         path = self._log_path(container_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         return os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+
+    async def _set_hostname(self, pid: int, hostname: str | None) -> None:
+        """Give the container its cluster hostname (`main1`, `sub1`, ...).
+
+        runc applies the OCI spec's hostname; enroot has no equivalent and a fresh UTS namespace
+        just inherits the agent's, so without this every kernel calls itself by the agent pod's
+        name — wrong for anything that treats the hostname as its cluster identity (MPI, some
+        torch-distributed setups). Set from outside, entering the container's user namespace as its
+        owner so this works whether the agent runs as root or already as the kernel uid.
+        """
+        if not hostname:
+            return
+        rc, _out, err = await self._run(
+            "nsenter",
+            "-t",
+            str(pid),
+            "-U",
+            "-u",
+            "--preserve-credentials",
+            "--",
+            "hostname",
+            hostname,
+        )
+        if rc != 0:
+            log.warning(
+                "[enroot] could not set the hostname of pid {} to {}: {}",
+                pid,
+                hostname,
+                err.decode(errors="replace").strip(),
+            )
 
     # ------------------------------------------------------------------ container journal
     def _meta_path(self, container_id: str) -> Path:
@@ -759,9 +792,27 @@ class EnrootRuntime(OciRuntime):
             "--root",
             "--net",
             "--pid",
+            # A private UTS namespace, so the kernel can carry its own cluster hostname instead of
+            # the agent's. enroot does not *set* one — a fresh UTS ns inherits the parent's — so
+            # create_task assigns it once the container is up.
+            "--uts",
+            # NOT --ipc, much as the IPC isolation is wanted: it makes enroot's `10-devices` hook
+            # rebuild /dev, and that hook bind-mounts /dev/log with no `nofail`, so it hard-fails on
+            # any host without a syslog socket — which is every containerised agent. The part of
+            # --ipc that actually matters here (a per-container /dev/shm) is done below instead.
             "--rw",
             "-m",
             f"{gate_dir}:{_GATE_MNT}:none:x-create=auto,bind,rw",
+            # enroot's default fstab BINDS the host's /dev/shm into every container, so all kernels
+            # on a node share one /dev/shm — they see each other's segments and compete for its
+            # size. Give each its own tmpfs, sized from the session's `shmem` resource_opt (Docker's
+            # ShmSize) and defaulting to Docker's 64 MiB. Later -m entries win, so this overrides
+            # the fstab bind.
+            "-m",
+            (
+                f"tmpfs:/dev/shm:tmpfs:x-create=dir,rw,nosuid,nodev,mode=1777,"
+                f"size={int(spec.get('shmem') or _DEFAULT_SHM_BYTES)}"
+            ),
         ]
         # Host binds from the OCI spec (scratch config/work, krunner, vfolders, /etc/hosts, ...).
         # enroot provides proc/sys/dev/tmpfs itself (userns), so those are skipped.
