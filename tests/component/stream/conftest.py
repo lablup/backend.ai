@@ -35,6 +35,7 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.stream.repository import StreamRepository
+from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.stream.processors import StreamProcessors
 from ai.backend.manager.services.stream.service import StreamService
@@ -83,7 +84,10 @@ def stream_processors(
 
 
 @pytest.fixture()
-async def session_processors(database_engine: ExtendedAsyncSAEngine) -> Any:
+async def session_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> Any:
     """Minimal real resolver for the stream handler.
 
     Only ``resolve_session_name`` is wired to the real DB (via a real
@@ -108,6 +112,9 @@ async def session_processors(database_engine: ExtendedAsyncSAEngine) -> Any:
     )
     processors = MagicMock()
     processors.resolve_session_name = ActionProcessor(service.resolve_session_name, [])
+    processors.lookup = processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)).public_lookup_ops(
+        LookupSessionAction
+    )
     return processors
 
 

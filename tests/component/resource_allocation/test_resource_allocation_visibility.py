@@ -111,6 +111,7 @@ def _build_registries(
 ) -> list[RouteRegistry]:
     """Build route registries with the given config provider."""
     processors = MagicMock(spec=Processors)
+    processors.session = MagicMock()
     processors.session.resource_allocation = ra_processors
     adapter = ResourceAllocationAdapter(
         processors=processors,

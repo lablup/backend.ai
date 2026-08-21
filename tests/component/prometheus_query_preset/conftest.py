@@ -40,6 +40,8 @@ from ai.backend.manager.models.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
 )
@@ -88,6 +90,7 @@ def prometheus_query_preset_processors(
         prometheus_client=prometheus_client_mock,
         default_timewindow="5m",
         template_renderer=PromQLTemplateRenderer(),
+        ops_repository=OpsRepository(V2DBOpsProvider(database_engine)),
     )
     return PrometheusQueryPresetProcessors(
         processor_registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)), service

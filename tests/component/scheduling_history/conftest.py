@@ -65,6 +65,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduling_history.repository import (
     SchedulingHistoryRepository,
 )
+from ai.backend.manager.services.resource_slot.actions.lookup_kernel_owner import (
+    LookupKernelOwnerAction,
+)
 from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
 from ai.backend.manager.services.scheduling_history.service import SchedulingHistoryService
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -92,14 +95,19 @@ def scheduling_history_processors(
 @pytest.fixture()
 def scheduling_history_adapter(
     scheduling_history_processors: SchedulingHistoryProcessors,
+    processor_registry: ProcessorRegistry[Any],
 ) -> SchedulingHistoryAdapter:
-    """Build an adapter wired only with scheduling-history processors.
+    """Build an adapter wired with the processors its call sites reach.
 
-    Every call site in the adapter goes through ``self._processors.scheduling_history``,
-    so a MagicMock backing object with that attribute set is sufficient.
+    The scoped kernel search resolves each kernel's owner through the resource-slot
+    group, so that lookup is wired for real beside the scheduling-history ones.
     """
     processors = MagicMock()
     processors.scheduling_history = scheduling_history_processors
+    processors.resource_slot = MagicMock()
+    processors.resource_slot.lookup_kernel_owner = processor_registry.group(
+        GroupMeta(SESSION_ENTITY_TYPE)
+    ).key_owner_lookup_ops(LookupKernelOwnerAction)
     return SchedulingHistoryAdapter(processors)
 
 

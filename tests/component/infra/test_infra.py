@@ -230,11 +230,11 @@ class TestResourcePresets:
     async def test_list_presets_with_scaling_group_filter(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
     ) -> None:
         """Filtering presets by scaling group."""
         await admin_registry.infra.list_presets(
-            ListPresetsRequest(scaling_group=scaling_group_name)
+            ListPresetsRequest(scaling_group=resource_group_name)
         )
 
 
