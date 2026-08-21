@@ -51,6 +51,21 @@ def tcp_client_session_factory(
     )
 
 
+def _has_inflight_requests(session: aiohttp.ClientSession) -> bool:
+    """Whether any request currently holds a connection from the session's connector.
+
+    A connection stays acquired until its response body is fully read, so this stays
+    true for the whole of a long-lived streaming response.
+    """
+    connector = session.connector
+    if connector is None:
+        return False
+    # ponytail: aiohttp exposes no public in-flight count, and `_acquired` is the
+    # set the connector itself checks. Move to refcounting inside the pool if this
+    # ever breaks on an aiohttp upgrade — that needs an API change at every caller.
+    return bool(connector._acquired)
+
+
 @dataclass(slots=True)
 class _Client:
     session: aiohttp.ClientSession
@@ -113,12 +128,19 @@ class ClientPool:
             await asyncio.sleep(cleanup_interval_seconds)
             now = time.perf_counter()
             for key, client in list(self._clients.items()):
-                if now - client.last_used > cleanup_interval_seconds:
-                    del self._clients[key]
-                    try:
-                        await client.session.close()
-                    except Exception as e:
-                        log.exception("Error closing client session: {}", e)
+                if now - client.last_used <= cleanup_interval_seconds:
+                    continue
+                if _has_inflight_requests(client.session):
+                    # `last_used` is only stamped on acquisition, so a request that
+                    # outlives the interval looks idle. Closing the session here
+                    # would tear down its connections mid-response.
+                    client.last_used = now
+                    continue
+                del self._clients[key]
+                try:
+                    await client.session.close()
+                except Exception as e:
+                    log.exception("Error closing client session: {}", e)
 
     def load_client_session(self, key: ClientKey) -> aiohttp.ClientSession:
         session = self._clients.get(key, None)
