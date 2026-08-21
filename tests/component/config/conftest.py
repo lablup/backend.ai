@@ -11,8 +11,6 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
-from ai.backend.common.data.entity.error_log import ERROR_LOG_FIELD_TYPE
-from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.dto.manager.config import (
@@ -27,7 +25,6 @@ from ai.backend.common.dto.manager.config import (
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
-    FieldGroupMeta,
     GroupMeta,
     ProcessorDependencies,
 )
@@ -40,8 +37,6 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.userconfig.handler import UserConfigHandler
 from ai.backend.manager.api.rest.userconfig.registry import register_userconfig_routes
-from ai.backend.manager.data.error_log.types import ErrorLogData
-from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.group.repository import GroupRepository
@@ -53,15 +48,6 @@ from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.group.service import GroupService
-from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
-    LookupBulkKeypairOwnerAction,
-    LookupKeypairOwnerAction,
-)
-from ai.backend.manager.services.user.error_log.actions.lookup_owner import (
-    LookupBulkErrorLogOwnerAction,
-    LookupErrorLogOwnerAction,
-)
-from ai.backend.manager.services.user.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -111,20 +97,6 @@ def server_module_registries(
     )
     user = UserProcessors(
         config_registry.group(GroupMeta(USER_ENTITY_TYPE)),
-        config_registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
-            FieldGroupMeta(KEYPAIR_FIELD_TYPE),
-            KeyPairData,
-            LookupKeypairOwnerAction,
-            LookupBulkKeypairOwnerAction,
-        ),
-        ErrorLogProcessors(
-            config_registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
-                FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
-                ErrorLogData,
-                LookupErrorLogOwnerAction,
-                LookupBulkErrorLogOwnerAction,
-            )
-        ),
         UserService(
             MagicMock(),
             MagicMock(),

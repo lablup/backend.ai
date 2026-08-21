@@ -1,6 +1,9 @@
+from ai.backend.common.data.entity.error_log import ERROR_LOG_FIELD_TYPE
+from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.types import FieldGroupMeta
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
@@ -11,6 +14,7 @@ from ai.backend.manager.actions.v2.ops.result import (
 )
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.services.user.actions.admin_month_stats import (
@@ -75,6 +79,8 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
 )
 from ai.backend.manager.services.user.actions.lookup import LookupUserAction
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
+    LookupBulkKeypairOwnerAction,
+    LookupKeypairOwnerAction,
     LookupKeypairOwnerByAccessKeyAction,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
@@ -104,6 +110,10 @@ from ai.backend.manager.services.user.actions.update_user import (
 from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
+)
+from ai.backend.manager.services.user.error_log.actions.lookup_owner import (
+    LookupBulkErrorLogOwnerAction,
+    LookupErrorLogOwnerAction,
 )
 from ai.backend.manager.services.user.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.user.service import UserService
@@ -188,14 +198,10 @@ class UserProcessors:
     def __init__(
         self,
         group: ProcessorGroup[UserData],
-        keypair_group: LookupFieldGroup[KeyPairData],
-        error_log: ErrorLogProcessors,
         user_service: UserService,
     ) -> None:
-        self.error_log = error_log
         self.lookup = group.public_lookup_ops(LookupUserAction)
         self.lookup_keypair_owner = group.key_owner_lookup_ops(LookupKeypairOwnerByAccessKeyAction)
-        self.keypair_group = keypair_group
         self.global_search = group.global_search_ops(GlobalSearchUsersAction)
         self.search_users_by_domain = group.scope_search_ops(SearchUsersByDomainAction)
         self.search_users_by_project = group.scope_search_ops(SearchUsersByProjectAction)
@@ -273,4 +279,19 @@ class UserProcessors:
         )
         self.update_bootstrap_script = group.single_entity(
             UpdateBootstrapScriptAction, user_service.update_bootstrap_script
+        )
+
+        self.keypair_group = group.field_group(
+            FieldGroupMeta(KEYPAIR_FIELD_TYPE),
+            KeyPairData,
+            LookupKeypairOwnerAction,
+            LookupBulkKeypairOwnerAction,
+        )
+        self.error_log = ErrorLogProcessors(
+            group.field_group(
+                FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
+                ErrorLogData,
+                LookupErrorLogOwnerAction,
+                LookupBulkErrorLogOwnerAction,
+            )
         )

@@ -11,9 +11,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
 from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
-from ai.backend.common.data.entity.error_log import ERROR_LOG_FIELD_TYPE
 from ai.backend.common.data.entity.etcd_config import ETCD_CONFIG_ENTITY_TYPE
-from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
@@ -24,7 +22,6 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
-    FieldGroupMeta,
     GroupMeta,
 )
 from ai.backend.manager.actions.validators import ActionValidators
@@ -38,8 +35,6 @@ from ai.backend.manager.api.rest.resource_group.registry import register_resourc
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.error_log.types import ErrorLogData
-from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
@@ -68,15 +63,6 @@ from ai.backend.manager.services.resource_group.processors import ResourceGroupP
 from ai.backend.manager.services.resource_group.service import ResourceGroupService
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
-from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
-    LookupBulkKeypairOwnerAction,
-    LookupKeypairOwnerAction,
-)
-from ai.backend.manager.services.user.error_log.actions.lookup_owner import (
-    LookupBulkErrorLogOwnerAction,
-    LookupErrorLogOwnerAction,
-)
-from ai.backend.manager.services.user.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
@@ -214,20 +200,6 @@ def user_processors(
     service = UserService(storage_manager, valkey_clients.stat, AsyncMock(), user_repo, AsyncMock())
     return UserProcessors(
         processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
-        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
-            FieldGroupMeta(KEYPAIR_FIELD_TYPE),
-            KeyPairData,
-            LookupKeypairOwnerAction,
-            LookupBulkKeypairOwnerAction,
-        ),
-        ErrorLogProcessors(
-            processor_registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
-                FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
-                ErrorLogData,
-                LookupErrorLogOwnerAction,
-                LookupBulkErrorLogOwnerAction,
-            )
-        ),
         service,
     )
 

@@ -34,7 +34,6 @@ from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_
 from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
-from ai.backend.common.data.entity.error_log import ERROR_LOG_FIELD_TYPE
 from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
 from ai.backend.common.data.entity.fair_share import (
     DOMAIN_FAIR_SHARE_ENTITY_TYPE,
@@ -42,7 +41,6 @@ from ai.backend.common.data.entity.fair_share import (
     USER_FAIR_SHARE_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.image import IMAGE_ENTITY_TYPE
-from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
 from ai.backend.common.data.entity.login_client_type import LOGIN_CLIENT_TYPE_ENTITY_TYPE
 from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
 from ai.backend.common.data.entity.notification import (
@@ -50,9 +48,6 @@ from ai.backend.common.data.entity.notification import (
     NOTIFICATION_RULE_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
-from ai.backend.common.data.entity.preset_resource_slot import (
-    DEPLOYMENT_PRESET_RESOURCE_SLOT_FIELD_TYPE,
-)
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.entity.prometheus_query_preset import (
     PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
@@ -69,7 +64,6 @@ from ai.backend.common.data.entity.resource_policy import (
 from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_slot import RESOURCE_SLOT_TYPE_ENTITY_TYPE
 from ai.backend.common.data.entity.retention_policy import RETENTION_POLICY_ENTITY_TYPE
-from ai.backend.common.data.entity.role_permission_preset import ROLE_PERMISSION_PRESET_FIELD_TYPE
 from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.runtime_variant import RUNTIME_VARIANT_ENTITY_TYPE
 from ai.backend.common.data.entity.runtime_variant_preset import RUNTIME_VARIANT_PRESET_ENTITY_TYPE
@@ -100,10 +94,6 @@ from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAct
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
-from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotData
-from ai.backend.manager.data.error_log.types import ErrorLogData
-from ai.backend.manager.data.keypair.types import KeyPairData
-from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
@@ -116,10 +106,6 @@ from ai.backend.manager.services.artifact_registry.processors import ArtifactReg
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
-from ai.backend.manager.services.deployment_revision_preset.actions.lookup_slot_owner import (
-    LookupBulkPresetResourceSlotOwnerAction,
-    LookupPresetResourceSlotOwnerAction,
-)
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
 )
@@ -157,10 +143,6 @@ from ai.backend.manager.services.resource_group.processors import ResourceGroupP
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.services.retention_policy.processors import RetentionPolicyProcessors
-from ai.backend.manager.services.role_preset.actions.lookup_permission_owner import (
-    LookupBulkRolePermissionPresetOwnerAction,
-    LookupRolePermissionPresetOwnerAction,
-)
 from ai.backend.manager.services.role_preset.processors import RolePresetProcessors
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
 from ai.backend.manager.services.runtime_variant_preset.processors import (
@@ -178,15 +160,6 @@ from ai.backend.manager.services.storage_namespace.processors import (
     StorageNamespaceProcessors,
 )
 from ai.backend.manager.services.template.processors import TemplateProcessors
-from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
-    LookupBulkKeypairOwnerAction,
-    LookupKeypairOwnerAction,
-)
-from ai.backend.manager.services.user.error_log.actions.lookup_owner import (
-    LookupBulkErrorLogOwnerAction,
-    LookupErrorLogOwnerAction,
-)
-from ai.backend.manager.services.user.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
@@ -275,16 +248,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     ProjectResourcePolicyProcessors(registry.group(GroupMeta(PROJECT_RESOURCE_POLICY_ENTITY_TYPE)))
     UserResourcePolicyProcessors(registry.group(GroupMeta(USER_RESOURCE_POLICY_ENTITY_TYPE)))
     KeypairResourcePolicyProcessors(registry.group(GroupMeta(KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE)))
-    RolePresetProcessors(
-        registry.group(GroupMeta(ROLE_PRESET_ENTITY_TYPE)),
-        registry.group(GroupMeta(ROLE_PRESET_ENTITY_TYPE)).field_group(
-            FieldGroupMeta(ROLE_PERMISSION_PRESET_FIELD_TYPE),
-            RolePermissionPresetData,
-            LookupRolePermissionPresetOwnerAction,
-            LookupBulkRolePermissionPresetOwnerAction,
-        ),
-        MagicMock(),
-    )
+    RolePresetProcessors(registry.group(GroupMeta(ROLE_PRESET_ENTITY_TYPE)), MagicMock())
     RuntimeVariantProcessors(registry.group(GroupMeta(RUNTIME_VARIANT_ENTITY_TYPE)))
     ObjectStorageProcessors(
         registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)),
@@ -311,33 +275,12 @@ def test_every_defined_v2_action_is_wired() -> None:
     )
     StorageNamespaceProcessors(registry.group(GroupMeta(STORAGE_NAMESPACE_ENTITY_TYPE)))
     DeploymentPresetProcessors(
-        registry.group(GroupMeta(DEPLOYMENT_PRESET_ENTITY_TYPE)),
-        registry.group(GroupMeta(DEPLOYMENT_PRESET_ENTITY_TYPE)).field_group(
-            FieldGroupMeta(DEPLOYMENT_PRESET_RESOURCE_SLOT_FIELD_TYPE),
-            PresetResourceSlotData,
-            LookupPresetResourceSlotOwnerAction,
-            LookupBulkPresetResourceSlotOwnerAction,
-        ),
-        MagicMock(),
+        registry.group(GroupMeta(DEPLOYMENT_PRESET_ENTITY_TYPE)), MagicMock()
     )
     DomainProcessors(registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), MagicMock(), [])
     GroupProcessors(registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), MagicMock())
     UserProcessors(
         registry.group(GroupMeta(USER_ENTITY_TYPE)),
-        registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
-            FieldGroupMeta(KEYPAIR_FIELD_TYPE),
-            KeyPairData,
-            LookupKeypairOwnerAction,
-            LookupBulkKeypairOwnerAction,
-        ),
-        ErrorLogProcessors(
-            registry.group(GroupMeta(USER_ENTITY_TYPE)).field_group(
-                FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
-                ErrorLogData,
-                LookupErrorLogOwnerAction,
-                LookupBulkErrorLogOwnerAction,
-            )
-        ),
         MagicMock(),
     )
     FairShareProcessors(

@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from ai.backend.common.data.entity.preset_resource_slot import (
+    DEPLOYMENT_PRESET_RESOURCE_SLOT_FIELD_TYPE,
+)
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.types import FieldGroupMeta
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
@@ -21,6 +25,10 @@ from ai.backend.manager.services.deployment_revision_preset.actions.create impor
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.get import (
     GetDeploymentPresetAction,
+)
+from ai.backend.manager.services.deployment_revision_preset.actions.lookup_slot_owner import (
+    LookupBulkPresetResourceSlotOwnerAction,
+    LookupPresetResourceSlotOwnerAction,
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.purge import (
     PurgeDeploymentPresetAction,
@@ -64,7 +72,6 @@ class DeploymentPresetProcessors:
     def __init__(
         self,
         group: ProcessorGroup[DeploymentRevisionPresetData],
-        slots: LookupFieldGroup[PresetResourceSlotData],
         service: DeploymentPresetService,
     ) -> None:
         self.create = group.global_create_with_fields_ops(CreateDeploymentPresetAction)
@@ -72,4 +79,11 @@ class DeploymentPresetProcessors:
         self.global_search = group.global_search_ops(GlobalSearchDeploymentPresetsAction)
         self.update = group.single_entity(UpdateDeploymentPresetAction, service.update)
         self.purge = group.entity_purge_ops(PurgeDeploymentPresetAction)
+
+        slots: LookupFieldGroup[PresetResourceSlotData] = group.field_group(
+            FieldGroupMeta(DEPLOYMENT_PRESET_RESOURCE_SLOT_FIELD_TYPE),
+            PresetResourceSlotData,
+            LookupPresetResourceSlotOwnerAction,
+            LookupBulkPresetResourceSlotOwnerAction,
+        )
         self.search_resource_slots = slots.search_ops(SearchPresetResourceSlotsAction)
