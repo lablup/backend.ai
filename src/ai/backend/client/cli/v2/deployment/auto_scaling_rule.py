@@ -235,10 +235,12 @@ def update(
         metric_name=metric_name,
         step_size=step_size,
         time_window=time_window,
-        min_threshold=Decimal(min_threshold) if min_threshold is not None else None,
-        max_threshold=Decimal(max_threshold) if max_threshold is not None else None,
-        min_replicas=min_replicas if min_replicas is not None else None,
-        max_replicas=max_replicas if max_replicas is not None else None,
+        # These five are nullable-clearable: SENTINEL keeps the stored value,
+        # whereas a null would clear it.
+        min_threshold=Decimal(min_threshold) if min_threshold is not None else SENTINEL,
+        max_threshold=Decimal(max_threshold) if max_threshold is not None else SENTINEL,
+        min_replicas=min_replicas if min_replicas is not None else SENTINEL,
+        max_replicas=max_replicas if max_replicas is not None else SENTINEL,
         prometheus_query_preset_id=(
             prometheus_query_preset_id if prometheus_query_preset_id is not None else SENTINEL
         ),

@@ -114,6 +114,7 @@ def update(
     description: str | None,
 ) -> None:
     """Update a login client type (superadmin only)."""
+    from ai.backend.common.api_handlers import SENTINEL
     from ai.backend.common.dto.manager.v2.login_client_type.request import (
         UpdateLoginClientTypeInput,
     )
@@ -123,7 +124,12 @@ def update(
         try:
             result = await registry.login_client_type.admin_update(
                 login_client_type_id,
-                UpdateLoginClientTypeInput(name=name, description=description),
+                UpdateLoginClientTypeInput(
+                    name=name,
+                    # description is nullable-clearable: SENTINEL keeps the stored value,
+                    # whereas a null would clear it.
+                    description=description if description is not None else SENTINEL,
+                ),
             )
             print_result(result)
         finally:
