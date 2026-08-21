@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 import sqlalchemy as sa
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -44,8 +45,8 @@ class DomainPurger(EntityPurger[DomainRow, DomainData]):
         return DomainRow
 
     @override
-    def pk_value(self) -> str:
-        return self.name
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return DomainRow.id
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:

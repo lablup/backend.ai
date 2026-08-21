@@ -641,7 +641,6 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             ),
         )
         return UpdateGroupAction(
-            project_id=ProjectID(group_id),
             updater=updater,
             user_update_mode=OptionalState[str].from_graphql(
                 self.user_update_mode,
@@ -751,9 +750,7 @@ class DeleteGroup(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
         project_id = ProjectID(gid)
         await ctx.processors.group.delete_group.run(
-            DeleteGroupAction(
-                project_id=project_id, updater=GroupSoftDeleteUpdater(project_id=project_id)
-            )
+            DeleteGroupAction(updater=GroupSoftDeleteUpdater(project_id=project_id))
         )
         return cls(ok=True, msg="success")
 

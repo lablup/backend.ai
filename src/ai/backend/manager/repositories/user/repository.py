@@ -361,7 +361,7 @@ class UserRepository:
         async with self._v2_ops.write_ops() as w:
             data = await w.update_data(updater)
             if data is None:
-                raise KeyPairNotFound(f"Keypair not found: {updater.pk_value()}")
+                raise KeyPairNotFound(f"Keypair not found: {updater.target_id_value()}")
             return data
 
     @user_repository_resilience.apply()

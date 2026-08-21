@@ -5,6 +5,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
@@ -30,7 +33,11 @@ class ObjectStorageUpdater(DataUpdater[ObjectStorageRow, ObjectStorageData]):
         return ObjectStorageRow
 
     @override
-    def pk_value(self) -> ObjectStorageID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ObjectStorageRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.storage_id
 
     @property

@@ -12,6 +12,11 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.entity.resource_policy import (
+    KeyPairResourcePolicyUUID,
+    ProjectResourcePolicyUUID,
+    UserResourcePolicyUUID,
+)
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.keypair import keypairs
@@ -291,7 +296,7 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):  # type: ignor
     max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
     max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
-    def to_updater(self, name: str) -> KeyPairResourcePolicyUpdater:
+    def to_updater(self, policy_id: KeyPairResourcePolicyUUID) -> KeyPairResourcePolicyUpdater:
         default_for_unspecified = (
             DefaultForUnspecified[self.default_for_unspecified]
             if self.default_for_unspecified is not Undefined
@@ -309,7 +314,7 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):  # type: ignor
         )
 
         return KeyPairResourcePolicyUpdater(
-            name=name,
+            policy_id=policy_id,
             default_for_unspecified=OptionalState[DefaultForUnspecified].from_graphql(
                 default_for_unspecified
             ),
@@ -402,9 +407,7 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
             LookupKeypairResourcePolicyAction(name=name)
         )
         await graph_ctx.processors.keypair_resource_policy.update.run(
-            UpdateKeyPairResourcePolicyAction(
-                policy_id=target.entity_id(), updater=props.to_updater(name)
-            )
+            UpdateKeyPairResourcePolicyAction(updater=props.to_updater(target.entity_id()))
         )
 
         return ModifyKeyPairResourcePolicy(
@@ -584,13 +587,13 @@ class ModifyUserResourcePolicyInput(graphene.InputObjectType):  # type: ignore[m
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
 
-    def to_updater(self, name: str) -> UserResourcePolicyUpdater:
+    def to_updater(self, policy_id: UserResourcePolicyUUID) -> UserResourcePolicyUpdater:
         from ai.backend.manager.models.resource_policy.updaters import (
             UserResourcePolicyUpdater,
         )
 
         return UserResourcePolicyUpdater(
-            name=name,
+            policy_id=policy_id,
             max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
             max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
             max_session_count_per_model_session=OptionalState[int].from_graphql(
@@ -666,9 +669,7 @@ class ModifyUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
             LookupUserResourcePolicyAction(name=name)
         )
         await graph_ctx.processors.user_resource_policy.update.run(
-            UpdateUserResourcePolicyAction(
-                policy_id=target.entity_id(), updater=props.to_updater(name)
-            )
+            UpdateUserResourcePolicyAction(updater=props.to_updater(target.entity_id()))
         )
 
         return ModifyUserResourcePolicy(
@@ -845,13 +846,13 @@ class ModifyProjectResourcePolicyInput(graphene.InputObjectType):  # type: ignor
         description="Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks."
     )
 
-    def to_updater(self, name: str) -> ProjectResourcePolicyUpdater:
+    def to_updater(self, policy_id: ProjectResourcePolicyUUID) -> ProjectResourcePolicyUpdater:
         from ai.backend.manager.models.resource_policy.updaters import (
             ProjectResourcePolicyUpdater,
         )
 
         return ProjectResourcePolicyUpdater(
-            name=name,
+            policy_id=policy_id,
             max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
             max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
             max_vfolder_size=OptionalState[int].from_graphql(self.max_vfolder_size),
@@ -923,9 +924,7 @@ class ModifyProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
             LookupProjectResourcePolicyAction(name=name)
         )
         await graph_ctx.processors.project_resource_policy.update.run(
-            UpdateProjectResourcePolicyAction(
-                policy_id=target.entity_id(), updater=props.to_updater(name)
-            )
+            UpdateProjectResourcePolicyAction(updater=props.to_updater(target.entity_id()))
         )
 
         return ModifyProjectResourcePolicy(

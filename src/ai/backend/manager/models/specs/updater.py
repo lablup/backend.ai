@@ -11,6 +11,8 @@ from collections.abc import Sequence
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy.orm import InstrumentedAttribute
+
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -27,8 +29,19 @@ class DataUpdater[TRow: Base, TData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def pk_value(self) -> UUID | str | int:
-        """Return the primary key value identifying the target row."""
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        """Return the column that carries the id the row is written by.
+
+        Named rather than derived from the primary key: what an operation is
+        authorized against is the entity or field id, and a table whose key is a name
+        (``domains.name``) still identifies its row by a uuid column beside it. Writing
+        by the key while checking by the id lets the two part ways.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def target_id_value(self) -> UUID:
+        """Return the id of the row to write."""
         raise NotImplementedError
 
     @abstractmethod

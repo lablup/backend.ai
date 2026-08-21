@@ -215,7 +215,7 @@ class WriteOps(ReadOps):
     ) -> TData | None:
         """Update a single row by primary key and return it as its ``data/`` type."""
         result = await execute_updater(
-            self._sess, Updater(spec=updater, pk_value=updater.pk_value())
+            self._sess, Updater(spec=updater, pk_value=updater.target_id_value())
         )
         if result is None:
             return None
@@ -262,11 +262,11 @@ class WriteOps(ReadOps):
             try:
                 async with self._sess.begin_nested():
                     result = await execute_updater(
-                        self._sess, Updater(spec=updater, pk_value=updater.pk_value())
+                        self._sess, Updater(spec=updater, pk_value=updater.target_id_value())
                     )
                     if result is None:
                         raise EntityNotFoundError(
-                            f"{updater.row_class.__name__} {updater.pk_value()} not found"
+                            f"{updater.row_class.__name__} {updater.target_id_value()} not found"
                         )
                     successes[entity_id] = updater.to_data(result.row)
             except Exception as e:

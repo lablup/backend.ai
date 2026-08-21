@@ -15,6 +15,7 @@ from typing import Any, ClassVar, NoReturn
 import sqlalchemy as sa
 from asyncpg.exceptions import PostgresError
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
@@ -29,7 +30,6 @@ from ai.backend.manager.errors.repository import (
     NotNullViolationError,
     RepositoryIntegrityError,
     UniqueConstraintViolationError,
-    UnsupportedCompositePrimaryKeyError,
     UpsertEmptyResultError,
 )
 from ai.backend.manager.models.base import Base
@@ -264,31 +264,22 @@ class V2WriteOpsBase(V2OpsBase):
     async def _update_row_returning[TRow: Base](
         self,
         row_class: type[TRow],
-        pk_value: Any,
+        id_column: InstrumentedAttribute[Any],
+        id_value: Any,
         values: dict[str, Any],
         checks: Sequence[IntegrityErrorCheck],
     ) -> TRow | None:
-        """Update one row by primary key and return it; ``None`` if no row matched.
+        """Update the row the id names and return it; ``None`` if no row matched.
 
         With nothing to set, reads the current row instead, so callers can tell
         "nothing to change" apart from "row not found".
         """
         table = row_class.__table__
-        pk_columns = list(table.primary_key.columns)
-        if len(pk_columns) != 1:
-            raise UnsupportedCompositePrimaryKeyError(
-                f"Updater only supports single-column primary keys (table: {table.name})",
-            )
         if not values:
-            existing = await self._sess.execute(
-                sa.select(row_class).where(pk_columns[0] == pk_value)
-            )
+            existing = await self._sess.execute(sa.select(row_class).where(id_column == id_value))
             return existing.scalar_one_or_none()
         stmt = (
-            sa.update(table)
-            .values(values)
-            .where(pk_columns[0] == pk_value)
-            .returning(*table.columns)
+            sa.update(table).values(values).where(id_column == id_value).returning(*table.columns)
         )
         # from_statement lets SQLAlchemy map the RETURNING columns onto the ORM class.
         select_stmt = sa.select(row_class).from_statement(stmt)
@@ -299,15 +290,10 @@ class V2WriteOpsBase(V2OpsBase):
         return result.scalar_one_or_none()
 
     async def _delete_row_returning[TRow: Base](
-        self, row_class: type[TRow], pk_value: Any
+        self, row_class: type[TRow], id_column: InstrumentedAttribute[Any], id_value: Any
     ) -> TRow | None:
         table = row_class.__table__
-        pk_columns = list(table.primary_key.columns)
-        if len(pk_columns) != 1:
-            raise UnsupportedCompositePrimaryKeyError(
-                f"Purger only supports single-column primary keys (table: {table.name})",
-            )
-        stmt = sa.delete(table).where(pk_columns[0] == pk_value).returning(*table.columns)
+        stmt = sa.delete(table).where(id_column == id_value).returning(*table.columns)
         # from_statement lets SQLAlchemy map the RETURNING columns onto the ORM class.
         # Calling the row class instead would go through its __init__, which many rows
         # narrow to the caller-supplied columns — a server-generated one then arrives as

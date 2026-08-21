@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.vfs_storage import VFSStorageID
@@ -23,8 +25,8 @@ class VFSStoragePurger(EntityPurger[VFSStorageRow, VFSStorageData]):
         return VFSStorageRow
 
     @override
-    def pk_value(self) -> VFSStorageID:
-        return self.storage_id
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return VFSStorageRow.id
 
     @override
     def entity_id(self) -> EntityIdentifier:

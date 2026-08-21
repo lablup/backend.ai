@@ -203,7 +203,7 @@ class DomainAdapter(BaseAdapter):
             LookupDomainAction(name=DomainName(domain_name))
         )
         updater = DomainUpdater(
-            name=domain_name,
+            domain_id=target.entity_id(),
             description=(
                 TriState.nop()
                 if isinstance(input.description, Sentinel)
@@ -233,7 +233,6 @@ class DomainAdapter(BaseAdapter):
         )
         result = await self._processors.domain.update_domain_node.run(
             UpdateDomainNodeAction(
-                domain_id=target.entity_id(),
                 updater=updater,
                 user_info=user_info,
             )
@@ -251,8 +250,7 @@ class DomainAdapter(BaseAdapter):
         )
         await self._processors.domain.delete_domain.run(
             DeleteDomainAction(
-                domain_id=target.entity_id(),
-                updater=DomainSoftDeleteUpdater(name=input.name),
+                updater=DomainSoftDeleteUpdater(domain_id=target.entity_id()),
             )
         )
         return DeleteDomainPayload(deleted=True)

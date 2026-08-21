@@ -5,6 +5,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
 from ai.backend.manager.data.app_config.types import AppConfigAllowListData
@@ -33,7 +36,11 @@ class AppConfigAllowListUpdater(DataUpdater[AppConfigAllowListRow, AppConfigAllo
         return AppConfigAllowListRow
 
     @override
-    def pk_value(self) -> AppConfigAllowListID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return AppConfigAllowListRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.allow_list_id
 
     @property

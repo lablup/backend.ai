@@ -6,6 +6,7 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.domain import (
     DomainDTO,
     DomainFilter,
@@ -46,7 +47,7 @@ class DomainAdapter(BaseFilterAdapter):
             integration_id=data.integration_name,  # data type uses integration_name, v1 DTO uses integration_id
         )
 
-    def build_updater(self, request: UpdateDomainRequest, domain_name: str) -> DomainUpdater:
+    def build_updater(self, request: UpdateDomainRequest, domain_id: DomainID) -> DomainUpdater:
         """Convert update request to updater."""
         name = OptionalState[str].nop()
         description = TriState[str].nop()
@@ -72,7 +73,7 @@ class DomainAdapter(BaseFilterAdapter):
             integration_name = TriState.update(request.integration_id)
 
         return DomainUpdater(
-            name=domain_name,
+            domain_id=domain_id,
             new_name=name,
             description=description,
             is_active=is_active,

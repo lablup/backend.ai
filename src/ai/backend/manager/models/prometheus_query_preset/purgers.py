@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -25,8 +27,8 @@ class PrometheusQueryPresetPurger(
         return PrometheusQueryPresetRow
 
     @override
-    def pk_value(self) -> PrometheusQueryPresetID:
-        return self.preset_id
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return PrometheusQueryPresetRow.id
 
     @override
     def entity_id(self) -> EntityIdentifier:

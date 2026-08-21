@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -23,8 +25,8 @@ class LoginClientTypePurger(EntityPurger[LoginClientTypeRow, LoginClientTypeData
         return LoginClientTypeRow
 
     @override
-    def pk_value(self) -> LoginClientTypeID:
-        return self.login_client_type_id
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return LoginClientTypeRow.id
 
     @override
     def entity_id(self) -> EntityIdentifier:

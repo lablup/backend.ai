@@ -269,7 +269,11 @@ class _PresetUpdater(DataUpdater[RolePresetRow, _PresetData]):
         return RolePresetRow
 
     @override
-    def pk_value(self) -> uuid.UUID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
+
+    @override
+    def target_id_value(self) -> uuid.UUID:
         return self.target
 
     @property
@@ -306,8 +310,8 @@ class _PresetPurger(EntityPurger[RolePresetRow, _PresetData]):
         return RolePresetRow
 
     @override
-    def pk_value(self) -> uuid.UUID:
-        return self.target
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
@@ -461,8 +465,8 @@ class _PresetGlobalPurger(EntityPurger[RolePresetRow, _PresetData]):
         return RolePresetRow
 
     @override
-    def pk_value(self) -> uuid.UUID:
-        return self.target
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
@@ -482,7 +486,11 @@ class _PresetFieldPurger(FieldPurger[RolePresetRow, _PresetData]):
         return RolePresetRow
 
     @override
-    def pk_value(self) -> uuid.UUID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
+
+    @override
+    def target_id_value(self) -> uuid.UUID:
         return self.target
 
     @override

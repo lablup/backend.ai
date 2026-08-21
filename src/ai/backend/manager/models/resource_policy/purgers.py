@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.resource_policy import (
     KeyPairResourcePolicyUUID,
@@ -38,8 +40,8 @@ class KeyPairResourcePolicyPurger(
         return KeyPairResourcePolicyRow
 
     @override
-    def pk_value(self) -> str:
-        return self.name
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return KeyPairResourcePolicyRow.uuid
 
     @override
     def entity_id(self) -> EntityIdentifier:
@@ -64,8 +66,8 @@ class UserResourcePolicyPurger(EntityPurger[UserResourcePolicyRow, UserResourceP
         return UserResourcePolicyRow
 
     @override
-    def pk_value(self) -> str:
-        return self.name
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return UserResourcePolicyRow.uuid
 
     @override
     def entity_id(self) -> EntityIdentifier:
@@ -92,8 +94,8 @@ class ProjectResourcePolicyPurger(
         return ProjectResourcePolicyRow
 
     @override
-    def pk_value(self) -> str:
-        return self.name
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ProjectResourcePolicyRow.uuid
 
     @override
     def entity_id(self) -> EntityIdentifier:

@@ -3,7 +3,15 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
 
+from sqlalchemy.orm import InstrumentedAttribute
+
+from ai.backend.common.data.entity.resource_policy import (
+    KeyPairResourcePolicyUUID,
+    ProjectResourcePolicyUUID,
+    UserResourcePolicyUUID,
+)
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.manager.data.resource.types import (
     KeyPairResourcePolicyData,
@@ -24,7 +32,7 @@ from ai.backend.manager.types import OptionalState, TriState
 class KeyPairResourcePolicyUpdater(
     DataUpdater[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
 ):
-    name: str
+    policy_id: KeyPairResourcePolicyUUID
     allowed_vfolder_hosts: OptionalState[dict[str, Any]] = field(default_factory=OptionalState.nop)
     default_for_unspecified: OptionalState[DefaultForUnspecified] = field(
         default_factory=OptionalState.nop
@@ -48,8 +56,12 @@ class KeyPairResourcePolicyUpdater(
         return KeyPairResourcePolicyRow
 
     @override
-    def pk_value(self) -> str:
-        return self.name
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return KeyPairResourcePolicyRow.uuid
+
+    @override
+    def target_id_value(self) -> UUID:
+        return self.policy_id
 
     @property
     @override
@@ -84,7 +96,7 @@ class KeyPairResourcePolicyUpdater(
 
 @dataclass
 class UserResourcePolicyUpdater(DataUpdater[UserResourcePolicyRow, UserResourcePolicyData]):
-    name: str
+    policy_id: UserResourcePolicyUUID
     max_vfolder_count: OptionalState[int] = field(default_factory=OptionalState[int].nop)
     max_quota_scope_size: OptionalState[int] = field(default_factory=OptionalState[int].nop)
     max_session_count_per_model_session: OptionalState[int] = field(
@@ -99,8 +111,12 @@ class UserResourcePolicyUpdater(DataUpdater[UserResourcePolicyRow, UserResourceP
         return UserResourcePolicyRow
 
     @override
-    def pk_value(self) -> str:
-        return self.name
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return UserResourcePolicyRow.uuid
+
+    @override
+    def target_id_value(self) -> UUID:
+        return self.policy_id
 
     @property
     @override
@@ -128,7 +144,7 @@ class UserResourcePolicyUpdater(DataUpdater[UserResourcePolicyRow, UserResourceP
 class ProjectResourcePolicyUpdater(
     DataUpdater[ProjectResourcePolicyRow, ProjectResourcePolicyData]
 ):
-    name: str
+    policy_id: ProjectResourcePolicyUUID
     max_vfolder_count: OptionalState[int] = field(default_factory=OptionalState[int].nop)
     max_quota_scope_size: OptionalState[int] = field(default_factory=OptionalState[int].nop)
     max_vfolder_size: OptionalState[int] = field(default_factory=OptionalState[int].nop)
@@ -140,8 +156,12 @@ class ProjectResourcePolicyUpdater(
         return ProjectResourcePolicyRow
 
     @override
-    def pk_value(self) -> str:
-        return self.name
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ProjectResourcePolicyRow.uuid
+
+    @override
+    def target_id_value(self) -> UUID:
+        return self.policy_id
 
     @property
     @override

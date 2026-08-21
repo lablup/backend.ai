@@ -3,6 +3,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.notification import (
     NotificationChannelID,
@@ -41,7 +44,11 @@ class NotificationChannelUpdater(DataUpdater[NotificationChannelRow, Notificatio
         return NotificationChannelRow
 
     @override
-    def pk_value(self) -> NotificationChannelID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return NotificationChannelRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.channel_id
 
     @property
@@ -81,7 +88,11 @@ class NotificationRuleUpdater(DataUpdater[NotificationRuleRow, NotificationRuleD
         return NotificationRuleRow
 
     @override
-    def pk_value(self) -> NotificationRuleID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return NotificationRuleRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.rule_id
 
     @property

@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import RestoreSingleEntityOpsAction
 from ai.backend.manager.data.group.types import GroupData
@@ -13,12 +12,11 @@ from ai.backend.manager.models.group.updaters import GroupRestoreUpdater
 class RestoreGroupAction(RestoreSingleEntityOpsAction[GroupRow, GroupData]):
     """Put one retired project back in service."""
 
-    project_id: ProjectID
     updater: GroupRestoreUpdater
 
     @override
     def entity_id(self) -> EntityIdentifier:
-        return self.project_id
+        return self.updater.project_id
 
     @override
     @classmethod

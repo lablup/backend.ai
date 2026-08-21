@@ -27,7 +27,8 @@ class V2UpdateWriteOps(V2WriteOpsBase):
         """
         row = await self._update_row_returning(
             updater.row_class,
-            updater.pk_value(),
+            updater.target_id_column(),
+            updater.target_id_value(),
             updater.build_values(),
             updater.integrity_error_checks,
         )
@@ -47,13 +48,14 @@ class V2UpdateWriteOps(V2WriteOpsBase):
                 async with self._sess.begin_nested():
                     row = await self._update_row_returning(
                         updater.row_class,
-                        updater.pk_value(),
+                        updater.target_id_column(),
+                        updater.target_id_value(),
                         updater.build_values(),
                         updater.integrity_error_checks,
                     )
                     if row is None:
                         raise EntityNotFoundError(
-                            f"{updater.row_class.__name__} {updater.pk_value()} not found"
+                            f"{updater.row_class.__name__} {updater.target_id_value()} not found"
                         )
                     successes[entity_id] = updater.to_data(row)
             except Exception as e:

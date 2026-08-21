@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from typing import override
 
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
@@ -14,14 +13,13 @@ from ai.backend.manager.types import OptionalState
 class UpdateGroupAction(BaseSingleEntityAction):
     """Edit one project, optionally rewriting who belongs to it."""
 
-    project_id: ProjectID
     updater: GroupUpdater
     user_update_mode: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     user_uuids: OptionalState[list[str]] = field(default_factory=OptionalState[list[str]].nop)
 
     @override
     def entity_id(self) -> EntityIdentifier:
-        return self.project_id
+        return self.updater.project_id
 
     @override
     @classmethod

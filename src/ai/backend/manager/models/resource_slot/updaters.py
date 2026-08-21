@@ -5,7 +5,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
 
+from sqlalchemy.orm import InstrumentedAttribute
+
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.resource_slot.types import NumberFormat
@@ -16,14 +20,14 @@ from ai.backend.manager.types import OptionalState
 
 @dataclass
 class ResourceSlotTypeUpdater(DataUpdater[ResourceSlotTypeRow, ResourceSlotTypeData]):
-    """Updater for a resource slot type, keyed by its ``slot_name`` primary key.
+    """Updater for a resource slot type.
 
     ``slot_name`` and ``slot_type`` are absent on purpose: the name is the FK target
     of five tables, and the type decides how every quota already stored in the slot
     is read.
     """
 
-    slot_name: str
+    slot_type_id: ResourceSlotTypeUUID
     required: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
     enabled: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
     display_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
@@ -41,8 +45,12 @@ class ResourceSlotTypeUpdater(DataUpdater[ResourceSlotTypeRow, ResourceSlotTypeD
         return ResourceSlotTypeRow
 
     @override
-    def pk_value(self) -> str:
-        return self.slot_name
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ResourceSlotTypeRow.uuid
+
+    @override
+    def target_id_value(self) -> UUID:
+        return self.slot_type_id
 
     @property
     @override

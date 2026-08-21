@@ -5,7 +5,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
 
+from sqlalchemy.orm import InstrumentedAttribute
+
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.domain.row import DomainRow
@@ -16,10 +20,9 @@ from ai.backend.manager.types import OptionalState, TriState
 
 @dataclass
 class DomainUpdater(DataUpdater[DomainRow, DomainData]):
-    """Edits a domain's settings. The name is the primary key, so a rename keys on
-    the old one."""
+    """Edits a domain's settings."""
 
-    name: str
+    domain_id: DomainID
     new_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
     is_active: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
@@ -39,8 +42,12 @@ class DomainUpdater(DataUpdater[DomainRow, DomainData]):
         return DomainRow
 
     @override
-    def pk_value(self) -> str:
-        return self.name
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return DomainRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
+        return self.domain_id
 
     @override
     def build_values(self) -> dict[str, Any]:
@@ -70,7 +77,7 @@ class DomainUpdater(DataUpdater[DomainRow, DomainData]):
 class DomainDotfilesUpdater(DataUpdater[DomainRow, DomainData]):
     """Replaces the packed dotfile entries a domain hands to its sessions."""
 
-    name: str
+    domain_id: DomainID
     dotfiles: bytes
 
     @property
@@ -79,8 +86,12 @@ class DomainDotfilesUpdater(DataUpdater[DomainRow, DomainData]):
         return DomainRow
 
     @override
-    def pk_value(self) -> str:
-        return self.name
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return DomainRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
+        return self.domain_id
 
     @override
     def build_values(self) -> dict[str, Any]:
@@ -100,7 +111,7 @@ class DomainDotfilesUpdater(DataUpdater[DomainRow, DomainData]):
 class DomainSoftDeleteUpdater(DataUpdater[DomainRow, DomainData]):
     """Retires a domain by clearing its active flag."""
 
-    name: str
+    domain_id: DomainID
 
     @property
     @override
@@ -108,8 +119,12 @@ class DomainSoftDeleteUpdater(DataUpdater[DomainRow, DomainData]):
         return DomainRow
 
     @override
-    def pk_value(self) -> str:
-        return self.name
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return DomainRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
+        return self.domain_id
 
     @override
     def build_values(self) -> dict[str, Any]:
@@ -129,7 +144,7 @@ class DomainSoftDeleteUpdater(DataUpdater[DomainRow, DomainData]):
 class DomainRestoreUpdater(DataUpdater[DomainRow, DomainData]):
     """Puts a retired domain back in service."""
 
-    name: str
+    domain_id: DomainID
 
     @property
     @override
@@ -137,8 +152,12 @@ class DomainRestoreUpdater(DataUpdater[DomainRow, DomainData]):
         return DomainRow
 
     @override
-    def pk_value(self) -> str:
-        return self.name
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return DomainRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
+        return self.domain_id
 
     @override
     def build_values(self) -> dict[str, Any]:

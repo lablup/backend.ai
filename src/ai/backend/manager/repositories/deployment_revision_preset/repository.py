@@ -43,7 +43,7 @@ class DeploymentPresetRepository:
             data = await w.update_data(updater)
             if data is None:
                 raise DeploymentRevisionPresetNotFound(
-                    f"Deployment preset with ID {updater.pk_value()} not found."
+                    f"Deployment preset with ID {updater.target_id_value()} not found."
                 )
             if slot_creators is not None:
                 preset_id = data.entity_id()

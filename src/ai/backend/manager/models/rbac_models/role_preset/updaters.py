@@ -9,6 +9,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.manager.data.permission.types import ScopeType
@@ -35,7 +38,11 @@ class RolePresetUpdater(DataUpdater[RolePresetRow, RolePresetData]):
         return RolePresetRow
 
     @override
-    def pk_value(self) -> RolePresetID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.preset_id
 
     @property
@@ -69,7 +76,11 @@ class RolePresetSoftDeleteUpdater(DataUpdater[RolePresetRow, RolePresetData]):
         return RolePresetRow
 
     @override
-    def pk_value(self) -> RolePresetID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.preset_id
 
     @property
@@ -98,7 +109,11 @@ class RolePresetRestoreUpdater(DataUpdater[RolePresetRow, RolePresetData]):
         return RolePresetRow
 
     @override
-    def pk_value(self) -> RolePresetID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.preset_id
 
     @property

@@ -219,9 +219,7 @@ class ProjectAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        result = await self._processors.group.update_group.run(
-            UpdateGroupAction(project_id=ProjectID(project_id), updater=updater)
-        )
+        result = await self._processors.group.update_group.run(UpdateGroupAction(updater=updater))
         if result.data is None:
             raise UnreachableError("modify_group must return data")
         return ProjectPayload(project=self._group_data_to_node(result.data))
@@ -230,9 +228,7 @@ class ProjectAdapter(BaseAdapter):
         """Soft-delete a project (superadmin only)."""
         project_id = ProjectID(input.group_id)
         await self._processors.group.delete_group.run(
-            DeleteGroupAction(
-                project_id=project_id, updater=GroupSoftDeleteUpdater(project_id=project_id)
-            )
+            DeleteGroupAction(updater=GroupSoftDeleteUpdater(project_id=project_id))
         )
         return DeleteProjectPayload(deleted=True)
 

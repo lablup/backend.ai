@@ -8,9 +8,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.models.base import Base
@@ -34,7 +36,8 @@ class EntityPurger[TRow: Base, TData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def pk_value(self) -> UUID | str | int:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        """Return the column carrying the entity id, which the delete keys on."""
         raise NotImplementedError
 
     @abstractmethod
@@ -55,7 +58,13 @@ class FieldPurger[TRow: Base, TData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def pk_value(self) -> UUID | str | int:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        """Return the column carrying the field id, which the delete keys on."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def target_id_value(self) -> UUID:
+        """Return the id of the field row to delete."""
         raise NotImplementedError
 
     @abstractmethod

@@ -4,6 +4,9 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.config import PresetModelDefinition
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
@@ -64,7 +67,11 @@ class DeploymentPresetUpdater(
         return DeploymentRevisionPresetRow
 
     @override
-    def pk_value(self) -> DeploymentPresetID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return DeploymentRevisionPresetRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.preset_id
 
     @property

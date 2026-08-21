@@ -266,8 +266,11 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_update_keypair_resource_policy(
         self, name: str, input: UpdateKeypairResourcePolicyInput
     ) -> UpdateKeypairResourcePolicyPayload:
+        target = await self._processors.keypair_resource_policy.lookup.run(
+            LookupKeypairResourcePolicyAction(name=name)
+        )
         updater = KeyPairResourcePolicyUpdater(
-            name=name,
+            policy_id=target.entity_id(),
             default_for_unspecified=(
                 OptionalState.update(input.default_for_unspecified)
                 if input.default_for_unspecified is not None
@@ -340,11 +343,8 @@ class ResourcePolicyAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        target = await self._processors.keypair_resource_policy.lookup.run(
-            LookupKeypairResourcePolicyAction(name=updater.name)
-        )
         result = await self._processors.keypair_resource_policy.update.run(
-            UpdateKeyPairResourcePolicyAction(policy_id=target.entity_id(), updater=updater)
+            UpdateKeyPairResourcePolicyAction(updater=updater)
         )
         return UpdateKeypairResourcePolicyPayload(
             keypair_resource_policy=self._keypair_policy_data_to_node(result.data)
@@ -431,8 +431,11 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_update_user_resource_policy(
         self, name: str, input: UpdateUserResourcePolicyInput
     ) -> UpdateUserResourcePolicyPayload:
+        target = await self._processors.user_resource_policy.lookup.run(
+            LookupUserResourcePolicyAction(name=name)
+        )
         updater = UserResourcePolicyUpdater(
-            name=name,
+            policy_id=target.entity_id(),
             max_vfolder_count=(
                 OptionalState.nop()
                 if isinstance(input.max_vfolder_count, Sentinel)
@@ -465,11 +468,8 @@ class ResourcePolicyAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        target = await self._processors.user_resource_policy.lookup.run(
-            LookupUserResourcePolicyAction(name=updater.name)
-        )
         result = await self._processors.user_resource_policy.update.run(
-            UpdateUserResourcePolicyAction(policy_id=target.entity_id(), updater=updater)
+            UpdateUserResourcePolicyAction(updater=updater)
         )
         return UpdateUserResourcePolicyPayload(
             user_resource_policy=self._user_policy_data_to_node(result.data)
@@ -554,8 +554,11 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_update_project_resource_policy(
         self, name: str, input: UpdateProjectResourcePolicyInput
     ) -> UpdateProjectResourcePolicyPayload:
+        target = await self._processors.project_resource_policy.lookup.run(
+            LookupProjectResourcePolicyAction(name=name)
+        )
         updater = ProjectResourcePolicyUpdater(
-            name=name,
+            policy_id=target.entity_id(),
             max_vfolder_count=(
                 OptionalState.nop()
                 if isinstance(input.max_vfolder_count, Sentinel)
@@ -576,11 +579,8 @@ class ResourcePolicyAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        target = await self._processors.project_resource_policy.lookup.run(
-            LookupProjectResourcePolicyAction(name=updater.name)
-        )
         result = await self._processors.project_resource_policy.update.run(
-            UpdateProjectResourcePolicyAction(policy_id=target.entity_id(), updater=updater)
+            UpdateProjectResourcePolicyAction(updater=updater)
         )
         return UpdateProjectResourcePolicyPayload(
             project_resource_policy=self._project_policy_data_to_node(result.data)

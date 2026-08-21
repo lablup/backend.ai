@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from typing import Any, override
 from uuid import UUID
 
+from sqlalchemy.orm import InstrumentedAttribute
+
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.group.types import GroupData
@@ -44,7 +46,11 @@ class GroupUpdater(DataUpdater[GroupRow, GroupData]):
         return GroupRow
 
     @override
-    def pk_value(self) -> UUID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return GroupRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.project_id
 
     @override
@@ -86,7 +92,11 @@ class GroupDotfilesUpdater(DataUpdater[GroupRow, GroupData]):
         return GroupRow
 
     @override
-    def pk_value(self) -> UUID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return GroupRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.project_id
 
     @override
@@ -115,7 +125,11 @@ class GroupSoftDeleteUpdater(DataUpdater[GroupRow, GroupData]):
         return GroupRow
 
     @override
-    def pk_value(self) -> UUID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return GroupRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.project_id
 
     @override
@@ -144,7 +158,11 @@ class GroupRestoreUpdater(DataUpdater[GroupRow, GroupData]):
         return GroupRow
 
     @override
-    def pk_value(self) -> UUID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return GroupRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.project_id
 
     @override

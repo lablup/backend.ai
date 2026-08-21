@@ -5,6 +5,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
@@ -26,7 +29,11 @@ class LoginClientTypeUpdater(DataUpdater[LoginClientTypeRow, LoginClientTypeData
         return LoginClientTypeRow
 
     @override
-    def pk_value(self) -> LoginClientTypeID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return LoginClientTypeRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.login_client_type_id
 
     @property

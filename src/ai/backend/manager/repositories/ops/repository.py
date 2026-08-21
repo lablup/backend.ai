@@ -272,7 +272,7 @@ class OpsRepository[TData]:
             data = await w.purge_entity(purger)
             if data is None:
                 raise EntityNotFoundError(
-                    f"{purger.row_class().__name__} {purger.pk_value()} not found"
+                    f"{purger.row_class().__name__} {purger.entity_id()} not found"
                 )
             return data
 
@@ -282,7 +282,7 @@ class OpsRepository[TData]:
             data = await w.purge_field_entity(purger)
             if data is None:
                 raise EntityNotFoundError(
-                    f"{purger.row_class().__name__} {purger.pk_value()} not found"
+                    f"{purger.row_class().__name__} {purger.target_id_value()} not found"
                 )
             return data
 
@@ -335,7 +335,7 @@ class OpsRepository[TData]:
             data = await w.update_data(updater)
             if data is None:
                 raise EntityNotFoundError(
-                    f"{updater.row_class.__name__} {updater.pk_value()} not found"
+                    f"{updater.row_class.__name__} {updater.target_id_value()} not found"
                 )
             return data
 

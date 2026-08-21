@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import override
+from typing import Any, override
 
 import sqlalchemy as sa
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.manager.data.deployment_revision_preset.types import (
@@ -40,8 +41,8 @@ class DeploymentPresetPurger(
         return DeploymentRevisionPresetRow
 
     @override
-    def pk_value(self) -> DeploymentPresetID:
-        return self._preset_id
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return DeploymentRevisionPresetRow.id
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:

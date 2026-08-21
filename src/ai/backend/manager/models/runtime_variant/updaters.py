@@ -5,6 +5,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
@@ -26,7 +29,11 @@ class RuntimeVariantUpdater(DataUpdater[RuntimeVariantRow, RuntimeVariantData]):
         return RuntimeVariantRow
 
     @override
-    def pk_value(self) -> RuntimeVariantID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return RuntimeVariantRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.variant_id
 
     @property

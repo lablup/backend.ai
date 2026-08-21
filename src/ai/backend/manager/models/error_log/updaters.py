@@ -6,6 +6,9 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
+from uuid import UUID
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.models.error_log.row import ErrorLogRow
@@ -29,7 +32,11 @@ class ErrorLogSoftDeleteUpdater(DataUpdater[ErrorLogRow, ErrorLogData]):
         return ErrorLogRow
 
     @override
-    def pk_value(self) -> uuid.UUID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ErrorLogRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.log_id
 
     @override

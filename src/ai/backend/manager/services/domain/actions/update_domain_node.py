@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
@@ -14,7 +13,6 @@ from ai.backend.manager.models.domain.updaters import DomainUpdater
 class UpdateDomainNodeAction(BaseSingleEntityAction):
     """Edit one domain and the resource groups it may schedule on."""
 
-    domain_id: DomainID
     updater: DomainUpdater
     user_info: UserInfo
     sgroup_ids_to_add: set[ResourceGroupID] | None = None
@@ -22,7 +20,7 @@ class UpdateDomainNodeAction(BaseSingleEntityAction):
 
     @override
     def entity_id(self) -> EntityIdentifier:
-        return self.domain_id
+        return self.updater.domain_id
 
     @override
     @classmethod

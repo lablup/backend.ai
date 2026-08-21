@@ -501,7 +501,7 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
         sgroup_ids_to_remove: set[ResourceGroupID] | None,
     ) -> UpdateDomainNodeAction:
         updater = DomainUpdater(
-            name=name,
+            domain_id=domain_id,
             description=TriState[str].from_graphql(
                 self.description,
             ),
@@ -526,7 +526,6 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
         )
         return UpdateDomainNodeAction(
             user_info=user_info,
-            domain_id=domain_id,
             updater=updater,
             sgroup_ids_to_add=sgroup_ids_to_add,
             sgroup_ids_to_remove=sgroup_ids_to_remove,
@@ -731,7 +730,7 @@ class ModifyDomainInput(graphene.InputObjectType):  # type: ignore[misc]
 
     def to_action(self, domain_name: str, domain_id: DomainID) -> UpdateDomainAction:
         updater = DomainUpdater(
-            name=domain_name,
+            domain_id=domain_id,
             new_name=OptionalState[str].from_graphql(self.name),
             description=TriState[str].from_graphql(
                 self.description,
@@ -752,7 +751,7 @@ class ModifyDomainInput(graphene.InputObjectType):  # type: ignore[misc]
             ),
             integration_name=TriState[str].from_graphql(self.integration_id),
         )
-        return UpdateDomainAction(domain_id=domain_id, updater=updater)
+        return UpdateDomainAction(updater=updater)
 
 
 class CreateDomain(graphene.Mutation):  # type: ignore[misc]
@@ -842,7 +841,7 @@ class DeleteDomain(graphene.Mutation):  # type: ignore[misc]
         target = await ctx.processors.domain.lookup.run(LookupDomainAction(name=DomainName(name)))
         await ctx.processors.domain.delete_domain.run(
             DeleteDomainAction(
-                domain_id=target.entity_id(), updater=DomainSoftDeleteUpdater(name=name)
+                updater=DomainSoftDeleteUpdater(domain_id=target.entity_id()),
             )
         )
         return cls(ok=True, msg=f"domain {name} deleted successfully")

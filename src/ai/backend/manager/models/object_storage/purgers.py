@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -23,8 +25,8 @@ class ObjectStoragePurger(EntityPurger[ObjectStorageRow, ObjectStorageData]):
         return ObjectStorageRow
 
     @override
-    def pk_value(self) -> ObjectStorageID:
-        return self.storage_id
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ObjectStorageRow.id
 
     @override
     def entity_id(self) -> EntityIdentifier:

@@ -4,6 +4,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any, override
+from uuid import UUID
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.data.retention.types import RetentionCategory
@@ -29,7 +32,11 @@ class RetentionPolicyUpdater(DataUpdater[RetentionPolicyRow, RetentionPolicyData
         return RetentionPolicyRow
 
     @override
-    def pk_value(self) -> RetentionPolicyID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return RetentionPolicyRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.policy_id
 
     @property

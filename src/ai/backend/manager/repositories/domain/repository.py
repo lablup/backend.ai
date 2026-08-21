@@ -130,7 +130,7 @@ class DomainRepository:
         async with self._v2_ops.write_ops() as w:
             data = await w.update_data(updater)
             if data is None:
-                raise DomainNotFound(f"Domain not found: {updater.pk_value()}")
+                raise DomainNotFound(f"Domain not found: {updater.target_id_value()}")
             return data
 
     @domain_repository_resilience.apply()
@@ -139,7 +139,7 @@ class DomainRepository:
         async with self._v2_ops.write_ops() as w:
             data = await w.update_data(updater)
             if data is None:
-                raise DomainNotFound(f"Domain not found: {updater.pk_value()}")
+                raise DomainNotFound(f"Domain not found: {updater.target_id_value()}")
             return data
 
     @domain_repository_resilience.apply()

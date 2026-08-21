@@ -158,7 +158,9 @@ class V2EntityWriteOps(V2WriteOpsBase):
     ) -> TData | None:
         """Delete one entity row and the RBAC graph it left; ``None`` if already gone."""
         await self._validate_conflict_checks(purger.conflict_checks())
-        row = await self._delete_row_returning(purger.row_class(), purger.pk_value())
+        row = await self._delete_row_returning(
+            purger.row_class(), purger.target_id_column(), purger.entity_id()
+        )
         if row is None:
             return None
         await self._teardown_entity(purger.entity_id())
@@ -177,7 +179,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
                     data = await self.purge_entity(purger)
                     if data is None:
                         raise EntityNotFoundError(
-                            f"{purger.row_class().__name__} {purger.pk_value()} not found"
+                            f"{purger.row_class().__name__} {purger.entity_id()} not found"
                         )
                     successes[entity_id] = data
             except Exception as e:

@@ -220,8 +220,11 @@ class ResourceSlotAdapter(BaseAdapter):
         self, input: UpdateResourceSlotTypeInput
     ) -> UpdateResourceSlotTypePayload:
         """Update the display and scheduling flags of a resource slot type."""
+        target = await self._processors.resource_slot.public_lookup_resource_slot_type.run(
+            LookupResourceSlotTypeAction(slot_name=input.slot_name)
+        )
         updater = ResourceSlotTypeUpdater(
-            slot_name=input.slot_name,
+            slot_type_id=target.entity_id(),
             required=OptionalState.from_nullable(input.required),
             enabled=OptionalState.from_nullable(input.enabled),
             display_name=OptionalState.from_nullable(input.display_name),

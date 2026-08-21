@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.notification import (
     NotificationChannelID,
@@ -32,8 +34,8 @@ class NotificationChannelPurger(EntityPurger[NotificationChannelRow, Notificatio
         return NotificationChannelRow
 
     @override
-    def pk_value(self) -> NotificationChannelID:
-        return self.channel_id
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return NotificationChannelRow.id
 
     @override
     def entity_id(self) -> EntityIdentifier:
@@ -57,8 +59,8 @@ class NotificationRulePurger(EntityPurger[NotificationRuleRow, NotificationRuleD
         return NotificationRuleRow
 
     @override
-    def pk_value(self) -> NotificationRuleID:
-        return self.rule_id
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return NotificationRuleRow.id
 
     @override
     def entity_id(self) -> EntityIdentifier:

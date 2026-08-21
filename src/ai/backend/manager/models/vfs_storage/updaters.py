@@ -5,6 +5,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
@@ -27,7 +30,11 @@ class VFSStorageUpdater(DataUpdater[VFSStorageRow, VFSStorageData]):
         return VFSStorageRow
 
     @override
-    def pk_value(self) -> VFSStorageID:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return VFSStorageRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
         return self.storage_id
 
     @property

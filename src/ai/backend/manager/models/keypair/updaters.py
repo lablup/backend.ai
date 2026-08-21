@@ -5,8 +5,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
+from uuid import UUID
 
-from ai.backend.common.types import AccessKey
+from sqlalchemy.orm import InstrumentedAttribute
+
+from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -17,7 +20,7 @@ from ai.backend.manager.models.specs.updater import DataUpdater
 class KeypairDotfilesUpdater(DataUpdater[KeyPairRow, KeyPairData]):
     """Replaces the packed dotfile entries a keypair hands to its sessions."""
 
-    access_key: AccessKey
+    keypair_id: KeyPairID
     dotfiles: bytes
 
     @property
@@ -26,8 +29,12 @@ class KeypairDotfilesUpdater(DataUpdater[KeyPairRow, KeyPairData]):
         return KeyPairRow
 
     @override
-    def pk_value(self) -> str:
-        return self.access_key
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return KeyPairRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
+        return self.keypair_id
 
     @override
     def build_values(self) -> dict[str, Any]:
@@ -47,7 +54,7 @@ class KeypairDotfilesUpdater(DataUpdater[KeyPairRow, KeyPairData]):
 class KeypairBootstrapScriptUpdater(DataUpdater[KeyPairRow, KeyPairData]):
     """Replaces the bootstrap script a keypair carries."""
 
-    access_key: AccessKey
+    keypair_id: KeyPairID
     script: str
 
     @property
@@ -56,8 +63,12 @@ class KeypairBootstrapScriptUpdater(DataUpdater[KeyPairRow, KeyPairData]):
         return KeyPairRow
 
     @override
-    def pk_value(self) -> str:
-        return self.access_key
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return KeyPairRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
+        return self.keypair_id
 
     @override
     def build_values(self) -> dict[str, Any]:

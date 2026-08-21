@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
@@ -14,6 +15,7 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.common.types import ResourceSlot, SlotTypes
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.errors.resource_slot import (
     ResourceSlotTypeAlreadyExists,
     ResourceSlotTypeInUse,
@@ -121,18 +123,18 @@ async def db_with_referencing_tables(
 @pytest.fixture
 async def existing_slot_type(
     db_with_referencing_tables: ExtendedAsyncSAEngine,
-) -> str:
-    slot_name = "cuda.device"
+) -> ResourceSlotTypeData:
+    """Seed a slot type and answer with it: a write names it by uuid, a check by name."""
     async with db_with_referencing_tables.begin_session() as db_sess:
-        db_sess.add(
-            ResourceSlotTypeRow(
-                slot_name=slot_name,
-                slot_type="unique",
-                display_name="GPU",
-                rank=3,
-            )
+        row = ResourceSlotTypeRow(
+            slot_name="cuda.device",
+            slot_type="unique",
+            display_name="GPU",
+            rank=3,
         )
-    return slot_name
+        db_sess.add(row)
+        await db_sess.flush()
+        return row.to_data()
 
 
 def _creator(
@@ -197,10 +199,10 @@ class TestResourceSlotTypeCreator:
     async def test_existing_name_conflicts_and_leaves_the_row_alone(
         self,
         db_with_referencing_tables: ExtendedAsyncSAEngine,
-        existing_slot_type: str,
+        existing_slot_type: ResourceSlotTypeData,
     ) -> None:
         creator = _creator(
-            existing_slot_type,
+            existing_slot_type.slot_name,
             SlotTypes.COUNT,
             display_name="Overwritten",
         )
@@ -223,10 +225,10 @@ class TestResourceSlotTypeUpdater:
     async def test_updates_only_the_named_fields(
         self,
         db_with_referencing_tables: ExtendedAsyncSAEngine,
-        existing_slot_type: str,
+        existing_slot_type: ResourceSlotTypeData,
     ) -> None:
         updater = ResourceSlotTypeUpdater(
-            slot_name=existing_slot_type,
+            slot_type_id=existing_slot_type.uuid,
             enabled=OptionalState.update(False),
             required=OptionalState.update(True),
         )
@@ -246,7 +248,7 @@ class TestResourceSlotTypeUpdater:
         db_with_referencing_tables: ExtendedAsyncSAEngine,
     ) -> None:
         updater = ResourceSlotTypeUpdater(
-            slot_name="no.such.slot",
+            slot_type_id=ResourceSlotTypeUUID(uuid4()),
             enabled=OptionalState.update(False),
         )
         provider = V2DBOpsProvider(db_with_referencing_tables)
@@ -258,15 +260,15 @@ class TestResourceSlotTypePurger:
     async def test_removes_an_unreferenced_slot_type(
         self,
         db_with_referencing_tables: ExtendedAsyncSAEngine,
-        existing_slot_type: str,
+        existing_slot_type: ResourceSlotTypeData,
     ) -> None:
         purger = ResourceSlotTypePurger(
-            slot_name=existing_slot_type, slot_type_id=ResourceSlotTypeUUID(uuid.uuid4())
+            slot_name=existing_slot_type.slot_name, slot_type_id=existing_slot_type.uuid
         )
         async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
             data = await w.purge_entity(purger)
             assert data is not None
-            assert data.slot_name == existing_slot_type
+            assert data.slot_name == existing_slot_type.slot_name
 
         async with db_with_referencing_tables.begin_readonly_session() as db_sess:
             remaining = await db_sess.scalar(
@@ -279,7 +281,7 @@ class TestResourceSlotTypePurger:
     async def test_refuses_while_an_agent_reports_the_slot(
         self,
         db_with_referencing_tables: ExtendedAsyncSAEngine,
-        existing_slot_type: str,
+        existing_slot_type: ResourceSlotTypeData,
     ) -> None:
         agent_id = "i-conflict"
         resource_group_id = ResourceGroupID(uuid.uuid4())
@@ -325,7 +327,7 @@ class TestResourceSlotTypePurger:
             )
 
         purger = ResourceSlotTypePurger(
-            slot_name=existing_slot_type, slot_type_id=ResourceSlotTypeUUID(uuid.uuid4())
+            slot_name=existing_slot_type.slot_name, slot_type_id=existing_slot_type.uuid
         )
         with pytest.raises(ResourceSlotTypeInUse):
             async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:

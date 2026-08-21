@@ -154,12 +154,10 @@ class DomainHandler:
     ) -> APIResponse:
         domain_name = path.parsed.domain_name
         log.info("UPDATE_DOMAIN (ak:{}, d:{})", ctx.access_key, domain_name)
-        updater = self._adapter.build_updater(body.parsed, domain_name)
         target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        updater = self._adapter.build_updater(body.parsed, target.entity_id())
 
-        action_result = await self._domain.update_domain.run(
-            UpdateDomainAction(domain_id=target.entity_id(), updater=updater)
-        )
+        action_result = await self._domain.update_domain.run(UpdateDomainAction(updater=updater))
 
         resp = UpdateDomainResponse(domain=self._adapter.convert_to_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
@@ -179,8 +177,7 @@ class DomainHandler:
         )
         await self._domain.delete_domain.run(
             DeleteDomainAction(
-                domain_id=target.entity_id(),
-                updater=DomainSoftDeleteUpdater(name=body.parsed.name),
+                updater=DomainSoftDeleteUpdater(domain_id=target.entity_id()),
             )
         )
 

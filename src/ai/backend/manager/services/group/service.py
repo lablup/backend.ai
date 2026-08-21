@@ -91,7 +91,7 @@ class GroupService:
             user_uuids_converted = [UUID(user_uuid) for user_uuid in user_uuids_list]
 
         group_data = await self._group_repository.modify_validated(
-            action.project_id,
+            action.updater.project_id,
             action.updater,
             action.user_update_mode.optional_value(),
             user_uuids_converted,

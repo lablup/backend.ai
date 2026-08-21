@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -23,8 +25,8 @@ class StorageNamespacePurger(EntityPurger[StorageNamespaceRow, StorageNamespaceD
         return StorageNamespaceRow
 
     @override
-    def pk_value(self) -> StorageNamespaceID:
-        return self.storage_namespace_id
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return StorageNamespaceRow.id
 
     @override
     def entity_id(self) -> EntityIdentifier:

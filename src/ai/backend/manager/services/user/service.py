@@ -4,6 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.exception import InvalidAPIParameters
@@ -402,22 +403,25 @@ class UserService:
     ) -> CreateKeypairDotfileActionResult:
         if not verify_dotfile_name(action.entry.path):
             raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
-        entries = (await self._read_dotfiles(action.access_key)).added(action.entry)
-        await self._write_dotfiles(action.access_key, entries)
+        keypair_id, current = await self._read_dotfiles(action.access_key)
+        entries = current.added(action.entry)
+        await self._write_dotfiles(keypair_id, entries)
         return CreateKeypairDotfileActionResult(entries=entries.entries)
 
     async def update_dotfile(
         self, action: UpdateKeypairDotfileAction
     ) -> UpdateKeypairDotfileActionResult:
-        entries = (await self._read_dotfiles(action.access_key)).replaced(action.entry)
-        await self._write_dotfiles(action.access_key, entries)
+        keypair_id, current = await self._read_dotfiles(action.access_key)
+        entries = current.replaced(action.entry)
+        await self._write_dotfiles(keypair_id, entries)
         return UpdateKeypairDotfileActionResult(entries=entries.entries)
 
     async def delete_dotfile(
         self, action: DeleteKeypairDotfileAction
     ) -> DeleteKeypairDotfileActionResult:
-        entries = (await self._read_dotfiles(action.access_key)).removed(action.path)
-        await self._write_dotfiles(action.access_key, entries)
+        keypair_id, current = await self._read_dotfiles(action.access_key)
+        entries = current.removed(action.path)
+        await self._write_dotfiles(keypair_id, entries)
         return DeleteKeypairDotfileActionResult(entries=entries.entries)
 
     async def get_bootstrap_script(
@@ -432,16 +436,18 @@ class UserService:
         script = action.script.strip()
         if len(script) > MAXIMUM_DOTFILE_SIZE:
             raise DotfileCreationFailed("Maximum bootstrap script length reached")
+        keypair = await self._user_repository.admin_get_keypair(action.access_key)
         await self._user_repository.update_keypair_column(
-            KeypairBootstrapScriptUpdater(access_key=action.access_key, script=script)
+            KeypairBootstrapScriptUpdater(keypair_id=keypair.id, script=script)
         )
         return UpdateBootstrapScriptActionResult()
 
-    async def _read_dotfiles(self, access_key: AccessKey) -> DotfileEntries:
+    async def _read_dotfiles(self, access_key: AccessKey) -> tuple[KeyPairID, DotfileEntries]:
+        """The keypair's id alongside its entries, so the write keys on the row it read."""
         keypair = await self._user_repository.admin_get_keypair(access_key)
-        return DotfileEntries.unpack(keypair.dotfiles)
+        return keypair.id, DotfileEntries.unpack(keypair.dotfiles)
 
-    async def _write_dotfiles(self, access_key: AccessKey, entries: DotfileEntries) -> None:
+    async def _write_dotfiles(self, keypair_id: KeyPairID, entries: DotfileEntries) -> None:
         await self._user_repository.update_keypair_column(
-            KeypairDotfilesUpdater(access_key=access_key, dotfiles=entries.pack())
+            KeypairDotfilesUpdater(keypair_id=keypair_id, dotfiles=entries.pack())
         )

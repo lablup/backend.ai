@@ -3,9 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.resource_policy import (
-    UserResourcePolicyUUID,
-)
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import UpdateSingleEntityOpsAction
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
@@ -26,7 +23,6 @@ class UpdateUserResourcePolicyAction(
     replaces it.
     """
 
-    policy_id: UserResourcePolicyUUID
     updater: UserResourcePolicyUpdater
 
     @override
@@ -36,7 +32,7 @@ class UpdateUserResourcePolicyAction(
 
     @override
     def entity_id(self) -> EntityIdentifier:
-        return self.policy_id
+        return self.updater.policy_id
 
     @override
     def to_updater(self) -> UserResourcePolicyUpdater:

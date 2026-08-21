@@ -28,7 +28,7 @@ from uuid import UUID
 
 import pytest
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import InstrumentedAttribute, Mapped, mapped_column
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
@@ -229,8 +229,8 @@ class _Purger(EntityPurger[EntityLifecycleTestRow, _EntityData]):
         return EntityLifecycleTestRow
 
     @override
-    def pk_value(self) -> UUID:
-        return self.target
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return EntityLifecycleTestRow.id
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:

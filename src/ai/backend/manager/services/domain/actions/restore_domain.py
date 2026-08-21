@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import RestoreSingleEntityOpsAction
 from ai.backend.manager.data.domain.types import DomainData
@@ -13,12 +12,11 @@ from ai.backend.manager.models.domain.updaters import DomainRestoreUpdater
 class RestoreDomainAction(RestoreSingleEntityOpsAction[DomainRow, DomainData]):
     """Put one retired domain back in service."""
 
-    domain_id: DomainID
     updater: DomainRestoreUpdater
 
     @override
     def entity_id(self) -> EntityIdentifier:
-        return self.domain_id
+        return self.updater.domain_id
 
     @override
     @classmethod

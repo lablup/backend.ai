@@ -87,7 +87,9 @@ class V2FieldWriteOps(V2WriteOpsBase):
         """Delete one field row; ``None`` if already gone. The delete is
         authorized through the owner."""
         await self._validate_conflict_checks(purger.conflict_checks())
-        row = await self._delete_row_returning(purger.row_class(), purger.pk_value())
+        row = await self._delete_row_returning(
+            purger.row_class(), purger.target_id_column(), purger.target_id_value()
+        )
         if row is None:
             return None
         return purger.to_data(row)
@@ -106,7 +108,7 @@ class V2FieldWriteOps(V2WriteOpsBase):
                     data = await self.purge_field_entity(purger)
                     if data is None:
                         raise EntityNotFoundError(
-                            f"{purger.row_class().__name__} {purger.pk_value()} not found"
+                            f"{purger.row_class().__name__} {purger.target_id_value()} not found"
                         )
                     successes[field_id] = data
             except Exception as e:

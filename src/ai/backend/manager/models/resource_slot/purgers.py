@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -37,8 +39,8 @@ class ResourceSlotTypePurger(EntityPurger[ResourceSlotTypeRow, ResourceSlotTypeD
         return ResourceSlotTypeRow
 
     @override
-    def pk_value(self) -> str:
-        return self.slot_name
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ResourceSlotTypeRow.uuid
 
     @override
     def entity_id(self) -> EntityIdentifier:

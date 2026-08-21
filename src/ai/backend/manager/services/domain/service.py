@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.dotfile.types import DotfileEntries
@@ -72,7 +73,7 @@ class DomainService:
                     f"`sgroups_to_remove` (sg:{conflict})."
                 )
         domain_data = await self._repository.update_domain_node(
-            action.domain_id,
+            action.updater.domain_id,
             action.updater,
             action.sgroup_ids_to_add,
             action.sgroup_ids_to_remove,
@@ -88,22 +89,25 @@ class DomainService:
     ) -> CreateDomainDotfileActionResult:
         if not verify_dotfile_name(action.entry.path):
             raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
-        entries = (await self._read_dotfiles(action.name)).added(action.entry)
-        await self._write_dotfiles(action.name, entries)
+        domain_id, current = await self._read_dotfiles(action.name)
+        entries = current.added(action.entry)
+        await self._write_dotfiles(domain_id, entries)
         return CreateDomainDotfileActionResult(entries=entries.entries)
 
     async def update_dotfile(
         self, action: UpdateDomainDotfileAction
     ) -> UpdateDomainDotfileActionResult:
-        entries = (await self._read_dotfiles(action.name)).replaced(action.entry)
-        await self._write_dotfiles(action.name, entries)
+        domain_id, current = await self._read_dotfiles(action.name)
+        entries = current.replaced(action.entry)
+        await self._write_dotfiles(domain_id, entries)
         return UpdateDomainDotfileActionResult(entries=entries.entries)
 
     async def delete_dotfile(
         self, action: DeleteDomainDotfileAction
     ) -> DeleteDomainDotfileActionResult:
-        entries = (await self._read_dotfiles(action.name)).removed(action.path)
-        await self._write_dotfiles(action.name, entries)
+        domain_id, current = await self._read_dotfiles(action.name)
+        entries = current.removed(action.path)
+        await self._write_dotfiles(domain_id, entries)
         return DeleteDomainDotfileActionResult(entries=entries.entries)
 
     def _validate_name(self, name: str) -> None:
@@ -113,11 +117,12 @@ class DomainService:
                 f"Domain name cannot be empty or exceed {_MAXIMUM_DOMAIN_NAME_LENGTH} characters."
             )
 
-    async def _read_dotfiles(self, name: str) -> DotfileEntries:
+    async def _read_dotfiles(self, name: str) -> tuple[DomainID, DotfileEntries]:
+        """The domain's id alongside its entries, so the write keys on the id it read."""
         data = await self._repository.get_domain(name)
-        return DotfileEntries.unpack(data.dotfiles)
+        return data.id, DotfileEntries.unpack(data.dotfiles)
 
-    async def _write_dotfiles(self, name: str, entries: DotfileEntries) -> None:
+    async def _write_dotfiles(self, domain_id: DomainID, entries: DotfileEntries) -> None:
         await self._repository.update_dotfiles(
-            DomainDotfilesUpdater(name=name, dotfiles=entries.pack())
+            DomainDotfilesUpdater(domain_id=domain_id, dotfiles=entries.pack())
         )

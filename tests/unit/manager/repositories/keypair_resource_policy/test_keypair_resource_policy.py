@@ -158,19 +158,17 @@ class TestKeypairResourcePolicyOps:
         )
 
     @pytest.fixture
-    async def sample_policy_name(
+    async def sample_policy(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_creator: KeyPairResourcePolicyCreator,
-    ) -> str:
-        """Create sample keypair resource policy directly in DB and return its name"""
+    ) -> KeyPairResourcePolicyData:
+        """Seed a policy and answer with it, since a write names it by uuid."""
         async with db_with_cleanup.begin_session() as db_sess:
             policy_row = sample_creator.build_row()
             db_sess.add(policy_row)
             await db_sess.commit()
-
-        assert sample_creator.name is not None
-        return sample_creator.name
+            return policy_row.to_dataclass()
 
     @pytest.fixture
     async def multiple_policies(
@@ -330,7 +328,7 @@ class TestKeypairResourcePolicyOps:
         [
             pytest.param(
                 KeyPairResourcePolicyUpdater(
-                    name="",
+                    policy_id=KeyPairResourcePolicyUUID(uuid4()),
                     default_for_unspecified=OptionalState.update(DefaultForUnspecified.UNLIMITED),
                     total_resource_slots=OptionalState.update(
                         ResourceSlot({"cpu": "8", "mem": "16g", "gpu": "2"})
@@ -348,7 +346,7 @@ class TestKeypairResourcePolicyOps:
             ),
             pytest.param(
                 KeyPairResourcePolicyUpdater(
-                    name="",
+                    policy_id=KeyPairResourcePolicyUUID(uuid4()),
                     max_concurrent_sessions=OptionalState.update(15),
                 ),
                 {"max_concurrent_sessions": 15},
@@ -356,7 +354,7 @@ class TestKeypairResourcePolicyOps:
             ),
             pytest.param(
                 KeyPairResourcePolicyUpdater(
-                    name="",
+                    policy_id=KeyPairResourcePolicyUUID(uuid4()),
                     max_pending_session_count=TriState.nullify(),
                     max_pending_session_resource_slots=TriState.nullify(),
                 ),
@@ -368,7 +366,7 @@ class TestKeypairResourcePolicyOps:
             ),
             pytest.param(
                 KeyPairResourcePolicyUpdater(
-                    name="",
+                    policy_id=KeyPairResourcePolicyUUID(uuid4()),
                     max_pending_session_count=TriState.update(15),
                 ),
                 {"max_pending_session_count": 15},
@@ -379,14 +377,14 @@ class TestKeypairResourcePolicyOps:
     async def test_update_keypair_resource_policy(
         self,
         ops: OpsRepository[KeyPairResourcePolicyData],
-        sample_policy_name: str,
+        sample_policy: KeyPairResourcePolicyData,
         update_spec: KeyPairResourcePolicyUpdater,
         expected_values: dict[str, Any],
     ) -> None:
         """Test updating an existing keypair resource policy with various updaters"""
-        result = await ops.update(replace(update_spec, name=sample_policy_name))
+        result = await ops.update(replace(update_spec, policy_id=sample_policy.uuid))
 
-        assert result.name == sample_policy_name
+        assert result.name == sample_policy.name
 
         for field_name, expected_value in expected_values.items():
             actual_value = getattr(result, field_name)
@@ -400,7 +398,7 @@ class TestKeypairResourcePolicyOps:
     ) -> None:
         """Test that updating a non-existent policy raises EntityNotFoundError"""
         updater = KeyPairResourcePolicyUpdater(
-            name="nonexistent-policy",
+            policy_id=KeyPairResourcePolicyUUID(uuid4()),
             max_concurrent_sessions=OptionalState.update(99),
         )
 
@@ -410,22 +408,20 @@ class TestKeypairResourcePolicyOps:
     async def test_remove_keypair_resource_policy(
         self,
         ops: OpsRepository[KeyPairResourcePolicyData],
-        sample_policy_name: str,
+        sample_policy: KeyPairResourcePolicyData,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Test removing a keypair resource policy"""
         result = await ops.purge_entity(
-            KeyPairResourcePolicyPurger(
-                name=sample_policy_name, policy_id=KeyPairResourcePolicyUUID(uuid4())
-            )
+            KeyPairResourcePolicyPurger(name=sample_policy.name, policy_id=sample_policy.uuid)
         )
 
-        assert result.name == sample_policy_name
+        assert result.name == sample_policy.name
 
         # Verify policy is deleted
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             query = sa.select(KeyPairResourcePolicyRow).where(
-                KeyPairResourcePolicyRow.name == sample_policy_name
+                KeyPairResourcePolicyRow.name == sample_policy.name
             )
             deleted_policy = await db_sess.scalar(query)
             assert deleted_policy is None
@@ -449,19 +445,21 @@ class TestKeypairResourcePolicyOps:
     ) -> KeyPairResourcePolicyUpdater:
         """Fixture for allowed_vfolder_hosts updater spec"""
         return KeyPairResourcePolicyUpdater(
-            name="",
+            policy_id=KeyPairResourcePolicyUUID(uuid4()),
             allowed_vfolder_hosts=OptionalState.update(sample_allowed_vfolder_hosts),
         )
 
     async def test_update_allowed_vfolder_hosts(
         self,
         ops: OpsRepository[KeyPairResourcePolicyData],
-        sample_policy_name: str,
+        sample_policy: KeyPairResourcePolicyData,
         allowed_vfolder_updater_spec: KeyPairResourcePolicyUpdater,
         sample_allowed_vfolder_hosts: dict[str, Any],
     ) -> None:
         """Test updating allowed_vfolder_hosts configuration"""
-        result = await ops.update(replace(allowed_vfolder_updater_spec, name=sample_policy_name))
+        result = await ops.update(
+            replace(allowed_vfolder_updater_spec, policy_id=sample_policy.uuid)
+        )
         assert result.allowed_vfolder_hosts == sample_allowed_vfolder_hosts
 
     @pytest.mark.parametrize("max_priority", [None, 0, 10, 100])
