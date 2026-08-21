@@ -12,7 +12,9 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
 from ai.backend.common.types import (
@@ -26,7 +28,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_card.types import ModelCardData
-from ai.backend.manager.data.permission.types import RBACElementRef, RBACElementType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.models.agent import AgentRow
@@ -37,6 +38,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.model_card.creators import ModelCardCreator
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -56,10 +58,10 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
 from ai.backend.manager.repositories.model_card.db_source.db_source import ModelCardDBSource
 from ai.backend.manager.repositories.model_card.purgers import ModelCardPurgerSpec
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -366,43 +368,36 @@ class TestModelCardDelete:
     @pytest.fixture
     def make_card(
         self,
-        db_source: ModelCardDBSource,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
         test_user: UserRow,
         test_group: GroupRow,
         test_vfolder: VFolderRow,
     ) -> _MakeCardFn:
         """Factory that creates a model card on ``test_vfolder`` (or an override vfolder)."""
+        ops: OpsRepository[ModelCardData] = OpsRepository(V2DBOpsProvider(db_with_cleanup))
 
         async def _make(*, vfolder_id: VFolderUUID | None = None) -> ModelCardData:
-            creator: RBACEntityCreator[ModelCardRow] = RBACEntityCreator(
-                spec=ModelCardCreatorSpec(
-                    name=f"test-model-{uuid.uuid4().hex[:8]}",
-                    vfolder_id=vfolder_id if vfolder_id is not None else test_vfolder.id,
-                    domain=test_domain.name,
-                    project_id=test_group.id,
-                    creator_id=test_user.uuid,
-                    author=None,
-                    title=None,
-                    model_version=None,
-                    description=None,
-                    task=None,
-                    category=None,
-                    architecture=None,
-                    framework=[],
-                    label=[],
-                    license=None,
-                    min_resource=[],
-                    readme=None,
-                    access_level="internal",
-                ),
-                element_type=RBACElementType.MODEL_CARD,
-                scope_ref=RBACElementRef(
-                    element_type=RBACElementType.PROJECT,
-                    element_id=str(test_group.id),
-                ),
+            creator = ModelCardCreator(
+                name=f"test-model-{uuid.uuid4().hex[:8]}",
+                vfolder_id=vfolder_id if vfolder_id is not None else test_vfolder.id,
+                domain=test_domain.name,
+                project_id=ProjectID(test_group.id),
+                creator_id=UserID(test_user.uuid),
+                author=None,
+                title=None,
+                model_version=None,
+                description=None,
+                task=None,
+                category=None,
+                architecture=None,
+                framework=[],
+                label=[],
+                license=None,
+                readme=None,
+                access_level="internal",
             )
-            return await db_source.create(creator)
+            return await ops.create_entity(creator)
 
         return _make
 

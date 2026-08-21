@@ -12,7 +12,11 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
+from ai.backend.manager.data.model_card.types import (
+    ModelCardData,
+    ModelCardResourceRequirementData,
+    ResourceRequirementEntry,
+)
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import ModelCardConflict
 from ai.backend.manager.models.model_card.row import ModelCardRow
@@ -93,7 +97,7 @@ class ModelCardCreator(EntityCreator[ModelCardRow, ModelCardData]):
 
 @dataclass
 class ModelCardResourceRequirementCreator(
-    FieldCreator[ModelCardID, ModelCardResourceRequirementRow, ResourceRequirementEntry]
+    FieldCreator[ModelCardID, ModelCardResourceRequirementRow, ModelCardResourceRequirementData]
 ):
     """Insert one minimum slot quantity of the card that owns it."""
 
@@ -116,8 +120,5 @@ class ModelCardResourceRequirementCreator(
         )
 
     @override
-    def to_data(self, row: ModelCardResourceRequirementRow) -> ResourceRequirementEntry:
-        return ResourceRequirementEntry(
-            slot_name=row.slot_name,
-            min_quantity=str(row.min_quantity),
-        )
+    def to_data(self, row: ModelCardResourceRequirementRow) -> ModelCardResourceRequirementData:
+        return row.to_data()

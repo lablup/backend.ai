@@ -8,7 +8,11 @@ from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityType, ScopeRef
 from ai.backend.manager.actions.v2.ops.base import CreateEntityWithFieldsOpsAction
-from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
+from ai.backend.manager.data.model_card.types import (
+    ModelCardData,
+    ModelCardResourceRequirementData,
+    ResourceRequirementEntry,
+)
 from ai.backend.manager.models.model_card.creators import (
     ModelCardCreator,
     ModelCardResourceRequirementCreator,
@@ -20,7 +24,10 @@ from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequire
 @dataclass(frozen=True)
 class CreateModelCardAction(
     CreateEntityWithFieldsOpsAction[
-        ModelCardRow, ModelCardData, ModelCardResourceRequirementRow, ResourceRequirementEntry
+        ModelCardRow,
+        ModelCardData,
+        ModelCardResourceRequirementRow,
+        ModelCardResourceRequirementData,
     ]
 ):
     """Register a model card in a project, with the minimum resources it declares."""

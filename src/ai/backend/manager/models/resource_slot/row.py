@@ -28,6 +28,7 @@ from ai.backend.common.data.entity.model_card_resource_requirement import (
 from ai.backend.common.data.entity.preset_resource_slot import PresetResourceSlotID
 from ai.backend.common.data.entity.resource_allocation import ResourceAllocationID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
+from ai.backend.manager.data.model_card.types import ModelCardResourceRequirementData
 from ai.backend.manager.data.resource_slot.types import (
     NumberFormatData,
     ResourceSlotTypeData,
@@ -316,6 +317,25 @@ class ModelCardResourceRequirementRow(Base):
         ),
         sa.Index("ix_mc_resource_req_slot_name", "slot_name"),
     )
+
+    def to_data(self) -> ModelCardResourceRequirementData:
+        return ModelCardResourceRequirementData(
+            model_card_id=self.model_card_id,
+            slot_name=self.slot_name,
+            min_quantity=self._formatted_min_quantity(),
+        )
+
+    def _formatted_min_quantity(self) -> str:
+        """The quantity as the caller wrote it, not as ``Numeric(24, 6)`` stores it.
+
+        A read of ``"2"`` comes back ``Decimal("2.000000")``; before a flush the
+        attribute may still be the raw string, so normalize before trimming.
+        """
+        value = self.min_quantity
+        quantity = value if isinstance(value, Decimal) else Decimal(value)
+        if quantity == quantity.to_integral_value():
+            return str(int(quantity))
+        return format(quantity.normalize(), "f")
 
 
 class PresetResourceSlotRow(Base):

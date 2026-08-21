@@ -52,21 +52,14 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     get_sessions_by_mounted_folder,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.purger import Purger, execute_purger
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    execute_rbac_entity_creator,
-)
 from ai.backend.manager.repositories.base.updater import (
     Updater,
     execute_updater,
 )
 from ai.backend.manager.repositories.base.upserter import BulkUpserter, execute_bulk_upserter
-from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
 from ai.backend.manager.repositories.model_card.types import (
     AvailablePresetsSearchResult,
-    ModelCardSearchResult,
 )
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
@@ -76,43 +69,11 @@ from ai.backend.manager.types import TriState
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def format_min_quantity(value: Decimal | str) -> str:
-    """Format a Numeric column value as a canonical string.
-
-    The column is ``Numeric(24, 6)``, so a read returns ``Decimal("2.000000")`` where
-    the caller supplied ``"2"``. Normalize into ``Decimal`` first — before a flush the
-    attribute may still be the raw string — then drop trailing zeros.
-    """
-    decimal_value = value if isinstance(value, Decimal) else Decimal(value)
-    if decimal_value == decimal_value.to_integral_value():
-        return str(int(decimal_value))
-    return format(decimal_value.normalize(), "f")
-
-
 class ModelCardDBSource:
     _db: ExtendedAsyncSAEngine
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-
-    async def create(self, creator: RBACEntityCreator[ModelCardRow]) -> ModelCardData:
-        async with self._db.begin_session() as session:
-            result = await execute_rbac_entity_creator(session, creator)
-            spec = creator.spec
-            if isinstance(spec, ModelCardCreatorSpec):
-                rows = spec.build_requirement_rows(result.row.id)
-                if rows:
-                    session.add_all(rows)
-                    await session.flush()
-            return result.row.to_data()
-
-    async def get_by_id(self, card_id: UUID) -> ModelCardData:
-        async with self._db.begin_readonly_session_read_committed() as session:
-            stmt = sa.select(ModelCardRow).where(ModelCardRow.id == card_id)
-            row = (await session.execute(stmt)).scalar_one_or_none()
-            if row is None:
-                raise ModelCardNotFound()
-            return row.to_data()
 
     async def update(self, updater: Updater[ModelCardRow]) -> ModelCardData:
         async with self._db.begin_session() as session:
@@ -281,20 +242,6 @@ class ModelCardDBSource:
                     "Cannot delete the vfolder. "
                     f"The vfolder(id: {vfolder_row.id}) is mounted on sessions(ids: {session_ids})."
                 )
-
-    async def search(
-        self,
-        querier: BatchQuerier,
-    ) -> ModelCardSearchResult:
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ModelCardRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-            return ModelCardSearchResult(
-                items=[row.ModelCardRow.to_data() for row in result.rows],
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
 
     async def search_available_presets(
         self,
@@ -516,29 +463,3 @@ class ModelCardDBSource:
 
         if new_rows:
             await session.execute(sa.insert(ModelCardResourceRequirementRow).values(new_rows))
-
-    async def min_resources_by_card_ids(
-        self,
-        card_ids: Sequence[UUID],
-    ) -> dict[UUID, list[ResourceRequirementEntry]]:
-        """Read the minimum resource requirements of the named cards.
-
-        They live in their own table, so whoever renders them asks here for every card
-        at once. A card with no requirements is absent from the mapping.
-        """
-        if not card_ids:
-            return {}
-        async with self._db.begin_readonly_session_read_committed() as session:
-            stmt = sa.select(ModelCardResourceRequirementRow).where(
-                ModelCardResourceRequirementRow.model_card_id.in_(list(card_ids))
-            )
-            rows = (await session.execute(stmt)).scalars().all()
-        by_card: dict[UUID, list[ResourceRequirementEntry]] = {}
-        for row in rows:
-            by_card.setdefault(row.model_card_id, []).append(
-                ResourceRequirementEntry(
-                    slot_name=row.slot_name,
-                    min_quantity=format_min_quantity(row.min_quantity),
-                )
-            )
-        return by_card

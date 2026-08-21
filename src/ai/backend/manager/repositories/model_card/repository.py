@@ -12,7 +12,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.model_card.types import (
     BulkModelCardDeleteResultData,
     ModelCardData,
-    ResourceRequirementEntry,
     VFolderScanData,
 )
 from ai.backend.manager.models.model_card.row import ModelCardRow
@@ -34,15 +33,6 @@ class ModelCardRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = ModelCardDBSource(db)
-
-    async def get_by_id(self, card_id: UUID) -> ModelCardData:
-        return await self._db_source.get_by_id(card_id)
-
-    async def min_resources_by_card_ids(
-        self,
-        card_ids: Sequence[UUID],
-    ) -> dict[UUID, list[ResourceRequirementEntry]]:
-        return await self._db_source.min_resources_by_card_ids(card_ids)
 
     async def update(self, updater: Updater[ModelCardRow]) -> ModelCardData:
         return await self._db_source.update(updater)

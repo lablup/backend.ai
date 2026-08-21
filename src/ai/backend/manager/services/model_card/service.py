@@ -23,10 +23,6 @@ from ai.backend.manager.services.model_card.actions.delete import (
     DeleteModelCardAction,
     DeleteModelCardActionResult,
 )
-from ai.backend.manager.services.model_card.actions.min_resources import (
-    GetModelCardMinResourcesAction,
-    GetModelCardMinResourcesActionResult,
-)
 from ai.backend.manager.services.model_card.actions.scan import (
     ScanProjectModelCardsAction,
     ScanProjectModelCardsActionResult,
@@ -69,12 +65,6 @@ class ModelCardService:
     ) -> BulkDeleteModelCardActionResult:
         data = await self._repository.bulk_delete(action.purgers, action.options)
         return BulkDeleteModelCardActionResult(data=data)
-
-    async def get_min_resources(
-        self, action: GetModelCardMinResourcesAction
-    ) -> GetModelCardMinResourcesActionResult:
-        min_resources = await self._repository.min_resources_by_card_ids(action.card_ids)
-        return GetModelCardMinResourcesActionResult(min_resources=min_resources)
 
     async def available_presets(
         self, action: AvailablePresetsAction

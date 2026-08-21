@@ -6,7 +6,7 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.entity.model_card import ModelCardID
-from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.entity.types import EntityData, FieldData
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID
 
@@ -15,6 +15,19 @@ from ai.backend.common.types import QuotaScopeID
 class ResourceRequirementEntry:
     """A single resource requirement entry (slot_name → min_quantity)."""
 
+    slot_name: str
+    min_quantity: str
+
+
+@dataclass(frozen=True)
+class ModelCardResourceRequirementData(FieldData):
+    """One minimum slot quantity row, naming the card it belongs to.
+
+    Carries the owner, unlike :class:`ResourceRequirementEntry`: a read spanning
+    several cards has to say which card each row came from.
+    """
+
+    model_card_id: ModelCardID
     slot_name: str
     min_quantity: str
 

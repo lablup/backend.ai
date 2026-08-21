@@ -2,17 +2,24 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.model_card.types import ResourceRequirementEntry
-from ai.backend.manager.data.permission.types import RBACElementRef, RBACElementType
+from ai.backend.manager.data.model_card.types import (
+    ModelCardData,
+    ModelCardResourceRequirementData,
+    ResourceRequirementEntry,
+)
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
@@ -21,6 +28,10 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.model_card.creators import (
+    ModelCardCreator,
+    ModelCardResourceRequirementCreator,
+)
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -39,21 +50,28 @@ from ai.backend.manager.models.resource_slot.row import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
 from ai.backend.manager.repositories.model_card.db_source.db_source import ModelCardDBSource
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import TriState
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.model_card.types import ModelCardData
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
+@dataclass(frozen=True)
+class _CardCreators:
+    """A card and the requirement rows created with it, as one write takes them."""
+
+    card: ModelCardCreator
+    requirements: list[ModelCardResourceRequirementCreator]
+
+
 class TestModelCardCreatorResourceRequirements:
-    """Tests for ModelCardDBSource.create() with resource_requirement_rows."""
+    """Tests for creating a model card together with its requirement rows."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -231,6 +249,13 @@ class TestModelCardCreatorResourceRequirements:
     ) -> ModelCardDBSource:
         return ModelCardDBSource(db_with_cleanup)
 
+    @pytest.fixture
+    def ops(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> OpsRepository[ModelCardData]:
+        return OpsRepository(V2DBOpsProvider(db_with_cleanup))
+
     def _build_creator(
         self,
         *,
@@ -239,14 +264,14 @@ class TestModelCardCreatorResourceRequirements:
         test_group: GroupRow,
         test_vfolder: VFolderRow,
         min_resource: list[ResourceRequirementEntry],
-    ) -> RBACEntityCreator[ModelCardRow]:
-        return RBACEntityCreator(
-            spec=ModelCardCreatorSpec(
+    ) -> _CardCreators:
+        return _CardCreators(
+            card=ModelCardCreator(
                 name=f"test-model-{uuid.uuid4().hex[:8]}",
                 vfolder_id=test_vfolder.id,
                 domain=test_domain.name,
-                project_id=test_group.id,
-                creator_id=test_user.uuid,
+                project_id=ProjectID(test_group.id),
+                creator_id=UserID(test_user.uuid),
                 author=None,
                 title=None,
                 model_version=None,
@@ -257,15 +282,12 @@ class TestModelCardCreatorResourceRequirements:
                 framework=[],
                 label=[],
                 license=None,
-                min_resource=min_resource,
                 readme=None,
                 access_level="internal",
             ),
-            element_type=RBACElementType.MODEL_CARD,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.PROJECT,
-                element_id=str(test_group.id),
-            ),
+            requirements=[
+                ModelCardResourceRequirementCreator(entry=entry) for entry in min_resource
+            ],
         )
 
     @pytest.fixture
@@ -275,7 +297,7 @@ class TestModelCardCreatorResourceRequirements:
         test_user: UserRow,
         test_group: GroupRow,
         test_vfolder: VFolderRow,
-    ) -> RBACEntityCreator[ModelCardRow]:
+    ) -> _CardCreators:
         return self._build_creator(
             test_domain=test_domain,
             test_user=test_user,
@@ -294,7 +316,7 @@ class TestModelCardCreatorResourceRequirements:
         test_user: UserRow,
         test_group: GroupRow,
         test_vfolder: VFolderRow,
-    ) -> RBACEntityCreator[ModelCardRow]:
+    ) -> _CardCreators:
         return self._build_creator(
             test_domain=test_domain,
             test_user=test_user,
@@ -305,12 +327,17 @@ class TestModelCardCreatorResourceRequirements:
 
     async def test_create_with_min_resource(
         self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ModelCardDBSource,
-        creator_with_min_resource: RBACEntityCreator[ModelCardRow],
+        ops: OpsRepository[ModelCardData],
+        creator_with_min_resource: _CardCreators,
     ) -> None:
-        data: ModelCardData = await db_source.create(creator_with_min_resource)
-        by_card = await db_source.min_resources_by_card_ids([data.id])
-        entries = by_card[data.id]
+        data: ModelCardData = (
+            await ops.create_entity_with_fields(
+                creator_with_min_resource.card, creator_with_min_resource.requirements
+            )
+        ).data
+        entries = await self._requirements(db_with_cleanup, data.id)
         assert len(entries) == 2
         assert {(r.slot_name, r.min_quantity) for r in entries} == {
             ("cpu", "2"),
@@ -319,19 +346,48 @@ class TestModelCardCreatorResourceRequirements:
 
     async def test_create_without_min_resource(
         self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ModelCardDBSource,
-        creator_without_min_resource: RBACEntityCreator[ModelCardRow],
+        ops: OpsRepository[ModelCardData],
+        creator_without_min_resource: _CardCreators,
     ) -> None:
-        data: ModelCardData = await db_source.create(creator_without_min_resource)
-        assert await db_source.min_resources_by_card_ids([data.id]) == {}
+        data: ModelCardData = (
+            await ops.create_entity_with_fields(
+                creator_without_min_resource.card, creator_without_min_resource.requirements
+            )
+        ).data
+        assert await self._requirements(db_with_cleanup, data.id) == []
+
+    async def _requirements(
+        self, db: ExtendedAsyncSAEngine, card_id: UUID
+    ) -> list[ModelCardResourceRequirementData]:
+        """The card's requirement rows as their data type, quantities formatted."""
+        async with db.begin_readonly_session() as session:
+            rows = (
+                (
+                    await session.execute(
+                        sa.select(ModelCardResourceRequirementRow).where(
+                            ModelCardResourceRequirementRow.model_card_id == card_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        return [row.to_data() for row in rows]
 
     async def test_resource_requirements_persisted_in_db(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ModelCardDBSource,
-        creator_with_min_resource: RBACEntityCreator[ModelCardRow],
+        ops: OpsRepository[ModelCardData],
+        creator_with_min_resource: _CardCreators,
     ) -> None:
-        data: ModelCardData = await db_source.create(creator_with_min_resource)
+        data: ModelCardData = (
+            await ops.create_entity_with_fields(
+                creator_with_min_resource.card, creator_with_min_resource.requirements
+            )
+        ).data
         async with db_with_cleanup.begin_readonly_session() as session:
             stmt = sa.select(ModelCardResourceRequirementRow).where(
                 ModelCardResourceRequirementRow.model_card_id == data.id
@@ -347,7 +403,8 @@ class TestModelCardCreatorResourceRequirements:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ModelCardDBSource,
-        creator_with_min_resource: RBACEntityCreator[ModelCardRow],
+        ops: OpsRepository[ModelCardData],
+        creator_with_min_resource: _CardCreators,
     ) -> None:
         """Regression: update() must sync model_card_resource_requirements.
 
@@ -358,7 +415,11 @@ class TestModelCardCreatorResourceRequirements:
         the new requirements.
         """
         # Seed the card with the original (cpu=2, mem=4096) requirements.
-        created = await db_source.create(creator_with_min_resource)
+        created = (
+            await ops.create_entity_with_fields(
+                creator_with_min_resource.card, creator_with_min_resource.requirements
+            )
+        ).data
 
         # Swap in a completely different requirement set via update().
         # Reuse only slot_types seeded by the fixture (cpu, mem) so the
@@ -370,13 +431,7 @@ class TestModelCardCreatorResourceRequirements:
             ]),
         )
         updater: Updater[ModelCardRow] = Updater(spec=spec, pk_value=created.id)
-        updated = await db_source.update(updater)
-
-        by_card = await db_source.min_resources_by_card_ids([updated.id])
-        assert {(r.slot_name, r.min_quantity) for r in by_card[updated.id]} == {
-            ("cpu", "8"),
-            ("mem", "16384"),
-        }
+        await db_source.update(updater)
 
         async with db_with_cleanup.begin_readonly_session() as session:
             rows = (
@@ -399,16 +454,19 @@ class TestModelCardCreatorResourceRequirements:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ModelCardDBSource,
-        creator_with_min_resource: RBACEntityCreator[ModelCardRow],
+        ops: OpsRepository[ModelCardData],
+        creator_with_min_resource: _CardCreators,
     ) -> None:
         """TriState.nullify() on min_resource must drop every child row."""
-        created = await db_source.create(creator_with_min_resource)
+        created = (
+            await ops.create_entity_with_fields(
+                creator_with_min_resource.card, creator_with_min_resource.requirements
+            )
+        ).data
 
         spec = ModelCardUpdaterSpec(min_resource=TriState.nullify())
         updater: Updater[ModelCardRow] = Updater(spec=spec, pk_value=created.id)
-        updated = await db_source.update(updater)
-
-        assert await db_source.min_resources_by_card_ids([updated.id]) == {}
+        await db_source.update(updater)
 
         async with db_with_cleanup.begin_readonly_session() as session:
             rows = (
@@ -428,7 +486,8 @@ class TestModelCardCreatorResourceRequirements:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ModelCardDBSource,
-        creator_with_min_resource: RBACEntityCreator[ModelCardRow],
+        ops: OpsRepository[ModelCardData],
+        creator_with_min_resource: _CardCreators,
     ) -> None:
         """Default NOP updater must leave child rows untouched and not 404.
 
@@ -437,17 +496,15 @@ class TestModelCardCreatorResourceRequirements:
         re-read the row instead and pass through without touching the
         normalized requirements.
         """
-        created = await db_source.create(creator_with_min_resource)
+        created = (
+            await ops.create_entity_with_fields(
+                creator_with_min_resource.card, creator_with_min_resource.requirements
+            )
+        ).data
 
         spec = ModelCardUpdaterSpec()  # every field defaults to nop
         updater: Updater[ModelCardRow] = Updater(spec=spec, pk_value=created.id)
-        updated = await db_source.update(updater)
-
-        by_card = await db_source.min_resources_by_card_ids([updated.id])
-        assert {(r.slot_name, r.min_quantity) for r in by_card[updated.id]} == {
-            ("cpu", "2"),
-            ("mem", "4096"),
-        }
+        await db_source.update(updater)
 
         async with db_with_cleanup.begin_readonly_session() as session:
             count = (

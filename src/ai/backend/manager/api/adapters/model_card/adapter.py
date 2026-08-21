@@ -64,13 +64,21 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     ReplicaSpec,
 )
-from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
+from ai.backend.manager.data.model_card.types import (
+    ModelCardData,
+    ModelCardResourceRequirementData,
+    ResourceRequirementEntry,
+)
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.model_card.conditions import ModelCardConditions
 from ai.backend.manager.models.model_card.creators import ModelCardCreator
 from ai.backend.manager.models.model_card.orders import ModelCardOrders
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.model_card.searchers import ModelCardSearcher
+from ai.backend.manager.models.model_card.searchers import (
+    ModelCardResourceRequirementSearcher,
+    ModelCardSearcher,
+)
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import combine_conditions_or, negate_conditions
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
@@ -90,10 +98,10 @@ from ai.backend.manager.services.model_card.actions.bulk_delete import (
 from ai.backend.manager.services.model_card.actions.create import CreateModelCardAction
 from ai.backend.manager.services.model_card.actions.delete import DeleteModelCardAction
 from ai.backend.manager.services.model_card.actions.get import GetModelCardAction
-from ai.backend.manager.services.model_card.actions.min_resources import (
-    GetModelCardMinResourcesAction,
-)
 from ai.backend.manager.services.model_card.actions.scan import ScanProjectModelCardsAction
+from ai.backend.manager.services.model_card.actions.scoped_search_requirements import (
+    ScopedSearchModelCardResourceRequirementsAction,
+)
 from ai.backend.manager.services.model_card.actions.search import GlobalSearchModelCardsAction
 from ai.backend.manager.services.model_card.actions.search_in_project import (
     SearchModelCardsInProjectAction,
@@ -158,7 +166,7 @@ def _entries_to_requirements(
 
 
 def _requirements_to_entries(
-    reqs: list[ResourceRequirementEntry],
+    reqs: list[ModelCardResourceRequirementData],
 ) -> list[ResourceSlotEntryInfo]:
     return [ResourceSlotEntryInfo(resource_type=r.slot_name, quantity=r.min_quantity) for r in reqs]
 
@@ -655,13 +663,18 @@ class ModelCardAdapter(BaseAdapter):
         A second read because the requirements are their own table. GraphQL calls it
         from the field resolver, so a query that skips ``minResource`` skips this.
         """
-        result = await self._processors.model_card.get_min_resources.run(
-            GetModelCardMinResourcesAction(card_ids=list(card_ids))
+        if not card_ids:
+            return {}
+        result = await self._processors.model_card.scoped_search_requirements.run(
+            ScopedSearchModelCardResourceRequirementsAction(
+                card_ids=[ModelCardID(card_id) for card_id in card_ids],
+                searcher=ModelCardResourceRequirementSearcher(pagination=NoPagination()),
+            )
         )
-        return {
-            card_id: _requirements_to_entries(entries)
-            for card_id, entries in result.min_resources.items()
-        }
+        by_card: dict[UUID, list[ModelCardResourceRequirementData]] = {}
+        for requirement in result.items:
+            by_card.setdefault(requirement.model_card_id, []).append(requirement)
+        return {card_id: _requirements_to_entries(reqs) for card_id, reqs in by_card.items()}
 
     @staticmethod
     def _data_to_node(
