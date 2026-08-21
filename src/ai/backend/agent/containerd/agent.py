@@ -45,7 +45,11 @@ from ai.backend.agent.agent import (
     AbstractKernelCreationContext,
     ScanImagesResult,
 )
-from ai.backend.agent.config.unified import ContainerSandboxType, ScratchType
+from ai.backend.agent.config.unified import (
+    AgentUnifiedConfig,
+    ContainerSandboxType,
+    ScratchType,
+)
 from ai.backend.agent.containerd.apparmor import ensure_profile_loaded
 from ai.backend.agent.containerd.dns import resolve_container_dns
 from ai.backend.agent.containerd.logs import read_tail_plan, write_logger_launcher
@@ -177,6 +181,19 @@ _KERNEL_STOP_GRACE_SECONDS = 10.0
 _LOG_COLLECTION_TIMEOUT = 60.0
 # Read the finished shim log in this many bytes at a time; collect_logs re-chunks to its own size.
 _LOG_READ_CHUNK = 256 * 1024
+
+
+def create_runtime(local_config: AgentUnifiedConfig) -> OciRuntime:
+    """The containerd backend's OCI runtime client.
+
+    Module-level so the agent's ``_create_runtime()`` seam and the discovery's
+    ``create_oci_runtime()`` (which is what a kernel reaches for when it needs a short-lived
+    client of its own) build the same thing from the same place.
+    """
+    return ContainerdGrpcRuntime(
+        namespace="backend-ai",
+        registry_hosts_dir=local_config.container.registry_hosts_dir,
+    )
 
 
 async def _read_container_log(container_id: str, max_bytes: int) -> AsyncGenerator[bytes, None]:
@@ -1689,10 +1706,7 @@ class ContainerdAgent(
         ``OciRuntime`` implementation while reusing the rest of the containerd agent — the
         OCI-spec build, BEP-1062 session networking, scratch, ssh, and recovery all stay.
         """
-        return ContainerdGrpcRuntime(
-            namespace="backend-ai",
-            registry_hosts_dir=self.local_config.container.registry_hosts_dir,
-        )
+        return create_runtime(self.local_config)
 
     @override
     def get_liveness_health_checkers(self) -> list[ServiceHealthChecker]:

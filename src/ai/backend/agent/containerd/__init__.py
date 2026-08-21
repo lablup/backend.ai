@@ -10,7 +10,9 @@ from decimal import Decimal
 from typing import Any, override
 
 from ai.backend.agent.agent import AbstractAgent
+from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.containerd.krunner import prepare_krunner_env
+from ai.backend.agent.containerd.runtime.interface import OciRuntime
 from ai.backend.agent.resources import (
     AbstractComputePlugin,
     load_resources,
@@ -20,7 +22,7 @@ from ai.backend.agent.types import AbstractAgentDiscovery
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.types import DeviceName, SlotName
 
-from .agent import ContainerdAgent
+from .agent import ContainerdAgent, create_runtime
 
 
 class ContainerdAgentDiscovery(AbstractAgentDiscovery):
@@ -45,6 +47,10 @@ class ContainerdAgentDiscovery(AbstractAgentDiscovery):
     @override
     async def prepare_krunner_env(self, local_config: Mapping[str, Any]) -> Mapping[str, str]:
         return await prepare_krunner_env(local_config)
+
+    @override
+    def create_oci_runtime(self, local_config: AgentUnifiedConfig) -> OciRuntime:
+        return create_runtime(local_config)
 
 
 def get_agent_discovery() -> AbstractAgentDiscovery:

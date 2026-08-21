@@ -30,6 +30,8 @@ from ai.backend.common.types import (
 
 if TYPE_CHECKING:
     from .agent import AbstractAgent
+    from .config.unified import AgentUnifiedConfig
+    from .containerd.runtime.interface import OciRuntime
     from .resources import AbstractComputePlugin
 
 
@@ -81,6 +83,22 @@ class AbstractAgentDiscovery(ABC):
         tar archives.
         """
         raise NotImplementedError
+
+    def create_oci_runtime(self, local_config: AgentUnifiedConfig) -> OciRuntime:
+        """Construct the OCI runtime client this backend drives.
+
+        Deliberately not abstract: only the OCI-spec backends (containerd and its enroot variant)
+        have one, and the Docker/Kubernetes/dummy backends legitimately do not.
+
+        This lives on the discovery — the one place that already dispatches per backend, and is
+        reachable from code that holds only the config — rather than solely on the agent class,
+        because a kernel needs it too: `ContainerdKernel.commit()` runs a short-lived runtime
+        client of its own, and hard-coding the containerd one there sent an enroot kernel's commit
+        to a containerd daemon that knows nothing about it.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not drive an OCI runtime",
+        )
 
 
 def get_agent_discovery(backend: AgentBackend) -> AbstractAgentDiscovery:

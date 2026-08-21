@@ -11,6 +11,7 @@ from typing import Any, cast
 import pytest
 
 import ai.backend.agent.containerd.kernel as kernel_mod
+from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.errors.kernel import KernelRunnerNotInitializedError
 from ai.backend.agent.resources import Mount
@@ -109,11 +110,46 @@ class TestCommit:
             async def commit_container(self, *a: Any, **kw: Any) -> None:
                 await asyncio.sleep(10)  # far longer than commit-timeout
 
-        monkeypatch.setattr(kernel_mod, "ContainerdGrpcRuntime", lambda **kw: _SlowRuntime())
         k = self._kernel_for_commit(tmp_path)
+        monkeypatch.setattr(k, "_create_commit_runtime", lambda: _SlowRuntime(), raising=False)
 
         with pytest.raises(TimeoutError):
             await k.commit(cast(Any, "k1"), "sub", canonical="target:1")
+
+    async def test_the_commit_runtime_follows_the_configured_backend(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The commit opens a runtime client of its own, and it must be the backend's own.
+
+        Hard-coding the containerd client here sent an enroot kernel's commit to a containerd
+        daemon that has never heard of that container.
+        """
+        asked: list[Any] = []
+        sentinel = object()
+
+        class _Discovery:
+            def create_oci_runtime(self, local_config: Any) -> Any:
+                return sentinel
+
+        def _get_agent_discovery(backend: Any) -> Any:
+            asked.append(backend)
+            return _Discovery()
+
+        k = self._kernel_for_commit(tmp_path)
+        k.agent_config = {**k.agent_config, "agent": {"backend": "enroot"}}
+        monkeypatch.setattr(
+            AgentUnifiedConfig,
+            "model_validate",
+            classmethod(
+                lambda cls, cfg: SimpleNamespace(
+                    agent=SimpleNamespace(backend=cfg["agent"]["backend"])
+                )
+            ),
+        )
+        monkeypatch.setattr(kernel_mod, "get_agent_discovery", _get_agent_discovery)
+
+        assert k._create_commit_runtime() is sentinel
+        assert asked == ["enroot"]
 
 
 class TestStartService:

@@ -24,14 +24,16 @@ from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
 from typing import Any, override
 
+from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.containerd.logs import read_log_tail
-from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime, container_log_path
+from ai.backend.agent.containerd.runtime.grpc import container_log_path
+from ai.backend.agent.containerd.runtime.interface import OciRuntime
 from ai.backend.agent.errors.kernel import KernelRunnerNotInitializedError
 from ai.backend.agent.kernel import (
     AbstractCodeRunner,
     AbstractKernel,
 )
-from ai.backend.agent.types import AgentEventData, KernelOwnershipData
+from ai.backend.agent.types import AgentEventData, KernelOwnershipData, get_agent_discovery
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
@@ -164,6 +166,19 @@ class ContainerdKernel(AbstractKernel):
             return CommitStatus.ONGOING
         return CommitStatus.READY
 
+    def _create_commit_runtime(self) -> OciRuntime:
+        """A short-lived runtime client for the commit, of whatever backend this agent runs.
+
+        It must NOT be the agent's own instance: this one is opened and closed around the commit,
+        and closing the agent's would take its containerd channel (and the enroot backend's log
+        rotator) down with it. But it must be the same *kind* — hard-coding the containerd client
+        here sent an enroot kernel's commit to a containerd daemon that has never heard of that
+        container. The backend's own factory is reached through the discovery, the same dispatch
+        the agent used to pick its runtime in the first place.
+        """
+        local_config = AgentUnifiedConfig.model_validate(self.agent_config)
+        return get_agent_discovery(local_config.agent.backend).create_oci_runtime(local_config)
+
     @override
     async def commit(
         self,
@@ -196,7 +211,7 @@ class ContainerdKernel(AbstractKernel):
             log.warning("commit(k:{}): already being committed", kernel_id)
             return
         try:
-            runtime = ContainerdGrpcRuntime(namespace="backend-ai")
+            runtime = self._create_commit_runtime()
             await runtime.open()
             try:
                 async with asyncio.timeout(commit_timeout):
