@@ -21,10 +21,16 @@
 #   {"name": "krunner-extractor", "dockerfile": "docker/krunner-extractor.dockerfile",
 #    "context": "docker"}
 #
+# Base images (BASE_IMAGES below) are backend.ai-* dockerfiles that service
+# images build FROM: built inside the docker-images.yml bake run, never
+# published, and emitted only with --all (no `image` field):
+#   {"name": "backend.ai-base", "dockerfile": "docker/backend.ai-base.dockerfile",
+#    "context": "."}
+#
 # Publishing is allowlist-driven: every backend.ai-* dockerfile must be
-# registered in PUBLISHABLE_SERVICES below. An unregistered backend.ai-*
-# dockerfile makes the script fail loudly, so a new dockerfile cannot start
-# publishing an image without a deliberate registration edit here.
+# registered in PUBLISHABLE_SERVICES (or BASE_IMAGES) below. An unregistered
+# backend.ai-* dockerfile makes the script fail loudly, so a new dockerfile
+# cannot start publishing an image without a deliberate registration edit here.
 set -euo pipefail
 
 # Registry of publishable service images (lowercase names):
@@ -39,11 +45,18 @@ PUBLISHABLE_SERVICES=(
   backend.ai-appproxy-worker
 )
 
+# Registry of unpublished base images the service images build FROM
+# (lowercase names). Built as bake dependencies of the service targets in
+# docker-bake.hcl — not pushed anywhere, and not part of --service/--infra.
+BASE_IMAGES=(
+  backend.ai-base
+)
+
 print_usage() {
   echo "usage: $0 [--all|--service|--infra]"
   echo ""
   echo "Prints the docker/ dockerfile build matrix as compact JSON."
-  echo "  --all       service and infra images (default)"
+  echo "  --all       every dockerfile: service, infra, and base (default)"
   echo "  --service   publishable backend.ai-* images only"
   echo "  --infra     unpublished infra images only"
   echo "  --help, -h  show this help"
@@ -78,7 +91,7 @@ cd -- "$(dirname "$0")/.." >/dev/null
 files=$(find docker -type f \( -name '*.dockerfile' -o -name '*.Dockerfile' \) | LC_ALL=C sort)
 
 # Fail loudly on any backend.ai-* dockerfile that is not a registered
-# publishable service, before emitting any JSON.
+# publishable service or base image, before emitting any JSON.
 while IFS= read -r file; do
   [ -n "$file" ] || continue
   name="${file##*/}"
@@ -88,14 +101,14 @@ while IFS= read -r file; do
   case "$lower" in
     backend.ai-*)
       registered=false
-      for svc in "${PUBLISHABLE_SERVICES[@]}"; do
+      for svc in "${PUBLISHABLE_SERVICES[@]}" "${BASE_IMAGES[@]}"; do
         if [ "$lower" = "$svc" ]; then
           registered=true
           break
         fi
       done
       if [ "$registered" != true ]; then
-        echo "$0: '$file' looks like a publishable service image, but '$name' is not registered in PUBLISHABLE_SERVICES." >&2
+        echo "$0: '$file' looks like a publishable service image, but '$name' is not registered in PUBLISHABLE_SERVICES (or BASE_IMAGES)." >&2
         echo "$0: register the name in scripts/list-dockerfiles.sh (or rename the dockerfile) to proceed." >&2
         exit 1
       fi
@@ -104,12 +117,15 @@ while IFS= read -r file; do
 done <<<"$files"
 
 printf '%s\n' "$files" \
-  | jq -R -s -c --arg mode "$mode" '
-      split("\n")
+  | jq -R -s -c --arg mode "$mode" --arg base "${BASE_IMAGES[*]}" '
+      ($base | split(" ")) as $base_names
+      | split("\n")
       | map(select(length > 0))
       | map(
           (split("/")[-1] | sub("\\.[dD]ockerfile$"; "")) as $name
-          | if ($name | ascii_downcase | startswith("backend.ai-")) then
+          | if ($base_names | index($name | ascii_downcase)) then
+              {category: "base", name: $name, dockerfile: ., context: "."}
+            elif ($name | ascii_downcase | startswith("backend.ai-")) then
               {category: "service", name: $name, dockerfile: .,
                context: ".", image: ("lablup/" + $name)}
             else
