@@ -104,6 +104,8 @@ _SKIP_MOUNT_TYPES: Final = frozenset({
 _TASK_START_TIMEOUT_SEC: Final = 30.0
 # How often each live container's log is measured against the cap. A stat() per container is
 # nothing, and the interval is what bounds the overshoot (see _rotate_logs_loop), so keep it short.
+# enroot has no event stream, so container death is polled for (see subscribe_task_events).
+_TASK_POLL_INTERVAL_SEC: Final = 1.0
 _LOG_ROTATE_INTERVAL_SEC: Final = 5.0
 _LOG_COPY_CHUNK: Final = 1024 * 1024
 # Presence of the unified hierarchy's controller list is what tells cgroup v2 from v1.
@@ -1315,16 +1317,41 @@ class EnrootRuntime(OciRuntime):
 
     @override
     async def subscribe_task_events(self) -> AsyncIterator[TaskEvent]:
-        # No daemon event stream; poll tracked PIDs and emit 'exit' when one disappears.
-        seen = dict(self._pids)
+        """Emit an 'exit' the moment a tracked container's process is gone.
+
+        containerd has a daemon event stream; enroot has nothing, so this polls. A death must be
+        reported EXACTLY ONCE: the agent turns each 'exit' into a CLEAN lifecycle event, and the
+        entry stays in ``_pids`` until ``remove_container`` finishes clearing up — several seconds
+        later. Re-deriving "is it dead?" from ``_pids`` alone therefore re-fires every tick for the
+        whole teardown (measured: 4 CLEAN events in 4 seconds), and the duplicates race the first
+        one, so the kernel's recorded reason came out as `already-terminated` instead of
+        `self-terminated`. Hence the explicit `reported` set, pruned only when the container leaves
+        ``_pids`` for good.
+        """
+        reported: set[str] = set()
         while True:
-            await asyncio.sleep(1.0)
-            for cid, pid in list(seen.items()):
-                if not self._alive(pid):
-                    seen.pop(cid, None)
-                    yield TaskEvent(kind="exit", container_id=cid, exit_code=0)
-            for cid, pid in self._pids.items():
-                seen.setdefault(cid, pid)
+            await asyncio.sleep(_TASK_POLL_INTERVAL_SEC)
+            for cid, pid in list(self._pids.items()):
+                if cid in reported or self._alive(pid):
+                    continue
+                reported.add(cid)
+                yield TaskEvent(kind="exit", container_id=cid, exit_code=self._exit_code_of(cid))
+            # remove_container has finished with these; drop them so the set cannot grow forever.
+            reported &= set(self._pids)
+
+    def _exit_code_of(self, container_id: str) -> int:
+        """The container's exit status, or -1 when it cannot be known.
+
+        `enroot start` propagates the command's status, so its return code is the container's —
+        but only for a container this process spawned, and only once it has been reaped. A
+        container recovered from the journal after an agent restart is not our child at all, so
+        there is no status to collect and the honest answer is "unknown" rather than a fabricated 0
+        that would report a crash as a clean exit.
+        """
+        proc = self._procs.get(container_id)
+        if proc is None or proc.returncode is None:
+            return -1
+        return proc.returncode
 
     @override
     async def container_pid(self, container_id: str) -> int | None:
