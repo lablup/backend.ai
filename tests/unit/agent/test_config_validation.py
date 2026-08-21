@@ -447,6 +447,39 @@ class ContainerConfigTest:
 
         assert config.sandbox_type == ContainerSandboxType.DOCKER
 
+    @pytest.mark.parametrize("arch", ["aarch64", "x86_64", "x86"])
+    def test_sandbox_type_runtime_allowed_on_any_arch(
+        self,
+        make_raw_config: MakeRawConfig,
+        arch: str,
+    ) -> None:
+        """`runtime` is what a non-x86_64 node uses: the jail binary is x86_64-only, but letting
+        the container runtime confine syscalls works everywhere it is implemented."""
+        with patch("ai.backend.agent.utils.get_arch_name", return_value=arch):
+            raw_config = make_raw_config(sandbox_type=ContainerSandboxType.RUNTIME)
+            config = ContainerConfig.model_validate(raw_config)
+
+        assert config.sandbox_type == ContainerSandboxType.RUNTIME
+
+    def test_runtime_and_docker_are_both_simply_not_jail(
+        self, make_raw_config: MakeRawConfig
+    ) -> None:
+        """Every consumer asks "is this jail?" and nothing branches on the others, so the legacy
+        spelling and the new one must stay interchangeable."""
+        with patch("ai.backend.agent.utils.get_arch_name", return_value="x86_64"):
+            for value in (ContainerSandboxType.RUNTIME, ContainerSandboxType.DOCKER):
+                config = ContainerConfig.model_validate(make_raw_config(sandbox_type=value))
+                assert config.sandbox_type != ContainerSandboxType.JAIL
+
+    @patch("ai.backend.agent.utils.get_arch_name", return_value="aarch64")
+    def test_the_jail_rejection_points_at_the_alternative(
+        self, make_raw_config: MakeRawConfig
+    ) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
+            ContainerConfig.model_validate(make_raw_config(sandbox_type=ContainerSandboxType.JAIL))
+
+        assert "runtime" in str(exc_info.value)
+
     @patch("os.getuid", return_value=NON_ROOT_UID)
     def test_stats_type_cgroup_fails_for_non_root(self, make_raw_config: MakeRawConfig) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:

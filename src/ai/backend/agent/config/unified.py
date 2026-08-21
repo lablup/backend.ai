@@ -76,6 +76,20 @@ class EventLoopType(enum.StrEnum):
 
 
 class ContainerSandboxType(enum.StrEnum):
+    """Which sandbox confines the kernel's syscalls.
+
+    Only ``JAIL`` is ever tested for — every consumer asks "is this jail?", nothing branches on the
+    others. So the non-jail values all mean the same thing: *let the container runtime do it*, which
+    is runc's seccomp on containerd, dockerd's default profile on docker, and the BPF filter the
+    agent compiles on enroot. Keep it that way; a ``== DOCKER`` comparison added later would
+    silently change what ``RUNTIME`` means.
+    """
+
+    RUNTIME = "runtime"
+    # The original spelling of RUNTIME, from when the choice really was "a Docker container or a
+    # jail". It names a runtime rather than a policy, which reads as nonsense on the containerd and
+    # enroot backends that also use it — kept because it is the default and deployments are full
+    # of it.
     DOCKER = "docker"
     JAIL = "jail"
 
@@ -1641,10 +1655,14 @@ class OverridableContainerConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description=(
-                "Container sandbox implementation for process isolation. "
-                "'docker' uses Docker containers (standard). "
-                "'jail' uses lightweight jailed containers for faster startup (x86_64 Linux only). "
-                "Jail provides better performance but with reduced isolation."
+                "Which sandbox confines the kernel's syscalls. "
+                "'runtime' (recommended) lets the container runtime do it: runc's seccomp on the "
+                "containerd backend, dockerd's default profile on docker, and the BPF filter the "
+                "agent compiles on enroot. "
+                "'docker' is the legacy spelling of 'runtime' and behaves identically. "
+                "'jail' substitutes Backend.AI's own ptrace sandbox, which then replaces seccomp "
+                "rather than adding to it — cheaper to start, but weaker confinement, and x86_64 "
+                "Linux only."
             ),
             added_version="25.12.0",
             example=ConfigExample(local="docker", prod="docker"),
@@ -1804,11 +1822,16 @@ class OverridableContainerConfig(BaseConfigSchema):
     @field_validator("sandbox_type", mode="after")
     @classmethod
     def _validate_sandbox_type(cls, sandbox_type: ContainerSandboxType) -> ContainerSandboxType:
-        # FIXME: Remove this after ARM64 support lands on Jail
+        # The jail is shipped as an x86_64-only binary. On other architectures the answer is not
+        # "no sandbox" but `runtime`, which is architecture-independent everywhere it is
+        # implemented (runc's seccomp, or the agent's own BPF filter on enroot).
         if sandbox_type == ContainerSandboxType.JAIL:
             current_arch = get_arch_name()
             if current_arch != "x86_64":
-                raise ValueError(f"Jail sandbox is not supported on architecture {current_arch}")
+                raise ValueError(
+                    f"Jail sandbox is not supported on architecture {current_arch}; "
+                    "use sandbox-type = 'runtime'"
+                )
         return sandbox_type
 
     @field_validator("stats_type", mode="after")
