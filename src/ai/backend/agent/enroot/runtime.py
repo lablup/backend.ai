@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import json
 import logging
 import os
@@ -97,6 +98,7 @@ _CGROUP_RMDIR_RETRIES: Final = 20
 _CGROUP_RMDIR_DELAY_SEC: Final = 0.05
 # Docker's default ShmSize, used when the session did not ask for one.
 _DEFAULT_SHM_BYTES: Final = 64 * 1024 * 1024
+_SQSH_DIGEST_CHUNK: Final = 4 * 1024 * 1024
 
 
 def _slug(image_ref: str) -> str:
@@ -1017,16 +1019,40 @@ class EnrootRuntime(OciRuntime):
             raise RuntimeError(
                 f"enroot export failed for {container_id}: {err.decode(errors='replace')}"
             )
+        # The committed image needs an identity of its own, and it must inherit the base's.
+        # Writing nulls here (the first cut) made `image_config_digest` return None, which
+        # check_image reads as "not present locally" — so a just-committed image was either
+        # re-pulled from a registry that has never heard of it, or rejected outright as
+        # ImageNotAvailable. Dropping the base's labels was just as bad: `ai.backend.kernelspec`
+        # and the base-distro label are what the agent needs to launch a kernel from it at all.
+        base = self._read_meta(base_image_ref) or {}
+        digest = await asyncio.to_thread(self._sqsh_digest, self._sqsh(target_ref))
         self._meta(target_ref).write_text(
             json.dumps({
                 "ref": target_ref,
-                "digest": None,
-                "config_digest": None,
-                "architecture": "",
-                "labels": dict(labels or {}),
-                "entrypoint": None,
+                # A committed image has no registry and so no config blob to be digested. Its
+                # content IS the squashfs, so that is what identifies it — stable, and different
+                # for every commit, which is all the digest is compared for.
+                "digest": digest,
+                "config_digest": digest,
+                "architecture": base.get("architecture") or "",
+                "labels": {**(base.get("labels") or {}), **(labels or {})},
+                "entrypoint": base.get("entrypoint"),
             })
         )
+
+    @staticmethod
+    def _sqsh_digest(sqsh: Path) -> str | None:
+        """``sha256:<hex>`` over the squashfs, the committed image's only stable identity."""
+        digest = hashlib.sha256()
+        try:
+            with sqsh.open("rb") as f:
+                while chunk := f.read(_SQSH_DIGEST_CHUNK):
+                    digest.update(chunk)
+        except OSError as e:
+            log.warning("[enroot] cannot digest {}: {!r}", sqsh, e)
+            return None
+        return f"sha256:{digest.hexdigest()}"
 
     # ------------------------------------------------------------------ introspection
     def _alive(self, pid: int) -> bool:
