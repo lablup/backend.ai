@@ -7,14 +7,14 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.manager.data.session.types import SessionData, SessionStatus
+from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.lookup import DataLookup
 
 
 @dataclass
-class SessionNameOfUserLookup(DataLookup[SessionRow, SessionData]):
+class SessionNameOfUserLookup(DataLookup[SessionRow, SessionEntityData]):
     """Resolves a session's name within its owner into the session it names.
 
     ``ix_sessions_unique_name_per_user_nonterminal`` is what makes the pair a key: a name
@@ -38,5 +38,5 @@ class SessionNameOfUserLookup(DataLookup[SessionRow, SessionData]):
         ]
 
     @override
-    def to_data(self, row: SessionRow) -> SessionData:
-        return row.to_dataclass()
+    def to_data(self, row: SessionRow) -> SessionEntityData:
+        return row.to_entity_data()

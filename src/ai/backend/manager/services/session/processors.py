@@ -5,7 +5,7 @@ from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
-from ai.backend.manager.data.session.types import SessionData
+from ai.backend.manager.data.session.types import SessionEntityData
 from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
     BatchGetKernelResourceAllocationAction,
     BatchGetKernelResourceAllocationActionResult,
@@ -219,13 +219,13 @@ class SessionProcessors:
     upload_files: SingleEntityActionProcessor[UploadFilesAction, UploadFilesActionResult]
     get_session: SingleEntityActionProcessor[GetSessionAction, GetSessionActionResult]
     update_session: SingleEntityActionProcessor[UpdateSessionAction, UpdateSessionActionResult]
-    lookup: LookupActionProcessor[LookupSessionAction, LookupOpsResult[SessionData]]
+    lookup: LookupActionProcessor[LookupSessionAction, LookupOpsResult[SessionEntityData]]
 
     resource_allocation: ResourceAllocationProcessors
 
     def __init__(
         self,
-        group: ProcessorGroup[SessionData],
+        group: ProcessorGroup[SessionEntityData],
         resource_allocation: ResourceAllocationProcessors,
         service: SessionService,
     ) -> None:

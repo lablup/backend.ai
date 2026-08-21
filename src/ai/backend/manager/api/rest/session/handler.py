@@ -445,9 +445,15 @@ class SessionHandler:
     ) -> SessionID:
         """Resolve the session a request names, at the API boundary.
 
-        Keyed by the owner rather than the requester: a delegated call names a
-        session under the access key it acts for.
+        The path segment carries either an id or a name. Keyed by the owner rather
+        than the requester: a delegated call names a session under the access key it
+        acts for. A name resolves among the live sessions only, which is where it is
+        unique; an id reaches a terminated one too.
         """
+        try:
+            return SessionID(UUID(session_name))
+        except ValueError:
+            pass
         owner = await self._user.lookup_keypair_owner.run(
             LookupKeypairOwnerByAccessKeyAction(access_key=owner_access_key)
         )

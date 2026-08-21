@@ -842,14 +842,13 @@ class SessionService:
             raise InternalServerError from e
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
-        session_name = action.session_name
         owner_access_key = action.owner_access_key
         forced = action.forced
         recursive = action.recursive
 
         # Get session IDs to terminate (based on recursive flag)
         session_ids = await self._session_repository.get_target_session_ids(
-            session_name,
+            SessionId(action.session_id),
             owner_access_key,
             recursive=recursive,
         )
