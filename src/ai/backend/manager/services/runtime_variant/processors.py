@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
@@ -54,7 +55,7 @@ class RuntimeVariantProcessors:
         SearchRuntimeVariantsAction, BatchOpsResult[RuntimeVariantData]
     ]
     public_lookup: LookupActionProcessor[
-        LookupRuntimeVariantAction, LookupOpsResult[RuntimeVariantData]
+        LookupRuntimeVariantAction, LookupOpsResult[RuntimeVariantID]
     ]
 
     def __init__(self, group: ProcessorGroup[RuntimeVariantData]) -> None:

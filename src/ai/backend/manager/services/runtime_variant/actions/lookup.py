@@ -3,11 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.runtime_variant import RUNTIME_VARIANT_ENTITY_TYPE
+from ai.backend.common.data.entity.runtime_variant import (
+    RUNTIME_VARIANT_ENTITY_TYPE,
+    RuntimeVariantID,
+)
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
-from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.models.runtime_variant.lookups import RuntimeVariantLookup
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 
@@ -28,7 +30,7 @@ class RuntimeVariantNameKey(LookupKey):
 
 
 @dataclass
-class LookupRuntimeVariantAction(LookupEntityOpsAction[RuntimeVariantRow, RuntimeVariantData]):
+class LookupRuntimeVariantAction(LookupEntityOpsAction[RuntimeVariantRow, RuntimeVariantID]):
     """Resolve a runtime variant name into the variant it names.
 
     Legacy API handlers call this before invoking id-typed internal adapters, so

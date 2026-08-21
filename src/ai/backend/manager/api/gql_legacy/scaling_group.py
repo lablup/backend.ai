@@ -144,7 +144,7 @@ async def _resolve_resource_group_id(
     result = await graph_ctx.processors.resource_group.lookup.run(
         LookupResourceGroupAction(name=ResourceGroupName(scaling_group))
     )
-    return result.data.id
+    return result.entity_id()
 
 
 async def _resolve_resource_group_ids(

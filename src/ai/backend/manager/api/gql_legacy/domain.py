@@ -355,7 +355,7 @@ async def _resolve_sgroup_ids(
         result = await graph_ctx.processors.resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(name))
         )
-        resolved.append(result.data.id)
+        resolved.append(result.entity_id())
     return resolved
 
 
@@ -576,7 +576,7 @@ class ModifyDomainNode(graphene.Mutation):  # type: ignore[misc]
             await graph_ctx.processors.domain.update_domain_node.run(
                 input.to_action(
                     name=domain_name,
-                    domain_id=target.data.id,
+                    domain_id=target.entity_id(),
                     user_info=user_info,
                     sgroup_ids_to_add=sgroup_ids_to_add,
                     sgroup_ids_to_remove=sgroup_ids_to_remove,
@@ -813,7 +813,7 @@ class ModifyDomain(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         target = await ctx.processors.domain.lookup.run(LookupDomainAction(name=DomainName(name)))
-        action = props.to_action(name, target.data.id)
+        action = props.to_action(name, target.entity_id())
         res = await ctx.processors.domain.update_domain.run(action)
         return cls(
             ok=True,
@@ -841,7 +841,9 @@ class DeleteDomain(graphene.Mutation):  # type: ignore[misc]
 
         target = await ctx.processors.domain.lookup.run(LookupDomainAction(name=DomainName(name)))
         await ctx.processors.domain.delete_domain.run(
-            DeleteDomainAction(domain_id=target.data.id, updater=DomainSoftDeleteUpdater(name=name))
+            DeleteDomainAction(
+                domain_id=target.entity_id(), updater=DomainSoftDeleteUpdater(name=name)
+            )
         )
         return cls(ok=True, msg=f"domain {name} deleted successfully")
 
@@ -868,6 +870,6 @@ class PurgeDomain(graphene.Mutation):  # type: ignore[misc]
 
         target = await ctx.processors.domain.lookup.run(LookupDomainAction(name=DomainName(name)))
         await ctx.processors.domain.purge_domain.run(
-            PurgeDomainAction(domain_id=target.data.id, name=name)
+            PurgeDomainAction(domain_id=target.entity_id(), name=name)
         )
         return cls(ok=True, msg=f"domain {name} purged successfully")

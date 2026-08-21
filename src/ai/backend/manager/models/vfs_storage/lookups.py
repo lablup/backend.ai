@@ -6,14 +6,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.data.vfs_storage.types import VFSStorageData
+from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
 
 
 @dataclass
-class VFSStorageLookup(DataLookup[VFSStorageRow, VFSStorageData]):
+class VFSStorageLookup(DataLookup[VFSStorageRow, VFSStorageID]):
     """Resolves a VFS storage's name into the row it names."""
 
     name: str
@@ -27,5 +27,5 @@ class VFSStorageLookup(DataLookup[VFSStorageRow, VFSStorageData]):
         return [lambda: VFSStorageRow.name == self.name]
 
     @override
-    def to_data(self, row: VFSStorageRow) -> VFSStorageData:
-        return row.to_dataclass()
+    def to_entity_id(self, row: VFSStorageRow) -> VFSStorageID:
+        return row.id

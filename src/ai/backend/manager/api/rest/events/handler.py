@@ -121,7 +121,7 @@ class EventsHandler:
             resolve_result = await self._session.lookup.run(
                 LookupSessionAction(user_uuid=user_uuid, name=session_name)
             )
-            resolved_session_id = resolve_result.data.id
+            resolved_session_id = resolve_result.entity_id()
 
         # Resolve group name to group ID
         if group_name == "*":
@@ -133,7 +133,7 @@ class EventsHandler:
                     project_name=group_name,
                 )
             )
-            group_id = group_result.data.id
+            group_id = group_result.entity_id
 
         filters = {
             "user_role": user_role,

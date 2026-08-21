@@ -70,7 +70,7 @@ class StorageNamespaceAdapter(BaseAdapter):
             )
         )
         action_result = await self._processors.storage_namespace.unregister.run(
-            UnregisterNamespaceAction(id=resolved.data.id)
+            UnregisterNamespaceAction(id=resolved.entity_id())
         )
         return UnregisterStorageNamespacePayload(id=action_result.data.storage_id)
 

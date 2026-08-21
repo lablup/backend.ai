@@ -1,3 +1,4 @@
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
@@ -80,9 +81,7 @@ from .service import ArtifactRegistryService
 
 
 class ArtifactRegistryProcessors:
-    lookup: LookupActionProcessor[
-        LookupArtifactRegistryAction, LookupOpsResult[ArtifactRegistryData]
-    ]
+    lookup: LookupActionProcessor[LookupArtifactRegistryAction, LookupOpsResult[ArtifactRegistryID]]
     create_huggingface_registry: GlobalActionProcessor[
         CreateHuggingFaceRegistryAction, CreateHuggingFaceRegistryActionResult
     ]

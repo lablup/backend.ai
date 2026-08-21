@@ -206,7 +206,7 @@ class UserAdapter(BaseAdapter):
         result = await self._processors.domain.lookup.run(
             LookupDomainAction(name=DomainName(domain_name))
         )
-        return result.data.id
+        return result.entity_id()
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 

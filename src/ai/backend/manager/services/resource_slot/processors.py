@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
@@ -73,7 +74,7 @@ class ResourceSlotProcessors:
     ]
     public_lookup_resource_slot_type: LookupActionProcessor[
         LookupResourceSlotTypeAction,
-        LookupOpsResult[ResourceSlotTypeData],
+        LookupOpsResult[ResourceSlotTypeUUID],
     ]
     public_search_resource_slot_types: PublicActionProcessor[
         SearchResourceSlotTypesAction,

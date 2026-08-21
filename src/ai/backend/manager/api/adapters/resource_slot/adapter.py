@@ -251,7 +251,7 @@ class ResourceSlotAdapter(BaseAdapter):
         action_result = await self._processors.resource_slot.purge_resource_slot_type.run(
             PurgeResourceSlotTypeAction(
                 purger=ResourceSlotTypePurger(
-                    slot_name=input.slot_name, slot_type_id=target.data.uuid
+                    slot_name=input.slot_name, slot_type_id=target.entity_id()
                 )
             )
         )
@@ -501,7 +501,7 @@ class ResourceSlotAdapter(BaseAdapter):
         )
         action_result = await self._processors.resource_slot.get_agent_resource_by_slot.run(
             GetAgentResourceBySlotAction(
-                agent_uuid=agent.data.entity_id(), agent_id=agent_id, slot_name=slot_name
+                agent_uuid=agent.entity_id(), agent_id=agent_id, slot_name=slot_name
             )
         )
         return self._agent_resource_data_to_node(action_result.item)
@@ -532,7 +532,7 @@ class ResourceSlotAdapter(BaseAdapter):
             LookupDomainAction(name=DomainName(domain_name))
         )
         action_result = await self._processors.resource_slot.get_domain_resource_overview.run(
-            GetDomainResourceOverviewAction(domain_id=domain.data.id, domain_name=domain_name)
+            GetDomainResourceOverviewAction(domain_id=domain.entity_id, domain_name=domain_name)
         )
         occupancy = action_result.item
         return ActiveResourceOverviewInfoDTO(

@@ -136,8 +136,8 @@ class LookupService[TData: EntityData]:
     def __init__(self, repository: OpsRepository[TData]) -> None:
         self._repository = repository
 
-    async def execute(self, action: LookupOpsAction[Any, TData]) -> LookupOpsResult[TData]:
-        return LookupOpsResult(data=await self._repository.lookup(action.to_lookup()))
+    async def execute(self, action: LookupOpsAction[Any, Any]) -> LookupOpsResult[Any]:
+        return LookupOpsResult(resolved_entity_id=await self._repository.lookup(action.to_lookup()))
 
 
 class FieldOwnerLookupService:

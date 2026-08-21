@@ -1,3 +1,4 @@
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import (
@@ -50,7 +51,7 @@ from ai.backend.manager.services.domain.service import DomainService
 
 
 class DomainProcessors:
-    lookup: LookupActionProcessor[LookupDomainAction, LookupOpsResult[DomainData]]
+    lookup: LookupActionProcessor[LookupDomainAction, LookupOpsResult[DomainID]]
     global_search: GlobalActionProcessor[GlobalSearchDomainsAction, BatchOpsResult[DomainData]]
     public_search_rg_domains: PublicActionProcessor[
         SearchRGDomainsAction, BatchOpsResult[DomainData]

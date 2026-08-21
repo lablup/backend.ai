@@ -60,7 +60,7 @@ class DomainConfigHandler:
         target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
         await self._domain.create_dotfile.run(
             CreateDomainDotfileAction(
-                domain_id=target.data.id,
+                domain_id=target.entity_id(),
                 name=params.domain,
                 entry=DotfileEntry(path=params.path, perm=params.permission, data=params.data),
             )
@@ -97,7 +97,7 @@ class DomainConfigHandler:
         target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
         await self._domain.update_dotfile.run(
             UpdateDomainDotfileAction(
-                domain_id=target.data.id,
+                domain_id=target.entity_id(),
                 name=params.domain,
                 entry=DotfileEntry(path=params.path, perm=params.permission, data=params.data),
             )
@@ -114,7 +114,7 @@ class DomainConfigHandler:
         target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
         await self._domain.delete_dotfile.run(
             DeleteDomainDotfileAction(
-                domain_id=target.data.id, name=params.domain, path=params.path
+                domain_id=target.entity_id(), name=params.domain, path=params.path
             )
         )
         return APIResponse.build(HTTPStatus.OK, DeleteDotfileResponse(success=True))

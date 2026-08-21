@@ -5,12 +5,12 @@ from typing import Any, override
 
 from ai.backend.common.data.entity.resource_group import (
     RESOURCE_GROUP_ENTITY_TYPE,
+    ResourceGroupID,
     ResourceGroupName,
 )
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
-from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.models.resource_group.lookups import ResourceGroupNameLookup
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 
@@ -31,7 +31,7 @@ class ResourceGroupNameKey(LookupKey):
 
 
 @dataclass
-class LookupResourceGroupAction(LookupEntityOpsAction[ResourceGroupRow, ResourceGroupData]):
+class LookupResourceGroupAction(LookupEntityOpsAction[ResourceGroupRow, ResourceGroupID]):
     """Resolve a resource group's name into the group it names."""
 
     name: ResourceGroupName

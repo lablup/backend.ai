@@ -14,7 +14,7 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 
 
-class DataLookup[TRow: Base, TData](ABC):
+class DataLookup[TRow: Base, TEntityID: EntityIdentifier](ABC):
     """Reads one entity by a key that is not its primary key.
 
     A lookup resolves an external key — a name, an email within a domain, a canonical
@@ -27,11 +27,15 @@ class DataLookup[TRow: Base, TData](ABC):
     — is a domain repository method, not this.
 
     What separates it from a search is the expected cardinality, which is why
-    ``lookup_data`` reads at most two rows and rejects the second: matching more than one
+    ``lookup_entity_id`` reads at most two rows and rejects the second: matching more than one
     means the key is not unique, and answering with an arbitrary one would hide that.
 
+    Answers the id alone. The value behind it is read by a get, which carries its own
+    querier and can say what to load; a lookup that also produced the value would decide
+    that for every caller.
+
     Example:
-        class UserByEmail(DataLookup[UserRow, UserData]):
+        class UserByEmail(DataLookup[UserRow, UserID]):
             def row_class(self) -> type[UserRow]:
                 return UserRow
 
@@ -41,11 +45,11 @@ class DataLookup[TRow: Base, TData](ABC):
                     lambda: UserRow.domain_name == self._domain,
                 ]
 
-            def to_data(self, row: UserRow) -> UserData:
-                return row.to_data()
+            def to_entity_id(self, row: UserRow) -> UserID:
+                return UserID(row.uuid)
 
         async with ops.read_ops() as r:
-            user = await r.lookup_data(UserByEmail(email, domain))
+            user_id = await r.lookup_entity_id(UserByEmail(email, domain))
     """
 
     @abstractmethod
@@ -59,8 +63,8 @@ class DataLookup[TRow: Base, TData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def to_data(self, row: TRow) -> TData:
-        """Convert the matched row into its ``data/`` type."""
+    def to_entity_id(self, row: TRow) -> TEntityID:
+        """Return the id of the entity the matched row is."""
         raise NotImplementedError
 
 

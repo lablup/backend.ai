@@ -1090,4 +1090,4 @@ class ResourceUsageAdapter(BaseAdapter):
         result = await self._processors.resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(name))
         )
-        return result.data.id
+        return result.entity_id()

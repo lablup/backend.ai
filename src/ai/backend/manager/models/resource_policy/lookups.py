@@ -6,10 +6,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.data.resource.types import (
-    KeyPairResourcePolicyData,
-    ProjectResourcePolicyData,
-    UserResourcePolicyData,
+from ai.backend.common.data.entity.resource_policy import (
+    KeyPairResourcePolicyUUID,
+    ProjectResourcePolicyUUID,
+    UserResourcePolicyUUID,
 )
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.resource_policy.row import (
@@ -22,7 +22,7 @@ from ai.backend.manager.models.specs.lookup import DataLookup
 
 @dataclass
 class KeypairResourcePolicyNameLookup(
-    DataLookup[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
+    DataLookup[KeyPairResourcePolicyRow, KeyPairResourcePolicyUUID]
 ):
     """Resolves a policy's name into the policy it names."""
 
@@ -37,13 +37,13 @@ class KeypairResourcePolicyNameLookup(
         return [lambda: KeyPairResourcePolicyRow.name == self.name]
 
     @override
-    def to_data(self, row: KeyPairResourcePolicyRow) -> KeyPairResourcePolicyData:
-        return row.to_dataclass()
+    def to_entity_id(self, row: KeyPairResourcePolicyRow) -> KeyPairResourcePolicyUUID:
+        return row.uuid
 
 
 @dataclass
 class ProjectResourcePolicyNameLookup(
-    DataLookup[ProjectResourcePolicyRow, ProjectResourcePolicyData]
+    DataLookup[ProjectResourcePolicyRow, ProjectResourcePolicyUUID]
 ):
     """Resolves a policy's name into the policy it names."""
 
@@ -58,12 +58,12 @@ class ProjectResourcePolicyNameLookup(
         return [lambda: ProjectResourcePolicyRow.name == self.name]
 
     @override
-    def to_data(self, row: ProjectResourcePolicyRow) -> ProjectResourcePolicyData:
-        return row.to_dataclass()
+    def to_entity_id(self, row: ProjectResourcePolicyRow) -> ProjectResourcePolicyUUID:
+        return row.uuid
 
 
 @dataclass
-class UserResourcePolicyNameLookup(DataLookup[UserResourcePolicyRow, UserResourcePolicyData]):
+class UserResourcePolicyNameLookup(DataLookup[UserResourcePolicyRow, UserResourcePolicyUUID]):
     """Resolves a policy's name into the policy it names."""
 
     name: str
@@ -77,5 +77,5 @@ class UserResourcePolicyNameLookup(DataLookup[UserResourcePolicyRow, UserResourc
         return [lambda: UserResourcePolicyRow.name == self.name]
 
     @override
-    def to_data(self, row: UserResourcePolicyRow) -> UserResourcePolicyData:
-        return row.to_dataclass()
+    def to_entity_id(self, row: UserResourcePolicyRow) -> UserResourcePolicyUUID:
+        return row.uuid

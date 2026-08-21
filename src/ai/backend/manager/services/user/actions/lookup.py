@@ -4,10 +4,9 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
-from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.user.lookups import UserEmailLookup
 from ai.backend.manager.models.user.row import UserRow
 
@@ -28,7 +27,7 @@ class UserEmailKey(LookupKey):
 
 
 @dataclass
-class LookupUserAction(LookupEntityOpsAction[UserRow, UserData]):
+class LookupUserAction(LookupEntityOpsAction[UserRow, UserID]):
     """Resolve a user's email into the user it names."""
 
     email: str

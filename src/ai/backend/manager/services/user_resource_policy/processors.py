@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ai.backend.common.data.entity.resource_policy import UserResourcePolicyUUID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
@@ -39,7 +40,7 @@ class UserResourcePolicyProcessors:
     """Every operation runs straight against ops, so this domain has no service."""
 
     lookup: LookupActionProcessor[
-        LookupUserResourcePolicyAction, LookupOpsResult[UserResourcePolicyData]
+        LookupUserResourcePolicyAction, LookupOpsResult[UserResourcePolicyUUID]
     ]
     search: ScopeActionProcessor[
         SearchUserResourcePoliciesAction, ScopedBatchOpsResult[UserResourcePolicyData]

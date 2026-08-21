@@ -3,11 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DomainName
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DomainID, DomainName
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
-from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.domain.lookups import DomainNameLookup
 from ai.backend.manager.models.domain.row import DomainRow
 
@@ -28,7 +27,7 @@ class DomainNameKey(LookupKey):
 
 
 @dataclass
-class LookupDomainAction(LookupEntityOpsAction[DomainRow, DomainData]):
+class LookupDomainAction(LookupEntityOpsAction[DomainRow, DomainID]):
     """Resolve a domain's name into the domain it names."""
 
     name: DomainName

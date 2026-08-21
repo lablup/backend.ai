@@ -72,17 +72,19 @@ class OpsRepository[TData]:
                 )
             return data
 
-    async def lookup(self, lookup: DataLookup[Any, TData]) -> TData:
-        """Read one entity by a non-primary key, raising if the key resolves to nothing.
+    async def lookup[TEntityID: EntityIdentifier](
+        self, lookup: DataLookup[Any, TEntityID]
+    ) -> TEntityID:
+        """Resolve a non-primary key into the id it names, raising if it names nothing.
 
         A lookup has to produce an id — its result contract says so — so an absent
         entity cannot be reported by returning ``None``.
         """
         async with self._ops.read_ops() as r:
-            data = await r.lookup_data(lookup)
-            if data is None:
+            entity_id = await r.lookup_entity_id(lookup)
+            if entity_id is None:
                 raise EntityNotFoundError(f"No {lookup.row_class().__name__} matches the given key")
-            return data
+            return entity_id
 
     async def field_owners(
         self, lookup: FieldOwnerLookup[Any, Any], field_ids: Sequence[FieldIdentifier]

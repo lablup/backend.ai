@@ -147,7 +147,7 @@ class FairShareAPIHandler:
         result = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(resource_group))
         )
-        return result.data.id
+        return result.entity_id()
 
     # Domain Fair Share
 
@@ -730,7 +730,7 @@ class FairShareAPIHandler:
         action_result = await self._fair_share.upsert_domain_fair_share_weight.run(
             UpsertDomainFairShareWeightAction(
                 resource_group=path.parsed.resource_group,
-                resource_group_id=result.data.id,
+                resource_group_id=result.entity_id(),
                 domain_name=path.parsed.domain_name,
                 weight=body.parsed.weight,
             )
@@ -754,7 +754,7 @@ class FairShareAPIHandler:
         action_result = await self._fair_share.upsert_project_fair_share_weight.run(
             UpsertProjectFairShareWeightAction(
                 resource_group=path.parsed.resource_group,
-                resource_group_id=result.data.id,
+                resource_group_id=result.entity_id(),
                 project_id=path.parsed.project_id,
                 domain_name=body.parsed.domain_name,
                 weight=body.parsed.weight,
@@ -779,7 +779,7 @@ class FairShareAPIHandler:
         action_result = await self._fair_share.upsert_user_fair_share_weight.run(
             UpsertUserFairShareWeightAction(
                 resource_group=path.parsed.resource_group,
-                resource_group_id=result.data.id,
+                resource_group_id=result.entity_id(),
                 project_id=path.parsed.project_id,
                 user_uuid=path.parsed.user_uuid,
                 domain_name=body.parsed.domain_name,
@@ -813,7 +813,7 @@ class FairShareAPIHandler:
         action_result = await self._fair_share.bulk_upsert_domain_fair_share_weight.run(
             BulkUpsertDomainFairShareWeightAction(
                 resource_group=body.parsed.resource_group,
-                resource_group_id=result.data.id,
+                resource_group_id=result.entity_id(),
                 inputs=inputs,
             )
         )
@@ -844,7 +844,7 @@ class FairShareAPIHandler:
         action_result = await self._fair_share.bulk_upsert_project_fair_share_weight.run(
             BulkUpsertProjectFairShareWeightAction(
                 resource_group=body.parsed.resource_group,
-                resource_group_id=result.data.id,
+                resource_group_id=result.entity_id(),
                 inputs=inputs,
             )
         )
@@ -876,7 +876,7 @@ class FairShareAPIHandler:
         action_result = await self._fair_share.bulk_upsert_user_fair_share_weight.run(
             BulkUpsertUserFairShareWeightAction(
                 resource_group=body.parsed.resource_group,
-                resource_group_id=result.data.id,
+                resource_group_id=result.entity_id(),
                 inputs=inputs,
             )
         )

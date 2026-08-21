@@ -171,7 +171,7 @@ class RuntimeVariantAdapter(BaseAdapter):
         result = await self._processors.runtime_variant.public_lookup.run(
             LookupRuntimeVariantAction(name=name)
         )
-        return result.data.id
+        return result.entity_id()
 
     def _convert_filter(self, filter_: RuntimeVariantFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

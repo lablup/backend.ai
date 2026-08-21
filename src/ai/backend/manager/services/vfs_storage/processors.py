@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
@@ -53,7 +54,7 @@ class VFSStorageProcessors:
     update: SingleEntityActionProcessor[UpdateVFSStorageAction, EntityOpsResult[VFSStorageData]]
     purge: SingleEntityActionProcessor[PurgeVFSStorageAction, EntityOpsResult[VFSStorageData]]
     get: SingleEntityActionProcessor[GetVFSStorageAction, EntityOpsResult[VFSStorageData]]
-    lookup: LookupActionProcessor[LookupVFSStorageAction, LookupOpsResult[VFSStorageData]]
+    lookup: LookupActionProcessor[LookupVFSStorageAction, LookupOpsResult[VFSStorageID]]
     global_list_storages: GlobalActionProcessor[
         ListVFSStorageAction, BatchOpsResult[VFSStorageData]
     ]

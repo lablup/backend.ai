@@ -6,15 +6,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DomainName
-from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.specs.lookup import DataLookup
 
 
 @dataclass
-class DomainNameLookup(DataLookup[DomainRow, DomainData]):
+class DomainNameLookup(DataLookup[DomainRow, DomainID]):
     """Resolves a domain's name into the domain it names."""
 
     name: DomainName
@@ -28,5 +27,5 @@ class DomainNameLookup(DataLookup[DomainRow, DomainData]):
         return [lambda: DomainRow.name == self.name]
 
     @override
-    def to_data(self, row: DomainRow) -> DomainData:
-        return row.to_data()
+    def to_entity_id(self, row: DomainRow) -> DomainID:
+        return row.id

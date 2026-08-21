@@ -1,3 +1,4 @@
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
@@ -112,7 +113,7 @@ from ai.backend.manager.services.resource_group.service import ResourceGroupServ
 
 
 class ResourceGroupProcessors:
-    lookup: LookupActionProcessor[LookupResourceGroupAction, LookupOpsResult[ResourceGroupData]]
+    lookup: LookupActionProcessor[LookupResourceGroupAction, LookupOpsResult[ResourceGroupID]]
     create_resource_group: GlobalActionProcessor[
         CreateResourceGroupAction, CreateResourceGroupActionResult
     ]

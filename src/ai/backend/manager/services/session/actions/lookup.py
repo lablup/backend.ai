@@ -4,11 +4,10 @@ from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
 
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
-from ai.backend.manager.data.session.types import SessionEntityData
 from ai.backend.manager.models.session.lookups import SessionNameOfUserLookup
 from ai.backend.manager.models.session.row import SessionRow
 
@@ -30,7 +29,7 @@ class SessionNameOfUserKey(LookupKey):
 
 
 @dataclass
-class LookupSessionAction(LookupEntityOpsAction[SessionRow, SessionEntityData]):
+class LookupSessionAction(LookupEntityOpsAction[SessionRow, SessionID]):
     """Resolve a session's name within its owner into the session it names."""
 
     user_uuid: UUID

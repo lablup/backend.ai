@@ -4,11 +4,13 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.storage_namespace import STORAGE_NAMESPACE_ENTITY_TYPE
+from ai.backend.common.data.entity.storage_namespace import (
+    STORAGE_NAMESPACE_ENTITY_TYPE,
+    StorageNamespaceID,
+)
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
-from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.storage_namespace.lookups import (
     StorageNamespaceLookup,
@@ -32,9 +34,7 @@ class StorageNamespaceKey(LookupKey):
 
 
 @dataclass
-class LookupStorageNamespaceAction(
-    LookupEntityOpsAction[StorageNamespaceRow, StorageNamespaceData]
-):
+class LookupStorageNamespaceAction(LookupEntityOpsAction[StorageNamespaceRow, StorageNamespaceID]):
     """Resolve a (storage, namespace) pair into the row it names.
 
     Registration exposes the pair rather than the id. Keeping the translation as its

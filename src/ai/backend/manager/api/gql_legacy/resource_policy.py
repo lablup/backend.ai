@@ -403,7 +403,7 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
         await graph_ctx.processors.keypair_resource_policy.update.run(
             UpdateKeyPairResourcePolicyAction(
-                policy_id=target.data.uuid, updater=props.to_updater(name)
+                policy_id=target.entity_id(), updater=props.to_updater(name)
             )
         )
 
@@ -441,7 +441,7 @@ class DeleteKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
             LookupKeypairResourcePolicyAction(name=name)
         )
         await graph_ctx.processors.keypair_resource_policy.purge.run(
-            PurgeKeyPairResourcePolicyAction(name=name, policy_id=target.data.uuid)
+            PurgeKeyPairResourcePolicyAction(name=name, policy_id=target.entity_id())
         )
         return DeleteKeyPairResourcePolicy(
             ok=True,
@@ -667,7 +667,7 @@ class ModifyUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
         await graph_ctx.processors.user_resource_policy.update.run(
             UpdateUserResourcePolicyAction(
-                policy_id=target.data.uuid, updater=props.to_updater(name)
+                policy_id=target.entity_id(), updater=props.to_updater(name)
             )
         )
 
@@ -705,7 +705,7 @@ class DeleteUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
             LookupUserResourcePolicyAction(name=name)
         )
         await graph_ctx.processors.user_resource_policy.purge.run(
-            PurgeUserResourcePolicyAction(name=name, policy_id=target.data.uuid)
+            PurgeUserResourcePolicyAction(name=name, policy_id=target.entity_id())
         )
 
         return DeleteUserResourcePolicy(
@@ -924,7 +924,7 @@ class ModifyProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
         await graph_ctx.processors.project_resource_policy.update.run(
             UpdateProjectResourcePolicyAction(
-                policy_id=target.data.uuid, updater=props.to_updater(name)
+                policy_id=target.entity_id(), updater=props.to_updater(name)
             )
         )
 
@@ -962,7 +962,7 @@ class DeleteProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
             LookupProjectResourcePolicyAction(name=name)
         )
         await graph_ctx.processors.project_resource_policy.purge.run(
-            PurgeProjectResourcePolicyAction(name=name, policy_id=target.data.uuid)
+            PurgeProjectResourcePolicyAction(name=name, policy_id=target.entity_id())
         )
 
         return DeleteProjectResourcePolicy(

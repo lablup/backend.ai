@@ -6,14 +6,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.data.resource_preset.types import ResourcePresetData
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.specs.lookup import DataLookup
 
 
 @dataclass
-class ResourcePresetNameLookup(DataLookup[ResourcePresetRow, ResourcePresetData]):
+class ResourcePresetNameLookup(DataLookup[ResourcePresetRow, ResourcePresetID]):
     """Reads the preset a name refers to, within a resource group or outside one."""
 
     name: str
@@ -33,5 +33,5 @@ class ResourcePresetNameLookup(DataLookup[ResourcePresetRow, ResourcePresetData]
         ]
 
     @override
-    def to_data(self, row: ResourcePresetRow) -> ResourcePresetData:
-        return row.to_dataclass()
+    def to_entity_id(self, row: ResourcePresetRow) -> ResourcePresetID:
+        return row.id

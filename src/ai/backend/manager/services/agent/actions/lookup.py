@@ -3,12 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
+from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE, AgentUUID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
-from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.models.agent.lookups import AgentNameLookup
 from ai.backend.manager.models.agent.row import AgentRow
 
@@ -29,7 +28,7 @@ class AgentNameKey(LookupKey):
 
 
 @dataclass
-class LookupAgentAction(LookupEntityOpsAction[AgentRow, AgentData]):
+class LookupAgentAction(LookupEntityOpsAction[AgentRow, AgentUUID]):
     """Resolve the operator-facing agent id into the agent it names."""
 
     agent_id: AgentId

@@ -6,14 +6,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.specs.lookup import DataLookup
 
 
 @dataclass
-class RuntimeVariantLookup(DataLookup[RuntimeVariantRow, RuntimeVariantData]):
+class RuntimeVariantLookup(DataLookup[RuntimeVariantRow, RuntimeVariantID]):
     """Resolves a runtime variant's name into the row it names.
 
     The name is unique, which separates this from a search: two matches would mean the
@@ -31,5 +31,5 @@ class RuntimeVariantLookup(DataLookup[RuntimeVariantRow, RuntimeVariantData]):
         return [lambda: RuntimeVariantRow.name == self.name]
 
     @override
-    def to_data(self, row: RuntimeVariantRow) -> RuntimeVariantData:
-        return row.to_data()
+    def to_entity_id(self, row: RuntimeVariantRow) -> RuntimeVariantID:
+        return row.id

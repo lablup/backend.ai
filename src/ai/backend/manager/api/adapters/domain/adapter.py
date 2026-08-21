@@ -229,7 +229,7 @@ class DomainAdapter(BaseAdapter):
         )
         result = await self._processors.domain.update_domain_node.run(
             UpdateDomainNodeAction(
-                domain_id=target.data.id,
+                domain_id=target.entity_id(),
                 updater=updater,
                 user_info=user_info,
             )
@@ -247,7 +247,7 @@ class DomainAdapter(BaseAdapter):
         )
         await self._processors.domain.delete_domain.run(
             DeleteDomainAction(
-                domain_id=target.data.id,
+                domain_id=target.entity_id(),
                 updater=DomainSoftDeleteUpdater(name=input.name),
             )
         )
@@ -263,7 +263,7 @@ class DomainAdapter(BaseAdapter):
             LookupDomainAction(name=DomainName(input.name))
         )
         await self._processors.domain.purge_domain.run(
-            PurgeDomainAction(domain_id=target.data.id, name=input.name)
+            PurgeDomainAction(domain_id=target.entity_id(), name=input.name)
         )
         return PurgeDomainPayload(purged=True)
 

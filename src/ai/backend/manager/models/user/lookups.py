@@ -6,14 +6,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.data.user.types import UserData
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.user.row import UserRow
 
 
 @dataclass
-class UserEmailLookup(DataLookup[UserRow, UserData]):
+class UserEmailLookup(DataLookup[UserRow, UserID]):
     """Resolves a user's email into the user it names."""
 
     email: str
@@ -27,5 +27,5 @@ class UserEmailLookup(DataLookup[UserRow, UserData]):
         return [lambda: UserRow.email == self.email]
 
     @override
-    def to_data(self, row: UserRow) -> UserData:
-        return row.to_data()
+    def to_entity_id(self, row: UserRow) -> UserID:
+        return UserID(row.uuid)

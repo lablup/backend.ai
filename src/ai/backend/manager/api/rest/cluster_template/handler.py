@@ -87,7 +87,7 @@ class ClusterTemplateHandler:
         result = await self._group.lookup.run(
             LookupProjectAction(domain_name=DomainName(domain_name), project_name=project_name)
         )
-        return ProjectID(result.data.id)
+        return ProjectID(result.entity_id())
 
     async def create(
         self,

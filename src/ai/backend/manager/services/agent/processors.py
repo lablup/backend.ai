@@ -1,3 +1,4 @@
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
@@ -96,7 +97,7 @@ class AgentProcessors:
     update_resource_group: ActionProcessor[
         UpdateAgentResourceGroupAction, UpdateAgentResourceGroupActionResult
     ]
-    lookup: LookupActionProcessor[LookupAgentAction, LookupOpsResult[AgentData]]
+    lookup: LookupActionProcessor[LookupAgentAction, LookupOpsResult[AgentUUID]]
 
     def __init__(
         self,

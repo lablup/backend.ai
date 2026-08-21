@@ -1,3 +1,4 @@
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
@@ -109,7 +110,7 @@ from ai.backend.manager.services.user.service import UserService
 
 
 class UserProcessors:
-    lookup: LookupActionProcessor[LookupUserAction, LookupOpsResult[UserData]]
+    lookup: LookupActionProcessor[LookupUserAction, LookupOpsResult[UserID]]
     lookup_keypair_owner: LookupActionProcessor[
         LookupKeypairOwnerByAccessKeyAction, FieldOwnerLookupOpsResult
     ]

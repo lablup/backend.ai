@@ -3,11 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.resource_slot import RESOURCE_SLOT_TYPE_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_slot import (
+    RESOURCE_SLOT_TYPE_ENTITY_TYPE,
+    ResourceSlotTypeUUID,
+)
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
-from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.models.resource_slot.lookups import ResourceSlotTypeLookup
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 
@@ -29,7 +31,7 @@ class ResourceSlotTypeNameKey(LookupKey):
 
 @dataclass
 class LookupResourceSlotTypeAction(
-    LookupEntityOpsAction[ResourceSlotTypeRow, ResourceSlotTypeData]
+    LookupEntityOpsAction[ResourceSlotTypeRow, ResourceSlotTypeUUID]
 ):
     """Resolve a slot name into the type it names."""
 

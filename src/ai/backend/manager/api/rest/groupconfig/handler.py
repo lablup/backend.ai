@@ -66,7 +66,7 @@ class GroupConfigHandler:
                 domain_name=DomainName(domain or ctx.user_domain), project_name=group
             )
         )
-        return result.data.entity_id()
+        return result.entity_id()
 
     async def create(
         self,

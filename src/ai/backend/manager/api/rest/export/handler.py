@@ -102,7 +102,7 @@ class ExportHandler:
 
     async def _resolve_domain_id(self, domain_name: str) -> DomainID:
         result = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
-        return DomainID(result.data.id)
+        return DomainID(result.entity_id())
 
     async def list_reports(self) -> APIResponse:
         """List available export reports."""

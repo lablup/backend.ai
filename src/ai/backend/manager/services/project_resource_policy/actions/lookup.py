@@ -5,11 +5,11 @@ from typing import Any, override
 
 from ai.backend.common.data.entity.resource_policy import (
     PROJECT_RESOURCE_POLICY_ENTITY_TYPE,
+    ProjectResourcePolicyUUID,
 )
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
-from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.models.resource_policy.lookups import (
     ProjectResourcePolicyNameLookup,
 )
@@ -33,7 +33,7 @@ class ProjectResourcePolicyNameKey(LookupKey):
 
 @dataclass
 class LookupProjectResourcePolicyAction(
-    LookupEntityOpsAction[ProjectResourcePolicyRow, ProjectResourcePolicyData]
+    LookupEntityOpsAction[ProjectResourcePolicyRow, ProjectResourcePolicyUUID]
 ):
     """Resolve a project resource policy's name into the policy it names."""
 

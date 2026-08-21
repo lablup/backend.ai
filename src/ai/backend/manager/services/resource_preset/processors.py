@@ -1,3 +1,4 @@
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
@@ -38,7 +39,7 @@ from ai.backend.manager.services.resource_preset.service import ResourcePresetSe
 
 
 class ResourcePresetProcessors:
-    lookup: LookupActionProcessor[LookupResourcePresetAction, LookupOpsResult[ResourcePresetData]]
+    lookup: LookupActionProcessor[LookupResourcePresetAction, LookupOpsResult[ResourcePresetID]]
     create_preset: GlobalActionProcessor[
         CreateResourcePresetAction, CreateResourcePresetActionResult
     ]

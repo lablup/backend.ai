@@ -3,11 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.artifact_registry import ARTIFACT_REGISTRY_ENTITY_TYPE
+from ai.backend.common.data.entity.artifact_registry import (
+    ARTIFACT_REGISTRY_ENTITY_TYPE,
+    ArtifactRegistryID,
+)
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
-from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.models.artifact_registries.lookups import ArtifactRegistryNameLookup
 from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
 
@@ -28,9 +30,7 @@ class ArtifactRegistryNameKey(LookupKey):
 
 
 @dataclass
-class LookupArtifactRegistryAction(
-    LookupEntityOpsAction[ArtifactRegistryRow, ArtifactRegistryData]
-):
+class LookupArtifactRegistryAction(LookupEntityOpsAction[ArtifactRegistryRow, ArtifactRegistryID]):
     """Resolve an artifact registry's name into the registry it names."""
 
     name: str

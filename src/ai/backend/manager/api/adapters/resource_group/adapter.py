@@ -706,14 +706,14 @@ class ResourceGroupAdapter(BaseAdapter):
         result = await self._processors.domain.lookup.run(
             LookupDomainAction(name=DomainName(domain_name))
         )
-        return result.data.id
+        return result.entity_id()
 
     async def _resolve_resource_group_id(self, name: str) -> ResourceGroupID:
         """Resolve a resource group name to its row ID at the API boundary."""
         result = await self._processors.resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(name))
         )
-        return result.data.id
+        return result.entity_id()
 
     async def _resolve_allowed_resource_group_ids(
         self,

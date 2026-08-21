@@ -1,3 +1,4 @@
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
@@ -61,7 +62,7 @@ from ai.backend.manager.services.group.service import GroupService
 
 
 class GroupProcessors:
-    lookup: LookupActionProcessor[LookupProjectAction, LookupOpsResult[GroupData]]
+    lookup: LookupActionProcessor[LookupProjectAction, LookupOpsResult[ProjectID]]
     get_project: SingleEntityActionProcessor[GetProjectAction, EntityOpsResult[GroupData]]
     global_search: GlobalActionProcessor[GlobalSearchProjectsAction, BatchOpsResult[GroupData]]
     search_projects_by_domain: ScopeActionProcessor[

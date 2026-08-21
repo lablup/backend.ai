@@ -157,7 +157,7 @@ class FairShareAdapter(BaseAdapter):
         )
         result = await self._processors.fair_share.get_domain_fair_share.run(
             GetDomainFairShareAction(
-                resource_group_id=resource_group_id_result.data.id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 domain_name=input.domain_name,
             )
         )
@@ -220,9 +220,9 @@ class FairShareAdapter(BaseAdapter):
 
         result = await self._processors.fair_share.search_rg_domain_fair_shares.run(
             SearchRGDomainFairSharesAction(
-                resource_group_id=resource_group_id_result.data.id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 scope=DomainFairShareOperationScope(
-                    resource_group_id=resource_group_id_result.data.id,
+                    resource_group_id=resource_group_id_result.entity_id(),
                 ),
                 querier=querier,
             )
@@ -243,7 +243,7 @@ class FairShareAdapter(BaseAdapter):
         result = await self._processors.fair_share.upsert_domain_fair_share_weight.run(
             UpsertDomainFairShareWeightAction(
                 resource_group=input.resource_group_name,
-                resource_group_id=resource_group_id_result.data.id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 domain_name=input.domain_name,
                 weight=input.weight,
             )
@@ -263,7 +263,7 @@ class FairShareAdapter(BaseAdapter):
         result = await self._processors.fair_share.bulk_upsert_domain_fair_share_weight.run(
             BulkUpsertDomainFairShareWeightAction(
                 resource_group=input.resource_group_name,
-                resource_group_id=resource_group_id_result.data.id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 inputs=[
                     DomainWeightInput(domain_name=e.domain_name, weight=e.weight)
                     for e in input.inputs
@@ -281,7 +281,7 @@ class FairShareAdapter(BaseAdapter):
         )
         result = await self._processors.fair_share.get_project_fair_share.run(
             GetProjectFairShareAction(
-                resource_group_id=resource_group_id_result.data.id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 project_id=input.project_id,
             )
         )
@@ -343,10 +343,10 @@ class FairShareAdapter(BaseAdapter):
 
         result = await self._processors.fair_share.search_rg_project_fair_shares.run(
             SearchRGProjectFairSharesAction(
-                resource_group_id=resource_group_id_result.data.id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 scope=ProjectFairShareOperationScope(
                     domain_name=domain_name,
-                    resource_group_id=resource_group_id_result.data.id,
+                    resource_group_id=resource_group_id_result.entity_id(),
                 ),
                 querier=querier,
             )
@@ -367,7 +367,7 @@ class FairShareAdapter(BaseAdapter):
         result = await self._processors.fair_share.upsert_project_fair_share_weight.run(
             UpsertProjectFairShareWeightAction(
                 resource_group=input.resource_group_name,
-                resource_group_id=resource_group_id_result.data.id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 project_id=input.project_id,
                 domain_name=input.domain_name,
                 weight=input.weight,
@@ -388,7 +388,7 @@ class FairShareAdapter(BaseAdapter):
         result = await self._processors.fair_share.bulk_upsert_project_fair_share_weight.run(
             BulkUpsertProjectFairShareWeightAction(
                 resource_group=input.resource_group_name,
-                resource_group_id=resource_group_id_result.data.id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 inputs=[
                     ProjectWeightInput(
                         project_id=e.project_id,
@@ -410,7 +410,7 @@ class FairShareAdapter(BaseAdapter):
         )
         result = await self._processors.fair_share.get_user_fair_share.run(
             GetUserFairShareAction(
-                resource_group_id=resource_group_id_result.data.id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 project_id=input.project_id,
                 user_uuid=input.user_uuid,
             )
@@ -472,11 +472,11 @@ class FairShareAdapter(BaseAdapter):
 
         result = await self._processors.fair_share.search_rg_user_fair_shares.run(
             SearchRGUserFairSharesAction(
-                resource_group_id=resource_group_id_result.data.id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 scope=UserFairShareOperationScope(
                     domain_name=domain_name,
                     project_id=project_id,
-                    resource_group_id=resource_group_id_result.data.id,
+                    resource_group_id=resource_group_id_result.entity_id(),
                 ),
                 querier=querier,
             )
@@ -497,7 +497,7 @@ class FairShareAdapter(BaseAdapter):
         result = await self._processors.fair_share.upsert_user_fair_share_weight.run(
             UpsertUserFairShareWeightAction(
                 resource_group=input.resource_group_name,
-                resource_group_id=resource_group_id_result.data.id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 project_id=input.project_id,
                 user_uuid=input.user_uuid,
                 domain_name=input.domain_name,
@@ -517,7 +517,7 @@ class FairShareAdapter(BaseAdapter):
         result = await self._processors.fair_share.bulk_upsert_user_fair_share_weight.run(
             BulkUpsertUserFairShareWeightAction(
                 resource_group=input.resource_group_name,
-                resource_group_id=resource_group_id_result.data.id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 inputs=[
                     UserWeightInput(
                         user_uuid=e.user_uuid,

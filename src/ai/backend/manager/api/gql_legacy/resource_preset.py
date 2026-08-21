@@ -207,7 +207,7 @@ async def _resolve_preset_id(
     result = await graph_ctx.processors.resource_preset.lookup.run(
         LookupResourcePresetAction(name=name)
     )
-    return result.data.id
+    return result.entity_id()
 
 
 class ModifyResourcePresetInput(graphene.InputObjectType):  # type: ignore[misc]

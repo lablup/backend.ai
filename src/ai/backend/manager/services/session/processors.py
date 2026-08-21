@@ -1,3 +1,4 @@
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import PublicActionProcessor
@@ -219,7 +220,7 @@ class SessionProcessors:
     upload_files: SingleEntityActionProcessor[UploadFilesAction, UploadFilesActionResult]
     get_session: SingleEntityActionProcessor[GetSessionAction, GetSessionActionResult]
     update_session: SingleEntityActionProcessor[UpdateSessionAction, UpdateSessionActionResult]
-    lookup: LookupActionProcessor[LookupSessionAction, LookupOpsResult[SessionEntityData]]
+    lookup: LookupActionProcessor[LookupSessionAction, LookupOpsResult[SessionID]]
 
     resource_allocation: ResourceAllocationProcessors
 

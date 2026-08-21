@@ -47,8 +47,10 @@ class V2ReadOps(V2OpsBase):
             return None
         return querier.to_data(row)
 
-    async def lookup_data[TRow: Base, TData](self, lookup: DataLookup[TRow, TData]) -> TData | None:
-        """Fetch one row by a key that is not its primary key, as its ``data/`` type.
+    async def lookup_entity_id[TRow: Base, TEntityID: EntityIdentifier](
+        self, lookup: DataLookup[TRow, TEntityID]
+    ) -> TEntityID | None:
+        """Resolve a key that is not a primary key into the id of the entity it names.
 
         Reads at most two rows and rejects the second: a lookup key is expected to
         be unique, so more than one match means the conditions are wrong or the
@@ -66,7 +68,7 @@ class V2ReadOps(V2OpsBase):
             raise AmbiguousEntityKeyError(
                 f"The given key matches more than one {row_class.__name__}"
             )
-        return lookup.to_data(rows[0])
+        return lookup.to_entity_id(rows[0])
 
     async def lookup_field_owners(
         self, lookup: FieldOwnerLookup[Any, Any], field_ids: Sequence[FieldIdentifier]

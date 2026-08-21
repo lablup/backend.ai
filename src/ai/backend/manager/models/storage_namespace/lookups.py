@@ -7,14 +7,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
+from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 
 
 @dataclass
-class StorageNamespaceLookup(DataLookup[StorageNamespaceRow, StorageNamespaceData]):
+class StorageNamespaceLookup(DataLookup[StorageNamespaceRow, StorageNamespaceID]):
     """Resolves the storage a namespace sits in, plus the namespace, into that row.
 
     The pair is the table's unique constraint, so it names one row; the id is a
@@ -36,5 +36,5 @@ class StorageNamespaceLookup(DataLookup[StorageNamespaceRow, StorageNamespaceDat
         ]
 
     @override
-    def to_data(self, row: StorageNamespaceRow) -> StorageNamespaceData:
-        return row.to_dataclass()
+    def to_entity_id(self, row: StorageNamespaceRow) -> StorageNamespaceID:
+        return row.id

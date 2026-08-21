@@ -156,7 +156,7 @@ class DomainHandler:
         target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
 
         action_result = await self._domain.update_domain.run(
-            UpdateDomainAction(domain_id=target.data.id, updater=updater)
+            UpdateDomainAction(domain_id=target.entity_id(), updater=updater)
         )
 
         resp = UpdateDomainResponse(domain=self._adapter.convert_to_dto(action_result.data))
@@ -177,7 +177,7 @@ class DomainHandler:
         )
         await self._domain.delete_domain.run(
             DeleteDomainAction(
-                domain_id=target.data.id,
+                domain_id=target.entity_id(),
                 updater=DomainSoftDeleteUpdater(name=body.parsed.name),
             )
         )
@@ -199,7 +199,7 @@ class DomainHandler:
             LookupDomainAction(name=DomainName(body.parsed.name))
         )
         await self._domain.purge_domain.run(
-            PurgeDomainAction(domain_id=target.data.id, name=body.parsed.name)
+            PurgeDomainAction(domain_id=target.entity_id(), name=body.parsed.name)
         )
 
         resp = PurgeDomainResponse(purged=True)

@@ -334,7 +334,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             LookupKeypairResourcePolicyAction(name=updater.name)
         )
         result = await self._processors.keypair_resource_policy.update.run(
-            UpdateKeyPairResourcePolicyAction(policy_id=target.data.uuid, updater=updater)
+            UpdateKeyPairResourcePolicyAction(policy_id=target.entity_id(), updater=updater)
         )
         return UpdateKeypairResourcePolicyPayload(
             keypair_resource_policy=self._keypair_policy_data_to_node(result.data)
@@ -347,7 +347,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             LookupKeypairResourcePolicyAction(name=input.name)
         )
         await self._processors.keypair_resource_policy.purge.run(
-            PurgeKeyPairResourcePolicyAction(name=input.name, policy_id=target.data.uuid)
+            PurgeKeyPairResourcePolicyAction(name=input.name, policy_id=target.entity_id())
         )
         return DeleteKeypairResourcePolicyPayload(name=input.name)
 
@@ -456,7 +456,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             LookupUserResourcePolicyAction(name=updater.name)
         )
         result = await self._processors.user_resource_policy.update.run(
-            UpdateUserResourcePolicyAction(policy_id=target.data.uuid, updater=updater)
+            UpdateUserResourcePolicyAction(policy_id=target.entity_id(), updater=updater)
         )
         return UpdateUserResourcePolicyPayload(
             user_resource_policy=self._user_policy_data_to_node(result.data)
@@ -469,7 +469,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             LookupUserResourcePolicyAction(name=input.name)
         )
         await self._processors.user_resource_policy.purge.run(
-            PurgeUserResourcePolicyAction(name=input.name, policy_id=target.data.uuid)
+            PurgeUserResourcePolicyAction(name=input.name, policy_id=target.entity_id())
         )
         return DeleteUserResourcePolicyPayload(name=input.name)
 
@@ -564,7 +564,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             LookupProjectResourcePolicyAction(name=updater.name)
         )
         result = await self._processors.project_resource_policy.update.run(
-            UpdateProjectResourcePolicyAction(policy_id=target.data.uuid, updater=updater)
+            UpdateProjectResourcePolicyAction(policy_id=target.entity_id(), updater=updater)
         )
         return UpdateProjectResourcePolicyPayload(
             project_resource_policy=self._project_policy_data_to_node(result.data)
@@ -577,7 +577,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             LookupProjectResourcePolicyAction(name=input.name)
         )
         await self._processors.project_resource_policy.purge.run(
-            PurgeProjectResourcePolicyAction(name=input.name, policy_id=target.data.uuid)
+            PurgeProjectResourcePolicyAction(name=input.name, policy_id=target.entity_id())
         )
         return DeleteProjectResourcePolicyPayload(name=input.name)
 

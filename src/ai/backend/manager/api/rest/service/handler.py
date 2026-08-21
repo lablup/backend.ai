@@ -744,7 +744,7 @@ class ServiceHandler:
         result = await self._runtime_variant.public_lookup.run(
             LookupRuntimeVariantAction(name=str(name))
         )
-        return result.data.id
+        return result.entity_id()
 
     @staticmethod
     def _to_start_action(

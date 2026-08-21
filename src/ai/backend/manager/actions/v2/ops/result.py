@@ -83,16 +83,21 @@ class CreatedEntityWithFieldsOpsResult[TData: EntityData, TFieldData](
 
 
 @dataclass
-class LookupOpsResult[TData: EntityData](EntityOpsResult[TData], BaseLookupActionResult):
-    """The entity a lookup's key names.
+class LookupOpsResult[TEntityID: EntityIdentifier](BaseLookupActionResult):
+    """The id of the entity a lookup's key names.
 
     A lookup declares no target — producing one is the point of the run — so the id
     reaches the audit trail through the result, the same way a create's does.
+
+    Carries the id alone: what the caller does next is an operation on that entity, and
+    the value behind the id is read by a get, which says for itself what to load.
     """
+
+    resolved_entity_id: TEntityID
 
     @override
     def entity_id(self) -> EntityIdentifier:
-        return self.data.entity_id()
+        return self.resolved_entity_id
 
 
 @dataclass

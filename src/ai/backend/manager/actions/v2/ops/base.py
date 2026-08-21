@@ -112,16 +112,16 @@ class GetOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class LookupOpsAction[TRow: Base, TData](OpsBackendAction):
+class LookupOpsAction[TRow: Base, TEntityID: EntityIdentifier](OpsBackendAction):
     """A read by a key that is not the entity's id.
 
     The lookup shape's whole point is producing an id, so the spec has to say which
-    columns the key is and how the row becomes data; there is nothing on the action for
+    columns the key is and how the row names its entity; there is nothing on the action for
     it to lean on the way the single-entity shape leans on ``entity_id()``.
     """
 
     @abstractmethod
-    def to_lookup(self) -> DataLookup[TRow, TData]:
+    def to_lookup(self) -> DataLookup[TRow, TEntityID]:
         """Return the key-resolution spec this action executes."""
         raise NotImplementedError
 
@@ -486,7 +486,9 @@ class GlobalBatchPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class LookupEntityOpsAction[TRow: Base, TData](BaseLookupAction, LookupOpsAction[TRow, TData], ABC):
+class LookupEntityOpsAction[TRow: Base, TEntityID: EntityIdentifier](
+    BaseLookupAction, LookupOpsAction[TRow, TEntityID], ABC
+):
     """A key resolution backed by ops: the lookup shape paired with its spec.
 
     Declares nothing further — the shape fixes the operation, and the spec carries

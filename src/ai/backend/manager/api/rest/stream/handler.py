@@ -127,7 +127,7 @@ class StreamHandler:
         result = await self._session.lookup.run(
             LookupSessionAction(user_uuid=user_id, name=session_name)
         )
-        return SessionId(result.data.id)
+        return SessionId(result.entity_id())
 
     async def _resolve_session_name(self, session_name_or_id: str) -> str:
         """Normalize a streaming path reference (name or UUID) to its canonical name.

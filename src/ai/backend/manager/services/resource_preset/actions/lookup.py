@@ -3,11 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_preset import (
+    RESOURCE_PRESET_ENTITY_TYPE,
+    ResourcePresetID,
+)
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
-from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.resource_preset.lookups import ResourcePresetNameLookup
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 
@@ -30,7 +32,7 @@ class ResourcePresetNameKey(LookupKey):
 
 
 @dataclass
-class LookupResourcePresetAction(LookupEntityOpsAction[ResourcePresetRow, ResourcePresetData]):
+class LookupResourcePresetAction(LookupEntityOpsAction[ResourcePresetRow, ResourcePresetID]):
     """Resolve a preset's name into the preset it names."""
 
     name: str

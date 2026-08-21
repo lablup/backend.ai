@@ -4,10 +4,9 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE, VFSStorageID
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
-from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.vfs_storage.lookups import VFSStorageLookup
 from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
 
@@ -28,7 +27,7 @@ class VFSStorageNameKey(LookupKey):
 
 
 @dataclass
-class LookupVFSStorageAction(LookupEntityOpsAction[VFSStorageRow, VFSStorageData]):
+class LookupVFSStorageAction(LookupEntityOpsAction[VFSStorageRow, VFSStorageID]):
     """Resolve a VFS storage name into the storage it names.
 
     Split out of the read: the old ``get`` branched on which key the caller

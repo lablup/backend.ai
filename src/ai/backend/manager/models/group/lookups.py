@@ -7,14 +7,14 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.domain import DomainName
-from ai.backend.manager.data.group.types import GroupData
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.specs.lookup import DataLookup
 
 
 @dataclass
-class ProjectNameInDomainLookup(DataLookup[GroupRow, GroupData]):
+class ProjectNameInDomainLookup(DataLookup[GroupRow, ProjectID]):
     """Resolves a project's name within its domain into the project it names.
 
     The pair is the table's unique constraint: a name is only unique inside one domain.
@@ -35,5 +35,5 @@ class ProjectNameInDomainLookup(DataLookup[GroupRow, GroupData]):
         ]
 
     @override
-    def to_data(self, row: GroupRow) -> GroupData:
-        return row.to_data()
+    def to_entity_id(self, row: GroupRow) -> ProjectID:
+        return ProjectID(row.id)

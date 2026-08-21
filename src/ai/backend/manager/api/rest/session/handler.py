@@ -438,7 +438,7 @@ class SessionHandler:
         result = await self._group.lookup.run(
             LookupProjectAction(domain_name=DomainName(domain_name), project_name=group_name)
         )
-        return result.data.entity_id()
+        return result.entity_id()
 
     async def _resolve_session_id(
         self, owner_access_key: AccessKey, session_name: str
@@ -460,7 +460,7 @@ class SessionHandler:
         result = await self._session.lookup.run(
             LookupSessionAction(user_uuid=owner.entity_id(), name=session_name)
         )
-        return result.data.entity_id()
+        return result.entity_id()
 
     def _require_user_id(self) -> UUID:
         """Return the authenticated user's id from the request context.
@@ -1148,7 +1148,7 @@ class SessionHandler:
         )
         result = await self._session.start_service.run(
             StartServiceAction(
-                session_id=resolved.data.entity_id(),
+                session_id=resolved.entity_id(),
                 service=params.app,
                 login_session_token=params.login_session_token,
                 port=params.port,

@@ -381,7 +381,7 @@ class ProcessorGroup[TData: EntityData]:
         *,
         validators: Sequence[LookupActionValidator] = (),
         monitors: Sequence[LookupActionMonitor] = (),
-    ) -> LookupActionProcessor[TAction, LookupOpsResult[TData]]:
+    ) -> LookupActionProcessor[TAction, LookupOpsResult[Any]]:
         self._record(action_cls, ActionKind.LOOKUP, ActionGate.PERMISSION, ActionBacking.OPS)
         return LookupActionProcessor(
             LookupService(self._deps.repository).execute,
@@ -396,7 +396,7 @@ class ProcessorGroup[TData: EntityData]:
         *,
         validators: Sequence[LookupActionValidator] = (),
         monitors: Sequence[LookupActionMonitor] = (),
-    ) -> LookupActionProcessor[TAction, LookupOpsResult[TData]]:
+    ) -> LookupActionProcessor[TAction, LookupOpsResult[Any]]:
         """A key every authenticated caller may resolve: no post-validators, so the
         resolved entity carries no permission."""
         self._record(action_cls, ActionKind.LOOKUP, ActionGate.PUBLIC, ActionBacking.OPS)
