@@ -61,8 +61,11 @@ from ai.backend.common.dto.manager.v2.session.request import (
 from ai.backend.common.dto.manager.v2.session.response import (
     AdminSearchSessionsPayload,
     EnqueueSessionPayload,
+    ExcludeSessionIdleChecksFailureInfo,
     ExcludeSessionIdleChecksPayload,
+    IncludeSessionIdleChecksFailureInfo,
     IncludeSessionIdleChecksPayload,
+    SessionIdleCheckTargetInfo,
     SessionLifecycleInfoGQLDTO,
     SessionLogsPayload,
     SessionMetadataInfoGQLDTO,
@@ -77,6 +80,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum, SessionStatusFilter
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
@@ -133,7 +137,14 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
 from ai.backend.manager.repositories.session.types import ProjectSessionOperationScope
+from ai.backend.manager.services.idle_checker.actions.exclude_sessions import (
+    ExcludeSessionIdleChecksAction,
+)
+from ai.backend.manager.services.idle_checker.actions.include_sessions import (
+    IncludeSessionIdleChecksAction,
+)
 from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
     BatchGetKernelResourceAllocationAction,
 )
@@ -993,16 +1004,70 @@ class SessionAdapter(BaseAdapter):
     async def exclude_idle_checks(
         self, input: ExcludeSessionIdleChecksInput
     ) -> ExcludeSessionIdleChecksPayload:
-        """Exclude sessions from a checker's idle checks."""
-        # Wired to the idle-checker service by BA-7120 (#13328).
-        raise NotImplementedError
+        """Exclude checker-session pairs from idle checks."""
+        result = await self._processors.idle_checker.exclude_sessions.run(
+            ExcludeSessionIdleChecksAction(
+                targets=[
+                    SessionIdleCheckPair(
+                        session_id=SessionId(target.session_id),
+                        checker_id=target.checker_id,
+                    )
+                    for target in input.targets
+                ],
+                user_id=UserID(self._require_user_id()),
+            )
+        )
+        return ExcludeSessionIdleChecksPayload(
+            items=[
+                SessionIdleCheckTargetInfo(
+                    checker_id=pair.checker_id,
+                    session_id=SessionID(pair.session_id),
+                )
+                for pair in result.success
+            ],
+            failed=[
+                ExcludeSessionIdleChecksFailureInfo(
+                    checker_id=pair.checker_id,
+                    session_id=SessionID(pair.session_id),
+                    message=str(error),
+                )
+                for pair, error in result.errors.items()
+            ],
+        )
 
     async def include_idle_checks(
         self, input: IncludeSessionIdleChecksInput
     ) -> IncludeSessionIdleChecksPayload:
-        """Re-include previously excluded sessions into a checker's idle checks."""
-        # Wired to the idle-checker service by BA-7120 (#13328).
-        raise NotImplementedError
+        """Re-include previously excluded checker-session pairs into idle checks."""
+        result = await self._processors.idle_checker.include_sessions.run(
+            IncludeSessionIdleChecksAction(
+                targets=[
+                    SessionIdleCheckPair(
+                        session_id=SessionId(target.session_id),
+                        checker_id=target.checker_id,
+                    )
+                    for target in input.targets
+                ],
+                user_id=UserID(self._require_user_id()),
+            )
+        )
+        return IncludeSessionIdleChecksPayload(
+            items=[
+                SessionIdleCheckTargetInfo(
+                    checker_id=pair.checker_id,
+                    session_id=SessionID(pair.session_id),
+                )
+                for pair in result.success
+            ],
+            failed=[
+                IncludeSessionIdleChecksFailureInfo(
+                    checker_id=pair.checker_id,
+                    session_id=SessionID(pair.session_id),
+                    message=str(error),
+                )
+                for pair, error in result.errors.items()
+            ],
+        )
 
     # -------------------------------------------------------------------------
     # Service management
