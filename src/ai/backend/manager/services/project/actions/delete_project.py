@@ -9,7 +9,7 @@ from ai.backend.manager.models.group.updaters import GroupSoftDeleteUpdater
 
 
 @dataclass(frozen=True)
-class DeleteGroupAction(DeleteSingleEntityOpsAction[GroupRow, GroupData]):
+class DeleteProjectAction(DeleteSingleEntityOpsAction[GroupRow, GroupData]):
     """Retire one project."""
 
     updater: GroupSoftDeleteUpdater

@@ -31,18 +31,18 @@ from ai.backend.common.dto.manager.config.response import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
 from ai.backend.manager.dto.context import UserContext
-from ai.backend.manager.services.group.actions.create_project_dotfile import (
+from ai.backend.manager.services.project.actions.create_project_dotfile import (
     CreateProjectDotfileAction,
 )
-from ai.backend.manager.services.group.actions.delete_project_dotfile import (
+from ai.backend.manager.services.project.actions.delete_project_dotfile import (
     DeleteProjectDotfileAction,
 )
-from ai.backend.manager.services.group.actions.lookup import LookupProjectAction
-from ai.backend.manager.services.group.actions.search_projects import GetProjectAction
-from ai.backend.manager.services.group.actions.update_project_dotfile import (
+from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
+from ai.backend.manager.services.project.actions.search_projects import GetProjectAction
+from ai.backend.manager.services.project.actions.update_project_dotfile import (
     UpdateProjectDotfileAction,
 )
-from ai.backend.manager.services.group.processors import GroupProcessors
+from ai.backend.manager.services.project.processors import ProjectProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -50,8 +50,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class GroupConfigHandler:
     """Group config (dotfile) API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, group: GroupProcessors) -> None:
-        self._group = group
+    def __init__(self, *, project: ProjectProcessors) -> None:
+        self._project = project
 
     async def _resolve(self, group: UUID | str, domain: str | None, ctx: UserContext) -> ProjectID:
         if isinstance(group, str):
@@ -61,7 +61,7 @@ class GroupConfigHandler:
                 pass
         if isinstance(group, UUID):
             return ProjectID(group)
-        result = await self._group.lookup.run(
+        result = await self._project.lookup.run(
             LookupProjectAction(
                 domain_name=DomainName(domain or ctx.user_domain), project_name=group
             )
@@ -76,7 +76,7 @@ class GroupConfigHandler:
         params = body.parsed
         log.info("GROUPCONFIG.CREATE(group:{})", params.group)
         project_id = await self._resolve(params.group, params.domain, ctx)
-        await self._group.create_dotfile.run(
+        await self._project.create_dotfile.run(
             CreateProjectDotfileAction(
                 project_id=project_id,
                 entry=DotfileEntry(path=params.path, perm=params.permission, data=params.data),
@@ -92,7 +92,7 @@ class GroupConfigHandler:
         params = query.parsed
         log.info("GROUPCONFIG.LIST_OR_GET(group:{})", params.group)
         project_id = await self._resolve(params.group, params.domain, ctx)
-        project = await self._group.get_project.run(GetProjectAction(project_id=project_id))
+        project = await self._project.get_project.run(GetProjectAction(project_id=project_id))
         entries = DotfileEntries.unpack(project.data.dotfiles)
         if params.path:
             entry = entries.get(params.path)
@@ -113,7 +113,7 @@ class GroupConfigHandler:
         params = body.parsed
         log.info("GROUPCONFIG.UPDATE(group:{})", params.group)
         project_id = await self._resolve(params.group, params.domain, ctx)
-        await self._group.update_dotfile.run(
+        await self._project.update_dotfile.run(
             UpdateProjectDotfileAction(
                 project_id=project_id,
                 entry=DotfileEntry(path=params.path, perm=params.permission, data=params.data),
@@ -129,7 +129,7 @@ class GroupConfigHandler:
         params = query.parsed
         log.info("GROUPCONFIG.DELETE(group:{})", params.group)
         project_id = await self._resolve(params.group, params.domain, ctx)
-        await self._group.delete_dotfile.run(
+        await self._project.delete_dotfile.run(
             DeleteProjectDotfileAction(project_id=project_id, path=params.path)
         )
         return APIResponse.build(HTTPStatus.OK, DeleteDotfileResponse(success=True))

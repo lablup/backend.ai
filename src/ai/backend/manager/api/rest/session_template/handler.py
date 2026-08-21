@@ -47,7 +47,7 @@ from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.services.group.actions.lookup import LookupProjectAction
+from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
 from ai.backend.manager.services.template.actions.create_task_template import (
     CreateTaskTemplateAction,
     TaskTemplateItemInput,
@@ -66,7 +66,7 @@ from ai.backend.manager.services.template.actions.update_task_template import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.group.processors import GroupProcessors
+    from ai.backend.manager.services.project.processors import ProjectProcessors
     from ai.backend.manager.services.template.processors import TemplateProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -79,13 +79,13 @@ class SessionTemplateHandler:
         self,
         *,
         template: TemplateProcessors,
-        group: GroupProcessors,
+        project: ProjectProcessors,
     ) -> None:
         self._template = template
-        self._group = group
+        self._project = project
 
     async def _resolve_project_id(self, domain_name: str, project_name: str) -> ProjectID:
-        result = await self._group.lookup.run(
+        result = await self._project.lookup.run(
             LookupProjectAction(domain_name=DomainName(domain_name), project_name=project_name)
         )
         return ProjectID(result.entity_id())

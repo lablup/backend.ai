@@ -64,8 +64,6 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
-from ai.backend.manager.services.group.processors import GroupProcessors
-from ai.backend.manager.services.group.service import GroupService
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.services.model_card.service import ModelCardService
 from ai.backend.manager.services.permission_contoller.processors import (
@@ -73,6 +71,8 @@ from ai.backend.manager.services.permission_contoller.processors import (
 )
 from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.project.processors import ProjectProcessors
+from ai.backend.manager.services.project.service import ProjectService
 from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -115,8 +115,8 @@ def group_processors(
     config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
     processor_registry: ProcessorRegistry[Any],
-) -> GroupProcessors:
-    """Real GroupProcessors with real RBAC enforcement."""
+) -> ProjectProcessors:
+    """Real ProjectProcessors with real RBAC enforcement."""
     repo = GroupRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
@@ -125,13 +125,13 @@ def group_processors(
         storage_manager,
     )
     repositories = GroupRepositories(repository=repo)
-    service = GroupService(
+    service = ProjectService(
         storage_manager=storage_manager,
         config_provider=config_provider,
         valkey_stat_client=valkey_clients.stat,
         group_repositories=repositories,
     )
-    return GroupProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
+    return ProjectProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()
@@ -164,7 +164,7 @@ def permission_controller_processors(
 def server_module_registries(
     route_deps: RouteDeps,
     model_card_processors: ModelCardProcessors,
-    group_processors: GroupProcessors,
+    group_processors: ProjectProcessors,
     permission_controller_processors: PermissionControllerProcessors,
 ) -> list[RouteRegistry]:
     """Register v2 model-card, project, and RBAC routes for testing."""

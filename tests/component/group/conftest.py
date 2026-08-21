@@ -37,7 +37,7 @@ from ai.backend.manager.service.container_registry.harbor import (
 )
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
-from ai.backend.manager.services.group.service import GroupService
+from ai.backend.manager.services.project.service import ProjectService
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -116,10 +116,10 @@ def group_service(
     storage_manager: StorageSessionManager,
     config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
-) -> GroupService:
-    """Provide a GroupService backed by the real test database."""
+) -> ProjectService:
+    """Provide a ProjectService backed by the real test database."""
     group_repositories = GroupRepositories(repository=group_repository)
-    return GroupService(
+    return ProjectService(
         storage_manager=storage_manager,
         config_provider=config_provider,
         valkey_stat_client=valkey_clients.stat,

@@ -30,8 +30,8 @@ from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.template.repository import TemplateRepository
-from ai.backend.manager.services.group.processors import GroupProcessors
-from ai.backend.manager.services.group.service import GroupService
+from ai.backend.manager.services.project.processors import ProjectProcessors
+from ai.backend.manager.services.project.service import ProjectService
 from ai.backend.manager.services.template.processors import TemplateProcessors
 from ai.backend.manager.services.template.service import TemplateService
 
@@ -57,13 +57,13 @@ def template_processors(
 
 
 @pytest.fixture()
-def group_processors(
+def project_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
     storage_manager: StorageSessionManager,
     processor_registry: ProcessorRegistry[Any],
-) -> GroupProcessors:
+) -> ProjectProcessors:
     group_repo = GroupRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
@@ -72,23 +72,23 @@ def group_processors(
         storage_manager,
     )
     group_repos = GroupRepositories(repository=group_repo)
-    service = GroupService(storage_manager, config_provider, valkey_clients.stat, group_repos)
-    return GroupProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
+    service = ProjectService(storage_manager, config_provider, valkey_clients.stat, group_repos)
+    return ProjectProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     template_processors: TemplateProcessors,
-    group_processors: GroupProcessors,
+    project_processors: ProjectProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for template-domain tests."""
     session_tpl_registry = register_session_template_routes(
-        SessionTemplateHandler(template=template_processors, group=group_processors),
+        SessionTemplateHandler(template=template_processors, project=project_processors),
         route_deps,
     )
     cluster_tpl_registry = register_cluster_template_routes(
-        ClusterTemplateHandler(template=template_processors, group=group_processors),
+        ClusterTemplateHandler(template=template_processors, project=project_processors),
         route_deps,
     )
     return [

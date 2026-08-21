@@ -112,7 +112,6 @@ from ai.backend.manager.services.deployment_revision_preset.processors import (
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
-from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.keypair_resource_policy.processors import (
@@ -130,6 +129,7 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.notification.processors import NotificationProcessors
 from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
+from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -278,7 +278,7 @@ def test_every_defined_v2_action_is_wired() -> None:
         registry.group(GroupMeta(DEPLOYMENT_PRESET_ENTITY_TYPE)), MagicMock()
     )
     DomainProcessors(registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), MagicMock(), [])
-    GroupProcessors(registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), MagicMock())
+    ProjectProcessors(registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), MagicMock())
     UserProcessors(
         registry.group(GroupMeta(USER_ENTITY_TYPE)),
         MagicMock(),

@@ -12,56 +12,56 @@ from ai.backend.manager.actions.v2.ops.result import (
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.group.types import GroupData
-from ai.backend.manager.services.group.actions.assign_users_to_project import (
+from ai.backend.manager.services.project.actions.assign_users_to_project import (
     AssignUsersToProjectAction,
     AssignUsersToProjectActionResult,
 )
-from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
-from ai.backend.manager.services.group.actions.create_project_dotfile import (
+from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
+from ai.backend.manager.services.project.actions.create_project_dotfile import (
     CreateProjectDotfileAction,
     CreateProjectDotfileActionResult,
 )
-from ai.backend.manager.services.group.actions.delete_group import DeleteGroupAction
-from ai.backend.manager.services.group.actions.delete_project_dotfile import (
+from ai.backend.manager.services.project.actions.delete_project import DeleteProjectAction
+from ai.backend.manager.services.project.actions.delete_project_dotfile import (
     DeleteProjectDotfileAction,
     DeleteProjectDotfileActionResult,
 )
-from ai.backend.manager.services.group.actions.lookup import LookupProjectAction
-from ai.backend.manager.services.group.actions.purge_group import (
-    PurgeGroupAction,
-    PurgeGroupActionResult,
+from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
+from ai.backend.manager.services.project.actions.purge_project import (
+    PurgeProjectAction,
+    PurgeProjectActionResult,
 )
-from ai.backend.manager.services.group.actions.restore_group import RestoreGroupAction
-from ai.backend.manager.services.group.actions.search_projects import (
+from ai.backend.manager.services.project.actions.restore_project import RestoreProjectAction
+from ai.backend.manager.services.project.actions.search_projects import (
     GetProjectAction,
     GlobalSearchProjectsAction,
     SearchProjectsByDomainAction,
     SearchProjectsByUserAction,
 )
-from ai.backend.manager.services.group.actions.unassign_users import (
+from ai.backend.manager.services.project.actions.unassign_users import (
     UnassignUsersFromProjectAction,
     UnassignUsersFromProjectActionResult,
 )
-from ai.backend.manager.services.group.actions.update_group import (
-    UpdateGroupAction,
-    UpdateGroupActionResult,
+from ai.backend.manager.services.project.actions.update_project import (
+    UpdateProjectAction,
+    UpdateProjectActionResult,
 )
-from ai.backend.manager.services.group.actions.update_project_dotfile import (
+from ai.backend.manager.services.project.actions.update_project_dotfile import (
     UpdateProjectDotfileAction,
     UpdateProjectDotfileActionResult,
 )
-from ai.backend.manager.services.group.actions.usage_per_month import (
+from ai.backend.manager.services.project.actions.usage_per_month import (
     UsagePerMonthAction,
     UsagePerMonthActionResult,
 )
-from ai.backend.manager.services.group.actions.usage_per_period import (
+from ai.backend.manager.services.project.actions.usage_per_period import (
     UsagePerPeriodAction,
     UsagePerPeriodActionResult,
 )
-from ai.backend.manager.services.group.service import GroupService
+from ai.backend.manager.services.project.service import ProjectService
 
 
-class GroupProcessors:
+class ProjectProcessors:
     lookup: LookupActionProcessor[LookupProjectAction, LookupOpsResult[ProjectID]]
     get_project: SingleEntityActionProcessor[GetProjectAction, EntityOpsResult[GroupData]]
     global_search: GlobalActionProcessor[GlobalSearchProjectsAction, BatchOpsResult[GroupData]]
@@ -71,11 +71,11 @@ class GroupProcessors:
     search_projects_by_user: ScopeActionProcessor[
         SearchProjectsByUserAction, ScopedBatchOpsResult[GroupData]
     ]
-    create_group: ScopeActionProcessor[CreateGroupAction, CreatedEntityOpsResult[GroupData]]
-    delete_group: SingleEntityActionProcessor[DeleteGroupAction, EntityOpsResult[GroupData]]
-    restore_group: SingleEntityActionProcessor[RestoreGroupAction, EntityOpsResult[GroupData]]
-    update_group: SingleEntityActionProcessor[UpdateGroupAction, UpdateGroupActionResult]
-    purge_group: SingleEntityActionProcessor[PurgeGroupAction, PurgeGroupActionResult]
+    create_project: ScopeActionProcessor[CreateProjectAction, CreatedEntityOpsResult[GroupData]]
+    delete_project: SingleEntityActionProcessor[DeleteProjectAction, EntityOpsResult[GroupData]]
+    restore_project: SingleEntityActionProcessor[RestoreProjectAction, EntityOpsResult[GroupData]]
+    update_project: SingleEntityActionProcessor[UpdateProjectAction, UpdateProjectActionResult]
+    purge_project: SingleEntityActionProcessor[PurgeProjectAction, PurgeProjectActionResult]
     usage_per_month: GlobalActionProcessor[UsagePerMonthAction, UsagePerMonthActionResult]
     usage_per_period: GlobalActionProcessor[UsagePerPeriodAction, UsagePerPeriodActionResult]
     assign_users_to_project: SingleEntityActionProcessor[
@@ -97,18 +97,18 @@ class GroupProcessors:
     def __init__(
         self,
         group: ProcessorGroup[GroupData],
-        group_service: GroupService,
+        group_service: ProjectService,
     ) -> None:
         self.lookup = group.public_lookup_ops(LookupProjectAction)
         self.get_project = group.single_get_ops(GetProjectAction)
         self.global_search = group.global_search_ops(GlobalSearchProjectsAction)
         self.search_projects_by_domain = group.scope_search_ops(SearchProjectsByDomainAction)
         self.search_projects_by_user = group.scope_search_ops(SearchProjectsByUserAction)
-        self.create_group = group.role_managed_create_ops(CreateGroupAction)
-        self.delete_group = group.single_delete_ops(DeleteGroupAction)
-        self.restore_group = group.single_restore_ops(RestoreGroupAction)
-        self.update_group = group.single_entity(UpdateGroupAction, group_service.update_group)
-        self.purge_group = group.single_entity(PurgeGroupAction, group_service.purge_group)
+        self.create_project = group.role_managed_create_ops(CreateProjectAction)
+        self.delete_project = group.single_delete_ops(DeleteProjectAction)
+        self.restore_project = group.single_restore_ops(RestoreProjectAction)
+        self.update_project = group.single_entity(UpdateProjectAction, group_service.update_group)
+        self.purge_project = group.single_entity(PurgeProjectAction, group_service.purge_group)
         self.usage_per_month = group.global_scope(
             UsagePerMonthAction, group_service.usage_per_month
         )

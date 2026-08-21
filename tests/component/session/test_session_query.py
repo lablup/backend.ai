@@ -60,7 +60,7 @@ from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
-from ai.backend.manager.services.group.processors import GroupProcessors
+from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
@@ -87,7 +87,7 @@ def server_module_registries(
     return [
         register_session_routes(
             SessionHandler(
-                group=GroupProcessors(
+                project=ProjectProcessors(
                     processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), AsyncMock()
                 ),
                 user=UserProcessors(

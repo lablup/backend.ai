@@ -81,13 +81,13 @@ from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
-from ai.backend.manager.services.group.processors import GroupProcessors
-from ai.backend.manager.services.group.service import GroupService
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
 from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.project.processors import ProjectProcessors
+from ai.backend.manager.services.project.service import ProjectService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
@@ -124,8 +124,8 @@ def group_processors(
     config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
     processor_registry: ProcessorRegistry[Any],
-) -> GroupProcessors:
-    """Real DB-backed GroupProcessors with real RBAC validators."""
+) -> ProjectProcessors:
+    """Real DB-backed ProjectProcessors with real RBAC validators."""
     repo = GroupRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
@@ -134,13 +134,13 @@ def group_processors(
         storage_manager,
     )
     repositories = GroupRepositories(repository=repo)
-    service = GroupService(
+    service = ProjectService(
         storage_manager=storage_manager,
         config_provider=config_provider,
         valkey_stat_client=valkey_clients.stat,
         group_repositories=repositories,
     )
-    return GroupProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
+    return ProjectProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()
@@ -196,7 +196,7 @@ def permission_controller_processors(
 def server_module_registries(
     route_deps: RouteDeps,
     config_provider: ManagerConfigProvider,
-    group_processors: GroupProcessors,
+    group_processors: ProjectProcessors,
     user_processors: UserProcessors,
     permission_controller_processors: PermissionControllerProcessors,
 ) -> list[RouteRegistry]:

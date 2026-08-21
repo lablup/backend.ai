@@ -188,7 +188,7 @@ def build_api_routes(
         resource_group=processors.resource_group,
     )
     group_handler = GroupHandler(container_registry=processors.container_registry)
-    groupconfig_handler = GroupConfigHandler(group=processors.group)
+    groupconfig_handler = GroupConfigHandler(project=processors.project)
     manager_handler = ManagerHandler(manager_admin=processors.manager_admin)
     notification_handler = NotificationHandler(notification=processors.notification)
     object_storage_handler = ObjectStorageHandler(
@@ -198,7 +198,7 @@ def build_api_routes(
     resource_handler = ResourceHandler(
         resource_preset=processors.resource_preset,
         agent=processors.agent,
-        group=processors.group,
+        project=processors.project,
         user=processors.user,
         container_registry=processors.container_registry,
     )
@@ -216,7 +216,7 @@ def build_api_routes(
     session_handler = SessionHandler(
         auth=processors.auth,
         session=processors.session,
-        group=processors.group,
+        project=processors.project,
         user=processors.user,
         agent=processors.agent,
         vfolder=processors.vfolder,
@@ -271,10 +271,10 @@ def build_api_routes(
 
     # Template sub-registries
     cluster_template_handler = ClusterTemplateHandler(
-        template=processors.template, group=processors.group
+        template=processors.template, project=processors.project
     )
     session_template_handler = SessionTemplateHandler(
-        template=processors.template, group=processors.group
+        template=processors.template, project=processors.project
     )
     cluster_template_reg = register_cluster_template_routes(cluster_template_handler, route_deps)
     session_template_reg = register_session_template_routes(session_template_handler, route_deps)
@@ -293,7 +293,7 @@ def build_api_routes(
         private_ctx=events_ctx,
         events_service=processors.events_service,
         session_processors=processors.session,
-        group_processors=processors.group,
+        project_processors=processors.project,
         event_hub=event_hub,
         event_fetcher=event_fetcher,
     )

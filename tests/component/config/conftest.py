@@ -46,8 +46,8 @@ from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
-from ai.backend.manager.services.group.processors import GroupProcessors
-from ai.backend.manager.services.group.service import GroupService
+from ai.backend.manager.services.project.processors import ProjectProcessors
+from ai.backend.manager.services.project.service import ProjectService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -82,9 +82,9 @@ def server_module_registries(
         DomainService(DomainRepository(database_engine, v2_ops)),
         [],
     )
-    group = GroupProcessors(
+    project = ProjectProcessors(
         config_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)),
-        GroupService(
+        ProjectService(
             MagicMock(),
             MagicMock(),
             MagicMock(),
@@ -106,7 +106,7 @@ def server_module_registries(
         ),
     )
     return [
-        register_groupconfig_routes(GroupConfigHandler(group=group), route_deps),
+        register_groupconfig_routes(GroupConfigHandler(project=project), route_deps),
         register_userconfig_routes(
             UserConfigHandler(auth=auth_processors, user=user),
             route_deps,

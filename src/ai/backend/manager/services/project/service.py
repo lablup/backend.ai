@@ -25,39 +25,39 @@ from ai.backend.manager.models.resource_usage import (
 )
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
-from ai.backend.manager.services.group.actions.assign_users_to_project import (
+from ai.backend.manager.services.project.actions.assign_users_to_project import (
     AssignUsersToProjectAction,
     AssignUsersToProjectActionResult,
 )
-from ai.backend.manager.services.group.actions.create_project_dotfile import (
+from ai.backend.manager.services.project.actions.create_project_dotfile import (
     CreateProjectDotfileAction,
     CreateProjectDotfileActionResult,
 )
-from ai.backend.manager.services.group.actions.delete_project_dotfile import (
+from ai.backend.manager.services.project.actions.delete_project_dotfile import (
     DeleteProjectDotfileAction,
     DeleteProjectDotfileActionResult,
 )
-from ai.backend.manager.services.group.actions.purge_group import (
-    PurgeGroupAction,
-    PurgeGroupActionResult,
+from ai.backend.manager.services.project.actions.purge_project import (
+    PurgeProjectAction,
+    PurgeProjectActionResult,
 )
-from ai.backend.manager.services.group.actions.unassign_users import (
+from ai.backend.manager.services.project.actions.unassign_users import (
     UnassignUsersFromProjectAction,
     UnassignUsersFromProjectActionResult,
 )
-from ai.backend.manager.services.group.actions.update_group import (
-    UpdateGroupAction,
-    UpdateGroupActionResult,
+from ai.backend.manager.services.project.actions.update_project import (
+    UpdateProjectAction,
+    UpdateProjectActionResult,
 )
-from ai.backend.manager.services.group.actions.update_project_dotfile import (
+from ai.backend.manager.services.project.actions.update_project_dotfile import (
     UpdateProjectDotfileAction,
     UpdateProjectDotfileActionResult,
 )
-from ai.backend.manager.services.group.actions.usage_per_month import (
+from ai.backend.manager.services.project.actions.usage_per_month import (
     UsagePerMonthAction,
     UsagePerMonthActionResult,
 )
-from ai.backend.manager.services.group.actions.usage_per_period import (
+from ai.backend.manager.services.project.actions.usage_per_period import (
     UsagePerPeriodAction,
     UsagePerPeriodActionResult,
 )
@@ -65,7 +65,7 @@ from ai.backend.manager.services.group.actions.usage_per_period import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class GroupService:
+class ProjectService:
     _config_provider: ManagerConfigProvider
     _valkey_stat_client: ValkeyStatClient
     _storage_manager: StorageSessionManager
@@ -83,7 +83,7 @@ class GroupService:
         self._valkey_stat_client = valkey_stat_client
         self._group_repository = group_repositories.repository
 
-    async def update_group(self, action: UpdateGroupAction) -> UpdateGroupActionResult:
+    async def update_group(self, action: UpdateProjectAction) -> UpdateProjectActionResult:
         # Convert user_uuids from list[str] to list[UUID] if provided
         user_uuids_converted = None
         user_uuids_list = action.user_uuids.optional_value()
@@ -97,11 +97,11 @@ class GroupService:
             user_uuids_converted,
         )
         # If no group data is returned, it means only user updates were performed or no updates at all
-        return UpdateGroupActionResult(data=group_data)
+        return UpdateProjectActionResult(data=group_data)
 
-    async def purge_group(self, action: PurgeGroupAction) -> PurgeGroupActionResult:
+    async def purge_group(self, action: PurgeProjectAction) -> PurgeProjectActionResult:
         await self._group_repository.purge_group(action.project_id)
-        return PurgeGroupActionResult(project_id=action.project_id)
+        return PurgeProjectActionResult(project_id=action.project_id)
 
     async def unassign_users_from_project(
         self, action: UnassignUsersFromProjectAction

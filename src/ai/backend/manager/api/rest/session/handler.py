@@ -105,8 +105,8 @@ from ai.backend.manager.services.agent.actions.sync_agent_registry import (
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
 )
-from ai.backend.manager.services.group.actions.lookup import LookupProjectAction
-from ai.backend.manager.services.group.processors import GroupProcessors
+from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
+from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
 )
@@ -419,7 +419,7 @@ class SessionHandler:
         *,
         auth: AuthProcessors,
         session: SessionProcessors,
-        group: GroupProcessors,
+        project: ProjectProcessors,
         user: UserProcessors,
         agent: AgentProcessors,
         vfolder: VFolderProcessors,
@@ -427,7 +427,7 @@ class SessionHandler:
     ) -> None:
         self._auth = auth
         self._session = session
-        self._group = group
+        self._project = project
         self._user = user
         self._agent = agent
         self._vfolder = vfolder
@@ -435,7 +435,7 @@ class SessionHandler:
 
     async def _resolve_project_id(self, domain_name: str, group_name: str) -> ProjectID:
         """Resolve the project a session is created in, at the API boundary."""
-        result = await self._group.lookup.run(
+        result = await self._project.lookup.run(
             LookupProjectAction(domain_name=DomainName(domain_name), project_name=group_name)
         )
         return result.entity_id()

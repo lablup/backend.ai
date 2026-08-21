@@ -45,8 +45,8 @@ from ai.backend.manager.services.agent.actions.watcher_agent_stop import Watcher
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
 )
-from ai.backend.manager.services.group.actions.usage_per_month import UsagePerMonthAction
-from ai.backend.manager.services.group.actions.usage_per_period import UsagePerPeriodAction
+from ai.backend.manager.services.project.actions.usage_per_month import UsagePerMonthAction
+from ai.backend.manager.services.project.actions.usage_per_period import UsagePerPeriodAction
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
 )
@@ -61,7 +61,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.container_registry.processors import (
         ContainerRegistryProcessors,
     )
-    from ai.backend.manager.services.group.processors import GroupProcessors
+    from ai.backend.manager.services.project.processors import ProjectProcessors
     from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
     from ai.backend.manager.services.user.processors import UserProcessors
 
@@ -76,13 +76,13 @@ class ResourceHandler:
         *,
         resource_preset: ResourcePresetProcessors,
         agent: AgentProcessors,
-        group: GroupProcessors,
+        project: ProjectProcessors,
         user: UserProcessors,
         container_registry: ContainerRegistryProcessors,
     ) -> None:
         self._resource_preset = resource_preset
         self._agent = agent
-        self._group = group
+        self._project = project
         self._user = user
         self._container_registry = container_registry
 
@@ -178,7 +178,7 @@ class ResourceHandler:
             ",".join(str(gid) for gid in params.group_ids) if params.group_ids else "",
             params.month,
         )
-        result = await self._group.usage_per_month.run(
+        result = await self._project.usage_per_month.run(
             UsagePerMonthAction(
                 group_ids=params.group_ids,
                 month=params.month,
@@ -196,7 +196,7 @@ class ResourceHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        result = await self._group.usage_per_period.run(
+        result = await self._project.usage_per_period.run(
             UsagePerPeriodAction(
                 project_id=params.project_id,
                 start_date=params.start_date,

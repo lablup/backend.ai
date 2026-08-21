@@ -35,14 +35,14 @@ from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.exceptions import InvalidArgument
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.services.group.actions.lookup import LookupProjectAction
+from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
 from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
 
 if TYPE_CHECKING:
     from ai.backend.common.events.fetcher import EventFetcher
     from ai.backend.common.events.hub.hub import EventHub
     from ai.backend.manager.services.events.service import EventsService
-    from ai.backend.manager.services.group.processors import GroupProcessors
+    from ai.backend.manager.services.project.processors import ProjectProcessors
     from ai.backend.manager.services.session.processors import SessionProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -62,14 +62,14 @@ class EventsHandler:
         private_ctx: PrivateContext,
         events_service: EventsService,
         session_processors: SessionProcessors,
-        group_processors: GroupProcessors,
+        project_processors: ProjectProcessors,
         event_hub: EventHub,
         event_fetcher: EventFetcher,
     ) -> None:
         self._ctx = private_ctx
         self._events = events_service
         self._session = session_processors
-        self._group = group_processors
+        self._project = project_processors
         self.event_hub = event_hub
         self.event_fetcher = event_fetcher
 
@@ -127,7 +127,7 @@ class EventsHandler:
         if group_name == "*":
             group_id: Any = WILDCARD
         else:
-            group_result = await self._group.lookup.run(
+            group_result = await self._project.lookup.run(
                 LookupProjectAction(
                     domain_name=DomainName(request["user"]["domain_name"]),
                     project_name=group_name,

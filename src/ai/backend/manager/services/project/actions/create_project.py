@@ -12,7 +12,7 @@ from ai.backend.manager.models.group.row import GroupRow
 
 
 @dataclass(frozen=True)
-class CreateGroupAction(CreateRoleManagedEntityOpsAction[GroupRow, GroupData]):
+class CreateProjectAction(CreateRoleManagedEntityOpsAction[GroupRow, GroupData]):
     """Register a project under a domain."""
 
     domain_id: DomainID

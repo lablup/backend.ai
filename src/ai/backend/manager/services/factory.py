@@ -125,8 +125,6 @@ from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.export.service import ExportService
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
 from ai.backend.manager.services.fair_share.service import FairShareService
-from ai.backend.manager.services.group.processors import GroupProcessors
-from ai.backend.manager.services.group.service import GroupService
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
 from ai.backend.manager.services.idle_checker.service import IdleCheckerService
 from ai.backend.manager.services.idle_checker_assignment.processors import (
@@ -172,6 +170,8 @@ from ai.backend.manager.services.processors import (
     ServiceArgs,
     Services,
 )
+from ai.backend.manager.services.project.processors import ProjectProcessors
+from ai.backend.manager.services.project.service import ProjectService
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -262,7 +262,7 @@ def create_services(args: ServiceArgs) -> Services:
         fair_share=FairShareService(
             repository=repositories.fair_share.repository,
         ),
-        group=GroupService(
+        project=ProjectService(
             args.storage_manager,
             args.config_provider,
             args.valkey_stat_client,
@@ -534,7 +534,7 @@ def create_processors(
             fair_share_groups.group(GroupMeta(USER_FAIR_SHARE_ENTITY_TYPE)),
             services.fair_share,
         ),
-        group=GroupProcessors(registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), services.group),
+        project=ProjectProcessors(registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), services.project),
         user=UserProcessors(
             registry.group(GroupMeta(USER_ENTITY_TYPE)),
             services.user,

@@ -109,8 +109,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.fair_share.service import (
         FairShareService,
     )
-    from ai.backend.manager.services.group.processors import GroupProcessors
-    from ai.backend.manager.services.group.service import GroupService
     from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
     from ai.backend.manager.services.idle_checker.service import IdleCheckerService
     from ai.backend.manager.services.idle_checker_assignment.processors import (
@@ -175,6 +173,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.permission_contoller.service import (
         PermissionControllerService,
     )
+    from ai.backend.manager.services.project.processors import ProjectProcessors
+    from ai.backend.manager.services.project.service import ProjectService
     from ai.backend.manager.services.project_resource_policy.processors import (
         ProjectResourcePolicyProcessors,
     )
@@ -335,7 +335,7 @@ class Services:
     etcd_config: EtcdConfigService
     export: ExportService
     fair_share: FairShareService
-    group: GroupService
+    project: ProjectService
     user: UserService
     idle_checker: IdleCheckerService
     image: ImageService
@@ -394,7 +394,7 @@ class Processors:
     etcd_config: EtcdConfigProcessors
     export: ExportProcessors
     fair_share: FairShareProcessors
-    group: GroupProcessors
+    project: ProjectProcessors
     user: UserProcessors
     idle_checker: IdleCheckerProcessors
     image: ImageProcessors

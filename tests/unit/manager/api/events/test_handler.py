@@ -64,7 +64,7 @@ async def bgtask_event_stream(
         private_ctx=PrivateContext(),
         events_service=MagicMock(),
         session_processors=MagicMock(),
-        group_processors=MagicMock(),
+        project_processors=MagicMock(),
         event_hub=event_hub,
         event_fetcher=MagicMock(),  # unused: WithCachePropagator is patched to `propagator`
     )

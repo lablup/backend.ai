@@ -10,7 +10,7 @@ from ai.backend.manager.types import OptionalState
 
 
 @dataclass(frozen=True)
-class UpdateGroupAction(BaseSingleEntityAction):
+class UpdateProjectAction(BaseSingleEntityAction):
     """Edit one project, optionally rewriting who belongs to it."""
 
     updater: GroupUpdater
@@ -38,5 +38,5 @@ class UpdateGroupAction(BaseSingleEntityAction):
 
 
 @dataclass(frozen=True)
-class UpdateGroupActionResult:
+class UpdateProjectActionResult:
     data: GroupData | None

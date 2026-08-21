@@ -62,7 +62,7 @@ def handler(mock_processors: MagicMock) -> ResourceHandler:
     return ResourceHandler(
         resource_preset=mock_processors.resource_preset,
         agent=mock_processors.agent,
-        group=mock_processors.group,
+        project=mock_processors.project,
         user=mock_processors.user,
         container_registry=mock_processors.container_registry,
     )
@@ -241,11 +241,11 @@ class TestUsagePerPeriod:
         })
         mock_result = MagicMock()
         mock_result.result = []
-        mock_processors.group.usage_per_period.run = AsyncMock(return_value=mock_result)
+        mock_processors.project.usage_per_period.run = AsyncMock(return_value=mock_result)
 
         await handler.usage_per_period(query, superadmin_context)
 
-        call_args = mock_processors.group.usage_per_period.run.call_args
+        call_args = mock_processors.project.usage_per_period.run.call_args
         action = call_args[0][0]
         assert action.project_id is None
 

@@ -8,7 +8,7 @@ from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAct
 
 
 @dataclass(frozen=True)
-class PurgeGroupAction(BaseSingleEntityAction):
+class PurgeProjectAction(BaseSingleEntityAction):
     """Remove one project for good, with the vfolders and sessions it held."""
 
     project_id: ProjectID
@@ -29,5 +29,5 @@ class PurgeGroupAction(BaseSingleEntityAction):
 
 
 @dataclass(frozen=True)
-class PurgeGroupActionResult:
+class PurgeProjectActionResult:
     project_id: ProjectID

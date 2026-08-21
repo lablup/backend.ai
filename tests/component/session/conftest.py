@@ -53,7 +53,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
-from ai.backend.manager.services.group.processors import GroupProcessors
+from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
@@ -178,7 +178,7 @@ def server_module_registries(
     return [
         register_session_routes(
             SessionHandler(
-                group=GroupProcessors(
+                project=ProjectProcessors(
                     processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), AsyncMock()
                 ),
                 user=UserProcessors(

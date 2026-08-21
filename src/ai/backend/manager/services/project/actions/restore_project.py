@@ -9,7 +9,7 @@ from ai.backend.manager.models.group.updaters import GroupRestoreUpdater
 
 
 @dataclass(frozen=True)
-class RestoreGroupAction(RestoreSingleEntityOpsAction[GroupRow, GroupData]):
+class RestoreProjectAction(RestoreSingleEntityOpsAction[GroupRow, GroupData]):
     """Put one retired project back in service."""
 
     updater: GroupRestoreUpdater

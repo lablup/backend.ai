@@ -71,7 +71,7 @@ class TestCreateGroupMutation:
         """GraphQueryContext mock with processors and user context."""
 
         ctx = MagicMock()
-        ctx.processors.group.create_group.run = AsyncMock(
+        ctx.processors.project.create_project.run = AsyncMock(
             return_value=CreatedEntityOpsResult(data=group_data_response)
         )
         domain_data = MagicMock()
