@@ -207,3 +207,48 @@ class TestIdleCheckerAssignmentMutationPermissions:
         )
 
         assert result.idle_checker_assignment.enabled is False
+
+    async def test_user_cannot_update_assignment_bound_to_own_user_scope(
+        self,
+        user_v2_registry: V2ClientRegistry,
+        assignment_seed: AssignmentSeedData,
+        user_self_scope_permission: None,
+    ) -> None:
+        """Owning the user scope does not grant managing the idle check bound to it."""
+        with pytest.raises(PermissionDeniedError):
+            await user_v2_registry.idle_checker_assignment.update(
+                assignment_seed.user_assignment_id,
+                UpdateIdleCheckerAssignmentInput(
+                    id=IdleCheckerAssignmentID(assignment_seed.user_assignment_id),
+                    enabled=False,
+                ),
+            )
+
+    async def test_user_cannot_purge_assignment_bound_to_own_user_scope(
+        self,
+        user_v2_registry: V2ClientRegistry,
+        assignment_seed: AssignmentSeedData,
+        user_self_scope_permission: None,
+    ) -> None:
+        """Same for purge — a user must not be able to drop their own idle check."""
+        with pytest.raises(PermissionDeniedError):
+            await user_v2_registry.idle_checker_assignment.purge(assignment_seed.user_assignment_id)
+
+    async def test_project_manager_updates_user_scope_assignment_of_project_member(
+        self,
+        user_v2_registry: V2ClientRegistry,
+        assignment_seed: AssignmentSeedData,
+        user_in_seeded_project: None,
+        project_assignment_manage_permission: None,
+    ) -> None:
+        """The scope chain walks user -> project, so project-scope manage rights reach a
+        member's user-scope assignment. Domain-scope grants reach it the same way."""
+        result = await user_v2_registry.idle_checker_assignment.update(
+            assignment_seed.user_assignment_id,
+            UpdateIdleCheckerAssignmentInput(
+                id=IdleCheckerAssignmentID(assignment_seed.user_assignment_id),
+                enabled=False,
+            ),
+        )
+
+        assert result.idle_checker_assignment.enabled is False
