@@ -280,39 +280,37 @@ class CUDAPlugin(AbstractComputePlugin):
                         Decimal(dev_stat.gpu_util), Decimal(100)
                     )
 
-                async with aiodocker.Docker() as docker:
-                    for cid in container_ids:
-                        try:
-                            container = await docker.containers.get(cid)
-                            container_info = await container.show()
-                        except DockerError as e:
-                            log.warning(
-                                "gather_container_measures(): container {} skipped: {!r}",
-                                cid,
-                                e,
-                            )
-                            continue
-                        nvidia_device_reqs = [
-                            x
-                            for x in container_info.get("HostConfig", {}).get("DeviceRequests")
-                            or []
-                            if x["Driver"] == "nvidia"
-                        ]
-                        if not nvidia_device_reqs:
-                            continue
+                for cid in container_ids:
+                    # Ask the agent which GPUs this container holds, not the container runtime.
+                    # Reading it back out of Docker's HostConfig.DeviceRequests meant every
+                    # containerd and enroot container 404'd here — `DockerError(404, 'No such
+                    # container')` once per container per stat cycle — and those kernels reported
+                    # no GPU utilization at all. The agent's allocation is the same answer, is
+                    # authoritative, and costs no API round-trip.
+                    allocations = ctx.agent.get_container_device_allocation(cid, DeviceName("cuda"))
+                    device_ids = [
+                        device_id
+                        for per_device in allocations.values()
+                        for device_id, alloc in per_device.items()
+                        if alloc > 0
+                    ]
+                    if not device_ids:
+                        continue
 
-                        mem_stats[cid] = 0
-                        mem_sizes[cid] = 0
-                        util_stats[cid] = Decimal("0")
-                        number_of_devices_per_container[cid] = 0
+                    mem_stats[cid] = 0
+                    mem_sizes[cid] = 0
+                    util_stats[cid] = Decimal("0")
+                    number_of_devices_per_container[cid] = 0
 
-                        for device_id in nvidia_device_reqs[0]["DeviceIDs"]:
-                            mem_stat = mem_stats_by_device_id[DeviceId(device_id)]
-                            util_stat = util_stats_by_device_id[DeviceId(device_id)]
-                            mem_stats[cid] += int(mem_stat.value)
-                            mem_sizes[cid] += int(mem_stat.capacity or 0)
-                            util_stats[cid] += Decimal(util_stat.value)
-                            number_of_devices_per_container[cid] += 1
+                    for device_id in device_ids:
+                        mem_stat = mem_stats_by_device_id.get(DeviceId(device_id))
+                        util_stat = util_stats_by_device_id.get(DeviceId(device_id))
+                        if mem_stat is None or util_stat is None:
+                            continue  # a masked device, or one that has gone away
+                        mem_stats[cid] += int(mem_stat.value)
+                        mem_sizes[cid] += int(mem_stat.capacity or 0)
+                        util_stats[cid] += Decimal(util_stat.value)
+                        number_of_devices_per_container[cid] += 1
             except ImportError:
                 log.warning("gather_container_measures(): NVML library is not found")
             except LibraryError as e:

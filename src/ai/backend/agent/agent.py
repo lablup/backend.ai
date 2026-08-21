@@ -1336,6 +1336,26 @@ class AbstractAgent[
         except Exception:
             log.exception("instance_heartbeat failure")
 
+    def get_container_device_allocation(
+        self, container_id: str, device_name: DeviceName
+    ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
+        """Which devices of ``device_name`` a running container holds, per slot.
+
+        The agent already knows this — it is what the scheduler allocated and what
+        ``resource_spec`` persists — so a compute plugin never has to ask the container runtime.
+        Asking the runtime is what broke per-container accelerator stats outside Docker: the
+        cuda_open plugin read the allocation back out of Docker's `HostConfig.DeviceRequests`,
+        which 404s for every containerd and enroot container, so those kernels reported no GPU
+        utilization at all.
+
+        Empty when the container is not (or no longer) registered, which the callers treat as
+        "nothing to measure".
+        """
+        for kernel_obj in self.kernel_registry.values():
+            if kernel_obj.data.get("container_id") == container_id:
+                return kernel_obj.resource_spec.allocations.get(device_name, {})
+        return {}
+
     async def collect_logs(
         self,
         kernel_id: KernelId,
