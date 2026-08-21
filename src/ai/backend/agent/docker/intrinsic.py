@@ -73,7 +73,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # "sockfs", "debugfs", etc.
 _CONTAINER_STAT_TIMEOUT: float = 2.0
 _INVALID_PID: int = 0
-
 # The list of pruned fstype when checking the filesystem usage statistics.
 pruned_disk_types = frozenset([
     "vfat",
@@ -548,14 +547,43 @@ class MemoryPlugin(AbstractComputePlugin):
     ]
 
     _docker: Docker
+    _graph_root_prefix: str | None
 
     @override
     async def init(self, context: Any | None = None) -> None:
         self._docker = Docker()
+        self._graph_root_prefix = await self._get_graph_root_prefix()
 
     @override
     async def cleanup(self) -> None:
         await self._docker.close()
+
+    async def _get_graph_root_prefix(self) -> str | None:
+        try:
+            docker_info = await self._docker.system.info()
+        except DockerError:
+            return None
+        graph_root: str | None = docker_info.get("DockerRootDir")
+        if not graph_root:
+            return None
+        return graph_root.rstrip("/") + "/"
+
+    def _is_disk_stat_target(
+        self,
+        disk_info: Any,
+        per_disk_stat: Mapping[DeviceId, Measurement],
+    ) -> bool:
+        if disk_info.fstype in pruned_disk_types:
+            return False
+        if disk_info.mountpoint.startswith("/proc/docker/runtime-runc/moby/"):
+            return False
+        if disk_info.mountpoint == "/var/lib/docker/btrfs":
+            return False
+        if self._graph_root_prefix is not None and disk_info.mountpoint.startswith(
+            self._graph_root_prefix
+        ):
+            return False
+        return DeviceId(disk_info.device) not in per_disk_stat
 
     @override
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
@@ -599,22 +627,25 @@ class MemoryPlugin(AbstractComputePlugin):
         _nstat = psutil.net_io_counters()
         net_rx_bytes = _nstat.bytes_recv
         net_tx_bytes = _nstat.bytes_sent
+        if self._graph_root_prefix is None:
+            self._graph_root_prefix = await self._get_graph_root_prefix()
 
         def get_disk_stat() -> tuple[Decimal, Decimal, dict[DeviceId, Measurement]]:
             total_disk_usage = Decimal(0)
             total_disk_capacity = Decimal(0)
             per_disk_stat: dict[DeviceId, Measurement] = {}
             for disk_info in psutil.disk_partitions():
-                # Skip additional filesystem types not filtered by psutil, like squashfs.
-                if disk_info.fstype in pruned_disk_types:
+                if not self._is_disk_stat_target(disk_info, per_disk_stat):
                     continue
-                # Skip transient filesystems created/destroyed by Docker.
-                if disk_info.mountpoint.startswith("/proc/docker/runtime-runc/moby/"):
+                try:
+                    dstat = os.statvfs(disk_info.mountpoint)
+                except OSError as e:
+                    log.debug(
+                        "get_disk_stat(): skipping the unreadable mountpoint {}: {}",
+                        disk_info.mountpoint,
+                        e,
+                    )
                     continue
-                # Skip btrfs subvolumes used by Docker if configured.
-                if disk_info.mountpoint == "/var/lib/docker/btrfs":
-                    continue
-                dstat = os.statvfs(disk_info.mountpoint)
                 disk_usage = Decimal(dstat.f_frsize * (dstat.f_blocks - dstat.f_bavail))
                 disk_capacity = Decimal(dstat.f_frsize * dstat.f_blocks)
                 per_disk_stat[DeviceId(disk_info.device)] = Measurement(disk_usage, disk_capacity)
