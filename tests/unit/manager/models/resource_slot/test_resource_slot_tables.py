@@ -13,9 +13,8 @@ from decimal import Decimal
 
 import pytest
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload
 
-from ai.backend.manager.models.agent import AgentRow
+from ai.backend.common.types import AgentId
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
     NumberFormat,
@@ -23,6 +22,7 @@ from ai.backend.manager.models.resource_slot import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.agent.query import fetch_actual_occupied_slots
 
 
 class TestResourceSlotTypeRow:
@@ -532,16 +532,6 @@ class TestActualOccupiedSlotsOrdering:
             await db_sess.flush()
 
         async with database_with_resource_slot_tables.begin_readonly_session() as db_sess:
-            agent_row = await db_sess.scalar(
-                sa.select(AgentRow)
-                .where(AgentRow.id == agent_id)
-                .options(
-                    selectinload(AgentRow.agent_resource_rows).joinedload(
-                        AgentResourceRow.slot_type_row
-                    )
-                )
-            )
-            assert agent_row is not None
-            occupied = agent_row.actual_occupied_slots()
+            occupied_by_agent = await fetch_actual_occupied_slots(db_sess, [AgentId(agent_id)])
 
-        assert list(occupied.keys()) == expected_order
+        assert list(occupied_by_agent[AgentId(agent_id)].keys()) == expected_order

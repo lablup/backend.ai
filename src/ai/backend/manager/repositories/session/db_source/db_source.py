@@ -37,8 +37,9 @@ from ai.backend.manager.errors.kernel import (
     SessionNotFound,
     TooManySessionsMatched,
 )
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -165,6 +166,13 @@ class SessionDBSource:
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
                 eager_loading_op=list(eager_loading_op) if eager_loading_op else None,
+            )
+
+    async def get_agent_public_host(self, agent_id: AgentId) -> str | None:
+        """Look up the public host of an agent, or None when the agent is unknown."""
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            return await db_sess.scalar(
+                sa.select(AgentRow.public_host).where(AgentRow.id == agent_id)
             )
 
     async def match_sessions(
@@ -544,22 +552,11 @@ class SessionDBSource:
                 access_key,
             )
 
-    async def get_session_with_group(
-        self,
-        session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
-        kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-        allow_stale: bool = False,
-    ) -> SessionRow:
-        """Get session with group information eagerly loaded"""
+    async def get_project_container_registry(self, group_id: uuid.UUID) -> dict[str, Any] | None:
+        """Look up the container registry configuration of a project."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await SessionRow.get_session(
-                db_sess,
-                session_name_or_id,
-                owner_access_key,
-                kernel_loading_strategy=kernel_loading_strategy,
-                allow_stale=allow_stale,
-                eager_loading_op=[selectinload(SessionRow.group)],
+            return await db_sess.scalar(
+                sa.select(GroupRow.container_registry).where(GroupRow.id == group_id)
             )
 
     async def get_session_with_routing_minimal(
@@ -579,11 +576,7 @@ class SessionDBSource:
                 noload("*"),
                 selectinload(
                     SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-                ).options(
-                    noload("*"),
-                    selectinload(KernelRow.agent_row).noload("*"),
-                ),
-                joinedload(SessionRow.user),
+                ).options(noload("*")),
             )
         )
         async with self._ops.read_ops() as r:

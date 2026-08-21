@@ -72,13 +72,11 @@ from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     QueryCondition,
-    QueryOption,
     SessionRow,
     by_status,
     by_user_id,
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.types import join_by_related_field
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
@@ -558,13 +556,7 @@ class UserDBSource:
             by_status(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
         ]
 
-        query_options: list[QueryOption] = [
-            join_by_related_field(SessionRow.user),
-        ]
-
-        return await SessionRow.list_session_by_condition(
-            query_conditions, query_options, db=self._db
-        )
+        return await SessionRow.list_session_by_condition(query_conditions, [], db=self._db)
 
     async def delegate_endpoint_ownership(
         self,

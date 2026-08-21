@@ -14,7 +14,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey, ImageAlias, KernelId, SessionId
+from ai.backend.common.types import AccessKey, AgentId, ImageAlias, KernelId, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
@@ -98,6 +98,10 @@ class SessionRepository:
             allow_stale,
             eager_loading_op,
         )
+
+    @session_repository_resilience.apply()
+    async def get_agent_public_host(self, agent_id: AgentId) -> str | None:
+        return await self._db_source.get_agent_public_host(agent_id)
 
     @session_repository_resilience.apply()
     async def match_sessions(
@@ -256,17 +260,8 @@ class SessionRepository:
         return await self._db_source.find_dependency_sessions(session_name_or_id, access_key)
 
     @session_repository_resilience.apply()
-    async def get_session_with_group(
-        self,
-        session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
-        kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-        allow_stale: bool = False,
-    ) -> SessionRow:
-        """Get session with group information eagerly loaded"""
-        return await self._db_source.get_session_with_group(
-            session_name_or_id, owner_access_key, kernel_loading_strategy, allow_stale
-        )
+    async def get_project_container_registry(self, group_id: uuid.UUID) -> dict[str, Any] | None:
+        return await self._db_source.get_project_container_registry(group_id)
 
     @session_repository_resilience.apply()
     async def get_session_with_routing_minimal(

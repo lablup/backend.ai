@@ -27,10 +27,10 @@ from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdent
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
+from ai.backend.manager.repositories.agent.query import fetch_actual_occupied_slots
 from ai.backend.manager.repositories.agent.stateful_source.stateful_source import (
     AgentStatefulSource,
 )
@@ -212,11 +212,7 @@ class AgentRepository:
         conditions: Sequence[QueryCondition],
         order_by: Sequence[QueryOrder] = tuple(),
     ) -> list[AgentData]:
-        stmt: sa.sql.Select[Any] = sa.select(AgentRow).options(
-            sa.orm.selectinload(AgentRow.agent_resource_rows).joinedload(
-                AgentResourceRow.slot_type_row
-            ),
-        )
+        stmt: sa.sql.Select[Any] = sa.select(AgentRow)
         for cond in conditions:
             stmt = stmt.where(cond())
 
@@ -226,7 +222,12 @@ class AgentRepository:
         async with self._db_source._db.begin_readonly_session() as db_session:
             result = await db_session.scalars(stmt)
             agent_rows = cast(list[AgentRow], result.unique().all())
-            return [agent_row.to_data() for agent_row in agent_rows]
+            occupied_slots = await fetch_actual_occupied_slots(
+                db_session, [AgentId(row.id) for row in agent_rows]
+            )
+            return [
+                agent_row.to_data(occupied_slots[AgentId(agent_row.id)]) for agent_row in agent_rows
+            ]
 
     @agent_repository_resilience.apply()
     async def update_gpu_alloc_map(self, agent_id: AgentId, alloc_map: Mapping[str, Any]) -> None:

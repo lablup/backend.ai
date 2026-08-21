@@ -82,6 +82,7 @@ from .base import (
     PaginatedList,
     batch_multiresult,
     batch_result,
+    batch_result_in_scalar_stream,
     generate_sql_info_for_gql_connection,
 )
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
@@ -173,6 +174,23 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "ai.backend.manager.api.gql_legacy.group.GroupConnection",
         description="Added in 25.5.0.",
     )
+
+    @classmethod
+    async def batch_load_by_uuids(
+        cls,
+        ctx: GraphQueryContext,
+        user_uuids: Sequence[UUID],
+    ) -> Sequence[Self | None]:
+        query = sa.select(UserRow).where(UserRow.uuid.in_(user_uuids))
+        async with ctx.db.begin_readonly_session() as db_session:
+            return await batch_result_in_scalar_stream(
+                ctx,
+                db_session,
+                query,
+                cls,
+                user_uuids,
+                lambda row: row.uuid,
+            )
 
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: UserRow) -> Self:

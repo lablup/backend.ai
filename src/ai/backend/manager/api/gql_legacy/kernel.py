@@ -15,12 +15,13 @@ import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
-from sqlalchemy.orm import noload, selectinload
+from sqlalchemy.orm import noload
 
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     BinarySize,
+    ImageID,
     KernelId,
     SessionId,
 )
@@ -28,7 +29,6 @@ from ai.backend.manager.api.gql_legacy.stat_converter import LegacyLiveStatConve
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.group import groups
-from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEFAULT_KERNEL_ORDERING,
@@ -220,6 +220,8 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
+    _image_id: ImageID | None = None
+
     # identity
     idx = graphene.Int()  # legacy
     role = graphene.String()  # legacy
@@ -286,7 +288,6 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
             "session_id": row.session_id,
             # image
             "image": row.image,
-            "image_object": ImageNode.from_row(ctx, row.image_row),
             "architecture": row.architecture,
             "registry": row.registry,
             # status
@@ -314,7 +315,18 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
         if row is None:
             return None
         props = cls.parse_row(ctx, row)
-        return cls(**props)
+        obj = cls(**props)
+        obj._image_id = row.image_id
+        return obj
+
+    async def resolve_image_object(self, info: graphene.ResolveInfo) -> ImageNode | None:
+        if self._image_id is None:
+            return None
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, ImageNode.batch_load_by_ids
+        )
+        return cast(ImageNode | None, await loader.load(self._image_id))
 
     # last_stat also fetches data from Redis, meaning that
     # both live_stat and last_stat will reference same data from same source
@@ -425,7 +437,6 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
             .where(KernelRow.session_id == session_id)
             .limit(limit)
             .offset(offset)
-            .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
         )
         if cluster_role is not None:
             query = query.where(KernelRow.cluster_role == cluster_role)
@@ -456,7 +467,6 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
             sa.select(KernelRow)
             # TODO: use "owner session ID" when we implement multi-container session
             .where(KernelRow.session_id.in_(session_ids))
-            .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
         )
         async with ctx.db.begin_readonly_session() as conn:
             return await batch_multiresult(
@@ -476,11 +486,7 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
         *,
         status: KernelStatus | None = None,
     ) -> Sequence[Sequence[ComputeContainer]]:
-        query_stmt = (
-            sa.select(KernelRow)
-            .where(KernelRow.agent.in_(agent_ids))
-            .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
-        )
+        query_stmt = sa.select(KernelRow).where(KernelRow.agent.in_(agent_ids))
         kernel_status: tuple[KernelStatus, ...]
         if status is not None:
             kernel_status = (status,)
@@ -511,12 +517,7 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
             .where(
                 (KernelRow.id.in_(container_ids)),
             )
-            .options(
-                noload("*"),
-                selectinload(KernelRow.group_row),
-                selectinload(KernelRow.user_row),
-                selectinload(KernelRow.image_row),
-            )
+            .options(noload("*"))
         )
         if domain_name is not None:
             query = query.where(KernelRow.domain_name == domain_name)

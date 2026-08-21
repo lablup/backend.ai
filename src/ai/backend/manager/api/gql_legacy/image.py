@@ -103,6 +103,7 @@ from .base import (
     ResourceLimit,
     ResourceLimitInput,
     batch_multiresult_in_scalar_stream,
+    batch_result_in_scalar_stream,
     extract_object_uuid,
     generate_sql_info_for_gql_connection,
 )
@@ -498,6 +499,28 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
                 cls,
                 name_and_arch,
                 lambda row: (row.name, row.architecture),
+            )
+
+    @classmethod
+    async def batch_load_by_ids(
+        cls,
+        graph_ctx: GraphQueryContext,
+        image_ids: Sequence[ImageID],
+    ) -> Sequence[ImageNode | None]:
+        """Load images by row id, regardless of status."""
+        query = (
+            sa.select(ImageRow)
+            .where(ImageRow.id.in_(image_ids))
+            .options(selectinload(ImageRow.aliases))
+        )
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            return await batch_result_in_scalar_stream(
+                graph_ctx,
+                db_session,
+                query,
+                cls,
+                image_ids,
+                lambda row: row.id,
             )
 
     @classmethod

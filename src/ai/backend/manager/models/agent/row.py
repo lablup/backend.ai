@@ -14,7 +14,6 @@ from sqlalchemy.orm import (
     joinedload,
     load_only,
     mapped_column,
-    relationship,
     selectinload,
 )
 from sqlalchemy.sql.expression import false, true
@@ -132,16 +131,7 @@ class AgentRow(Base):
         default=False,
     )
 
-    agent_resource_rows: Mapped[list[AgentResourceRow]] = relationship("AgentResourceRow")
-
-    def actual_occupied_slots(self) -> ResourceSlot:
-        occupied = ResourceSlot()
-        sorted_rows = sorted(self.agent_resource_rows, key=lambda r: r.slot_type_row.rank)
-        for resource_row in sorted_rows:
-            occupied[resource_row.slot_name] = resource_row.used
-        return occupied
-
-    def to_data(self) -> AgentData:
+    def to_data(self, actual_occupied_slots: ResourceSlot) -> AgentData:
         return AgentData(
             id=AgentId(self.id),
             status=self.status,
@@ -151,7 +141,7 @@ class AgentRow(Base):
             schedulable=self.schedulable,
             available_slots=self.available_slots,
             cached_occupied_slots=self.occupied_slots,
-            actual_occupied_slots=self.actual_occupied_slots(),
+            actual_occupied_slots=actual_occupied_slots,
             addr=self.addr,
             public_host=self.public_host,
             first_contact=self.first_contact,

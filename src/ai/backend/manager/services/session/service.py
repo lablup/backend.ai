@@ -93,7 +93,6 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.session import (
     DEAD_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
@@ -442,20 +441,22 @@ class SessionService:
                 },
             )
 
-        session = await self._session_repository.get_session_with_group(
+        session = await self._session_repository.get_session_validated(
             session_name,
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
-        project: GroupRow = session.group
-        if not project.container_registry:
+        container_registry = await self._session_repository.get_project_container_registry(
+            session.group_id
+        )
+        if not container_registry:
             raise InvalidAPIParameters(
                 "Project not ready to convert session image (registry configuration not populated)"
             )
 
-        registry_hostname = project.container_registry["registry"]
-        registry_project = project.container_registry["project"]
+        registry_hostname = container_registry["registry"]
+        registry_project = container_registry["project"]
 
         registry_conf = await self._session_repository.get_container_registry(
             registry_hostname, registry_project
@@ -1181,11 +1182,12 @@ class SessionService:
         resp = {}
         sess_type = sess.session_type
         if sess_type in PRIVATE_SESSION_TYPES:
-            if sess.main_kernel.agent_row is None:
+            agent_id = sess.main_kernel.agent
+            if agent_id is None:
                 raise KernelNotReady(
                     f"Kernel of the session has no agent info yet (kernel: {sess.main_kernel.id}, kernel status: {sess.main_kernel.status.name})"
                 )
-            public_host = sess.main_kernel.agent_row.public_host
+            public_host = await self._session_repository.get_agent_public_host(AgentId(agent_id))
             found_ports: dict[str, list[str]] = {}
             service_ports = sess.main_kernel.service_ports
             if service_ports is None:

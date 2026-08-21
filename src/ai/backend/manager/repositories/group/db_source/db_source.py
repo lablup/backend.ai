@@ -60,7 +60,7 @@ from ai.backend.manager.models.kernel import (
     kernels,
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.resource_usage import fetch_resource_usage
+from ai.backend.manager.models.resource_usage import ResourceUsageRecord, fetch_resource_usage
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRow, users
@@ -473,7 +473,7 @@ class GroupDBSource:
         start_date: datetime,
         end_date: datetime,
         project_ids: Sequence[UUID] | None = None,
-    ) -> list[KernelRow]:
+    ) -> list[ResourceUsageRecord]:
         """Fetch resource usage data for projects."""
         return await fetch_resource_usage(self._db, start_date, end_date, project_ids=project_ids)
 

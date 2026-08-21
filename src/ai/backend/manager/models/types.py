@@ -13,7 +13,3 @@ type QueryOption = Callable[[sa.sql.Select[Any]], sa.sql.Select[Any]]
 
 def load_related_field(field: _AbstractLoad) -> QueryOption:
     return lambda stmt: stmt.options(field)
-
-
-def join_by_related_field(field: sa.orm.attributes.InstrumentedAttribute[Any]) -> QueryOption:
-    return lambda stmt: stmt.join(field)
