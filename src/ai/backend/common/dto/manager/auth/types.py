@@ -7,7 +7,9 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Self
 
-from ai.backend.common.types import BackendAISchema
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.user import UserID
+from ai.backend.common.types import AccessKey, BackendAISchema, SecretKey
 
 __all__ = (
     "AuthTokenType",
@@ -50,14 +52,15 @@ class AuthResponse(BackendAISchema):
 class AuthSuccessResponse(AuthResponse):
     """Returned when authorization succeeds without requiring 2FA."""
 
-    access_key: str
-    secret_key: str
-    role: str
+    access_key: AccessKey
+    secret_key: SecretKey
+    role: UserRole
     status: str
     session_token: str
+    user_id: UserID
     type: AuthTokenType = AuthTokenType.KEYPAIR
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, Any]:
         return self.model_dump(mode="json")
 
 
