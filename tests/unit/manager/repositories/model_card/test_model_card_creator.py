@@ -60,6 +60,10 @@ from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.data.permission.types import ScopeType
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 
 
 @dataclass(frozen=True)
@@ -86,6 +90,9 @@ class TestModelCardCreatorResourceRequirements:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
                 RoleRow,
                 UserRoleRow,
                 UserRow,
@@ -218,6 +225,7 @@ class TestModelCardCreatorResourceRequirements:
                 allowed_vfolder_hosts={},
             )
             db_sess.add(group)
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.PROJECT.value, scope_id=group.id))
             await db_sess.flush()
         return group
 
