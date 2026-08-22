@@ -1,7 +1,7 @@
 ---
 name: storage-namespace-service-shapes
 type: decision-table
-description: storage namespace processor fields and their entity/operation/scope, why removal resolves a lookup before purging by id, the polymorphic storage_id and the missing foreign keys, what the association table points at
+description: storage namespace knowledge: why removal resolves a lookup before purging by id, the polymorphic storage_id and the missing foreign keys, what the association table points at
 scope: src/ai/backend/manager/services/storage_namespace
 keywords: [RegisterNamespaceAction, UnregisterNamespaceAction, ResolveStorageNamespaceAction, StorageNamespaceByStorageAndName, StorageNamespacePurger, lookup_ops, global_purge_ops, polymorphic, association_artifacts_storages]
 sources:
@@ -26,13 +26,8 @@ own rather than living as a column on the storage.
 
 ## The processor fields
 
-| Field | Action | Shape | Operation | Authorized against |
-|---|---|---|---|---|
-| `register` | `RegisterNamespaceAction` | global | CREATE | SUPERADMIN gate |
-| `search` | `SearchStorageNamespacesAction` | global | SEARCH | SUPERADMIN gate |
-| `get_namespaces` | `GetNamespacesAction` | global | SEARCH | SUPERADMIN gate |
-| `lookup` | `ResolveStorageNamespaceAction` | lookup | — | authenticated caller |
-| `unregister` | `UnregisterNamespaceAction` | global | PURGE | SUPERADMIN gate |
+배선된 목록은 `backend.ai mgr ops list --concern storage_namespace`가 낸다. entity type,
+모양, 연산, 관문, 실행 주체는 그 출력이 답한다.
 
 Every REST route in this domain declares `superadmin_required`, so the global
 gate matches what the surface promises. The same holds for the object and VFS

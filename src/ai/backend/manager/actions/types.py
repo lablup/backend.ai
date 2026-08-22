@@ -31,6 +31,22 @@ class ActionKind(enum.StrEnum):
     # Still on the legacy ``BaseAction`` base, which declares no shape.
     UNKNOWN = "unknown"
 
+    def describe(self) -> str:
+        """What the operation targets, as the catalog listing explains it."""
+        match self:
+            case ActionKind.SINGLE_ENTITY:
+                return "one entity the caller named by id"
+            case ActionKind.BULK:
+                return "several entities the caller named"
+            case ActionKind.SCOPE:
+                return "the scope itself, which a search stays inside and a create writes into"
+            case ActionKind.GLOBAL:
+                return "the installation, naming nothing else"
+            case ActionKind.LOOKUP:
+                return "an external key, resolved into an internal id"
+            case ActionKind.UNKNOWN:
+                return "declared by nothing: the action is still on the legacy base"
+
 
 class ActionGate(enum.StrEnum):
     """Who a wired processor lets through, orthogonal to :class:`ActionKind`."""
@@ -41,6 +57,16 @@ class ActionGate(enum.StrEnum):
     # Checked against the caller's permissions; ``ActionKind`` says where.
     PERMISSION = "permission"
 
+    def describe(self) -> str:
+        """Who gets through, as the catalog listing explains it."""
+        match self:
+            case ActionGate.ANONYMOUS:
+                return "anyone: the operation asks for no caller"
+            case ActionGate.PUBLIC:
+                return "every authenticated caller, whatever their roles"
+            case ActionGate.PERMISSION:
+                return "a caller holding the permission, checked where the kind says"
+
 
 class ActionBacking(enum.StrEnum):
     """What runs a wired processor's operation."""
@@ -49,6 +75,14 @@ class ActionBacking(enum.StrEnum):
     OPS = "ops"
     # A method the domain wrote.
     SERVICE = "service"
+
+    def describe(self) -> str:
+        """What runs the operation, as the catalog listing explains it."""
+        match self:
+            case ActionBacking.OPS:
+                return "a generic service over the repository's ops, driven by the action's spec"
+            case ActionBacking.SERVICE:
+                return "a method the domain wrote"
 
 
 class ActionOperationType(enum.StrEnum):

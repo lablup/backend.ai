@@ -71,6 +71,8 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   they are not operations a domain wires, only the step every field operation runs
   first.
 - Register all new wiring in `tests/unit/manager/actions/test_registry_catalog.py`.
+- 배선된 목록을 읽으려면 `backend.ai mgr ops list`를 쓴다. 문서에 그 목록을 옮겨 적지
+  않는다 (`KNOWLEDGE.md`).
 
 ## Many-row writes
 

@@ -134,3 +134,17 @@ which is why handlers call processors, not services.
   readable off a class — a single-entity action derives it from the id, and a field
   action has none until its owner is read — so the name alone has to tell two runs
   apart.
+
+## 배선 카탈로그를 읽어내는 명령
+
+- `backend.ai mgr ops list`가 배선 기록 전량을 낸다. `--concern`, `--entity`, `--field`,
+  `--operation`, `--gate`, `--backing`으로 거르고, `--output json|tsv`로 형식을 바꾼다.
+  `backend.ai mgr ops describe <entity_type> <action_name>`은 한 건의 입력 필드와 정의
+  위치까지 낸다.
+- concern, entity_type, field_type, kind, gate, backing은 배선이 정하므로 액션 클래스에
+  없다. operation과 action_name은 클래스가 선언한다.
+- 의존성을 한 단계도 세우지 않는다. 조립은 실행 객체를 핸들러로 저장할 뿐 호출하지
+  않으므로, 실행 객체 자리를 대역으로 채우면 DB도 리더 선출도 이벤트 소비자도 없이 조립만
+  돈다. 운영 중인 매니저 옆에서 돌려도 부딪히지 않는다.
+- 레지스트리가 기록하는 것만 나온다. 레거시 베이스에 남은 처리기는 `ProcessorGroup`을
+  거치지 않으므로 이 목록에 없다.

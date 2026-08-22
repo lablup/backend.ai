@@ -1,7 +1,7 @@
 ---
 name: app-config-service-shapes
 type: decision-table
-description: app config as a value computed from the definition/allow-list/fragment tables with no row of its own, how the allow-list decides which scopes may fill a config_name and which of domain or user overrides the other, why an anonymous read yields public values, the processor fields and the shape/scope/operation each runs as
+description: app config as a value computed from the definition/allow-list/fragment tables with no row of its own, how the allow-list decides which scopes may fill a config_name and which of domain or user overrides the other, why an anonymous read yields public values, why both reads are scope operations
 scope: src/ai/backend/manager/services/app_config
 keywords: [SearchAppConfigsAction, AnonymousSearchAppConfigsAction, VisibleAppConfigFragmentOperationScope, PublicAppConfigFragmentOperationScope, app_config_definitions, app_config_allow_list, app_config_fragments]
 sources:
@@ -48,10 +48,7 @@ three tables, so no row corresponds to the value.
 
 Both carry the entity type `app_config`.
 
-| Field | Action | Shape | Scope | Operation |
-|---|---|---|---|---|
-| `search_app_configs` | `SearchAppConfigsAction` | scope | user scope | SEARCH |
-| `anonymous_search_app_configs` | `AnonymousSearchAppConfigsAction` | scope | anonymous scope | SEARCH |
+배선된 목록은 `backend.ai mgr ops list --concern app_config`이 낸다.
 
 - Several names arrive at once, which is what makes it `SEARCH` rather than `GET`.
 - The user-scope read's three query conditions (public, that user's domain, that user)

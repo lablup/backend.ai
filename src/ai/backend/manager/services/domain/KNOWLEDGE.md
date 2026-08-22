@@ -27,19 +27,8 @@ status: draft
 
 ## 처리기 구성
 
-| 필드 | 모양 | 연산 |
-|---|---|---|
-| `lookup` | lookup (public) | 이름 → 도메인 |
-| `global_search` | global | 전체 도메인 페이지 |
-| `public_search_rg_domains` | public | 리소스 그룹이 서비스하는 도메인 |
-| `update_domain` | single_entity | UPDATE |
-| `delete_domain` | single_entity | DELETE (소프트) |
-| `restore_domain` | single_entity | RESTORE |
-| `create_domain` | global | CREATE |
-| `create_domain_node` | global | CREATE |
-| `update_domain_node` | single_entity | UPDATE |
-| `purge_domain` | single_entity | PURGE |
-| `create_dotfile` / `update_dotfile` / `delete_dotfile` | single_entity | UPDATE |
+배선된 목록은 `backend.ai mgr ops list --concern domain`이 낸다. entity type, 모양, 연산,
+관문, 실행 주체는 그 출력이 답한다.
 
 ## 도메인은 role-managed entity다
 

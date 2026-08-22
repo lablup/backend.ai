@@ -1,7 +1,7 @@
 ---
 name: notification-service-shapes
 type: decision-table
-description: notification processor fields and their entity/operation/scope, why channels and rules are two entity types in one package, which three operations keep a service and why, what a rule read returns
+description: notification knowledge: why channels and rules are two entity types in one package, which three operations keep a service and why, what a rule read returns
 scope: src/ai/backend/manager/services/notification
 keywords: [CreateChannelAction, CreateRuleAction, ValidateChannelAction, ValidateRuleAction, ProcessNotificationAction, MatchingNotificationRuleData, global_create_ops, global_scope, NOTIFICATION_CHANNEL_ENTITY_TYPE, NOTIFICATION_RULE_ENTITY_TYPE]
 sources:
@@ -24,16 +24,9 @@ anything a user owns.
 
 ## The processor fields
 
-| Field | Entity type | Shape | Operation |
-|---|---|---|---|
-| `create_channel` / `create_rule` | CHANNEL / RULE | global | CREATE |
-| `get_channel` / `get_rule` | CHANNEL / RULE | global | GET |
-| `search_channels` / `search_rules` | CHANNEL / RULE | global | SEARCH |
-| `update_channel` / `update_rule` | CHANNEL / RULE | global | UPDATE |
-| `purge_channel` / `purge_rule` | CHANNEL / RULE | global | PURGE |
-| `validate_channel` | CHANNEL | global, service-kept | — |
-| `validate_rule` | RULE | global, service-kept | — |
-| `process_notification` | RULE | global, service-kept | — |
+배선된 목록은 `backend.ai mgr ops list --concern notification_channel`과
+`--concern notification_rule`이 낸다. entity type, 모양, 연산, 관문, 실행 주체는 그 출력이
+답한다.
 
 Two `ProcessorGroup`s are wired, one per entity type. All thirteen REST routes
 declare `superadmin_required`, so the global gate matches the surface.

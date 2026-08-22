@@ -1,7 +1,7 @@
 ---
 name: model-card-service-shapes
 type: decision-table
-description: 모델 카드 processor 필드와 각각의 shape/operation, 서비스 메서드로 남은 연산과 각각이 무엇을 검사하는지
+description: 모델 카드 서비스 메서드로 남은 연산과 각각이 무엇을 검사하는지
 scope: src/ai/backend/manager/services/model_card
 keywords: [ModelCardCreator, ModelCardResourceRequirementCreator, bulk_scoped_search_ops, entity_create_with_fields_ops, ScanProjectModelCardsAction, AvailablePresetsAction]
 sources:
@@ -23,18 +23,8 @@ status: draft
 
 ## processor 필드
 
-| 필드 | 액션 | shape | 연산 |
-|---|---|---|---|
-| `create` | `CreateModelCardAction` | scope + fields | CREATE |
-| `get` | `GetModelCardAction` | single entity | GET |
-| `global_search` | `GlobalSearchModelCardsAction` | global | SEARCH |
-| `search_in_project` | `SearchModelCardsInProjectAction` | scope | SEARCH |
-| `update` | `UpdateModelCardAction` | single entity | UPDATE |
-| `delete` | `DeleteModelCardAction` | single entity | DELETE |
-| `bulk_delete` | `BulkDeleteModelCardAction` | global | DELETE |
-| `scan` | `ScanProjectModelCardsAction` | global | CREATE |
-| `available_presets` | `AvailablePresetsAction` | global | SEARCH |
-| `scoped_search_requirements` | `ScopedSearchModelCardResourceRequirementsAction` | bulk | SEARCH |
+배선된 목록은 `backend.ai mgr ops list --concern model_card`가 낸다. entity type, 모양,
+연산, 관문, 실행 주체는 그 출력이 답한다.
 
 ## 서비스 메서드로 남은 연산
 

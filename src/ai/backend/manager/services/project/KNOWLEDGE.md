@@ -26,20 +26,8 @@ status: draft
 
 ## 처리기 구성
 
-| 필드 | 모양 | 연산 |
-|---|---|---|
-| `lookup` | lookup (public) | (도메인, 이름) → 프로젝트 |
-| `get_project` | single_entity | GET |
-| `global_search` | global | 전체 프로젝트 페이지 |
-| `search_projects_by_domain` | scope (도메인) | SEARCH |
-| `search_projects_by_user` | scope (사용자) | SEARCH |
-| `create_project` | scope (도메인) | CREATE |
-| `delete_project` / `restore_project` | single_entity | DELETE / RESTORE |
-| `update_project` | single_entity | UPDATE |
-| `purge_project` | single_entity | PURGE |
-| `usage_per_month` / `usage_per_period` | global | SEARCH |
-| `assign_users_to_project` / `unassign_users_from_project` | single_entity | UPDATE |
-| `create_dotfile` / `update_dotfile` / `delete_dotfile` | single_entity | UPDATE |
+배선된 목록은 `backend.ai mgr ops list --concern project`가 낸다. entity type, 모양, 연산,
+관문, 실행 주체는 그 출력이 답한다.
 
 ## 멤버십은 프로젝트에 대한 변경이다
 

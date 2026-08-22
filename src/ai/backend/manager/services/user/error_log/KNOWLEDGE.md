@@ -1,7 +1,7 @@
 ---
 name: error-log-service-shapes
 type: decision-table
-description: error log processor fields and their entity/operation/scope, why recording is user-scoped rather than global, why clearing is a soft delete addressed by id
+description: error log knowledge: why recording is user-scoped rather than global, why clearing is a soft delete addressed by id
 scope: src/ai/backend/manager/services/user/error_log
 keywords: [CreateErrorLogAction, DeleteErrorLogAction, SearchErrorLogsAction, AdminSearchErrorLogsAction, ErrorLogSoftDeleteUpdater, UserErrorLogOperationScope, entity_create_ops, scope_search_ops, single_delete_ops, is_cleared]
 sources:
@@ -25,12 +25,8 @@ the action layer.
 
 ## The processor fields
 
-| Field | Action | Shape | Operation | Authorized against |
-|---|---|---|---|---|
-| `create` | `CreateErrorLogAction` | entity + scope-shaped | CREATE | the owning user's scope |
-| `scoped_search` | `SearchErrorLogsAction` | operation-scope | SEARCH | the owning user's scope |
-| `search` | `AdminSearchErrorLogsAction` | global | SEARCH | SUPERADMIN gate |
-| `delete` | `DeleteErrorLogAction` | single entity | DELETE | the log row itself |
+배선된 목록은 `backend.ai mgr ops list --field error_log`가 낸다. entity type, 모양, 연산,
+관문, 실행 주체는 그 출력이 답한다.
 
 ## Recording is user-scoped, not global
 
