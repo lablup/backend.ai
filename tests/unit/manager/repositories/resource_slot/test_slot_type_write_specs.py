@@ -213,7 +213,7 @@ class TestResourceSlotTypeCreator:
         async with db_with_referencing_tables.begin_readonly_session() as db_sess:
             row = await db_sess.scalar(
                 sa.select(ResourceSlotTypeRow).where(
-                    ResourceSlotTypeRow.slot_name == existing_slot_type
+                    ResourceSlotTypeRow.slot_name == existing_slot_type.slot_name
                 )
             )
             assert row is not None
@@ -274,7 +274,7 @@ class TestResourceSlotTypePurger:
             remaining = await db_sess.scalar(
                 sa.select(sa.func.count())
                 .select_from(ResourceSlotTypeRow)
-                .where(ResourceSlotTypeRow.slot_name == existing_slot_type)
+                .where(ResourceSlotTypeRow.slot_name == existing_slot_type.slot_name)
             )
             assert remaining == 0
 
@@ -321,7 +321,7 @@ class TestResourceSlotTypePurger:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=agent_id,
-                    slot_name=existing_slot_type,
+                    slot_name=existing_slot_type.slot_name,
                     capacity=Decimal(2),
                 )
             )
@@ -337,6 +337,6 @@ class TestResourceSlotTypePurger:
             remaining = await db_sess.scalar(
                 sa.select(sa.func.count())
                 .select_from(ResourceSlotTypeRow)
-                .where(ResourceSlotTypeRow.slot_name == existing_slot_type)
+                .where(ResourceSlotTypeRow.slot_name == existing_slot_type.slot_name)
             )
             assert remaining == 1
