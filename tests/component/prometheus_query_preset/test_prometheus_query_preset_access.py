@@ -20,14 +20,16 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
 
 
 class TestQueryPresetCatalogAccess:
-    async def test_user_cannot_search_presets(
+    async def test_user_searches_presets(
         self,
         user_v2_registry: V2ClientRegistry,
     ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.prometheus_query_preset.search(
-                SearchQueryDefinitionsInput(limit=10),
-            )
+        """The catalog is a public read: writing it stays with the superadmin."""
+        result = await user_v2_registry.prometheus_query_preset.search(
+            SearchQueryDefinitionsInput(limit=10),
+        )
+
+        assert isinstance(result.items, list)
 
     async def test_user_cannot_create_preset(
         self,
