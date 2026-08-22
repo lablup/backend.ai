@@ -32,7 +32,13 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.stream.repository import StreamRepository
+from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
+from ai.backend.manager.services.session.actions.resolve_session_name import (
+    ResolveSessionNameAction,
+)
+from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.stream.processors import StreamProcessors
 from ai.backend.manager.services.stream.service import StreamService
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -80,9 +86,44 @@ def stream_processors(
 
 
 @pytest.fixture()
+async def session_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> Any:
+    """The session processors the stream handler reaches for.
+
+    The handler resolves the session a request names, so the lookup and the name
+    normalization run against the real repository; the rest of the service is unused.
+    """
+    service = SessionService(
+        SessionServiceArgs(
+            agent_registry=AsyncMock(),
+            event_fetcher=AsyncMock(),
+            background_task_manager=AsyncMock(),
+            event_hub=AsyncMock(),
+            error_monitor=AsyncMock(),
+            idle_checker_host=AsyncMock(),
+            session_repository=SessionRepository(database_engine),
+            scheduler_repository=AsyncMock(),
+            scheduling_controller=AsyncMock(),
+            appproxy_client_pool=AsyncMock(),
+            user_repository=AsyncMock(),
+        )
+    )
+    processors = MagicMock()
+    group = processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE))
+    processors.resolve_session_name = group.single_entity(
+        ResolveSessionNameAction, service.resolve_session_name
+    )
+    processors.lookup = group.public_lookup_ops(LookupSessionAction)
+    return processors
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     stream_processors: StreamProcessors,
+    session_processors: Any,
     config_provider: ManagerConfigProvider,
     error_monitor: ErrorPluginContext,
 ) -> list[RouteRegistry]:
@@ -92,7 +133,7 @@ def server_module_registries(
             StreamHandler(
                 private_ctx=MagicMock(),
                 stream_processors=stream_processors,
-                session_processors=MagicMock(),
+                session_processors=session_processors,
                 config_provider=config_provider,
                 error_monitor=error_monitor,
             ),

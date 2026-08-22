@@ -18,7 +18,6 @@ from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import ResourceSlot, SessionTypes
-from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
@@ -36,6 +35,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.stream.repository import StreamRepository
 from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
+from ai.backend.manager.services.session.actions.resolve_session_name import (
+    ResolveSessionNameAction,
+)
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.stream.processors import StreamProcessors
 from ai.backend.manager.services.stream.service import StreamService
@@ -111,10 +113,11 @@ async def session_processors(
         )
     )
     processors = MagicMock()
-    processors.resolve_session_name = ActionProcessor(service.resolve_session_name, [])
-    processors.lookup = processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)).public_lookup_ops(
-        LookupSessionAction
+    group = processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE))
+    processors.resolve_session_name = group.single_entity(
+        ResolveSessionNameAction, service.resolve_session_name
     )
+    processors.lookup = group.public_lookup_ops(LookupSessionAction)
     return processors
 
 
