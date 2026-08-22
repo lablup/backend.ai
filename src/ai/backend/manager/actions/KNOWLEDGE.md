@@ -134,3 +134,20 @@ which is why handlers call processors, not services.
   readable off a class — a single-entity action derives it from the id, and a field
   action has none until its owner is read — so the name alone has to tell two runs
   apart.
+
+## The command that reads the catalog out
+
+- `backend.ai mgr ops list` prints every wiring record. It filters on `--concern`,
+  `--entity`, `--field`, `--operation`, `--gate` and `--backing`, and `--output
+  json|tsv` changes the format. `backend.ai mgr ops entities` prints the entity types
+  and the field types under each; `backend.ai mgr ops describe <entity_type>
+  <action_name>` adds one operation's input fields and where it is defined.
+- The wiring decides concern, entity_type, field_type, kind, gate and backing, so the
+  action class carries none of them. The class declares operation and action_name.
+- The areas are declared as `Concern` members with a line each on what they hold, so a
+  new domain picks one rather than coining a name.
+- No dependency stage is started. Assembly stores handlers rather than calling them, so
+  a stand-in in place of the runtime is enough: no database, no leader election, no
+  event consumer, and nothing that collides with a running manager.
+- Only what the registry records appears. A processor still on the legacy base is wired
+  outside `ProcessorGroup` and is absent from the listing.

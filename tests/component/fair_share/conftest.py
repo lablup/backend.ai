@@ -23,6 +23,7 @@ from ai.backend.common.data.entity.usage_bucket import (
 from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
     ConcernMeta,
     FieldGroupMeta,
     GroupMeta,
@@ -58,7 +59,7 @@ def fair_share_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> FairShareProcessors:
     service = FairShareService(FairShareRepository(database_engine))
-    fair_share_groups = processor_registry.concern(ConcernMeta("fair_share"))
+    fair_share_groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     return FairShareProcessors(
         fair_share_groups.group(GroupMeta(DOMAIN_FAIR_SHARE_ENTITY_TYPE)),
         fair_share_groups.group(GroupMeta(PROJECT_FAIR_SHARE_ENTITY_TYPE)),

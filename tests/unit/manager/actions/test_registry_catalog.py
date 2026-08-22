@@ -78,6 +78,7 @@ from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
     ConcernMeta,
     FieldGroupMeta,
     GroupMeta,
@@ -218,16 +219,16 @@ def test_every_defined_v2_action_is_wired() -> None:
     # One shared registry, as in the production wiring: every v2 package registers
     # through it, so its wired_actions() is the complete catalog of registered actions.
     registry = _ops_registry()
-    fair_share_groups = registry.concern(ConcernMeta("fair_share"))
+    fair_share_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     artifact_revisions = registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
         FieldGroupMeta(ARTIFACT_REVISION_FIELD_TYPE),
         ArtifactRevisionData,
         LookupArtifactRevisionOwnerAction,
         LookupBulkArtifactRevisionOwnerAction,
     )
-    resource_slot_groups = registry.concern(ConcernMeta("resource_slot"))
-    scheduling_history_groups = registry.concern(ConcernMeta("scheduling_history"))
-    resource_allocation_groups = registry.concern(ConcernMeta("resource_allocation"))
+    resource_slot_groups = registry.concern(ConcernMeta(Concern.SYSTEM))
+    scheduling_history_groups = registry.concern(ConcernMeta(Concern.SESSION))
+    resource_allocation_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     AppConfigProcessors(
         registry.group(GroupMeta(APP_CONFIG_ENTITY_TYPE)),
         registry.group(GroupMeta(APP_CONFIG_DEFINITION_ENTITY_TYPE)),

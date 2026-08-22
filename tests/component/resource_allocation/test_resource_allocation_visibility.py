@@ -35,6 +35,7 @@ from ai.backend.common.dto.manager.v2.resource_allocation.response import (
 )
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
     ConcernMeta,
     GroupMeta,
 )
@@ -161,7 +162,7 @@ class TestHideAgentsVisibility:
             resource_allocation_repository=ra_repo,
             resource_preset_repository=rp_repo,
         )
-        groups = processor_registry.concern(ConcernMeta("resource_allocation"))
+        groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
         return ResourceAllocationProcessors(
             groups.group(GroupMeta(USER_ENTITY_TYPE)),
             groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
@@ -297,7 +298,7 @@ class TestGroupResourceVisibility:
             resource_allocation_repository=ra_repo,
             resource_preset_repository=rp_repo,
         )
-        groups = processor_registry.concern(ConcernMeta("resource_allocation"))
+        groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
         return ResourceAllocationProcessors(
             groups.group(GroupMeta(USER_ENTITY_TYPE)),
             groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),

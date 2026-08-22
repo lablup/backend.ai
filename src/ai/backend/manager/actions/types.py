@@ -31,6 +31,22 @@ class ActionKind(enum.StrEnum):
     # Still on the legacy ``BaseAction`` base, which declares no shape.
     UNKNOWN = "unknown"
 
+    def describe(self) -> str:
+        """What the operation targets, as the catalog listing explains it."""
+        match self:
+            case ActionKind.SINGLE_ENTITY:
+                return "an action naming one entity by id and operating on it"
+            case ActionKind.BULK:
+                return "an action taking several entity ids and operating on each"
+            case ActionKind.SCOPE:
+                return "an action reaching every entity under a scope at once"
+            case ActionKind.GLOBAL:
+                return "an action operating over everything, divided by no scope"
+            case ActionKind.LOOKUP:
+                return "an action reading an entity id from a natural key"
+            case ActionKind.UNKNOWN:
+                return "an action still on the legacy base, to be removed"
+
 
 class ActionGate(enum.StrEnum):
     """Who a wired processor lets through, orthogonal to :class:`ActionKind`."""
@@ -41,14 +57,32 @@ class ActionGate(enum.StrEnum):
     # Checked against the caller's permissions; ``ActionKind`` says where.
     PERMISSION = "permission"
 
+    def describe(self) -> str:
+        """Who gets through, as the catalog listing explains it."""
+        match self:
+            case ActionGate.ANONYMOUS:
+                return "an action asking the caller for no permission"
+            case ActionGate.PUBLIC:
+                return "an action any authenticated user passes"
+            case ActionGate.PERMISSION:
+                return "an action only a user holding the permission may perform"
+
 
 class ActionBacking(enum.StrEnum):
     """What runs a wired processor's operation."""
 
-    # A generic service over the repository's ops, driven by the spec on the action.
-    OPS = "ops"
-    # A method the domain wrote.
-    SERVICE = "service"
+    # The shared implementation over the repository's ops, driven by the action's spec.
+    GENERIC = "generic"
+    # An implementation the domain wrote for this operation alone.
+    CUSTOM = "custom"
+
+    def describe(self) -> str:
+        """What runs the operation, as the catalog listing explains it."""
+        match self:
+            case ActionBacking.GENERIC:
+                return "an action the shared implementation performs from its spec"
+            case ActionBacking.CUSTOM:
+                return "an action the domain implemented itself"
 
 
 class ActionOperationType(enum.StrEnum):

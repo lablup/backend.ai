@@ -24,6 +24,7 @@ from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
     ConcernMeta,
     GroupMeta,
 )
@@ -83,7 +84,7 @@ def resource_allocation_processors(
         resource_allocation_repository=ra_repo,
         resource_preset_repository=rp_repo,
     )
-    groups = processor_registry.concern(ConcernMeta("resource_allocation"))
+    groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     return ResourceAllocationProcessors(
         groups.group(GroupMeta(USER_ENTITY_TYPE)),
         groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),

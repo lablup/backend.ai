@@ -70,7 +70,11 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   lookup action, bulk lookup action)` hands out. It builds the owner lookups itself:
   they are not operations a domain wires, only the step every field operation runs
   first.
+- Every group comes from an area: `registry.concern(ConcernMeta(Concern.<AREA>)).group(...)`.
+  The areas are the `Concern` members, so wiring a new domain is a choice among them.
 - Register all new wiring in `tests/unit/manager/actions/test_registry_catalog.py`.
+- Read the wired list with `backend.ai mgr ops list`. Do NOT transcribe it into a
+  document (`KNOWLEDGE.md`).
 
 ## Many-row writes
 
@@ -94,7 +98,7 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 
 ## Gates
 
-- `global` extends `scope` to the whole installation and runs behind the SUPERADMIN
+- `global` extends `scope` to the whole system and runs behind the SUPERADMIN
   gate. Global reads open to all authenticated users are wired via the `public_*`
   factories — read operations only; the constructor rejects writes.
 - `anonymous_global` takes no gate at all and accepts writes. Wire through any other

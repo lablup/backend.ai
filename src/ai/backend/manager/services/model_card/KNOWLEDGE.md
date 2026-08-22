@@ -1,7 +1,7 @@
 ---
 name: model-card-service-shapes
 type: decision-table
-description: 모델 카드 processor 필드와 각각의 shape/operation, 서비스 메서드로 남은 연산과 각각이 무엇을 검사하는지
+description: which model card operations keep a service method and what each one checks
 scope: src/ai/backend/manager/services/model_card
 keywords: [ModelCardCreator, ModelCardResourceRequirementCreator, bulk_scoped_search_ops, entity_create_with_fields_ops, ScanProjectModelCardsAction, AvailablePresetsAction]
 sources:
@@ -14,36 +14,14 @@ generated:
 status: draft
 ---
 
-# 모델 카드 서비스 — 배경 지식
+# Model card service — Knowledge
 
-> 규칙: `../AGENTS.md`. spec 선택: `../../models/specs/KNOWLEDGE.md`.
+> Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
-모델 카드는 VFolder에 담긴 모델을 프로젝트 안에서 가리키는 항목이다. 실행에 필요한
-최소 자원 요구량을 함께 적으므로 이 패키지는 두 테이블을 다룬다.
+A model card names, inside a project, a model held in a VFolder. It states the minimum
+resources the model needs to run alongside it, so this package covers two tables.
 
-## processor 필드
+## The processor composition
 
-| 필드 | 액션 | shape | 연산 |
-|---|---|---|---|
-| `create` | `CreateModelCardAction` | scope + fields | CREATE |
-| `get` | `GetModelCardAction` | single entity | GET |
-| `global_search` | `GlobalSearchModelCardsAction` | global | SEARCH |
-| `search_in_project` | `SearchModelCardsInProjectAction` | scope | SEARCH |
-| `update` | `UpdateModelCardAction` | single entity | UPDATE |
-| `delete` | `DeleteModelCardAction` | single entity | DELETE |
-| `bulk_delete` | `BulkDeleteModelCardAction` | global | DELETE |
-| `scan` | `ScanProjectModelCardsAction` | global | CREATE |
-| `available_presets` | `AvailablePresetsAction` | global | SEARCH |
-| `scoped_search_requirements` | `ScopedSearchModelCardResourceRequirementsAction` | bulk | SEARCH |
-
-## 서비스 메서드로 남은 연산
-
-| 연산 | 남은 이유 |
-|---|---|
-| `update` | 요구량 행을 지우고 다시 쓴다. 한 트랜잭션에 두 테이블이 걸린다 |
-| `delete` / `bulk_delete` | 옵션이 켜져 있으면 카드가 쓰던 VFolder도 함께 지운다 |
-| `scan` | VFolder를 훑어 이미 있는 카드 이름과 대조하고 나머지를 만든다 |
-| `available_presets` | 카드가 요구하는 자원을 담을 수 있는 프리셋만 고른다 |
-
-생성은 서비스가 필요 없다. `entity_create_with_fields_ops`가 카드와 요구량 행을 한
-트랜잭션에 넣는다.
+`backend.ai mgr ops list --concern deployment --entity model_card` prints the wired
+list. Its output answers the entity type, shape, operation, gate and backing.

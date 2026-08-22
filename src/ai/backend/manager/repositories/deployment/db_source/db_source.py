@@ -2280,7 +2280,7 @@ class DeploymentDBSource:
             return {}
 
         async with self._begin_readonly_session_read_committed() as db_sess:
-            # LEFT JOIN으로 route와 session 정보를 한 번에 가져오기
+            # One LEFT JOIN reads the route and its session together.
             query = (
                 sa.select(
                     RoutingRow.id,
@@ -2294,7 +2294,6 @@ class DeploymentDBSource:
             result = await db_sess.execute(query)
             rows = result.all()
 
-            # 결과를 매핑으로 변환
             status_map: dict[ReplicaID, SessionStatus | None] = {}
             for route_id, session_status in rows:
                 status_map[ReplicaID(route_id)] = session_status
