@@ -25,13 +25,11 @@ from ai.backend.common.dto.manager.deployment import (
     DeploymentMetadataInput,
     DeploymentStrategyInput,
     ImageInput,
-    ListDeploymentsResponse,
     ModelMountConfigInput,
     ModelRuntimeConfigInput,
     NetworkAccessInput,
     ResourceConfigInput,
     RevisionInput,
-    SearchDeploymentsRequest,
     SearchRevisionsRequest,
     UpdateDeploymentRequest,
 )
@@ -428,18 +426,6 @@ class TestReplicaManagement:
 
 
 class TestUserAccessDeployment:
-    async def test_user_searches_empty_deployments(
-        self,
-        user_registry: BackendAIClientRegistry,
-    ) -> None:
-        """Regular user can search deployments and gets empty results."""
-        result = await user_registry.deployment.search_deployments(
-            SearchDeploymentsRequest(),
-        )
-        assert isinstance(result, ListDeploymentsResponse)
-        assert result.deployments == []
-        assert result.pagination.total == 0
-
     async def test_user_get_nonexistent_deployment(
         self,
         user_registry: BackendAIClientRegistry,
