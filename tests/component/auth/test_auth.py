@@ -175,7 +175,12 @@ async def signup_default_project(
             ),
         )
         for email in data.cleanup_emails:
-            await conn.execute(keypairs.delete().where(keypairs.c.user_id == email))
+            await conn.execute(
+                keypairs.delete().where(
+                    keypairs.c.user
+                    == sa.select(users.c.uuid).where(users.c.email == email).scalar_subquery()
+                )
+            )
             await conn.execute(users.delete().where(users.c.email == email))
         await conn.execute(
             VirtualScopeRow.__table__.delete().where(
@@ -240,6 +245,7 @@ async def expired_password_user(
                 access_key=data.access_key,
                 secret_key=data.secret_key,
                 is_active=True,
+                is_default=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
                 num_queries=0,
@@ -369,6 +375,7 @@ async def cross_domain_fixture(
                 access_key=admin_data.keypair.access_key,
                 secret_key=admin_data.keypair.secret_key,
                 is_active=True,
+                is_default=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
                 num_queries=0,
@@ -411,6 +418,7 @@ async def cross_domain_fixture(
                 access_key=user_data.keypair.access_key,
                 secret_key=user_data.keypair.secret_key,
                 is_active=True,
+                is_default=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
                 num_queries=0,
@@ -1065,7 +1073,12 @@ class TestSignup:
 
         # Cleanup: remove the signup-created user and keypair
         async with db_engine.begin() as conn:
-            await conn.execute(keypairs.delete().where(keypairs.c.user_id == email))
+            await conn.execute(
+                keypairs.delete().where(
+                    keypairs.c.user
+                    == sa.select(users.c.uuid).where(users.c.email == email).scalar_subquery()
+                )
+            )
             await conn.execute(users.delete().where(users.c.email == email))
 
     async def test_signup_binds_user_to_default_project_via_ase(

@@ -598,6 +598,7 @@ async def assigned_users(
                     access_key=ak,
                     secret_key=secrets.token_hex(20),
                     is_active=True,
+                    is_default=True,
                     resource_policy=resource_policy_fixture,
                     rate_limit=30000,
                     num_queries=0,
