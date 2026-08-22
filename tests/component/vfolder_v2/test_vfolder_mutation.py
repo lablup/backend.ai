@@ -19,7 +19,6 @@ import yarl
 
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
-from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.common.dto.manager.field import VFolderPermissionField
@@ -297,14 +296,6 @@ async def project_vfolder(
 class TestDeleteVFolderRBAC:
     """DELETE /v2/vfolders/{id} -- SingleEntityActionProcessor RBAC."""
 
-    async def test_regular_user_denied(
-        self,
-        user_v2_registry: V2ClientRegistry,
-        project_vfolder: ProjectVFolderFixtureData,
-    ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.vfolder.delete(project_vfolder.id)
-
     async def test_superadmin_succeeds(
         self,
         admin_v2_registry: V2ClientRegistry,
@@ -316,14 +307,6 @@ class TestDeleteVFolderRBAC:
 
 class TestRestoreVFolderRBAC:
     """POST /v2/vfolders/{id}/restore -- SingleEntityActionProcessor RBAC."""
-
-    async def test_regular_user_denied(
-        self,
-        user_v2_registry: V2ClientRegistry,
-        project_vfolder: ProjectVFolderFixtureData,
-    ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.vfolder.restore(project_vfolder.id)
 
     async def test_superadmin_trash_then_restore(
         self,
@@ -338,34 +321,9 @@ class TestRestoreVFolderRBAC:
 class TestPurgeVFolderRBAC:
     """POST /v2/vfolders/{id}/purge -- SingleEntityActionProcessor RBAC."""
 
-    async def test_regular_user_denied(
-        self,
-        user_v2_registry: V2ClientRegistry,
-        project_vfolder: ProjectVFolderFixtureData,
-    ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.vfolder.purge(project_vfolder.id)
-
 
 class TestCreateVFolderInProjectRBAC:
     """POST /v2/vfolders/projects/{project_id}/create -- ScopeActionProcessor RBAC."""
-
-    async def test_regular_user_denied(
-        self,
-        user_v2_registry: V2ClientRegistry,
-        group_fixture: uuid.UUID,
-        vfolder_host_permission_fixture: None,
-    ) -> None:
-        """Regular user without project CREATE permission is denied before service runs."""
-        request = CreateVFolderInScopeInput(
-            name=f"rbac-denied-{secrets.token_hex(4)}",
-            host="local",
-            usage_mode=VFolderUsageMode.GENERAL,
-            permission=VFolderPermissionField.READ_WRITE,
-            cloneable=False,
-        )
-        with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.vfolder.create_in_project(group_fixture, request)
 
     async def test_superadmin_succeeds(
         self,

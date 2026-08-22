@@ -18,6 +18,7 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.permission.types import EntityType, OperationType, Permission, ScopeType
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
@@ -64,6 +65,7 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 )
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
+from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.services.model_card.service import ModelCardService
 from ai.backend.manager.services.permission_contoller.processors import (
@@ -73,6 +75,8 @@ from ai.backend.manager.services.permission_contoller.service import PermissionC
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.project.service import ProjectService
+from ai.backend.manager.services.user.processors import UserProcessors
+from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -161,17 +165,35 @@ def permission_controller_processors(
 
 
 @pytest.fixture()
+def user_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> UserProcessors:
+    """The project adapter reads the key each user authorizes with; the rest is unused."""
+    service = UserService(
+        storage_manager=AsyncMock(),
+        valkey_stat_client=AsyncMock(),
+        agent_registry=AsyncMock(),
+        user_repository=UserRepository(database_engine, V2DBOpsProvider(database_engine)),
+        scheduling_controller=AsyncMock(),
+    )
+    return UserProcessors(processor_registry.group(GroupMeta(USER_ENTITY_TYPE)), service)
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     model_card_processors: ModelCardProcessors,
     group_processors: ProjectProcessors,
     permission_controller_processors: PermissionControllerProcessors,
+    user_processors: UserProcessors,
 ) -> list[RouteRegistry]:
     """Register v2 model-card, project, and RBAC routes for testing."""
     processors = MagicMock(spec=Processors)
     processors.model_card = model_card_processors
-    processors.group = group_processors
+    processors.project = group_processors
     processors.permission_controller = permission_controller_processors
+    processors.user = user_processors
 
     mc_handler = V2ModelCardHandler(adapter=ModelCardAdapter(processors))
     proj_handler = V2ProjectHandler(adapter=ProjectAdapter(processors))
