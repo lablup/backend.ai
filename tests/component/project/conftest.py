@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.common.data.permission.types import RelationType
@@ -74,6 +75,7 @@ from ai.backend.manager.models.virtual_scope.entity_membership import EntityMemb
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -81,6 +83,8 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
@@ -193,16 +197,30 @@ def permission_controller_processors(
 
 
 @pytest.fixture()
+def domain_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> DomainProcessors:
+    """The adapter resolves a domain name to its id, so this runs against the DB."""
+    service = DomainService(
+        repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
+    )
+    return DomainProcessors(processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), service, [])
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     config_provider: ManagerConfigProvider,
     group_processors: ProjectProcessors,
     user_processors: UserProcessors,
+    domain_processors: DomainProcessors,
     permission_controller_processors: PermissionControllerProcessors,
 ) -> list[RouteRegistry]:
     """Register v2 project, user, and RBAC routes for testing."""
     processors = MagicMock(spec=Processors)
-    processors.group = group_processors
+    processors.project = group_processors
+    processors.domain = domain_processors
     processors.user = user_processors
     processors.permission_controller = permission_controller_processors
 
