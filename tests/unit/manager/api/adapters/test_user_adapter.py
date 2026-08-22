@@ -38,7 +38,6 @@ def _create_user_data(
         totp_activated=False,
         totp_activated_at=None,
         sudo_session_enabled=False,
-        default_access_key=None,
         container_uid=None,
         container_main_gid=None,
         container_gids=None,
@@ -53,7 +52,7 @@ class TestUserDataToNode:
         """UserData fields should map to UserNode sub-models."""
         user_id = uuid4()
         data = _create_user_data(user_id=user_id)
-        node = UserAdapter._user_data_to_node(data)
+        node = UserAdapter._user_data_to_node(data, None)
 
         assert node.id == user_id
         assert node.basic_info.username == "testuser"
@@ -70,5 +69,5 @@ class TestUserDataToNode:
     def test_node_has_no_groups_field(self) -> None:
         """UserNode should not have a groups field."""
         data = _create_user_data()
-        node = UserAdapter._user_data_to_node(data)
+        node = UserAdapter._user_data_to_node(data, None)
         assert not hasattr(node, "groups")

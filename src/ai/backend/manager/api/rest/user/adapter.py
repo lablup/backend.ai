@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.user import (
 )
 from ai.backend.common.dto.manager.user.types import UserRole as UserRoleDTO
 from ai.backend.common.dto.manager.user.types import UserStatus as UserStatusDTO
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -39,7 +40,7 @@ __all__ = ("UserAdapter",)
 class UserAdapter(BaseFilterAdapter):
     """Adapter for converting user admin requests to repository queries."""
 
-    def convert_to_dto(self, data: UserData) -> UserDTO:
+    def convert_to_dto(self, data: UserData, main_access_key: AccessKey | None) -> UserDTO:
         """Convert UserData to DTO for REST response."""
         return UserDTO(
             id=data.id,
@@ -58,7 +59,7 @@ class UserAdapter(BaseFilterAdapter):
             allowed_client_ip=data.allowed_client_ip,
             totp_activated=data.totp_activated,
             sudo_session_enabled=data.sudo_session_enabled,
-            main_access_key=data.default_access_key,
+            main_access_key=main_access_key,
             container_uid=data.container_uid,
             container_main_gid=data.container_main_gid,
             container_gids=data.container_gids,

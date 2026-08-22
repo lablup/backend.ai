@@ -44,12 +44,15 @@ from ai.backend.common.dto.manager.v2.group.types import (
     ProjectTypeFilter,
     ProjectUserFilter,
 )
+from ai.backend.common.dto.manager.v2.user.response import UserNode
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.project.conditions import ProjectConditions
@@ -85,6 +88,7 @@ from ai.backend.manager.services.project.actions.unassign_users import (
     UnassignUsersFromProjectAction,
 )
 from ai.backend.manager.services.project.actions.update_project import UpdateProjectAction
+from ai.backend.manager.services.user.actions.keypair_ops import GetDefaultKeypairsAction
 from ai.backend.manager.types import OptionalState, TriState
 
 _PROJECT_PAGINATION_SPEC = PaginationSpec(
@@ -256,9 +260,7 @@ class ProjectAdapter(BaseAdapter):
             )
         )
         return UnassignUsersFromProjectPayload(
-            unassigned_users=[
-                UserAdapter._user_data_to_node(user_data) for user_data in result.unassigned_users
-            ],
+            unassigned_users=await self._user_nodes(result.unassigned_users),
             failed=[
                 UnassignUserError(user_id=f.user_id, message=f.reason) for f in result.failures
             ],
@@ -342,8 +344,18 @@ class ProjectAdapter(BaseAdapter):
             )
         )
         return AssignUsersToProjectPayload(
-            items=[UserAdapter._user_data_to_node(u) for u in result.assigned_users],
+            items=await self._user_nodes(result.assigned_users),
         )
+
+    async def _user_nodes(self, users: Sequence[UserData]) -> list[UserNode]:
+        """Convert users, reading the key each authorizes with for all of them at once."""
+        if not users:
+            return []
+        result = await self._processors.user.get_default_keypairs.run(
+            GetDefaultKeypairsAction(user_ids=[UserID(user.id) for user in users])
+        )
+        keys = {owner: AccessKey(kp.access_key) for owner, kp in result.designated.items()}
+        return [UserAdapter._user_data_to_node(user, keys.get(UserID(user.id))) for user in users]
 
     def _convert_group_filter(self, filter: ProjectFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

@@ -98,7 +98,6 @@ class TestCreateUser:
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            default_access_key="TESTKEY1234567890",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
@@ -284,7 +283,6 @@ class TestModifyUser:
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            default_access_key="TESTKEY1234567890",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
@@ -451,7 +449,6 @@ class TestPurgeUser:
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            default_access_key="TESTKEY1234567890",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
@@ -682,7 +679,6 @@ class TestBulkPurgeUsers:
         admin_user = MagicMock()
         admin_user.uuid = uuid.uuid4()
         admin_user.email = "admin@example.com"
-        admin_user.default_access_key = "ADMINKEY123456789"
         mock_user_repository.get_user_by_uuid = AsyncMock(return_value=admin_user)
         return admin_user
 

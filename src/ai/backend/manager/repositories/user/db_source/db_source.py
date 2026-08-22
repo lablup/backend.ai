@@ -140,16 +140,6 @@ from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_de
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _default_access_key() -> sa.ScalarSelect[str]:
-    """The owner's default keypair access key, correlated to the enclosing ``users`` row."""
-    return (
-        sa.select(KeyPairRow.access_key)
-        .where((KeyPairRow.user == UserRow.uuid) & KeyPairRow.is_default)
-        .correlate(UserRow)
-        .scalar_subquery()
-    )
-
-
 class UserDBSource:
     """Database source for user-related operations."""
 
@@ -331,10 +321,7 @@ class UserDBSource:
             if status is not None and status != current_user.status:
                 to_update["status_info"] = "admin-requested"
             update_query = (
-                sa.update(users)
-                .where(users.c.email == email)
-                .values(to_update)
-                .returning(users, _default_access_key().label("default_access_key"))
+                sa.update(users).where(users.c.email == email).values(to_update).returning(users)
             )
             result = await session.execute(update_query)
             updated_user = result.first()
@@ -437,10 +424,7 @@ class UserDBSource:
         if status is not None and status != current_user.status:
             to_update["status_info"] = "admin-requested"
         update_query = (
-            sa.update(users)
-            .where(users.c.uuid == user_id)
-            .values(to_update)
-            .returning(users, _default_access_key().label("default_access_key"))
+            sa.update(users).where(users.c.uuid == user_id).values(to_update).returning(users)
         )
         result = await session.execute(update_query)
         updated_user = result.first()

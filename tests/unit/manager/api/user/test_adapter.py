@@ -488,14 +488,13 @@ class TestUserAdapterConversion:
             totp_activated=True,
             totp_activated_at=now,
             sudo_session_enabled=False,
-            default_access_key="AKIAIOSFODNN7EXAMPLE",
             container_uid=1000,
             container_main_gid=1000,
             container_gids=[1000, 1001],
         )
 
         adapter = UserAdapter()
-        dto = adapter.convert_to_dto(user_data)
+        dto = adapter.convert_to_dto(user_data, None)
 
         assert isinstance(dto, UserDTO)
         assert dto.id == user_id
@@ -544,14 +543,13 @@ class TestUserAdapterConversion:
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            default_access_key=None,
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
         )
 
         adapter = UserAdapter()
-        dto = adapter.convert_to_dto(user_data)
+        dto = adapter.convert_to_dto(user_data, None)
 
         assert isinstance(dto, UserDTO)
         assert dto.id == user_id

@@ -9,6 +9,7 @@ extracted by ``_wrap_api_handler`` and responses are returned as
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
@@ -29,8 +30,10 @@ from ai.backend.common.dto.manager.user import (
     UpdateUserRequest,
     UpdateUserResponse,
 )
+from ai.backend.common.dto.manager.user.response import UserDTO
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.user.types import UserStatus as ManagerUserStatus
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.user_request import GetUserPathParam, UpdateUserPathParam
@@ -41,7 +44,10 @@ from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.user.actions.create_user import CreateUserAction
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
-from ai.backend.manager.services.user.actions.keypair_ops import SwitchDefaultAccessKeyAction
+from ai.backend.manager.services.user.actions.keypair_ops import (
+    GetDefaultKeypairsAction,
+    SwitchDefaultAccessKeyAction,
+)
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
 from ai.backend.manager.services.user.actions.update_user import UpdateUserAction
@@ -71,6 +77,19 @@ class UserHandler:
         self._domain = domain
         self._config_provider = config_provider
         self._adapter = UserAdapter()
+
+    async def _user_dtos(self, users: Sequence[UserData]) -> list[UserDTO]:
+        """Convert users, reading the key each authorizes with for all of them at once."""
+        if not users:
+            return []
+        result = await self._user.get_default_keypairs.run(
+            GetDefaultKeypairsAction(user_ids=[UserID(user.id) for user in users])
+        )
+        keys = {owner: AccessKey(kp.access_key) for owner, kp in result.designated.items()}
+        return [self._adapter.convert_to_dto(user, keys.get(UserID(user.id))) for user in users]
+
+    async def _user_dto(self, user: UserData) -> UserDTO:
+        return (await self._user_dtos([user]))[0]
 
     # ------------------------------------------------------------------
     # create_user (POST /admin/users)
@@ -125,7 +144,7 @@ class UserHandler:
             )
         )
 
-        resp = CreateUserResponse(user=self._adapter.convert_to_dto(action_result.data.user))
+        resp = CreateUserResponse(user=await self._user_dto(action_result.data.user))
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
     # ------------------------------------------------------------------
@@ -142,7 +161,7 @@ class UserHandler:
             GetUserAction(user_id=UserID(path.parsed.user_id))
         )
 
-        resp = GetUserResponse(user=self._adapter.convert_to_dto(action_result.user))
+        resp = GetUserResponse(user=await self._user_dto(action_result.user))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     # ------------------------------------------------------------------
@@ -162,7 +181,7 @@ class UserHandler:
         )
 
         resp = SearchUsersResponse(
-            items=[self._adapter.convert_to_dto(u) for u in action_result.items],
+            items=await self._user_dtos(action_result.items),
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,
@@ -213,7 +232,7 @@ class UserHandler:
                 )
             )
 
-        resp = UpdateUserResponse(user=self._adapter.convert_to_dto(action_result.data))
+        resp = UpdateUserResponse(user=await self._user_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     # ------------------------------------------------------------------

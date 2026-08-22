@@ -62,6 +62,7 @@ from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
 )
 from ai.backend.manager.services.user.actions.keypair_ops import (
+    GetDefaultKeypairsAction,
     SwitchDefaultAccessKeyAction,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
@@ -597,7 +598,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         return cast(Iterable[UserGroup], await loader.load(self.id))
 
     @classmethod
-    def from_dto(cls, dto: UserData) -> Self:
+    def from_dto(cls, dto: UserData, main_access_key: str | None) -> Self:
         return cls(
             id=dto.id,
             uuid=dto.uuid,  # legacy
@@ -618,7 +619,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
             totp_activated=dto.totp_activated,
             totp_activated_at=dto.totp_activated_at,
             sudo_session_enabled=dto.sudo_session_enabled,
-            main_access_key=dto.default_access_key,
+            main_access_key=main_access_key,
             container_uid=dto.container_uid,
             container_main_gid=dto.container_main_gid,
             container_gids=dto.container_gids,
@@ -1121,7 +1122,7 @@ class CreateUser(graphene.Mutation):  # type: ignore[misc]
         return cls(
             ok=True,
             msg="success",
-            user=User.from_dto(action_result.data.user),
+            user=User.from_dto(action_result.data.user, action_result.data.keypair.access_key),
             keypair=keypair,
         )
 
@@ -1160,10 +1161,14 @@ class ModifyUser(graphene.Mutation):  # type: ignore[misc]
                 )
             )
 
+        designated = await graph_ctx.processors.user.get_default_keypairs.run(
+            GetDefaultKeypairsAction(user_ids=[UserID(user_data.id)])
+        )
+        main_access_key = designated.designated.get(UserID(user_data.id))
         return cls(
             ok=True,
             msg="success",
-            user=User.from_dto(res.data),
+            user=User.from_dto(res.data, main_access_key.access_key if main_access_key else None),
         )
 
 

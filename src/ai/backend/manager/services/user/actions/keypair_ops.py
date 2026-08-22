@@ -16,11 +16,13 @@ from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.ops.base import BulkGetOwnedFieldOpsAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
+from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
@@ -161,6 +163,30 @@ class SearchMyKeypairsActionResult(BaseScopeActionResult):
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:
         return ()
+
+
+@dataclass(frozen=True)
+class GetDefaultKeypairsAction(BulkGetOwnedFieldOpsAction[UserID, KeyPairRow, KeyPairData]):
+    """Read the keypair each named user authorizes with."""
+
+    user_ids: Sequence[UserID]
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return self.user_ids
+
+    @override
+    def owner_ids(self) -> Sequence[UserID]:
+        return self.user_ids
+
+    @override
+    def to_querier(self) -> DefaultKeypairQuerier:
+        return DefaultKeypairQuerier()
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_default_keypairs"
 
 
 @dataclass(frozen=True)

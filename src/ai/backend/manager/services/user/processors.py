@@ -4,12 +4,14 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     FieldOwnerLookupOpsResult,
     LookupOpsResult,
+    OwnedFieldsOpsResult,
     ScopedBatchOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
@@ -66,6 +68,7 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminSearchKeypairsActionResult,
     AdminUpdateKeypairAction,
     AdminUpdateKeypairActionResult,
+    GetDefaultKeypairsAction,
     IssueMyKeypairAction,
     IssueMyKeypairActionResult,
     RevokeMyKeypairAction,
@@ -150,6 +153,9 @@ class UserProcessors:
     ]
     switch_default_access_key: SingleEntityActionProcessor[
         SwitchDefaultAccessKeyAction, SwitchDefaultAccessKeyActionResult
+    ]
+    get_default_keypairs: BulkActionProcessor[
+        GetDefaultKeypairsAction, OwnedFieldsOpsResult[UserID, KeyPairData]
     ]
     update_my_keypair: SingleEntityActionProcessor[
         UpdateMyKeypairAction, UpdateMyKeypairActionResult
@@ -287,6 +293,7 @@ class UserProcessors:
             LookupKeypairOwnerAction,
             LookupBulkKeypairOwnerAction,
         )
+        self.get_default_keypairs = self.keypair_group.bulk_get_ops(GetDefaultKeypairsAction)
         self.error_log = ErrorLogProcessors(
             group.field_group(
                 FieldGroupMeta(ERROR_LOG_FIELD_TYPE),

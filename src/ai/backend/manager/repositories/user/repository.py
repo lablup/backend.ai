@@ -31,6 +31,7 @@ from ai.backend.manager.data.user.types import (
     UserSearchResult,
 )
 from ai.backend.manager.errors.user import KeyPairNotFound
+from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.updater import DataUpdater
@@ -76,6 +77,14 @@ class UserRepository:
     def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
         self._db_source = UserDBSource(db)
         self._v2_ops = v2_ops_provider
+
+    @user_repository_resilience.apply()
+    async def default_access_key(self, user_id: UserID) -> AccessKey | None:
+        """The key a user authorizes with, or ``None`` if they marked no active one."""
+        async with self._v2_ops.read_ops() as r:
+            designated = await r.query_owned_fields(DefaultKeypairQuerier(), [user_id])
+        keypair = designated.get(user_id)
+        return AccessKey(keypair.access_key) if keypair is not None else None
 
     @user_repository_resilience.apply()
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:

@@ -25,6 +25,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
@@ -38,7 +39,6 @@ from ai.backend.common.exception import (
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
-    AccessKey,
     AgentId,
     BinarySize,
     ContainerId,
@@ -1576,7 +1576,10 @@ class SessionService:
         domain_name = action.domain_name
         if action.owner_id is not None:
             owner = await self._user_repository.get_user_by_uuid(action.owner_id)
-            if owner.default_access_key is None:
+            owner_access_key = await self._user_repository.default_access_key(
+                UserID(action.owner_id)
+            )
+            if owner_access_key is None:
                 raise InternalServerError(
                     f"Delegated owner {action.owner_id} has no default access key configured"
                 )
@@ -1589,7 +1592,7 @@ class SessionService:
                     f"Delegated owner {action.owner_id} has no domain configured"
                 )
             user_id = owner.id
-            access_key = AccessKey(owner.default_access_key)
+            access_key = owner_access_key
             domain_name = owner.domain_name
 
         # Keep the image resolve so callers passing a stale UUID get a
