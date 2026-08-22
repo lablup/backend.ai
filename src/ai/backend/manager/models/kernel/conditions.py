@@ -14,11 +14,11 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.data.kernel.types import KernelStatusInMatchSpec
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 
 from .row import KernelRow
 
@@ -115,11 +115,11 @@ class KernelConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group(scaling_group: str) -> QueryCondition:
+    def by_resource_group(resource_group: str) -> QueryCondition:
         """Filter kernels by scaling group."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return KernelRow.scaling_group == scaling_group
+            return KernelRow.scaling_group == resource_group
 
         return inner
 
@@ -192,19 +192,19 @@ class KernelConditions:
         """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            # Subquery to get lookback_days from scaling_group's fair_share_spec
+            # Subquery to get lookback_days from resource_group's fair_share_spec
             # Falls back to DEFAULT_LOOKBACK_DAYS if not set
             lookback_days_subquery = (
                 sa.select(
                     sa.func.coalesce(
                         sa.cast(
-                            ScalingGroupRow.fair_share_spec["lookback_days"].as_string(),
+                            ResourceGroupRow.fair_share_spec["lookback_days"].as_string(),
                             sa.Integer,
                         ),
                         DEFAULT_LOOKBACK_DAYS,
                     )
                 )
-                .where(ScalingGroupRow.id == resource_group_id)
+                .where(ResourceGroupRow.id == resource_group_id)
                 .scalar_subquery()
             )
 

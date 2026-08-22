@@ -15,10 +15,10 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -36,16 +36,17 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import (
     AssociationScopesEntitiesRow,
     EntityFieldRow,
     RoleRow,
     UserRoleRow,
 )
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -53,7 +54,6 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
@@ -78,7 +78,7 @@ class TestEnqueueSessionSchedulingHistory:
             [
                 # FK dependency order: parents first
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -86,7 +86,7 @@ class TestEnqueueSessionSchedulingHistory:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
@@ -134,11 +134,11 @@ class TestEnqueueSessionSchedulingHistory:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sg = ScalingGroupRow(
+            sg = ResourceGroupRow(
                 name=sg_name,
                 driver="static",
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(
+                scheduler_opts=ResourceGroupOpts(
                     allowed_session_types=[],
                     pending_timeout=timedelta(hours=1),
                     config={},
@@ -257,7 +257,6 @@ class TestEnqueueSessionSchedulingHistory:
 
         async with db_with_cleanup.begin_session() as db_sess:
             keypair = KeyPairRow(
-                user_id=f"test-user-{uuid.uuid4().hex[:8]}@test.com",
                 access_key=access_key,
                 secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
                 is_active=True,
@@ -283,7 +282,7 @@ class TestEnqueueSessionSchedulingHistory:
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group",
@@ -331,7 +330,7 @@ class TestMarkTerminatingSchedulingHistory:
             [
                 # FK dependency order: parents first
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -339,7 +338,7 @@ class TestMarkTerminatingSchedulingHistory:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -393,12 +392,12 @@ class TestMarkTerminatingSchedulingHistory:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sg = ScalingGroupRow(
+            sg = ResourceGroupRow(
                 id=test_scaling_group_id,
                 name=sg_name,
                 driver="static",
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(
+                scheduler_opts=ResourceGroupOpts(
                     allowed_session_types=[],
                     pending_timeout=timedelta(hours=1),
                     config={},
@@ -517,7 +516,6 @@ class TestMarkTerminatingSchedulingHistory:
 
         async with db_with_cleanup.begin_session() as db_sess:
             keypair = KeyPairRow(
-                user_id=f"test-user-{uuid.uuid4().hex[:8]}@test.com",
                 access_key=access_key,
                 secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
                 is_active=True,
@@ -543,7 +541,7 @@ class TestMarkTerminatingSchedulingHistory:
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group",
@@ -594,7 +592,7 @@ class TestMarkTerminatingSchedulingHistory:
         kernel_status: KernelStatus,
         domain_name: str,
         domain_id: DomainID,
-        scaling_group_name: str,
+        resource_group_name: str,
         resource_group_id: ResourceGroupID,
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
@@ -613,7 +611,7 @@ class TestMarkTerminatingSchedulingHistory:
                 domain_name=domain_name,
                 domain_id=domain_id,
                 group_id=group_id,
-                scaling_group_name=scaling_group_name,
+                scaling_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=session_status,
                 status_info="test",
@@ -633,7 +631,7 @@ class TestMarkTerminatingSchedulingHistory:
                 session_id=session_id,
                 agent=agent_id,
                 agent_addr="127.0.0.1:6001",
-                scaling_group=scaling_group_name,
+                scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 cluster_idx=0,
                 cluster_role="main",
@@ -692,7 +690,7 @@ class TestMarkTerminatingSchedulingHistory:
             kernel_status=KernelStatus.RUNNING,
             domain_name=test_domain.domain_name,
             domain_id=test_domain_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -767,7 +765,7 @@ class TestMarkTerminatingSchedulingHistory:
             kernel_status=KernelStatus.PENDING,
             domain_name=test_domain.domain_name,
             domain_id=test_domain_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -812,7 +810,7 @@ class TestMarkTerminatingSchedulingHistory:
             kernel_status=KernelStatus.RUNNING,
             domain_name=test_domain.domain_name,
             domain_id=test_domain_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -856,7 +854,7 @@ class TestMarkTerminatingSchedulingHistory:
             kernel_status=KernelStatus.TERMINATING,
             domain_name=test_domain.domain_name,
             domain_id=test_domain_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -901,7 +899,7 @@ class TestMarkTerminatingSchedulingHistory:
             kernel_status=KernelStatus.RUNNING,
             domain_name=test_domain.domain_name,
             domain_id=test_domain_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -914,7 +912,7 @@ class TestMarkTerminatingSchedulingHistory:
             kernel_status=KernelStatus.SCHEDULED,
             domain_name=test_domain.domain_name,
             domain_id=test_domain_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,

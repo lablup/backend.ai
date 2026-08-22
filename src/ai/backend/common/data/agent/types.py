@@ -5,7 +5,7 @@ from typing import Any
 from pydantic import field_validator
 
 from ai.backend.common.auth import PublicKey
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     BackendAISchema,
     DeviceName,

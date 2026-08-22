@@ -12,7 +12,7 @@ from typing import Any
 from pydantic import ConfigDict, Field, HttpUrl, NonNegativeFloat, NonNegativeInt
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import BackendAISchema, RuntimeVariant
 
 __all__ = (

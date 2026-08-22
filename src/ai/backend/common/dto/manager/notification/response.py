@@ -79,7 +79,7 @@ class NotificationRuleDTO(BackendAISchema):
     name: str = Field(description="Rule name")
     description: str | None = Field(default=None, description="Rule description")
     rule_type: NotificationRuleType = Field(description="Rule type")
-    channel: NotificationChannelDTO = Field(description="Associated channel")
+    channel_id: UUID = Field(description="ID of the channel this rule dispatches through")
     message_template: str = Field(description="Jinja2 template for notification message")
     enabled: bool = Field(description="Whether the rule is enabled")
     created_at: datetime = Field(description="Creation timestamp")

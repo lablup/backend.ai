@@ -6,7 +6,7 @@ from typing import Final, Self
 
 from pydantic import Field, model_validator
 
-from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import BackendAISchema
 
 # Metric label carrying the session UUID; grouping by it enables per-session mapping.
@@ -48,12 +48,12 @@ class UtilizationThresholdEntry(BackendAISchema):
     )
     filter_labels: list[MetricLabel] = Field(
         default_factory=list,
-        description="Label filters injected into the preset's {labels} placeholder.",
+        description="Label filters injected into the preset's ${{labels}} placeholder.",
     )
     group_labels: list[str] = Field(
         default_factory=lambda: [SESSION_ID_LABEL],
         description=(
-            "Labels injected into the preset's {group_by} placeholder. "
+            "Labels injected into the preset's ${{group_by}} placeholder. "
             "Must include 'session_id' for per-session values to be mapped. "
             "When 'session_id' is grouped, the checker adds a session_id filter that "
             "limits the query to the sessions being evaluated; a user-provided "

@@ -19,7 +19,7 @@ class ResourcePresetCreatorSpec(CreatorSpec[ResourcePresetRow]):
     name: str
     resource_slots: ResourceSlot
     shared_memory: str | None
-    scaling_group_name: str | None
+    resource_group_name: str | None
 
     @property
     @override
@@ -28,7 +28,7 @@ class ResourcePresetCreatorSpec(CreatorSpec[ResourcePresetRow]):
             IntegrityErrorCheck(
                 violation_type=UniqueConstraintViolationError,
                 error=ResourcePresetConflict(
-                    f"Duplicate resource preset name (name:{self.name}, scaling_group:{self.scaling_group_name})"
+                    f"Duplicate resource preset name (name:{self.name}, scaling_group:{self.resource_group_name})"
                 ),
             ),
         )
@@ -41,5 +41,5 @@ class ResourcePresetCreatorSpec(CreatorSpec[ResourcePresetRow]):
         row.shared_memory = (
             int(BinarySize.from_str(self.shared_memory)) if self.shared_memory else None
         )
-        row.scaling_group_name = self.scaling_group_name
+        row.scaling_group_name = self.resource_group_name
         return row

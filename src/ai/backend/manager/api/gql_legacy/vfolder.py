@@ -44,10 +44,10 @@ from ai.backend.manager.errors.storage import (
     VFolderBadRequest,
     VFolderOperationFailed,
 )
-from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac import (
     ScopeType,
     SystemScope,
@@ -767,9 +767,9 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
             model_store_project_gids = (
                 (
                     await db_session.execute(
-                        sa.select(GroupRow.id).where(
-                            (GroupRow.type == ProjectType.MODEL_STORE)
-                            & (GroupRow.domain_name == graph_ctx.user["domain_name"])
+                        sa.select(ProjectRow.id).where(
+                            (ProjectRow.type == ProjectType.MODEL_STORE)
+                            & (ProjectRow.domain_name == graph_ctx.user["domain_name"])
                         )
                     )
                 )
@@ -986,7 +986,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> int:
-        from ai.backend.manager.models.group import groups
+        from ai.backend.manager.models.project import groups
         from ai.backend.manager.models.user import users
 
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
@@ -1019,7 +1019,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> Sequence[VirtualFolder]:
-        from ai.backend.manager.models.group import groups
+        from ai.backend.manager.models.project import groups
         from ai.backend.manager.models.user import users
 
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
@@ -1216,7 +1216,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> int:
-        from ai.backend.manager.models.group import groups
+        from ai.backend.manager.models.project import groups
 
         membership_query = user_scope_membership_query(PROJECT_SCOPE_TYPE).where(
             EntityMembershipRow.entity_id == user_id
@@ -1252,7 +1252,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> list[VirtualFolder]:
-        from ai.backend.manager.models.group import groups
+        from ai.backend.manager.models.project import groups
 
         membership_query = user_scope_membership_query(PROJECT_SCOPE_TYPE).where(
             EntityMembershipRow.entity_id == user_id
@@ -1476,9 +1476,9 @@ class QuotaScope(graphene.ObjectType):  # type: ignore[misc]
                     )
                 else:
                     group_query = (
-                        sa.select(GroupRow)
-                        .where(GroupRow.id == qsid.scope_id)
-                        .options(selectinload(GroupRow.resource_policy_row))
+                        sa.select(ProjectRow)
+                        .where(ProjectRow.id == qsid.scope_id)
+                        .options(selectinload(ProjectRow.resource_policy_row))
                     )
                     group_row = await sess.scalar(group_query)
                     if group_row is None:

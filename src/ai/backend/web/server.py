@@ -506,6 +506,7 @@ async def login_handler(request: web.Request) -> web.Response:
                     "secret_key": token.secret_key,
                     "role": token.role,
                     "status": token.status,
+                    "user_id": str(token.user_id),
                 }
                 public_return = {
                     "access_key": token.access_key,
@@ -767,6 +768,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
             "secret_key": token.secret_key,
             "role": token.role,
             "status": token.status,
+            "user_id": str(token.user_id),
         }
         public_return = {
             "access_key": token.access_key,

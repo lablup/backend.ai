@@ -6,6 +6,7 @@ from typing import Any
 import aiohttp
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.session.request import (
     CommitSessionRequest,
     CompleteRequest,
@@ -98,33 +99,33 @@ class SessionClient(BaseDomainClient):
 
     async def get_info(
         self,
-        session_name: str,
+        session_id: SessionID,
         *,
         owner_access_key: str | None = None,
     ) -> GetSessionInfoResponse:
         params = {"owner_access_key": owner_access_key} if owner_access_key else None
         return await self._client.typed_request(
             "GET",
-            f"{_BASE_PATH}/{session_name}",
+            f"{_BASE_PATH}/{session_id}",
             response_model=GetSessionInfoResponse,
             params=params,
         )
 
     async def restart(
         self,
-        session_name: str,
+        session_id: SessionID,
         request: RestartSessionRequest | None = None,
     ) -> None:
         params = request.model_dump(mode="json", exclude_none=True) if request else None
         await self._client.typed_request_no_content(
             "PATCH",
-            f"{_BASE_PATH}/{session_name}",
+            f"{_BASE_PATH}/{session_id}",
             params=params,
         )
 
     async def destroy(
         self,
-        session_name: str,
+        session_id: SessionID,
         request: DestroySessionRequest | None = None,
     ) -> DestroySessionResponse:
         params: dict[str, str] | None = None
@@ -133,29 +134,29 @@ class SessionClient(BaseDomainClient):
             params = {k: str(v) for k, v in raw.items()}
         return await self._client.typed_request(
             "DELETE",
-            f"{_BASE_PATH}/{session_name}",
+            f"{_BASE_PATH}/{session_id}",
             response_model=DestroySessionResponse,
             params=params,
         )
 
     async def rename(
         self,
-        session_name: str,
+        session_id: SessionID,
         request: RenameSessionRequest,
     ) -> None:
         await self._client.typed_request_no_content(
             "POST",
-            f"{_BASE_PATH}/{session_name}/rename",
+            f"{_BASE_PATH}/{session_id}/rename",
             request=request,
         )
 
     async def interrupt(
         self,
-        session_name: str,
+        session_id: SessionID,
     ) -> None:
         await self._client.typed_request_no_content(
             "POST",
-            f"{_BASE_PATH}/{session_name}/interrupt",
+            f"{_BASE_PATH}/{session_id}/interrupt",
         )
 
     async def match_sessions(
@@ -178,24 +179,24 @@ class SessionClient(BaseDomainClient):
 
     async def execute(
         self,
-        session_name: str,
+        session_id: SessionID,
         request: ExecuteRequest,
     ) -> ExecuteResponse:
         return await self._client.typed_request(
             "POST",
-            f"{_BASE_PATH}/{session_name}",
+            f"{_BASE_PATH}/{session_id}",
             request=request,
             response_model=ExecuteResponse,
         )
 
     async def complete(
         self,
-        session_name: str,
+        session_id: SessionID,
         request: CompleteRequest,
     ) -> CompleteResponse:
         return await self._client.typed_request(
             "POST",
-            f"{_BASE_PATH}/{session_name}/complete",
+            f"{_BASE_PATH}/{session_id}/complete",
             request=request,
             response_model=CompleteResponse,
         )
@@ -206,24 +207,24 @@ class SessionClient(BaseDomainClient):
 
     async def start_service(
         self,
-        session_name: str,
+        session_id: SessionID,
         request: StartServiceRequest,
     ) -> StartServiceResponse:
         return await self._client.typed_request(
             "POST",
-            f"{_BASE_PATH}/{session_name}/start-service",
+            f"{_BASE_PATH}/{session_id}/start-service",
             request=request,
             response_model=StartServiceResponse,
         )
 
     async def shutdown_service(
         self,
-        session_name: str,
+        session_id: SessionID,
         request: ShutdownServiceRequest,
     ) -> None:
         await self._client.typed_request_no_content(
             "POST",
-            f"{_BASE_PATH}/{session_name}/shutdown-service",
+            f"{_BASE_PATH}/{session_id}/shutdown-service",
             params=request.model_dump(mode="json", exclude_none=True),
         )
 
@@ -233,37 +234,37 @@ class SessionClient(BaseDomainClient):
 
     async def commit(
         self,
-        session_name: str,
+        session_id: SessionID,
         request: CommitSessionRequest,
     ) -> CommitSessionResponse:
         return await self._client.typed_request(
             "POST",
-            f"{_BASE_PATH}/{session_name}/commit",
+            f"{_BASE_PATH}/{session_id}/commit",
             response_model=CommitSessionResponse,
             params=request.model_dump(mode="json", exclude_none=True),
         )
 
     async def get_commit_status(
         self,
-        session_name: str,
+        session_id: SessionID,
         request: GetCommitStatusRequest | None = None,
     ) -> GetCommitStatusResponse:
         params = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.typed_request(
             "GET",
-            f"{_BASE_PATH}/{session_name}/commit",
+            f"{_BASE_PATH}/{session_id}/commit",
             response_model=GetCommitStatusResponse,
             params=params,
         )
 
     async def convert_to_image(
         self,
-        session_name: str,
+        session_id: SessionID,
         request: ConvertSessionToImageRequest,
     ) -> ConvertSessionToImageResponse:
         return await self._client.typed_request(
             "POST",
-            f"{_BASE_PATH}/{session_name}/imagify",
+            f"{_BASE_PATH}/{session_id}/imagify",
             response_model=ConvertSessionToImageResponse,
             request=request,
         )
@@ -274,39 +275,39 @@ class SessionClient(BaseDomainClient):
 
     async def list_files(
         self,
-        session_name: str,
+        session_id: SessionID,
         request: ListFilesRequest | None = None,
     ) -> ListFilesResponse:
         params = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.typed_request(
             "GET",
-            f"{_BASE_PATH}/{session_name}/files",
+            f"{_BASE_PATH}/{session_id}/files",
             response_model=ListFilesResponse,
             params=params,
         )
 
     async def get_container_logs(
         self,
-        session_name: str,
+        session_id: SessionID,
         request: GetContainerLogsRequest | None = None,
     ) -> GetContainerLogsResponse:
         params = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.typed_request(
             "GET",
-            f"{_BASE_PATH}/{session_name}/logs",
+            f"{_BASE_PATH}/{session_id}/logs",
             response_model=GetContainerLogsResponse,
             params=params,
         )
 
     async def get_status_history(
         self,
-        session_name: str,
+        session_id: SessionID,
         request: GetStatusHistoryRequest | None = None,
     ) -> GetStatusHistoryResponse:
         params = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.typed_request(
             "GET",
-            f"{_BASE_PATH}/{session_name}/status-history",
+            f"{_BASE_PATH}/{session_id}/status-history",
             response_model=GetStatusHistoryResponse,
             params=params,
         )
@@ -317,33 +318,33 @@ class SessionClient(BaseDomainClient):
 
     async def get_direct_access_info(
         self,
-        session_name: str,
+        session_id: SessionID,
     ) -> GetDirectAccessInfoResponse:
         return await self._client.typed_request(
             "GET",
-            f"{_BASE_PATH}/{session_name}/direct-access-info",
+            f"{_BASE_PATH}/{session_id}/direct-access-info",
             response_model=GetDirectAccessInfoResponse,
         )
 
     async def get_dependency_graph(
         self,
-        session_name: str,
+        session_id: SessionID,
     ) -> GetDependencyGraphResponse:
         return await self._client.typed_request(
             "GET",
-            f"{_BASE_PATH}/{session_name}/dependency-graph",
+            f"{_BASE_PATH}/{session_id}/dependency-graph",
             response_model=GetDependencyGraphResponse,
         )
 
     async def get_abusing_report(
         self,
-        session_name: str,
+        session_id: SessionID,
         request: GetAbusingReportRequest | None = None,
     ) -> GetAbusingReportResponse:
         params = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.typed_request(
             "GET",
-            f"{_BASE_PATH}/{session_name}/abusing-report",
+            f"{_BASE_PATH}/{session_id}/abusing-report",
             response_model=GetAbusingReportResponse,
             params=params,
         )
@@ -382,7 +383,7 @@ class SessionClient(BaseDomainClient):
 
     async def upload_files(
         self,
-        session_name: str,
+        session_id: SessionID,
         files: list[str | Path],
         basedir: str | Path | None = None,
     ) -> dict[str, Any] | None:
@@ -398,27 +399,27 @@ class SessionClient(BaseDomainClient):
                 content_type="application/octet-stream",
             )
         return await self._client.upload(
-            f"{_BASE_PATH}/{session_name}/upload",
+            f"{_BASE_PATH}/{session_id}/upload",
             data,
         )
 
     async def download_files(
         self,
-        session_name: str,
+        session_id: SessionID,
         request: DownloadFilesRequest,
     ) -> bytes:
         return await self._client.download(
-            f"{_BASE_PATH}/{session_name}/download",
+            f"{_BASE_PATH}/{session_id}/download",
             params=request.model_dump(mode="json", exclude_none=True),
         )
 
     async def download_single(
         self,
-        session_name: str,
+        session_id: SessionID,
         request: DownloadSingleRequest,
     ) -> bytes:
         return await self._client.download(
-            f"{_BASE_PATH}/{session_name}/download_single",
+            f"{_BASE_PATH}/{session_id}/download_single",
             params=request.model_dump(mode="json", exclude_none=True),
         )
 

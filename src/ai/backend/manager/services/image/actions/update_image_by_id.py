@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.types import ImageID
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
@@ -15,8 +14,9 @@ class UpdateImageByIdAction(ImageAction):
     updater_spec: ImageUpdaterSpec
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.image_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_image_by_id"
 
     @override
     @classmethod
@@ -25,9 +25,5 @@ class UpdateImageByIdAction(ImageAction):
 
 
 @dataclass
-class UpdateImageByIdActionResult(BaseActionResult):
+class UpdateImageByIdActionResult:
     image: ImageData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.image.id)

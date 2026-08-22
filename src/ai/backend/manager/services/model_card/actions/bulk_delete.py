@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_card.types import BulkModelCardDeleteResultData
 from ai.backend.manager.models.model_card.row import ModelCardRow
@@ -16,8 +15,9 @@ class BulkDeleteModelCardAction(ModelCardAction):
     options: DeleteModelCardOptions
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "bulk_delete_model_card"
 
     @override
     @classmethod
@@ -26,9 +26,5 @@ class BulkDeleteModelCardAction(ModelCardAction):
 
 
 @dataclass
-class BulkDeleteModelCardActionResult(BaseActionResult):
+class BulkDeleteModelCardActionResult:
     data: BulkModelCardDeleteResultData
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

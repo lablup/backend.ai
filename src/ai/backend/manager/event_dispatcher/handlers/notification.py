@@ -71,7 +71,7 @@ class NotificationEventHandler:
 
         # Delegate to processor for business logic
         processors = self._processors_factory()
-        await processors.notification.process_notification.wait_for_complete(
+        await processors.notification.process_notification.run(
             ProcessNotificationAction(
                 rule_type=rule_type,
                 timestamp=event.timestamp,

@@ -7,17 +7,22 @@ from uuid import uuid4
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.identifier.architecture import ArchName
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.types import PreemptionOrder, ResourceSlot, ResourceSlotEntry, SessionId
+from ai.backend.common.types import (
+    ArchName,
+    PreemptionOrder,
+    ResourceSlot,
+    ResourceSlotEntry,
+    SessionId,
+)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -458,7 +463,7 @@ class SchedulingController:
                 continue
             seen_ids.add(image_id)
             image_ids.append(image_id)
-        # An unknown resource group (ScalingGroupNotFound) is a request error,
+        # An unknown resource group (ResourceGroupNotFound) is a request error,
         # not a per-kernel fitting outcome, so let it propagate to the caller.
         fetched = await self._repository.fetch_compute_schedule_data(resource_group_id, image_ids)
         prepared = await self._spec_preparer.prepare_resources(draft, fetched.spec_context)

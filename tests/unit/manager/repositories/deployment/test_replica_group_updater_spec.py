@@ -2,7 +2,7 @@
 
 import uuid
 
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,

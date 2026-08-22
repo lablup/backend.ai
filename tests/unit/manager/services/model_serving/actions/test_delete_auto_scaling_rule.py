@@ -8,11 +8,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import RuleId
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.errors.service import (
     EndpointAutoScalingRuleNotFound,
 )
@@ -21,9 +21,6 @@ from ai.backend.manager.repositories.model_serving.repository import ModelServin
 from ai.backend.manager.services.model_serving.actions.delete_auto_scaling_rule import (
     DeleteEndpointAutoScalingRuleAction,
     DeleteEndpointAutoScalingRuleActionResult,
-)
-from ai.backend.manager.services.model_serving.processors.auto_scaling import (
-    ModelServingAutoScalingProcessors,
 )
 from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 from ai.backend.testutils.scenario import ScenarioBase
@@ -64,19 +61,6 @@ class TestDeleteAutoScalingRule:
     ) -> AutoScalingService:
         return AutoScalingService(
             repository=mock_repositories.repository,
-        )
-
-    @pytest.fixture
-    def auto_scaling_processors(
-        self,
-        mock_action_monitor: MagicMock,
-        auto_scaling_service: AutoScalingService,
-        mock_action_validators: ActionValidators,
-    ) -> ModelServingAutoScalingProcessors:
-        return ModelServingAutoScalingProcessors(
-            service=auto_scaling_service,
-            action_monitors=[mock_action_monitor],
-            validators=mock_action_validators,
         )
 
     @pytest.fixture
@@ -137,6 +121,7 @@ class TestDeleteAutoScalingRule:
             ScenarioBase.success(
                 "Normal delete",
                 DeleteEndpointAutoScalingRuleAction(
+                    deployment_id=DeploymentID(uuid.uuid4()),
                     id=RuleId(uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")),
                 ),
                 DeleteEndpointAutoScalingRuleActionResult(
@@ -146,6 +131,7 @@ class TestDeleteAutoScalingRule:
             ScenarioBase.failure(
                 "Rule not found",
                 DeleteEndpointAutoScalingRuleAction(
+                    deployment_id=DeploymentID(uuid.uuid4()),
                     id=RuleId(uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd")),
                 ),
                 EndpointAutoScalingRuleNotFound,
@@ -154,11 +140,11 @@ class TestDeleteAutoScalingRule:
     )
     async def test_delete_auto_scaling_rule(
         self,
+        auto_scaling_service: AutoScalingService,
         scenario: ScenarioBase[
             DeleteEndpointAutoScalingRuleAction, DeleteEndpointAutoScalingRuleActionResult
         ],
         user_data: UserData,
-        auto_scaling_processors: ModelServingAutoScalingProcessors,
         mock_check_user_access_delete_rule: AsyncMock,
         mock_get_auto_scaling_rule_by_id_delete_rule: AsyncMock,
         mock_get_endpoint_access_validation_data_delete_rule: AsyncMock,
@@ -190,10 +176,6 @@ class TestDeleteAutoScalingRule:
         async def delete_auto_scaling_rule(
             action: DeleteEndpointAutoScalingRuleAction,
         ) -> DeleteEndpointAutoScalingRuleActionResult:
-            return (
-                await auto_scaling_processors.delete_endpoint_auto_scaling_rule.wait_for_complete(
-                    action
-                )
-            )
+            return await auto_scaling_service.delete_endpoint_auto_scaling_rule(action)
 
         await scenario.test(delete_auto_scaling_rule)

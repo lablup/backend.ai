@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryCreatorMeta
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
@@ -16,8 +15,9 @@ class CreateReservoirRegistryAction(ArtifactRegistryAction):
     meta: ArtifactRegistryCreatorMeta
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_reservoir_registry"
 
     @override
     @classmethod
@@ -26,9 +26,5 @@ class CreateReservoirRegistryAction(ArtifactRegistryAction):
 
 
 @dataclass
-class CreateReservoirActionResult(BaseActionResult):
+class CreateReservoirActionResult:
     result: ReservoirRegistryData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.result.id)

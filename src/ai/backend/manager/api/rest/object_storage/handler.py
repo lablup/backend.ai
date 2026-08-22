@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from collections import defaultdict
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.dto.manager.request import (
     GetPresignedDownloadURLReq,
     GetPresignedUploadURLReq,
@@ -22,6 +24,9 @@ from ai.backend.common.dto.manager.response import (
     ObjectStorageListResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
 )
@@ -31,8 +36,10 @@ from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url
 from ai.backend.manager.services.object_storage.actions.list import (
     ListObjectStorageAction,
 )
-from ai.backend.manager.services.storage_namespace.actions.get_all import GetAllNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
+from ai.backend.manager.services.storage_namespace.actions.search import (
+    SearchStorageNamespacesAction,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
@@ -58,9 +65,9 @@ class ObjectStorageHandler:
         body: BodyParam[GetPresignedDownloadURLReq],
     ) -> APIResponse:
         """Generate a presigned URL for safely downloading artifact files."""
-        action_result = await self._object_storage.get_presigned_download_url.wait_for_complete(
+        action_result = await self._object_storage.get_presigned_download_url.run(
             GetDownloadPresignedURLAction(
-                artifact_revision_id=body.parsed.artifact_revision_id,
+                artifact_revision_id=ArtifactRevisionID(body.parsed.artifact_revision_id),
                 key=body.parsed.key,
                 expiration=body.parsed.expiration,
             )
@@ -74,9 +81,9 @@ class ObjectStorageHandler:
         body: BodyParam[GetPresignedUploadURLReq],
     ) -> APIResponse:
         """Generate a presigned URL for uploading artifact files."""
-        action_result = await self._object_storage.get_presigned_upload_url.wait_for_complete(
+        action_result = await self._object_storage.get_presigned_upload_url.run(
             GetUploadPresignedURLAction(
-                artifact_revision_id=body.parsed.artifact_revision_id,
+                artifact_revision_id=ArtifactRevisionID(body.parsed.artifact_revision_id),
                 key=body.parsed.key,
             )
         )
@@ -94,11 +101,18 @@ class ObjectStorageHandler:
 
         Note: This API is deprecated. Use /storage-namespaces instead.
         """
-        action_result = await self._storage_namespace.get_all_namespaces.wait_for_complete(
-            GetAllNamespacesAction()
+        # Grouping is the caller's job: the search reads the table, and this
+        # deprecated shape is the only one that wants it keyed by storage.
+        action_result = await self._storage_namespace.global_search.run(
+            SearchStorageNamespacesAction(
+                searcher=StorageNamespaceSearcher(pagination=NoPagination()),
+            )
         )
+        buckets_by_storage: dict[uuid.UUID, list[str]] = defaultdict(list)
+        for item in action_result.items:
+            buckets_by_storage[item.storage_id].append(item.namespace)
 
-        resp = ObjectStorageAllBucketsResponse(buckets_by_storage=action_result.result)
+        resp = ObjectStorageAllBucketsResponse(buckets_by_storage=dict(buckets_by_storage))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def get_buckets(
@@ -111,11 +125,11 @@ class ObjectStorageHandler:
         """
         storage_id: uuid.UUID = path.parsed.storage_id
 
-        action_result = await self._storage_namespace.get_namespaces.wait_for_complete(
+        action_result = await self._storage_namespace.global_get_namespaces.run(
             GetNamespacesAction(storage_id=storage_id)
         )
 
-        bucket_names = [namespace_data.namespace for namespace_data in action_result.result]
+        bucket_names = [namespace_data.namespace for namespace_data in action_result.items]
         resp = ObjectStorageBucketsResponse(buckets=bucket_names)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -123,11 +137,11 @@ class ObjectStorageHandler:
         self,
     ) -> APIResponse:
         """List all configured object storage systems."""
-        action_result = await self._object_storage.list_storages.wait_for_complete(
-            ListObjectStorageAction()
+        action_result = await self._object_storage.global_list_storages.run(
+            ListObjectStorageAction(searcher=ObjectStorageSearcher(pagination=NoPagination()))
         )
 
-        storage_responses = [storage_data.to_dto() for storage_data in action_result.data]
+        storage_responses = [storage_data.to_dto() for storage_data in action_result.items]
 
         resp = ObjectStorageListResponse(storages=storage_responses)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

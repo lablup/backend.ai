@@ -19,11 +19,19 @@ from typing import Any, override
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.orm import InstrumentedAttribute
 
-from ai.backend.common.data.entity.types import EntityData, EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.role_preset import (
+    RolePresetID,
+)
+from ai.backend.common.data.entity.types import (
+    EntityData,
+    EntityIdentifier,
+    EntityType,
+    ScopeRef,
+    ScopeType,
+)
 from ai.backend.common.data.permission.types import ScopeType as RBACScopeType
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.ops.base import SearchOpsAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
@@ -35,25 +43,30 @@ from ai.backend.manager.errors.repository import (
     EntityNotFoundError,
 )
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role_preset.purgers import RolePresetPurger
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.role_preset.updaters import (
+    RolePresetSoftDeleteUpdater,
+    RolePresetUpdater,
+)
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.specs.purger import DataBatchPurger, GlobalEntityPurger
+from ai.backend.manager.models.specs.purger import DataBatchPurger
 from ai.backend.manager.models.specs.querier import DataQuerier
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
-from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
+from ai.backend.manager.models.specs.updater import DataBatchUpdater
 from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.role_preset.purgers import RolePresetPurgerSpec
-from ai.backend.manager.repositories.role_preset.updaters import (
-    RolePresetDeletedFlagUpdaterSpec,
-    RolePresetUpdaterSpec,
-)
 from ai.backend.manager.services.ops.service import SearchService
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
@@ -71,6 +84,10 @@ class _PresetCreator(GlobalEntityCreator[RolePresetRow, RolePresetData]):
     scope_type: RBACScopeType
 
     @override
+    def entity_id(self, row: RolePresetRow) -> RolePresetID:
+        return RolePresetID(row.id)
+
+    @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return ()
 
@@ -84,42 +101,13 @@ class _PresetCreator(GlobalEntityCreator[RolePresetRow, RolePresetData]):
 
 
 @dataclass
-class _PresetUpdater(RolePresetUpdaterSpec, DataUpdater[RolePresetRow, RolePresetData]):
-    target: RolePresetID = RolePresetID(uuid.UUID(int=0))
-
-    @override
-    def pk_value(self) -> uuid.UUID:
-        return self.target
-
-    @override
-    def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
-
-
-@dataclass
-class _PresetDeleter(RolePresetDeletedFlagUpdaterSpec, DataUpdater[RolePresetRow, RolePresetData]):
-    target: RolePresetID = RolePresetID(uuid.UUID(int=0))
-
-    @override
-    def pk_value(self) -> uuid.UUID:
-        return self.target
-
-    @override
-    def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
-
-
-@dataclass
-class _PresetPurger(RolePresetPurgerSpec, GlobalEntityPurger[RolePresetRow, RolePresetData]):
-    @override
-    def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
-
-
-@dataclass
 class _PresetUpserter(GlobalEntityUpserter[RolePresetRow, RolePresetData]):
     target: RolePresetID
     name: str
+
+    @override
+    def entity_id(self, row: RolePresetRow) -> RolePresetID:
+        return RolePresetID(row.id)
 
     @override
     def row_class(self) -> type[RolePresetRow]:
@@ -161,8 +149,12 @@ class _PresetQuerier(DataQuerier[RolePresetRow, RolePresetData]):
         return RolePresetRow
 
     @override
-    def pk_value(self) -> uuid.UUID:
-        return self.target
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
+
+    @override
+    def entity_id_value(self) -> RolePresetID:
+        return RolePresetID(self.target)
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
@@ -170,12 +162,25 @@ class _PresetQuerier(DataQuerier[RolePresetRow, RolePresetData]):
 
 
 @dataclass
-class _PresetBatchUpdater(
-    RolePresetDeletedFlagUpdaterSpec, DataBatchUpdater[RolePresetRow, RolePresetData]
-):
+class _PresetBatchUpdater(DataBatchUpdater[RolePresetRow, RolePresetData]):
     """Marks every preset of one scope type deleted, in one statement."""
 
+    deleted: bool = True
     scope: RBACScopeType = RBACScopeType.DOMAIN
+
+    @property
+    @override
+    def row_class(self) -> type[RolePresetRow]:
+        return RolePresetRow
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"deleted": self.deleted}
 
     @override
     def conditions(self) -> list[QueryCondition]:
@@ -218,12 +223,12 @@ class _PresetView(EntityData):
     name: str
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id
 
 
 @dataclass
-class _PresetByName(DataLookup[RolePresetRow, RolePresetData]):
+class _PresetByName(DataLookup[RolePresetRow, RolePresetID]):
     """Resolves a preset by its name, the way a lookup action would."""
 
     name: str
@@ -237,8 +242,8 @@ class _PresetByName(DataLookup[RolePresetRow, RolePresetData]):
         return [lambda: RolePresetRow.name == self.name]
 
     @override
-    def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+    def to_entity_id(self, row: RolePresetRow) -> RolePresetID:
+        return RolePresetID(row.id)
 
 
 @dataclass
@@ -261,7 +266,17 @@ class _PresetSearcher(Searcher[RolePresetRow, _PresetView]):
 async def database(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-    async with with_tables(database_connection, [RolePresetRow]):
+    async with with_tables(
+        database_connection,
+        [
+            VirtualScopeRow,
+            EntityMembershipRow,
+            ScopeBindingRow,
+            RoleRow,
+            PermissionRow,
+            RolePresetRow,
+        ],
+    ):
         yield database_connection
 
 
@@ -317,7 +332,7 @@ class TestLookup:
     ) -> None:
         found = await repository.lookup(_PresetByName(name="default"))
 
-        assert found.id == preset.id
+        assert found == preset.id
 
     async def test_an_unmatched_key_raises(self, repository: OpsRepository[RolePresetData]) -> None:
         with pytest.raises(EntityNotFoundError):
@@ -340,7 +355,7 @@ class TestUpdate:
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
         updated = await repository.update(
-            _PresetUpdater(name=OptionalState.update("renamed"), target=preset.id)
+            RolePresetUpdater(preset_id=preset.id, name=OptionalState.update("renamed"))
         )
 
         assert updated.name == "renamed"
@@ -352,14 +367,16 @@ class TestUpdate:
     ) -> None:
         # What ``DeleteService`` runs: the domain's own deleted-flag updater, because
         # which column marks a row deleted is not something ops can know.
-        deleted = await repository.update(_PresetDeleter(deleted=True, target=preset.id))
+        deleted = await repository.update(RolePresetSoftDeleteUpdater(preset_id=preset.id))
 
         assert deleted.deleted is True
 
     async def test_missing_row_raises(self, repository: OpsRepository[RolePresetData]) -> None:
         with pytest.raises(EntityNotFoundError):
             await repository.update(
-                _PresetUpdater(name=OptionalState.update("x"), target=RolePresetID(uuid.uuid4()))
+                RolePresetUpdater(
+                    preset_id=RolePresetID(uuid.uuid4()), name=OptionalState.update("x")
+                )
             )
 
 
@@ -373,9 +390,9 @@ class TestBulkUpdate:
             _PresetCreator(name="other", scope_type=RBACScopeType.DOMAIN)
         )
 
-        result = await repository.bulk_update({
-            preset.id: _PresetUpdater(name=OptionalState.update("a"), target=preset.id),
-            other.id: _PresetUpdater(name=OptionalState.update("b"), target=other.id),
+        result = await repository.partial_bulk_update({
+            preset.id: RolePresetUpdater(preset_id=preset.id, name=OptionalState.update("a")),
+            other.id: RolePresetUpdater(preset_id=other.id, name=OptionalState.update("b")),
         })
 
         assert set(result.successes) == {preset.id, other.id}
@@ -387,9 +404,9 @@ class TestBulkUpdate:
     ) -> None:
         absent = RolePresetID(uuid.uuid4())
 
-        result = await repository.bulk_update({
-            preset.id: _PresetUpdater(name=OptionalState.update("written"), target=preset.id),
-            absent: _PresetUpdater(name=OptionalState.update("nowhere"), target=absent),
+        result = await repository.partial_bulk_update({
+            preset.id: RolePresetUpdater(preset_id=preset.id, name=OptionalState.update("written")),
+            absent: RolePresetUpdater(preset_id=absent, name=OptionalState.update("nowhere")),
         })
 
         assert set(result.successes) == {preset.id}
@@ -479,7 +496,7 @@ class TestPurge:
     async def test_purged_row_is_gone(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
-        purged = await repository.purge_global_entity(_PresetPurger(preset_id=preset.id))
+        purged = await repository.purge_entity(RolePresetPurger(preset_id=preset.id))
 
         assert purged.id == preset.id
         with pytest.raises(EntityNotFoundError):
@@ -487,7 +504,7 @@ class TestPurge:
 
     async def test_missing_row_raises(self, repository: OpsRepository[RolePresetData]) -> None:
         with pytest.raises(EntityNotFoundError):
-            await repository.purge_global_entity(_PresetPurger(preset_id=uuid.uuid4()))
+            await repository.purge_entity(RolePresetPurger(preset_id=RolePresetID(uuid.uuid4())))
 
 
 # =============================================================================

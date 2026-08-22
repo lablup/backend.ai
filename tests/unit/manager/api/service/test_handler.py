@@ -13,10 +13,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.model_serving.request import (
     NewServiceRequestModel,
 )
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.rest.service.handler import ServiceHandler
 from ai.backend.manager.models.user import UserRole
@@ -112,13 +112,13 @@ class TestRunValidationUsesKeypairResourcePolicy:
                 owner_role=UserRole.USER,
                 group_id=uuid.UUID("22222222-2222-2222-2222-222222222222"),
                 resource_policy=action.keypair_resource_policy,
-                scaling_group="default",
+                resource_group="default",
                 extra_mounts=[],
             )
 
         mock = MagicMock()
         mock.validate_model_service = MagicMock()
-        mock.validate_model_service.wait_for_complete = AsyncMock(side_effect=_capture)
+        mock.validate_model_service.run = AsyncMock(side_effect=_capture)
         return mock
 
     @pytest.fixture

@@ -539,7 +539,7 @@ class ArtifactService:
                     f"Failed to scan artifacts from remote reservoir: {e}"
                 ) from e
 
-            readme_data = {
+            readme_data: dict[uuid.UUID, ArtifactRevisionReadme] = {
                 rev.id: ArtifactRevisionReadme(readme=rev.readme)
                 for artifact in scan_result.result
                 for rev in artifact.revisions

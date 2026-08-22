@@ -18,17 +18,15 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UserNotFound
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.user.types import (
     UserData,
-    UserInfoContext,
 )
-from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.minilang import (
@@ -39,6 +37,7 @@ from ai.backend.manager.models.minilang import (
 )
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.project import ProjectRow, groups
 from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
     INACTIVE_USER_STATUSES,
@@ -55,7 +54,7 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
-from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
+from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
 )
@@ -63,14 +62,15 @@ from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
 )
 from ai.backend.manager.services.user.actions.keypair_ops import (
+    GetDefaultKeypairsAction,
     SwitchDefaultAccessKeyAction,
-)
-from ai.backend.manager.services.user.actions.modify_user import (
-    ModifyUserAction,
-    ModifyUserActionResult,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
+)
+from ai.backend.manager.services.user.actions.update_user import (
+    UpdateUserAction,
+    UpdateUserActionResult,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -115,8 +115,8 @@ def _project_membership_join(base_table: sa.Table | sa.sql.Join) -> sa.sql.Join:
         ms,
         base_table.c.uuid == ms.c.user_id,
     ).join(
-        GroupRow,
-        GroupRow.id == ms.c.scope_id,
+        ProjectRow,
+        ProjectRow.id == ms.c.scope_id,
     )
 
 
@@ -265,7 +265,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
     _external_table_filters: Mapping[str, ExternalTableFilterSpec] = {
         "project_name": ExternalTableFilterSpec(
             field_name="project_name",
-            target_table=GroupRow.__table__,
+            target_table=ProjectRow.__table__,
             target_column="name",
             join_builder=_project_membership_join,
         ),
@@ -450,7 +450,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult[GroupNode]:
-        from ai.backend.manager.models.group import GroupRow
+        from ai.backend.manager.models.project import ProjectRow
 
         from .group import GroupNode
 
@@ -474,8 +474,8 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
             page_size,
         ) = generate_sql_info_for_gql_connection(
             info,
-            GroupRow,
-            GroupRow.id,
+            ProjectRow,
+            ProjectRow.id,
             _filter_arg,
             _order_expr,
             offset,
@@ -484,14 +484,14 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
             before=before,
             last=last,
         )
-        membership_filter = user_scope_membership_exists(PROJECT_SCOPE_TYPE, GroupRow.id, self.id)
+        membership_filter = user_scope_membership_exists(PROJECT_SCOPE_TYPE, ProjectRow.id, self.id)
         prj_query = query.where(membership_filter)
         cnt_query = cnt_query.where(membership_filter)
         result: list[GroupNode] = []
         async with graph_ctx.db.begin_readonly_session() as db_session:
             total_cnt = await db_session.scalar(cnt_query)
             async for row in await db_session.stream_scalars(prj_query):
-                prj_row = cast(GroupRow, row)
+                prj_row = cast(ProjectRow, row)
                 result.append(GroupNode.from_row(graph_ctx, prj_row))
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
@@ -598,7 +598,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         return cast(Iterable[UserGroup], await loader.load(self.id))
 
     @classmethod
-    def from_dto(cls, dto: UserData) -> Self:
+    def from_dto(cls, dto: UserData, main_access_key: str | None) -> Self:
         return cls(
             id=dto.id,
             uuid=dto.uuid,  # legacy
@@ -619,7 +619,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
             totp_activated=dto.totp_activated,
             totp_activated_at=dto.totp_activated_at,
             sudo_session_enabled=dto.sudo_session_enabled,
-            main_access_key=dto.default_access_key,
+            main_access_key=main_access_key,
             container_uid=dto.container_uid,
             container_main_gid=dto.container_main_gid,
             container_gids=dto.container_gids,
@@ -930,6 +930,7 @@ class UserInput(graphene.InputObjectType):  # type: ignore[misc]
         )
 
         return CreateUserAction(
+            domain_id=domain_id,
             creator=Creator(
                 spec=UserCreatorSpec(
                     username=str(self.username),
@@ -951,7 +952,6 @@ class UserInput(graphene.InputObjectType):  # type: ignore[misc]
                     container_gids=value_or_none(self.container_gids),
                 ),
             ),
-            _domain_id=domain_id,
             group_ids=value_or_none(self.group_ids),
         )
 
@@ -986,7 +986,7 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
         description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
     )
 
-    def to_action(self, email: str, graph_ctx: GraphQueryContext) -> ModifyUserAction:
+    def to_action(self, user_id: UserID, graph_ctx: GraphQueryContext) -> UpdateUserAction:
         # Create PasswordInfo if password is being changed
         password_state = OptionalState[PasswordInfo].nop()
         if self.password is not Undefined and self.password is not None:
@@ -1052,10 +1052,9 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
                 self.group_ids,
             ),
         )
-        # Note: User update uses email for lookup, pk_value is not used
-        return ModifyUserAction(
-            email=email,
-            updater=Updater(spec=spec, pk_value=email),
+        return UpdateUserAction(
+            user_id=user_id,
+            updater=Updater(spec=spec, pk_value=user_id),
         )
 
 
@@ -1070,10 +1069,10 @@ class PurgeUserInput(graphene.InputObjectType):  # type: ignore[misc]
         ),
     )
 
-    def to_action(self, email: str, user_info_ctx: UserInfoContext) -> PurgeUserAction:
+    def to_action(self, user_id: UserID, admin_user_id: UUID) -> PurgeUserAction:
         return PurgeUserAction(
-            user_info_ctx=user_info_ctx,
-            email=email,
+            user_id=user_id,
+            admin_user_id=admin_user_id,
             purge_shared_vfolders=OptionalState[bool].from_graphql(
                 self.purge_shared_vfolders,
             ),
@@ -1110,20 +1109,20 @@ class CreateUser(graphene.Mutation):  # type: ignore[misc]
         validate_user_mutation_props(props)
 
         graph_ctx: GraphQueryContext = info.context
-        domain_data = (
-            await graph_ctx.processors.domain.get_domain.wait_for_complete(
-                GetDomainAction(domain_name=str(props.domain_name))
+        domain_id = (
+            await graph_ctx.processors.domain.lookup.run(
+                LookupDomainAction(name=DomainName(str(props.domain_name)))
             )
-        ).data
-        action: CreateUserAction = props.to_action(email, graph_ctx, domain_data.id)
+        ).entity_id()
+        action: CreateUserAction = props.to_action(email, graph_ctx, domain_id)
 
-        action_result = await graph_ctx.processors.user.create_user.wait_for_complete(action)
+        action_result = await graph_ctx.processors.user.create_user.run(action)
         keypair = KeyPair.from_data(action_result.data.keypair)
 
         return cls(
             ok=True,
             msg="success",
-            user=User.from_dto(action_result.data.user),
+            user=User.from_dto(action_result.data.user, action_result.data.keypair.access_key),
             keypair=keypair,
         )
 
@@ -1151,24 +1150,25 @@ class ModifyUser(graphene.Mutation):  # type: ignore[misc]
 
         validate_user_mutation_props(props)
 
-        action: ModifyUserAction = props.to_action(email, graph_ctx)
         user_data = await graph_ctx.user_repository.get_by_email_validated(email)
-        action.user_uuid = user_data.id
-        res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(
-            action
-        )
+        action: UpdateUserAction = props.to_action(UserID(user_data.id), graph_ctx)
+        res: UpdateUserActionResult = await graph_ctx.processors.user.update_user.run(action)
         if props.main_access_key is not Undefined and props.main_access_key is not None:
-            await graph_ctx.processors.user.switch_default_access_key.wait_for_complete(
+            await graph_ctx.processors.user.switch_default_access_key.run(
                 SwitchDefaultAccessKeyAction(
                     user_id=UserID(user_data.id),
                     access_key=AccessKey(props.main_access_key),
                 )
             )
 
+        designated = await graph_ctx.processors.user.get_default_keypairs.run(
+            GetDefaultKeypairsAction(user_ids=[UserID(user_data.id)])
+        )
+        main_access_key = designated.designated.get(UserID(user_data.id))
         return cls(
             ok=True,
             msg="success",
-            user=User.from_dto(res.data),
+            user=User.from_dto(res.data, main_access_key.access_key if main_access_key else None),
         )
 
 
@@ -1195,8 +1195,10 @@ class DeleteUser(graphene.Mutation):  # type: ignore[misc]
         email: str,
     ) -> DeleteUser:
         graph_ctx: GraphQueryContext = info.context
-        action = DeleteUserAction(email)
-        await graph_ctx.processors.user.delete_user.wait_for_complete(action)
+        user_data = await graph_ctx.user_repository.get_by_email_validated(email)
+        await graph_ctx.processors.user.delete_user.run(
+            DeleteUserAction(user_id=UserID(user_data.id))
+        )
         return cls(
             ok=True,
             msg="success",
@@ -1237,15 +1239,9 @@ class PurgeUser(graphene.Mutation):  # type: ignore[misc]
         props: PurgeUserInput,
     ) -> PurgeUser:
         graph_ctx: GraphQueryContext = info.context
-        user_info_ctx = UserInfoContext(
-            uuid=graph_ctx.user["uuid"],
-            email=graph_ctx.user["email"],
-        )
-        action = props.to_action(email, user_info_ctx)
         user_data = await graph_ctx.user_repository.get_by_email_validated(email)
-        action.user_uuid = user_data.id
-
-        await graph_ctx.processors.user.purge_user.wait_for_complete(action)
+        action = props.to_action(UserID(user_data.id), graph_ctx.user["uuid"])
+        await graph_ctx.processors.user.purge_user.run(action)
 
         return cls(
             ok=True,

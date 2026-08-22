@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from unittest.mock import Mock
+from uuid import uuid4
 
 import pytest
 from graphql import Undefined
 
+from ai.backend.common.data.entity.resource_policy import KeyPairResourcePolicyUUID
 from ai.backend.manager.api.gql_legacy.resource_policy import ModifyKeyPairResourcePolicyInput
-from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
-    KeyPairResourcePolicyUpdaterSpec,
+from ai.backend.manager.models.resource_policy.updaters import (
+    KeyPairResourcePolicyUpdater,
 )
 from ai.backend.manager.types import _TriStateEnum
 
@@ -39,7 +41,9 @@ class TestModifyKeyPairResourcePolicyInputType:
         causing the field to be skipped during updates.
         """
         mock_modify_input.total_resource_slots = {}
-        result = ModifyKeyPairResourcePolicyInput.to_updater(mock_modify_input, "test_policy")
+        result = ModifyKeyPairResourcePolicyInput.to_updater(
+            mock_modify_input, KeyPairResourcePolicyUUID(uuid4())
+        )
 
-        assert isinstance(result.spec, KeyPairResourcePolicyUpdaterSpec)
-        assert result.spec.total_resource_slots._state == _TriStateEnum.UPDATE
+        assert isinstance(result, KeyPairResourcePolicyUpdater)
+        assert result.total_resource_slots._state == _TriStateEnum.UPDATE

@@ -1,17 +1,37 @@
-from typing import cast
-
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
-from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.validator.base import ActionValidator
-from ai.backend.manager.actions.validator.scope import ScopeActionValidator
-from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators
+from ai.backend.common.data.entity.error_log import ERROR_LOG_FIELD_TYPE
+from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    FieldOwnerLookupOpsResult,
+    LookupOpsResult,
+    OwnedFieldsOpsResult,
+    ScopedBatchOpsResult,
+)
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.error_log.types import ErrorLogData
+from ai.backend.manager.data.keypair.types import KeyPairData
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
+)
+from ai.backend.manager.services.user.actions.bootstrap_script import (
+    GetBootstrapScriptAction,
+    GetBootstrapScriptActionResult,
+    UpdateBootstrapScriptAction,
+    UpdateBootstrapScriptActionResult,
+)
+from ai.backend.manager.services.user.actions.create_keypair_dotfile import (
+    CreateKeypairDotfileAction,
+    CreateKeypairDotfileActionResult,
 )
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
@@ -19,11 +39,13 @@ from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
     CreateUserActionResult,
 )
+from ai.backend.manager.services.user.actions.delete_keypair_dotfile import (
+    DeleteKeypairDotfileAction,
+    DeleteKeypairDotfileActionResult,
+)
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
-    DeleteUserByIdAction,
-    DeleteUserByIdActionResult,
 )
 from ai.backend.manager.services.user.actions.get_user import (
     GetUserAction,
@@ -46,12 +68,11 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminSearchKeypairsActionResult,
     AdminUpdateKeypairAction,
     AdminUpdateKeypairActionResult,
+    GetDefaultKeypairsAction,
     IssueMyKeypairAction,
     IssueMyKeypairActionResult,
     RevokeMyKeypairAction,
     RevokeMyKeypairActionResult,
-    SearchKeypairsByResourcePolicyAction,
-    SearchKeypairsByResourcePolicyActionResult,
     SearchMyKeypairsAction,
     SearchMyKeypairsActionResult,
     SwitchDefaultAccessKeyAction,
@@ -59,204 +80,225 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     UpdateMyKeypairAction,
     UpdateMyKeypairActionResult,
 )
-from ai.backend.manager.services.user.actions.modify_user import (
-    BulkModifyUserAction,
-    BulkModifyUserActionResult,
-    ModifyUserAction,
-    ModifyUserActionResult,
-    ModifyUserByIdAction,
-    ModifyUserByIdActionResult,
+from ai.backend.manager.services.user.actions.lookup import LookupUserAction
+from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
+    LookupBulkKeypairOwnerAction,
+    LookupKeypairOwnerAction,
+    LookupKeypairOwnerByAccessKeyAction,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
     BulkPurgeUserActionResult,
     PurgeUserAction,
     PurgeUserActionResult,
-    PurgeUserByIdAction,
-    PurgeUserByIdActionResult,
 )
-from ai.backend.manager.services.user.actions.search_users import (
-    SearchUsersAction,
-    SearchUsersActionResult,
-)
+from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
 from ai.backend.manager.services.user.actions.search_users_by_domain import (
     SearchUsersByDomainAction,
-    SearchUsersByDomainActionResult,
 )
 from ai.backend.manager.services.user.actions.search_users_by_project import (
     SearchUsersByProjectAction,
-    SearchUsersByProjectActionResult,
 )
-from ai.backend.manager.services.user.actions.search_users_by_role import (
-    SearchUsersByRoleAction,
-    SearchUsersByRoleActionResult,
+from ai.backend.manager.services.user.actions.search_users_by_role import SearchUsersByRoleAction
+from ai.backend.manager.services.user.actions.update_keypair_dotfile import (
+    UpdateKeypairDotfileAction,
+    UpdateKeypairDotfileActionResult,
+)
+from ai.backend.manager.services.user.actions.update_user import (
+    BulkUpdateUserAction,
+    BulkUpdateUserActionResult,
+    UpdateUserAction,
+    UpdateUserActionResult,
 )
 from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
 )
+from ai.backend.manager.services.user.error_log.actions.lookup_owner import (
+    LookupBulkErrorLogOwnerAction,
+    LookupErrorLogOwnerAction,
+)
+from ai.backend.manager.services.user.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.user.service import UserService
 
 
 class UserProcessors:
-    # Scope actions with RBAC
+    lookup: LookupActionProcessor[LookupUserAction, LookupOpsResult[UserID]]
+    lookup_keypair_owner: LookupActionProcessor[
+        LookupKeypairOwnerByAccessKeyAction, FieldOwnerLookupOpsResult
+    ]
+    keypair_group: LookupFieldGroup[KeyPairData]
+    error_log: ErrorLogProcessors
+    global_search: GlobalActionProcessor[GlobalSearchUsersAction, BatchOpsResult[UserData]]
+    search_users_by_domain: ScopeActionProcessor[
+        SearchUsersByDomainAction, ScopedBatchOpsResult[UserData]
+    ]
+    search_users_by_project: ScopeActionProcessor[
+        SearchUsersByProjectAction, ScopedBatchOpsResult[UserData]
+    ]
+    search_users_by_role: GlobalActionProcessor[SearchUsersByRoleAction, BatchOpsResult[UserData]]
     create_user: ScopeActionProcessor[CreateUserAction, CreateUserActionResult]
-    search_users_by_domain: ActionProcessor[
-        SearchUsersByDomainAction, SearchUsersByDomainActionResult
-    ]
-    search_users_by_project: ActionProcessor[
-        SearchUsersByProjectAction, SearchUsersByProjectActionResult
-    ]
-    search_users_by_role: ActionProcessor[SearchUsersByRoleAction, SearchUsersByRoleActionResult]
-    search_keypairs_by_resource_policy: ScopeActionProcessor[
-        SearchKeypairsByResourcePolicyAction, SearchKeypairsByResourcePolicyActionResult
-    ]
-    # Single entity actions with RBAC
     get_user: SingleEntityActionProcessor[GetUserAction, GetUserActionResult]
-    modify_user: SingleEntityActionProcessor[ModifyUserAction, ModifyUserActionResult]
-    modify_user_by_id: SingleEntityActionProcessor[ModifyUserByIdAction, ModifyUserByIdActionResult]
-    delete_user: ActionProcessor[DeleteUserAction, DeleteUserActionResult]
-    delete_user_by_id: SingleEntityActionProcessor[DeleteUserByIdAction, DeleteUserByIdActionResult]
+    update_user: SingleEntityActionProcessor[UpdateUserAction, UpdateUserActionResult]
+    delete_user: SingleEntityActionProcessor[DeleteUserAction, DeleteUserActionResult]
     purge_user: SingleEntityActionProcessor[PurgeUserAction, PurgeUserActionResult]
-    purge_user_by_id: SingleEntityActionProcessor[PurgeUserByIdAction, PurgeUserByIdActionResult]
-    # Bulk actions without RBAC (special handling)
-    bulk_create_users: ActionProcessor[BulkCreateUserAction, BulkCreateUserActionResult]
-    bulk_modify_users: ActionProcessor[BulkModifyUserAction, BulkModifyUserActionResult]
-    bulk_purge_users: ActionProcessor[BulkPurgeUserAction, BulkPurgeUserActionResult]
-    # Internal/stats actions without RBAC
-    user_month_stats: ActionProcessor[UserMonthStatsAction, UserMonthStatsActionResult]
-    admin_month_stats: ActionProcessor[AdminMonthStatsAction, AdminMonthStatsActionResult]
-    search_users: ActionProcessor[SearchUsersAction, SearchUsersActionResult]
-    issue_my_keypair: ActionProcessor[IssueMyKeypairAction, IssueMyKeypairActionResult]
-    revoke_my_keypair: ActionProcessor[RevokeMyKeypairAction, RevokeMyKeypairActionResult]
-    switch_default_access_key: ActionProcessor[
+    bulk_create_users: GlobalActionProcessor[BulkCreateUserAction, BulkCreateUserActionResult]
+    bulk_modify_users: GlobalActionProcessor[BulkUpdateUserAction, BulkUpdateUserActionResult]
+    bulk_purge_users: GlobalActionProcessor[BulkPurgeUserAction, BulkPurgeUserActionResult]
+    user_month_stats: SingleEntityActionProcessor[UserMonthStatsAction, UserMonthStatsActionResult]
+    admin_month_stats: GlobalActionProcessor[AdminMonthStatsAction, AdminMonthStatsActionResult]
+    issue_my_keypair: SingleEntityActionProcessor[IssueMyKeypairAction, IssueMyKeypairActionResult]
+    revoke_my_keypair: SingleEntityActionProcessor[
+        RevokeMyKeypairAction, RevokeMyKeypairActionResult
+    ]
+    switch_default_access_key: SingleEntityActionProcessor[
         SwitchDefaultAccessKeyAction, SwitchDefaultAccessKeyActionResult
     ]
-    update_my_keypair: ActionProcessor[UpdateMyKeypairAction, UpdateMyKeypairActionResult]
-    search_my_keypairs: ActionProcessor[SearchMyKeypairsAction, SearchMyKeypairsActionResult]
-    # Admin keypair operations
-    admin_create_keypair: ActionProcessor[AdminCreateKeypairAction, AdminCreateKeypairActionResult]
-    admin_update_keypair: ActionProcessor[AdminUpdateKeypairAction, AdminUpdateKeypairActionResult]
-    admin_delete_keypair: ActionProcessor[AdminDeleteKeypairAction, AdminDeleteKeypairActionResult]
-    admin_search_keypairs: ActionProcessor[
+    get_default_keypairs: BulkActionProcessor[
+        GetDefaultKeypairsAction, OwnedFieldsOpsResult[UserID, KeyPairData]
+    ]
+    update_my_keypair: SingleEntityActionProcessor[
+        UpdateMyKeypairAction, UpdateMyKeypairActionResult
+    ]
+    search_my_keypairs: ScopeActionProcessor[SearchMyKeypairsAction, SearchMyKeypairsActionResult]
+    admin_create_keypair: SingleEntityActionProcessor[
+        AdminCreateKeypairAction, AdminCreateKeypairActionResult
+    ]
+    admin_update_keypair: SingleEntityActionProcessor[
+        AdminUpdateKeypairAction, AdminUpdateKeypairActionResult
+    ]
+    admin_delete_keypair: SingleEntityActionProcessor[
+        AdminDeleteKeypairAction, AdminDeleteKeypairActionResult
+    ]
+    admin_search_keypairs: GlobalActionProcessor[
         AdminSearchKeypairsAction, AdminSearchKeypairsActionResult
     ]
-    admin_get_keypair: ActionProcessor[AdminGetKeypairAction, AdminGetKeypairActionResult]
-    # Admin SSH keypair operations
-    admin_register_ssh_keypair: ActionProcessor[
+    admin_get_keypair: SingleEntityActionProcessor[
+        AdminGetKeypairAction, AdminGetKeypairActionResult
+    ]
+    admin_register_ssh_keypair: SingleEntityActionProcessor[
         AdminRegisterSSHKeypairAction, AdminRegisterSSHKeypairActionResult
     ]
-    admin_delete_ssh_keypair: ActionProcessor[
+    admin_delete_ssh_keypair: SingleEntityActionProcessor[
         AdminDeleteSSHKeypairAction, AdminDeleteSSHKeypairActionResult
     ]
-    admin_get_ssh_keypair: ActionProcessor[AdminGetSSHKeypairAction, AdminGetSSHKeypairActionResult]
+    admin_get_ssh_keypair: SingleEntityActionProcessor[
+        AdminGetSSHKeypairAction, AdminGetSSHKeypairActionResult
+    ]
+    create_dotfile: SingleEntityActionProcessor[
+        CreateKeypairDotfileAction, CreateKeypairDotfileActionResult
+    ]
+    update_dotfile: SingleEntityActionProcessor[
+        UpdateKeypairDotfileAction, UpdateKeypairDotfileActionResult
+    ]
+    delete_dotfile: SingleEntityActionProcessor[
+        DeleteKeypairDotfileAction, DeleteKeypairDotfileActionResult
+    ]
+    get_bootstrap_script: SingleEntityActionProcessor[
+        GetBootstrapScriptAction, GetBootstrapScriptActionResult
+    ]
+    update_bootstrap_script: SingleEntityActionProcessor[
+        UpdateBootstrapScriptAction, UpdateBootstrapScriptActionResult
+    ]
 
     def __init__(
         self,
+        group: ProcessorGroup[UserData],
         user_service: UserService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
     ) -> None:
-        # Scope actions with RBAC — create_user is also invoked from gql_legacy,
-        # so use the non-enforcing legacy validator to avoid breaking callers.
-        # Mocked test fixtures do not provide a legacy_rbac, so isinstance
-        # guards against MagicMock attribute access returning a truthy mock.
-        legacy_rbac = validators.legacy_rbac
-        if isinstance(legacy_rbac, LegacyRBACValidators):
-            legacy_scope_validator: ScopeActionValidator = legacy_rbac.scope
-            legacy_single_entity_validator: SingleEntityActionValidator = legacy_rbac.single_entity
-        else:
-            legacy_scope_validator = validators.rbac.scope
-            legacy_single_entity_validator = validators.rbac.single_entity
-        self.create_user = ScopeActionProcessor(
-            user_service.create_user,
-            action_monitors,
-            validators=[legacy_scope_validator],
+        self.lookup = group.public_lookup_ops(LookupUserAction)
+        self.lookup_keypair_owner = group.key_owner_lookup_ops(LookupKeypairOwnerByAccessKeyAction)
+        self.global_search = group.global_search_ops(GlobalSearchUsersAction)
+        self.search_users_by_domain = group.scope_search_ops(SearchUsersByDomainAction)
+        self.search_users_by_project = group.scope_search_ops(SearchUsersByProjectAction)
+        self.search_users_by_role = group.global_search_ops(SearchUsersByRoleAction)
+        self.create_user = group.scope(CreateUserAction, user_service.create_user)
+        self.get_user = group.single_entity(GetUserAction, user_service.get_user)
+        self.update_user = group.single_entity(UpdateUserAction, user_service.update_user)
+        self.delete_user = group.single_entity(DeleteUserAction, user_service.delete_user)
+        self.purge_user = group.single_entity(PurgeUserAction, user_service.purge_user)
+        self.bulk_create_users = group.global_scope(
+            BulkCreateUserAction, user_service.bulk_create_users
         )
-        self.search_users_by_domain = ActionProcessor(
-            user_service.search_users_by_domain, action_monitors
+        self.bulk_modify_users = group.global_scope(
+            BulkUpdateUserAction, user_service.bulk_modify_users
         )
-        self.search_users_by_project = ActionProcessor(
-            user_service.search_users_by_project,
-            action_monitors,
-            validators=[cast(ActionValidator, validators.rbac.scope)],
+        self.bulk_purge_users = group.global_scope(
+            BulkPurgeUserAction, user_service.bulk_purge_users
         )
-        self.search_users_by_role = ActionProcessor(
-            user_service.search_users_by_role, action_monitors
+        self.user_month_stats = group.single_entity(
+            UserMonthStatsAction, user_service.user_month_stats
         )
-        self.search_keypairs_by_resource_policy = ScopeActionProcessor(
-            user_service.search_keypairs_by_resource_policy,
-            action_monitors,
-            validators=[validators.rbac.scope],
+        self.admin_month_stats = group.global_scope(
+            AdminMonthStatsAction, user_service.admin_month_stats
         )
-        # Single entity actions with RBAC
-        self.get_user = SingleEntityActionProcessor(
-            user_service.get_user, action_monitors, validators=[validators.rbac.single_entity]
+        self.issue_my_keypair = group.single_entity(
+            IssueMyKeypairAction, user_service.issue_my_keypair
         )
-        # modify_user is also invoked from gql_legacy — non-enforcing validator.
-        self.modify_user = SingleEntityActionProcessor(
-            user_service.modify_user,
-            action_monitors,
-            validators=[legacy_single_entity_validator],
+        self.revoke_my_keypair = group.single_entity(
+            RevokeMyKeypairAction, user_service.revoke_my_keypair
         )
-        self.modify_user_by_id = SingleEntityActionProcessor(
-            user_service.modify_user_by_id,
-            action_monitors,
-            validators=[validators.rbac.single_entity],
+        self.switch_default_access_key = group.single_entity(
+            SwitchDefaultAccessKeyAction, user_service.switch_default_access_key
         )
-        self.delete_user = ActionProcessor(user_service.delete_user, action_monitors)
-        self.delete_user_by_id = SingleEntityActionProcessor(
-            user_service.delete_user_by_id,
-            action_monitors,
-            validators=[validators.rbac.single_entity],
+        self.update_my_keypair = group.single_entity(
+            UpdateMyKeypairAction, user_service.update_my_keypair
         )
-        # purge_user is invoked only from gql_legacy — non-enforcing validator.
-        self.purge_user = SingleEntityActionProcessor(
-            user_service.purge_user,
-            action_monitors,
-            validators=[legacy_single_entity_validator],
+        self.search_my_keypairs = group.scope(
+            SearchMyKeypairsAction, user_service.search_my_keypairs
         )
-        self.purge_user_by_id = SingleEntityActionProcessor(
-            user_service.purge_user_by_id,
-            action_monitors,
-            validators=[validators.rbac.single_entity],
+        self.admin_create_keypair = group.single_entity(
+            AdminCreateKeypairAction, user_service.admin_create_keypair
         )
-        # Bulk actions without RBAC (special handling)
-        self.bulk_create_users = ActionProcessor(user_service.bulk_create_users, action_monitors)
-        self.bulk_modify_users = ActionProcessor(user_service.bulk_modify_users, action_monitors)
-        self.bulk_purge_users = ActionProcessor(user_service.bulk_purge_users, action_monitors)
-        # Internal/stats actions without RBAC
-        self.user_month_stats = ActionProcessor(user_service.user_month_stats, action_monitors)
-        self.admin_month_stats = ActionProcessor(user_service.admin_month_stats, action_monitors)
-        self.search_users = ActionProcessor(user_service.search_users, action_monitors)
-        self.issue_my_keypair = ActionProcessor(user_service.issue_my_keypair, action_monitors)
-        self.revoke_my_keypair = ActionProcessor(user_service.revoke_my_keypair, action_monitors)
-        self.switch_default_access_key = ActionProcessor(
-            user_service.switch_default_access_key, action_monitors
+        self.admin_update_keypair = group.single_entity(
+            AdminUpdateKeypairAction, user_service.admin_update_keypair
         )
-        self.update_my_keypair = ActionProcessor(user_service.update_my_keypair, action_monitors)
-        self.search_my_keypairs = ActionProcessor(user_service.search_my_keypairs, action_monitors)
-        # Admin keypair operations
-        self.admin_create_keypair = ActionProcessor(
-            user_service.admin_create_keypair, action_monitors
+        self.admin_delete_keypair = group.single_entity(
+            AdminDeleteKeypairAction, user_service.admin_delete_keypair
         )
-        self.admin_update_keypair = ActionProcessor(
-            user_service.admin_update_keypair, action_monitors
+        self.admin_search_keypairs = group.global_scope(
+            AdminSearchKeypairsAction, user_service.admin_search_keypairs
         )
-        self.admin_delete_keypair = ActionProcessor(
-            user_service.admin_delete_keypair, action_monitors
+        self.admin_get_keypair = group.single_entity(
+            AdminGetKeypairAction, user_service.admin_get_keypair
         )
-        self.admin_search_keypairs = ActionProcessor(
-            user_service.admin_search_keypairs, action_monitors
+        self.admin_register_ssh_keypair = group.single_entity(
+            AdminRegisterSSHKeypairAction, user_service.admin_register_ssh_keypair
         )
-        self.admin_get_keypair = ActionProcessor(user_service.admin_get_keypair, action_monitors)
-        # Admin SSH keypair operations
-        self.admin_register_ssh_keypair = ActionProcessor(
-            user_service.admin_register_ssh_keypair, action_monitors
+        self.admin_delete_ssh_keypair = group.single_entity(
+            AdminDeleteSSHKeypairAction, user_service.admin_delete_ssh_keypair
         )
-        self.admin_delete_ssh_keypair = ActionProcessor(
-            user_service.admin_delete_ssh_keypair, action_monitors
+        self.admin_get_ssh_keypair = group.single_entity(
+            AdminGetSSHKeypairAction, user_service.admin_get_ssh_keypair
         )
-        self.admin_get_ssh_keypair = ActionProcessor(
-            user_service.admin_get_ssh_keypair, action_monitors
+        self.create_dotfile = group.single_entity(
+            CreateKeypairDotfileAction, user_service.create_dotfile
+        )
+        self.update_dotfile = group.single_entity(
+            UpdateKeypairDotfileAction, user_service.update_dotfile
+        )
+        self.delete_dotfile = group.single_entity(
+            DeleteKeypairDotfileAction, user_service.delete_dotfile
+        )
+        self.get_bootstrap_script = group.single_entity(
+            GetBootstrapScriptAction, user_service.get_bootstrap_script
+        )
+        self.update_bootstrap_script = group.single_entity(
+            UpdateBootstrapScriptAction, user_service.update_bootstrap_script
+        )
+
+        self.keypair_group = group.field_group(
+            FieldGroupMeta(KEYPAIR_FIELD_TYPE),
+            KeyPairData,
+            LookupKeypairOwnerAction,
+            LookupBulkKeypairOwnerAction,
+        )
+        self.get_default_keypairs = self.keypair_group.bulk_get_ops(GetDefaultKeypairsAction)
+        self.error_log = ErrorLogProcessors(
+            group.field_group(
+                FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
+                ErrorLogData,
+                LookupErrorLogOwnerAction,
+                LookupBulkErrorLogOwnerAction,
+            )
         )

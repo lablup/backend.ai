@@ -7,7 +7,6 @@ Database models for the unified service catalog:
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from typing import Any
 
@@ -15,6 +14,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.models.base import (
     GUID,
@@ -36,8 +36,8 @@ class ServiceCatalogRow(Base):
 
     __tablename__ = "service_catalog"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ServiceCatalogID] = mapped_column(
+        "id", GUID(ServiceCatalogID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     service_group: Mapped[str] = mapped_column(
         "service_group", sa.String(length=64), nullable=False
@@ -94,12 +94,12 @@ class ServiceCatalogEndpointRow(Base):
 
     __tablename__ = "service_catalog_endpoint"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ServiceCatalogID] = mapped_column(
+        "id", GUID(ServiceCatalogID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    service_id: Mapped[uuid.UUID] = mapped_column(
+    service_id: Mapped[ServiceCatalogID] = mapped_column(
         "service_id",
-        GUID,
+        GUID(ServiceCatalogID),
         sa.ForeignKey("service_catalog.id", ondelete="CASCADE"),
         nullable=False,
     )

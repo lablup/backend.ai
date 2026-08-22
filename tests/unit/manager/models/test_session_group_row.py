@@ -7,11 +7,11 @@ from dataclasses import dataclass
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.session_group import SessionGroupID
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.session_group.types import (
@@ -19,15 +19,15 @@ from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementEnforcement,
 )
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user import UserRow
@@ -109,13 +109,13 @@ class TestSessionGroupRow:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 SessionGroupRow,
                 SessionRow,
             ],
@@ -126,7 +126,7 @@ class TestSessionGroupRow:
     async def scope(self, db: ExtendedAsyncSAEngine) -> AsyncIterator[_OwnershipScope]:
         domain_id = DomainID(uuid.uuid4())
         domain = DomainRow(id=domain_id, name=f"test-{uuid.uuid4().hex[:8]}")
-        scaling_group = ScalingGroupRow(
+        resource_group = ResourceGroupRow(
             id=ResourceGroupID(uuid.uuid4()),
             name=f"test-sg-{uuid.uuid4().hex[:8]}",
             driver="static",
@@ -153,7 +153,7 @@ class TestSessionGroupRow:
             resource_policy=user_policy.name,
             domain_id=domain_id,
         )
-        project = GroupRow(
+        project = ProjectRow(
             id=uuid.uuid4(),
             name=f"test-group-{uuid.uuid4().hex[:8]}",
             domain_name=domain.name,
@@ -161,7 +161,7 @@ class TestSessionGroupRow:
         )
 
         async with db.begin_session() as sess:
-            sess.add_all([domain, scaling_group, user_policy, project_policy])
+            sess.add_all([domain, resource_group, user_policy, project_policy])
             await sess.flush()
             sess.add_all([user, project])
             await sess.flush()
@@ -171,8 +171,8 @@ class TestSessionGroupRow:
             domain_name=domain.name,
             project_id=ProjectID(project.id),
             owner_user_id=UserID(user.uuid),
-            resource_group_id=ResourceGroupID(scaling_group.id),
-            resource_group_name=scaling_group.name,
+            resource_group_id=ResourceGroupID(resource_group.id),
+            resource_group_name=resource_group.name,
         )
 
     async def test_placement_policy_round_trips(

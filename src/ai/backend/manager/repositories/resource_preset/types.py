@@ -11,7 +11,7 @@ from ai.backend.manager.repositories.resource_slot.types import (
     quantities_to_json,
 )
 
-from .db_source.types import PerScalingGroupResourceData, PresetAllocatabilityData
+from .db_source.types import PerResourceGroupResourceData, PresetAllocatabilityData
 
 
 @dataclass
@@ -26,8 +26,8 @@ class CheckPresetsResult:
     group_using: list[SlotQuantity]
     group_remaining: list[SlotQuantity]
     domain_limits: list[SlotQuantity]
-    scaling_group_remaining: list[SlotQuantity]
-    scaling_groups: dict[str, PerScalingGroupResourceData]
+    resource_group_remaining: list[SlotQuantity]
+    resource_groups: dict[str, PerResourceGroupResourceData]
 
     def to_cache(self) -> bytes:
         """
@@ -44,9 +44,9 @@ class CheckPresetsResult:
             "group_using": quantities_to_json(self.group_using),
             "group_remaining": quantities_to_json(self.group_remaining),
             "domain_limits": quantities_to_json(self.domain_limits),
-            "scaling_group_remaining": quantities_to_json(self.scaling_group_remaining),
+            "scaling_group_remaining": quantities_to_json(self.resource_group_remaining),
             "scaling_groups": {
-                sgname: sg_data.to_cache() for sgname, sg_data in self.scaling_groups.items()
+                sgname: sg_data.to_cache() for sgname, sg_data in self.resource_groups.items()
             },
         }
 
@@ -72,9 +72,9 @@ class CheckPresetsResult:
             group_remaining=quantities_from_json(data["group_remaining"]),
             # Entries cached before this field existed lack the key.
             domain_limits=quantities_from_json(data.get("domain_limits", "{}")),
-            scaling_group_remaining=quantities_from_json(data["scaling_group_remaining"]),
-            scaling_groups={
-                sgname: PerScalingGroupResourceData.from_cache(sg_data)
+            resource_group_remaining=quantities_from_json(data["scaling_group_remaining"]),
+            resource_groups={
+                sgname: PerResourceGroupResourceData.from_cache(sg_data)
                 for sgname, sg_data in data["scaling_groups"].items()
             },
         )

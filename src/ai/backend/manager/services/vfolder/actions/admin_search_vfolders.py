@@ -3,41 +3,32 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.vfolder.actions.base import VFolderAction
+from ai.backend.manager.services.vfolder.actions.base import VFolderGlobalAction
 
 
 @dataclass
-class AdminSearchVFoldersAction(VFolderAction):
-    """Search all vfolders with filtering, ordering, and pagination.
-
-    Admin-only action without scope restriction.
-    """
+class GlobalSearchVFoldersAction(VFolderGlobalAction):
+    """Page through vfolders across every scope."""
 
     querier: BatchQuerier
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_search_vfolders"
+
 
 @dataclass
-class AdminSearchVFoldersActionResult(BaseActionResult):
-    """Result of AdminSearchVFoldersAction."""
-
+class GlobalSearchVFoldersActionResult:
     data: list[VFolderData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

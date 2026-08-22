@@ -7,6 +7,9 @@ from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
     DeploymentStrategy,
@@ -14,11 +17,9 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     MintEndpointTokenRequest,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.deployment.creator import (
@@ -29,7 +30,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     ExecutionSpec,
     LegacyDeploymentData,
-    ModelDeploymentAccessTokenData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
     ModelReplicaData,
@@ -43,27 +43,22 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.deployment_policy import (
     DeploymentPolicyRow,
 )
-from ai.backend.manager.models.endpoint import EndpointTokenRow
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
+from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.creators import (
-    EndpointTokenCreatorSpec,
-)
 from ai.backend.manager.repositories.deployment.updaters import DeploymentUpdaterSpec
 from ai.backend.manager.repositories.deployment.upserters import DeploymentPolicyUpserterSpec
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
-    DeploymentRevisionPresetRepository,
+    DeploymentPresetRepository,
 )
 from ai.backend.manager.repositories.runtime_variant_preset.repository import (
     RuntimeVariantPresetRepository,
@@ -83,6 +78,10 @@ from ai.backend.manager.services.deployment.actions.access_token.delete_access_t
 from ai.backend.manager.services.deployment.actions.access_token.get_access_token import (
     GetAccessTokenAction,
     GetAccessTokenActionResult,
+)
+from ai.backend.manager.services.deployment.actions.access_token.global_search_access_tokens import (
+    GlobalSearchAccessTokensAction,
+    GlobalSearchAccessTokensActionResult,
 )
 from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
     SearchAccessTokensAction,
@@ -144,6 +143,10 @@ from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
     GetReplicaByIdAction,
     GetReplicaByIdActionResult,
 )
+from ai.backend.manager.services.deployment.actions.global_search_replicas import (
+    GlobalSearchReplicasAction,
+    GlobalSearchReplicasActionResult,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
     AddModelRevisionActionResult,
@@ -151,6 +154,10 @@ from ai.backend.manager.services.deployment.actions.model_revision.add_model_rev
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
     GetRevisionByIdActionResult,
+)
+from ai.backend.manager.services.deployment.actions.model_revision.global_search_revisions import (
+    GlobalSearchRevisionsAction,
+    GlobalSearchRevisionsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.search_revision_resource_slots import (
     SearchRevisionResourceSlotsAction,
@@ -161,8 +168,8 @@ from ai.backend.manager.services.deployment.actions.model_revision.search_revisi
     SearchRevisionsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions import (
-    RefreshDeploymentRevisionsAction,
-    RefreshDeploymentRevisionsActionResult,
+    GlobalRefreshDeploymentRevisionsAction,
+    GlobalRefreshDeploymentRevisionsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.replace_deployment_options import (
     ReplaceDeploymentOptionsAction,
@@ -179,16 +186,16 @@ from ai.backend.manager.services.deployment.actions.route import (
     UpdateRouteTrafficStatusActionResult,
 )
 from ai.backend.manager.services.deployment.actions.search_deployments import (
-    SearchDeploymentsAction,
-    SearchDeploymentsActionResult,
+    GlobalSearchDeploymentsAction,
+    GlobalSearchDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.search_deployments_in_project import (
     SearchDeploymentsInProjectAction,
     SearchDeploymentsInProjectActionResult,
 )
 from ai.backend.manager.services.deployment.actions.search_legacy_deployments import (
-    SearchLegacyDeploymentsAction,
-    SearchLegacyDeploymentsActionResult,
+    GlobalSearchLegacyDeploymentsAction,
+    GlobalSearchLegacyDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.search_replicas import (
     SearchReplicasAction,
@@ -427,7 +434,7 @@ class DeploymentService:
     _deployment_controller: DeploymentController
     _deployment_repository: DeploymentRepository
     _appproxy_client_pool: AppProxyClientPool
-    _deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
+    _deployment_revision_preset_repository: DeploymentPresetRepository | None
     _runtime_variant_preset_repository: RuntimeVariantPresetRepository | None
 
     def __init__(
@@ -435,7 +442,7 @@ class DeploymentService:
         deployment_controller: DeploymentController,
         deployment_repository: DeploymentRepository,
         appproxy_client_pool: AppProxyClientPool,
-        deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None = None,
+        deployment_revision_preset_repository: DeploymentPresetRepository | None = None,
         runtime_variant_preset_repository: RuntimeVariantPresetRepository | None = None,
     ) -> None:
         """Initialize deployment service with controller and repository."""
@@ -536,10 +543,7 @@ class DeploymentService:
         options = await self._deployment_repository.replace_deployment_options(
             action.deployment_id, action.options
         )
-        return ReplaceDeploymentOptionsActionResult(
-            deployment_id=action.deployment_id,
-            options=options,
-        )
+        return ReplaceDeploymentOptionsActionResult(options=options)
 
     async def destroy_deployment(
         self, action: DestroyDeploymentAction
@@ -563,19 +567,19 @@ class DeploymentService:
         return DestroyDeploymentActionResult(success=success)
 
     async def search_deployments(
-        self, action: SearchDeploymentsAction
-    ) -> SearchDeploymentsActionResult:
+        self, action: GlobalSearchDeploymentsAction
+    ) -> GlobalSearchDeploymentsActionResult:
         """Search deployments with filtering and pagination.
 
         Args:
             action: Action containing BatchQuerier for filtering and pagination
 
         Returns:
-            SearchDeploymentsActionResult: Result containing list of deployments and pagination info
+            GlobalSearchDeploymentsActionResult: Result containing list of deployments and pagination info
         """
         result = await self._deployment_repository.search_endpoints(action.querier)
         deployments = [_convert_deployment_info_to_data(info) for info in result.items]
-        return SearchDeploymentsActionResult(
+        return GlobalSearchDeploymentsActionResult(
             data=deployments,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
@@ -583,14 +587,14 @@ class DeploymentService:
         )
 
     async def search_legacy_deployments(
-        self, action: SearchLegacyDeploymentsAction
-    ) -> SearchLegacyDeploymentsActionResult:
+        self, action: GlobalSearchLegacyDeploymentsAction
+    ) -> GlobalSearchLegacyDeploymentsActionResult:
         """Legacy (REST v1) search — full revision per item. DO NOT USE in new
         code; v2 uses :meth:`search_deployments`.
         """
         result = await self._deployment_repository.search_legacy_endpoints(action.querier)
         deployments = [_convert_deployment_info_to_legacy_data(info) for info in result.items]
-        return SearchLegacyDeploymentsActionResult(
+        return GlobalSearchLegacyDeploymentsActionResult(
             data=deployments,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
@@ -700,7 +704,7 @@ class DeploymentService:
         if requester is None:
             raise UserNotFound("User not found in context")
         revision_data = await self._deployment_controller.add_deployment_revision(
-            deployment_id=DeploymentID(action.model_deployment_id),
+            deployment_id=DeploymentID(action.deployment_id),
             revision=action.adder,
             requester_id=requester.user_id,
             auto_activate=action.auto_activate,
@@ -730,6 +734,18 @@ class DeploymentService:
             has_previous_page=result.has_previous_page,
         )
 
+    async def global_search_revisions(
+        self, action: GlobalSearchRevisionsAction
+    ) -> GlobalSearchRevisionsActionResult:
+        """Search revisions across every deployment."""
+        result = await self._deployment_repository.search_revisions(action.querier)
+        return GlobalSearchRevisionsActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
     async def activate_revision(
         self, action: ActivateRevisionAction
     ) -> ActivateRevisionActionResult:
@@ -749,9 +765,9 @@ class DeploymentService:
             deployment_policy=result.deployment_policy,
         )
 
-    async def admin_refresh_deployment_revisions(
-        self, action: RefreshDeploymentRevisionsAction
-    ) -> RefreshDeploymentRevisionsActionResult:
+    async def global_refresh_revisions(
+        self, action: GlobalRefreshDeploymentRevisionsAction
+    ) -> GlobalRefreshDeploymentRevisionsActionResult:
         """Refresh revisions for all active deployments.
 
         For each active deployment, rebuilds a ``ModelRevisionCreator`` from the
@@ -798,7 +814,7 @@ class DeploymentService:
                 succeeded += 1
             except Exception as exc:
                 log.warning(
-                    "admin_refresh_deployment_revisions failed for deployment {}: {}: {}",
+                    "global_refresh_revisions failed for deployment {}: {}: {}",
                     deployment_id,
                     type(exc).__name__,
                     exc,
@@ -813,12 +829,12 @@ class DeploymentService:
                 )
                 failed += 1
         log.info(
-            "admin_refresh_deployment_revisions summary: total={} succeeded={} failed={}",
+            "global_refresh_revisions summary: total={} succeeded={} failed={}",
             len(deployment_ids),
             succeeded,
             failed,
         )
-        return RefreshDeploymentRevisionsActionResult(results=results)
+        return GlobalRefreshDeploymentRevisionsActionResult(results=results)
 
     # ========== Route Operations ==========
 
@@ -995,7 +1011,7 @@ class DeploymentService:
         target configured — an opaque local fallback would not pass the
         worker's HS256 check, so refusing here is the only safe option.
         """
-        proxy_targets = await self._deployment_repository.fetch_scaling_group_proxy_targets({
+        proxy_targets = await self._deployment_repository.fetch_resource_group_proxy_targets({
             resource_group
         })
         proxy_target = proxy_targets.get(resource_group)
@@ -1030,45 +1046,25 @@ class DeploymentService:
             CreateAccessTokenActionResult with the created token data.
         """
         # Get endpoint info to retrieve domain, project, session_owner, resource_group
-        endpoint_info = await self._deployment_repository.get_endpoint_info(
-            action.creator.model_deployment_id
-        )
+        endpoint_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
 
         expires_at = action.creator.expires_at
         jwt_token = await self._mint_endpoint_jwt(
-            deployment_id=action.creator.model_deployment_id,
+            deployment_id=action.deployment_id,
             resource_group=endpoint_info.metadata.resource_group,
             user_uuid=endpoint_info.metadata.session_owner,
             expires_at=expires_at,
         )
 
-        # Create the RBACEntityCreator with the JWT-bearing spec
-        deployment_id = DeploymentID(action.creator.model_deployment_id)
-        spec = EndpointTokenCreatorSpec(
-            deployment_id=deployment_id,
-            domain=endpoint_info.metadata.domain,
-            project_id=endpoint_info.metadata.project,
-            session_owner_id=endpoint_info.metadata.session_owner,
-            expires_at=expires_at,
-            token=jwt_token,
-        )
-        creator: RBACEntityCreator[EndpointTokenRow] = RBACEntityCreator(
-            spec=spec,
-            element_type=RBACElementType.DEPLOYMENT_TOKEN,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.MODEL_DEPLOYMENT,
-                element_id=str(deployment_id),
+        data = await self._deployment_repository.create_access_token(
+            action.deployment_id,
+            EndpointTokenCreator(
+                domain=endpoint_info.metadata.domain,
+                project_id=ProjectID(endpoint_info.metadata.project),
+                session_owner_id=UserID(endpoint_info.metadata.session_owner),
+                expires_at=expires_at,
+                token=jwt_token,
             ),
-        )
-
-        # Create the token via repository
-        token_row = await self._deployment_repository.create_access_token(creator)
-
-        data = ModelDeploymentAccessTokenData(
-            id=token_row.id,
-            token=token_row.token,
-            expires_at=token_row.expires_at,
-            created_at=token_row.created_at,
         )
         return CreateAccessTokenActionResult(data=data)
 
@@ -1110,6 +1106,31 @@ class DeploymentService:
         replicas = [_convert_route_info_to_replica_data(route) for route in result.items]
         return SearchReplicasActionResult(
             data=replicas,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def global_search_replicas(
+        self, action: GlobalSearchReplicasAction
+    ) -> GlobalSearchReplicasActionResult:
+        """Search replicas across every deployment."""
+        result = await self._deployment_repository.search_routes(action.querier)
+        replicas = [_convert_route_info_to_replica_data(route) for route in result.items]
+        return GlobalSearchReplicasActionResult(
+            data=replicas,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def global_search_access_tokens(
+        self, action: GlobalSearchAccessTokensAction
+    ) -> GlobalSearchAccessTokensActionResult:
+        """Search access tokens across every deployment."""
+        result = await self._deployment_repository.search_access_tokens(action.querier)
+        return GlobalSearchAccessTokensActionResult(
+            data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,

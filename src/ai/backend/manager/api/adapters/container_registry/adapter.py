@@ -6,6 +6,7 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.common.container_registry import AllowedGroupsModel
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     AdminSearchContainerRegistriesInput,
@@ -23,7 +24,6 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
     UpdateContainerRegistryPayload,
 )
 from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryTypeFilter
-from ai.backend.common.identifier.container_registry import ContainerRegistryID
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -58,11 +58,11 @@ from ai.backend.manager.services.container_registry.actions.create_container_reg
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
 )
-from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
-    ModifyContainerRegistryAction,
-)
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
+)
+from ai.backend.manager.services.container_registry.actions.update_container_registry import (
+    UpdateContainerRegistryAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -86,10 +86,8 @@ class ContainerRegistryAdapter(BaseAdapter):
         """
         querier = self.build_querier(input)
 
-        action_result = (
-            await self._processors.container_registry.search_container_registries.wait_for_complete(
-                SearchContainerRegistriesAction(querier=querier)
-            )
+        action_result = await self._processors.container_registry.search_container_registries.run(
+            SearchContainerRegistriesAction(querier=querier)
         )
 
         return AdminSearchContainerRegistriesPayload(
@@ -122,10 +120,8 @@ class ContainerRegistryAdapter(BaseAdapter):
             extra=input.extra,
             allowed_groups=allowed_groups,
         )
-        result = (
-            await self._processors.container_registry.create_container_registry.wait_for_complete(
-                CreateContainerRegistryAction(creator=Creator(spec=spec))
-            )
+        result = await self._processors.container_registry.create_container_registry.run(
+            CreateContainerRegistryAction(creator=Creator(spec=spec))
         )
         return CreateContainerRegistryPayload(registry=self._data_to_dto(result.data))
 
@@ -175,10 +171,8 @@ class ContainerRegistryAdapter(BaseAdapter):
             ),
         )
         updater: Updater[ContainerRegistryRow] = Updater(spec=spec, pk_value=input.id)
-        result = (
-            await self._processors.container_registry.modify_container_registry.wait_for_complete(
-                ModifyContainerRegistryAction(updater=updater)
-            )
+        result = await self._processors.container_registry.update_container_registry.run(
+            UpdateContainerRegistryAction(updater=updater)
         )
         return UpdateContainerRegistryPayload(registry=self._data_to_dto(result.data))
 
@@ -190,7 +184,7 @@ class ContainerRegistryAdapter(BaseAdapter):
         purger: Purger[ContainerRegistryRow] = Purger(
             spec=ContainerRegistryPurgerSpec(registry_id=ContainerRegistryID(input.id))
         )
-        await self._processors.container_registry.delete_container_registry.wait_for_complete(
+        await self._processors.container_registry.delete_container_registry.run(
             DeleteContainerRegistryAction(purger=purger)
         )
         return DeleteContainerRegistryPayload(id=input.id)
@@ -278,13 +272,11 @@ class ContainerRegistryAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[ContainerRegistryConditions.by_ids(ids)],
         )
-        action_result = (
-            await self._processors.container_registry.search_container_registries.wait_for_complete(
-                SearchContainerRegistriesAction(querier=querier)
-            )
+        action_result = await self._processors.container_registry.search_container_registries.run(
+            SearchContainerRegistriesAction(querier=querier)
         )
         registry_map = {item.id: self._data_to_dto(item) for item in action_result.data}
-        return [registry_map.get(registry_id) for registry_id in ids]
+        return [registry_map.get(ContainerRegistryID(registry_id)) for registry_id in ids]
 
     @staticmethod
     def _data_to_dto(data: ContainerRegistryData) -> ContainerRegistryNode:

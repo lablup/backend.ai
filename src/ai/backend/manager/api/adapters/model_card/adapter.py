@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import secrets
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.model_card import ModelCardID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
@@ -61,21 +64,26 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     ReplicaSpec,
 )
-from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.errors.resource import ModelCardNotFound
+from ai.backend.manager.data.model_card.types import (
+    ModelCardData,
+    ModelCardResourceRequirementData,
+    ResourceRequirementEntry,
+)
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.model_card.conditions import ModelCardConditions
+from ai.backend.manager.models.model_card.creators import ModelCardCreator
 from ai.backend.manager.models.model_card.orders import ModelCardOrders
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.searchers import (
+    ModelCardResourceRequirementSearcher,
+    ModelCardSearcher,
+)
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import combine_conditions_or, negate_conditions
 from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
 from ai.backend.manager.repositories.model_card.purgers import ModelCardPurgerSpec
 from ai.backend.manager.repositories.model_card.types import (
-    ProjectModelCardOperationScope,
     VFolderModelCardOperationScope,
 )
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
@@ -89,8 +97,12 @@ from ai.backend.manager.services.model_card.actions.bulk_delete import (
 )
 from ai.backend.manager.services.model_card.actions.create import CreateModelCardAction
 from ai.backend.manager.services.model_card.actions.delete import DeleteModelCardAction
+from ai.backend.manager.services.model_card.actions.get import GetModelCardAction
 from ai.backend.manager.services.model_card.actions.scan import ScanProjectModelCardsAction
-from ai.backend.manager.services.model_card.actions.search import SearchModelCardsAction
+from ai.backend.manager.services.model_card.actions.scoped_search_requirements import (
+    ScopedSearchModelCardResourceRequirementsAction,
+)
+from ai.backend.manager.services.model_card.actions.search import GlobalSearchModelCardsAction
 from ai.backend.manager.services.model_card.actions.search_in_project import (
     SearchModelCardsInProjectAction,
 )
@@ -154,7 +166,7 @@ def _entries_to_requirements(
 
 
 def _requirements_to_entries(
-    reqs: list[ResourceRequirementEntry],
+    reqs: list[ModelCardResourceRequirementData],
 ) -> list[ResourceSlotEntryInfo]:
     return [ResourceSlotEntryInfo(resource_type=r.slot_name, quantity=r.min_quantity) for r in reqs]
 
@@ -166,7 +178,8 @@ class ModelCardAdapter(BaseAdapter):
     ) -> SearchModelCardsPayload:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            ModelCardSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_model_card_pagination_spec(),
@@ -177,11 +190,11 @@ class ModelCardAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.model_card.search.wait_for_complete(
-            SearchModelCardsAction(querier=querier)
+        result = await self._processors.model_card.global_search.run(
+            GlobalSearchModelCardsAction(searcher=searcher)
         )
         return SearchModelCardsPayload(
-            items=[self._data_to_node(d) for d in result.items],
+            items=await self._nodes_with_min_resources(result.items),
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
@@ -192,13 +205,10 @@ class ModelCardAdapter(BaseAdapter):
         project_id: UUID,
         input: SearchModelCardsInput,
     ) -> SearchModelCardsPayload:
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
-        scope = ProjectModelCardOperationScope(project_id=project_id, user_id=me.user_id)
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            ModelCardSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_model_card_pagination_spec(),
@@ -209,11 +219,11 @@ class ModelCardAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.model_card.search_in_project.wait_for_complete(
-            SearchModelCardsInProjectAction(scope=scope, querier=querier)
+        result = await self._processors.model_card.search_in_project.run(
+            SearchModelCardsInProjectAction(project_id=ProjectID(project_id), searcher=searcher)
         )
         return SearchModelCardsPayload(
-            items=[self._data_to_node(d) for d in result.items],
+            items=await self._nodes_with_min_resources(result.items),
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
@@ -234,7 +244,8 @@ class ModelCardAdapter(BaseAdapter):
         if input.filter:
             conditions.extend(self._convert_filter(input.filter))
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            ModelCardSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_model_card_pagination_spec(),
@@ -245,30 +256,21 @@ class ModelCardAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.model_card.search.wait_for_complete(
-            SearchModelCardsAction(querier=querier)
+        result = await self._processors.model_card.global_search.run(
+            GlobalSearchModelCardsAction(searcher=searcher)
         )
         return SearchModelCardsPayload(
-            items=[self._data_to_node(d) for d in result.items],
+            items=await self._nodes_with_min_resources(result.items),
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
 
     async def get(self, card_id: UUID) -> ModelCardNode:
-        conditions: list[QueryCondition] = [lambda: ModelCardRow.id == card_id]
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=[],
-            pagination_spec=_model_card_pagination_spec(),
-            limit=1,
+        result = await self._processors.model_card.get.run(
+            GetModelCardAction(model_card_id=ModelCardID(card_id))
         )
-        result = await self._processors.model_card.search.wait_for_complete(
-            SearchModelCardsAction(querier=querier)
-        )
-        if not result.items:
-            raise ModelCardNotFound()
-        return self._data_to_node(result.items[0])
+        return (await self._nodes_with_min_resources([result.data]))[0]
 
     async def create(
         self,
@@ -278,37 +280,31 @@ class ModelCardAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
         min_resource = _entries_to_requirements(input.min_resource) if input.min_resource else []
-        creator: RBACEntityCreator[ModelCardRow] = RBACEntityCreator(
-            spec=ModelCardCreatorSpec(
-                name=input.name,
-                vfolder_id=input.vfolder_id,
-                domain=input.domain_name or me.domain_name,
-                project_id=input.model_store_project_id,
-                creator_id=me.user_id,
-                author=input.author,
-                title=input.title,
-                model_version=input.model_version,
-                description=input.description,
-                task=input.task,
-                category=input.category,
-                architecture=input.architecture,
-                framework=input.framework,
-                label=input.label,
-                license=input.license,
-                min_resource=min_resource,
-                readme=input.readme,
-                access_level=input.access_level.value,
-            ),
-            element_type=RBACElementType.MODEL_CARD,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.PROJECT,
-                element_id=str(input.model_store_project_id),
-            ),
+        creator = ModelCardCreator(
+            name=input.name,
+            vfolder_id=input.vfolder_id,
+            domain=input.domain_name or me.domain_name,
+            project_id=ProjectID(input.model_store_project_id),
+            creator_id=UserID(me.user_id),
+            author=input.author,
+            title=input.title,
+            model_version=input.model_version,
+            description=input.description,
+            task=input.task,
+            category=input.category,
+            architecture=input.architecture,
+            framework=input.framework,
+            label=input.label,
+            license=input.license,
+            readme=input.readme,
+            access_level=input.access_level.value,
         )
-        result = await self._processors.model_card.create.wait_for_complete(
-            CreateModelCardAction(creator=creator)
+        result = await self._processors.model_card.create.run(
+            CreateModelCardAction(creator=creator, min_resource=min_resource)
         )
-        return CreateModelCardPayload(model_card=self._data_to_node(result.model_card))
+        return CreateModelCardPayload(
+            model_card=(await self._nodes_with_min_resources([result.data]))[0]
+        )
 
     async def update(
         self,
@@ -408,18 +404,21 @@ class ModelCardAdapter(BaseAdapter):
             ),
         )
         updater: Updater[ModelCardRow] = Updater(spec=spec, pk_value=input.id)
-        result = await self._processors.model_card.update.wait_for_complete(
-            UpdateModelCardAction(id=input.id, updater=updater)
+        result = await self._processors.model_card.update.run(
+            UpdateModelCardAction(model_card_id=ModelCardID(input.id), updater=updater)
         )
-        return UpdateModelCardPayload(model_card=self._data_to_node(result.model_card))
+        return UpdateModelCardPayload(
+            model_card=(await self._nodes_with_min_resources([result.model_card]))[0]
+        )
 
     async def delete(
         self,
         card_id: UUID,
         options: DeleteModelCardOptions,
     ) -> DeleteModelCardPayload:
-        result = await self._processors.model_card.delete.wait_for_complete(
+        result = await self._processors.model_card.delete.run(
             DeleteModelCardAction(
+                model_card_id=ModelCardID(card_id),
                 purger=Purger(spec=ModelCardPurgerSpec(card_id=card_id)),
                 options=options,
             )
@@ -446,7 +445,7 @@ class ModelCardAdapter(BaseAdapter):
         card_ids: list[UUID],
         options: DeleteModelCardOptions,
     ) -> BulkDeleteModelCardActionResult:
-        return await self._processors.model_card.bulk_delete.wait_for_complete(
+        return await self._processors.model_card.bulk_delete.run(
             BulkDeleteModelCardAction(
                 purgers=[Purger(spec=ModelCardPurgerSpec(card_id=card_id)) for card_id in card_ids],
                 options=options,
@@ -457,7 +456,7 @@ class ModelCardAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        result = await self._processors.model_card.scan.wait_for_complete(
+        result = await self._processors.model_card.scan.run(
             ScanProjectModelCardsAction(
                 project_id=project_id,
                 requester_id=me.user_id,
@@ -540,8 +539,12 @@ class ModelCardAdapter(BaseAdapter):
             policy=policy,
         )
 
-        result = await self._processors.deployment.create_deployment.wait_for_complete(
-            CreateDeploymentAction(creator=creator, auto_activate=True)
+        result = await self._processors.deployment.create_deployment.run(
+            CreateDeploymentAction(
+                project_id=ProjectID(creator.metadata.project),
+                creator=creator,
+                auto_activate=True,
+            )
         )
         return DeployModelCardPayload(
             deployment_id=result.data.id,
@@ -553,9 +556,9 @@ class ModelCardAdapter(BaseAdapter):
         model_card_id: UUID,
         input: SearchDeploymentRevisionPresetsInput,
     ) -> SearchDeploymentRevisionPresetsPayload:
-        action_result = await self._processors.model_card.available_presets.wait_for_complete(
+        action_result = await self._processors.model_card.available_presets.run(
             AvailablePresetsAction(
-                model_card_id=model_card_id,
+                model_card_id=ModelCardID(model_card_id),
                 search_input=input,
             )
         )
@@ -569,20 +572,10 @@ class ModelCardAdapter(BaseAdapter):
 
     async def _get_model_card_data(self, card_id: UUID) -> ModelCardData:
         """Fetch a single model card by ID."""
-        conditions: list[QueryCondition] = [lambda: ModelCardRow.id == card_id]
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=[],
-            pagination_spec=_model_card_pagination_spec(),
-            limit=1,
+        result = await self._processors.model_card.get.run(
+            GetModelCardAction(model_card_id=ModelCardID(card_id))
         )
-        result = await self._processors.model_card.search.wait_for_complete(
-            SearchModelCardsAction(querier=querier)
-        )
-        items: list[ModelCardData] = result.items
-        if not items:
-            raise ModelCardNotFound()
-        return items[0]
+        return result.data
 
     def _convert_filter(self, filter_: ModelCardFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
@@ -655,8 +648,39 @@ class ModelCardAdapter(BaseAdapter):
                     result.append(ModelCardOrders.created_at(ascending))
         return result
 
+    async def _nodes_with_min_resources(
+        self, cards: Sequence[ModelCardData]
+    ) -> list[ModelCardNode]:
+        """Convert cards to nodes with their requirements filled in, in one extra read."""
+        by_card = await self.min_resources([card.id for card in cards])
+        return [self._data_to_node(card, by_card.get(card.id)) for card in cards]
+
+    async def min_resources(
+        self, card_ids: Sequence[UUID]
+    ) -> dict[UUID, list[ResourceSlotEntryInfo]]:
+        """Read the minimum resource requirements of the named cards.
+
+        A second read because the requirements are their own table. GraphQL calls it
+        from the field resolver, so a query that skips ``minResource`` skips this.
+        """
+        if not card_ids:
+            return {}
+        result = await self._processors.model_card.scoped_search_requirements.run(
+            ScopedSearchModelCardResourceRequirementsAction(
+                card_ids=[ModelCardID(card_id) for card_id in card_ids],
+                searcher=ModelCardResourceRequirementSearcher(pagination=NoPagination()),
+            )
+        )
+        by_card: dict[UUID, list[ModelCardResourceRequirementData]] = {}
+        for requirement in result.items:
+            by_card.setdefault(requirement.model_card_id, []).append(requirement)
+        return {card_id: _requirements_to_entries(reqs) for card_id, reqs in by_card.items()}
+
     @staticmethod
-    def _data_to_node(data: ModelCardData) -> ModelCardNode:
+    def _data_to_node(
+        data: ModelCardData,
+        min_resource: list[ResourceSlotEntryInfo] | None = None,
+    ) -> ModelCardNode:
         return ModelCardNode(
             id=data.id,
             name=data.name,
@@ -676,9 +700,7 @@ class ModelCardAdapter(BaseAdapter):
                 label=data.label,
                 license=data.license,
             ),
-            min_resource=(
-                _requirements_to_entries(data.min_resource) if data.min_resource else None
-            ),
+            min_resource=min_resource,
             readme=data.readme,
             access_level=ModelCardAccessLevel(data.access_level),
             created_at=data.created_at,

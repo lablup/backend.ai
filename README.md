@@ -29,8 +29,15 @@ Requirements
 
 ### Infrastructure
 
+**Container engine** (one of):
+
+| Engine | Supported | Accelerator requirements |
+|---|---|---|
+| Docker | 20.10+ | The nvidia runtime registered with the daemon (`nvidia-ctk runtime configure --runtime=docker`) |
+| Podman | 5.4.0+ | A CDI spec for the accelerator under `/etc/cdi` or `/var/run/cdi` (`nvidia-ctk cdi generate` for NVIDIA GPUs) |
+
 **Required**:
-- Docker 20.10+ (with Compose v2)
+- Docker Compose v2
 - PostgreSQL 16+ (tested with 16.3)
 - Valkey 9.1+ (tested with 9.1.0; Redis-compatible)
 - etcd 3.5+ (tested with 3.5.14)

@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy.engine import CursorResult
 
 from ai.backend.common.exception import PrometheusQueryPresetNotFound
 from ai.backend.manager.data.prometheus_query_preset import (
@@ -14,12 +13,7 @@ from ai.backend.manager.data.prometheus_query_preset import (
     PrometheusQueryPresetListResult,
 )
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    Creator,
-    execute_batch_querier,
-    execute_creator,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
     PrometheusQueryPresetUpdaterSpec,
@@ -42,15 +36,6 @@ class PrometheusQueryPresetDBSource:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-
-    async def create(
-        self,
-        creator: Creator[PrometheusQueryPresetRow],
-    ) -> PrometheusQueryPresetData:
-        """Creates a new prometheus query preset."""
-        async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            return result.row.to_data()
 
     async def _merge_partial_options(
         self,
@@ -100,19 +85,6 @@ class PrometheusQueryPresetDBSource:
                 )
             return result.row.to_data()
 
-    async def delete(self, preset_id: UUID) -> bool:
-        """Deletes a prometheus query preset."""
-        async with self._db.begin_session() as db_sess:
-            stmt = sa.delete(PrometheusQueryPresetRow).where(
-                PrometheusQueryPresetRow.id == preset_id
-            )
-            result = await db_sess.execute(stmt)
-            if cast(CursorResult[Any], result).rowcount == 0:
-                raise PrometheusQueryPresetNotFound(
-                    f"Prometheus query preset {preset_id} not found"
-                )
-            return True
-
     async def get_by_id(self, preset_id: UUID) -> PrometheusQueryPresetData:
         """Retrieves a prometheus query preset by ID."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -127,18 +99,15 @@ class PrometheusQueryPresetDBSource:
         self,
         querier: BatchQuerier,
     ) -> PrometheusQueryPresetListResult:
-        """Searches prometheus query presets with total count."""
+        """Read presets for an internal caller.
+
+        The API searches through the action. This stays for the metric repository,
+        which resolves preset ids with no action to run.
+        """
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(PrometheusQueryPresetRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
+            result = await execute_batch_querier(db_sess, query, querier)
             items = [row.PrometheusQueryPresetRow.to_data() for row in result.rows]
-
             return PrometheusQueryPresetListResult(
                 items=items,
                 total_count=result.total_count,

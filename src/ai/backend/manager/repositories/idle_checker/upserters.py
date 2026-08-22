@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, override
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.identifier.session import SessionID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.errors.idle_checker import IdleCheckerNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.repository import ForeignKeyViolationError

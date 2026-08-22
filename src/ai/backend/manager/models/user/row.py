@@ -24,10 +24,10 @@ from sqlalchemy.orm import (
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 from sqlalchemy.sql.expression import SQLColumnExpression
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.types import ScopeID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.scope import ScopeID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -157,7 +157,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
     )
     domain_id: Mapped[DomainID] = mapped_column(
         "domain_id",
-        GUID,
+        GUID(DomainID),
         sa.ForeignKey("domains.id"),
         index=True,
         nullable=False,
@@ -311,20 +311,6 @@ class UserRow(LifecycleTimestampsMixin, Base):
             raise ObjectNotFound(f"User with id {user_uuid} not found")
         return rows[0]
 
-    def get_default_keypair_row(self) -> KeyPairRow | None:
-        keypair_candidate: KeyPairRow | None = None
-        default_keypair_row = self.default_keypair
-        if default_keypair_row is None:
-            keypair_rows = self.keypairs
-            active_keypairs = [row for row in keypair_rows if row.is_active]
-            for row in active_keypairs:
-                if keypair_candidate is None or not keypair_candidate.is_admin:
-                    keypair_candidate = row
-                    break
-        else:
-            keypair_candidate = default_keypair_row
-        return keypair_candidate
-
     def to_model_serving_user_data(self) -> ModelServingUserData:
         return ModelServingUserData(
             uuid=self.uuid,
@@ -355,7 +341,6 @@ class UserRow(LifecycleTimestampsMixin, Base):
             totp_activated=self.totp_activated,
             totp_activated_at=self.totp_activated_at,
             sudo_session_enabled=self.sudo_session_enabled,
-            default_access_key=(self.default_keypair.access_key if self.default_keypair else None),
             container_uid=self.container_uid,
             container_main_gid=self.container_main_gid,
             container_gids=self.container_gids,

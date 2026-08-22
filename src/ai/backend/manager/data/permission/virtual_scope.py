@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeRef
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
+from ai.backend.common.data.entity.user import UserID
 
 
 @dataclass(frozen=True)
@@ -13,7 +13,7 @@ class EntityPermissionCheckKey:
     """
 
     user_id: UserID
-    entity: EntityRef
+    entity: EntityIdentifier
 
 
 @dataclass(frozen=True)

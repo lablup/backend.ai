@@ -7,8 +7,8 @@ from dataclasses import dataclass
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
@@ -19,12 +19,13 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -33,7 +34,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -55,7 +55,7 @@ class SessionData:
     domain_id: DomainID
     domain_name: str
     resource_group_id: ResourceGroupID
-    scaling_group_name: str
+    resource_group_name: str
     status: SessionStatus
 
 
@@ -76,7 +76,7 @@ class TestSessionUniqueNamePerUser:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -84,7 +84,7 @@ class TestSessionUniqueNamePerUser:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 VFolderRow,
                 ContainerRegistryRow,
@@ -118,11 +118,11 @@ class TestSessionUniqueNamePerUser:
         yield domain
 
     @pytest.fixture
-    async def scaling_group(
+    async def resource_group(
         self, database_with_tables: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ScalingGroupRow, None]:
+    ) -> AsyncGenerator[ResourceGroupRow, None]:
         """Create test scaling group."""
-        sgroup = ScalingGroupRow(
+        sgroup = ResourceGroupRow(
             id=ResourceGroupID(uuid.uuid4()),
             name=f"test-sg-{uuid.uuid4().hex[:8]}",
             driver="static",
@@ -223,9 +223,9 @@ class TestSessionUniqueNamePerUser:
         database_with_tables: ExtendedAsyncSAEngine,
         domain: DomainRow,
         group_policy: ProjectResourcePolicyRow,
-    ) -> AsyncGenerator[GroupRow, None]:
+    ) -> AsyncGenerator[ProjectRow, None]:
         """Create test group."""
-        group = GroupRow(
+        group = ProjectRow(
             id=uuid.uuid4(),
             name=f"test-group-{uuid.uuid4().hex[:8]}",
             domain_name=domain.name,
@@ -243,9 +243,9 @@ class TestSessionUniqueNamePerUser:
         self,
         database_with_tables: ExtendedAsyncSAEngine,
         user_one: UserData,
-        group: GroupRow,
+        group: ProjectRow,
         domain: DomainRow,
-        scaling_group: ScalingGroupRow,
+        resource_group: ResourceGroupRow,
         test_config: TestConfig,
     ) -> AsyncGenerator[SessionData, None]:
         """Create first session with status from parametrize (indirect fixture)"""
@@ -257,8 +257,8 @@ class TestSessionUniqueNamePerUser:
             group_id=group.id,
             domain_id=domain.id,
             domain_name=domain.name,
-            resource_group_id=scaling_group.id,
-            scaling_group_name=scaling_group.name,
+            resource_group_id=resource_group.id,
+            scaling_group_name=resource_group.name,
             status=status,
             occupying_slots=ResourceSlot(),
             requested_slots=ResourceSlot(),
@@ -276,8 +276,8 @@ class TestSessionUniqueNamePerUser:
             group_id=group.id,
             domain_id=domain.id,
             domain_name=domain.name,
-            resource_group_id=scaling_group.id,
-            scaling_group_name=scaling_group.name,
+            resource_group_id=resource_group.id,
+            resource_group_name=resource_group.name,
             status=status,
         )
 
@@ -308,7 +308,7 @@ class TestSessionUniqueNamePerUser:
                 domain_id=prepared_first_session.domain_id,
                 domain_name=prepared_first_session.domain_name,
                 resource_group_id=prepared_first_session.resource_group_id,
-                scaling_group_name=prepared_first_session.scaling_group_name,
+                scaling_group_name=prepared_first_session.resource_group_name,
                 status=test_config.second_session_status,
                 occupying_slots=ResourceSlot(),
                 requested_slots=ResourceSlot(),
@@ -341,7 +341,7 @@ class TestSessionUniqueNamePerUser:
             domain_id=prepared_first_session.domain_id,
             domain_name=prepared_first_session.domain_name,
             resource_group_id=prepared_first_session.resource_group_id,
-            scaling_group_name=prepared_first_session.scaling_group_name,
+            scaling_group_name=prepared_first_session.resource_group_name,
             status=test_config.second_session_status,
             occupying_slots=ResourceSlot(),
             requested_slots=ResourceSlot(),
@@ -385,7 +385,7 @@ class TestSessionUniqueNamePerUser:
                 domain_id=prepared_first_session.domain_id,
                 domain_name=prepared_first_session.domain_name,
                 resource_group_id=prepared_first_session.resource_group_id,
-                scaling_group_name=prepared_first_session.scaling_group_name,
+                scaling_group_name=prepared_first_session.resource_group_name,
                 status=test_config.second_session_status,
                 occupying_slots=ResourceSlot(),
                 requested_slots=ResourceSlot(),

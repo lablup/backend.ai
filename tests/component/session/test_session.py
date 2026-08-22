@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import pytest
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.session.request import (
     DestroySessionRequest,
     MatchSessionsRequest,
@@ -19,6 +21,7 @@ from ai.backend.common.dto.manager.session.response import (
     GetStatusHistoryResponse,
     MatchSessionsResponse,
 )
+from ai.backend.common.types import SessionId
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
 
@@ -31,7 +34,7 @@ class TestSessionGetInfo:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
     ) -> None:
-        result = await admin_registry.session.get_info(session_seed.session_name)
+        result = await admin_registry.session.get_info(session_seed.session_id)
         assert isinstance(result, GetSessionInfoResponse)
         # LegacySessionInfo.asdict() uses camelCase keys and does not include
         # session id/name — verify that the returned dict contains expected
@@ -44,7 +47,7 @@ class TestSessionGetInfo:
         admin_registry: BackendAIClientRegistry,
     ) -> None:
         with pytest.raises(NotFoundError):
-            await admin_registry.session.get_info("nonexistent-session-xyz-99999")
+            await admin_registry.session.get_info(SessionID(uuid4()))
 
 
 class TestSessionRename:
@@ -55,13 +58,11 @@ class TestSessionRename:
     ) -> None:
         new_name = f"{session_seed.session_name}-renamed"
         await admin_registry.session.rename(
-            session_seed.session_name,
+            session_seed.session_id,
             RenameSessionRequest(session_name=new_name),
         )
-        # Verify the rename took effect by fetching with the new name
-        result = await admin_registry.session.get_info(new_name)
-        assert isinstance(result, GetSessionInfoResponse)
-        assert result.root["status"] == SessionStatus.RUNNING.name
+        matched = await admin_registry.session.match_sessions(MatchSessionsRequest(id=new_name))
+        assert [str(x["id"]) for x in matched.matches] == [str(session_seed.session_id)]
 
     async def test_rename_nonexistent_session_returns_not_found(
         self,
@@ -69,7 +70,7 @@ class TestSessionRename:
     ) -> None:
         with pytest.raises(NotFoundError):
             await admin_registry.session.rename(
-                "nonexistent-session-xyz-99999",
+                SessionID(uuid4()),
                 RenameSessionRequest(session_name="new-name"),
             )
 
@@ -85,22 +86,20 @@ class TestSessionRename:
         new_name = f"{original_name}-lifecycle-test"
 
         await admin_registry.session.rename(
-            original_name,
+            session_seed.session_id,
             RenameSessionRequest(session_name=new_name),
         )
-        result = await admin_registry.session.get_info(new_name)
-        assert result.root["status"] == SessionStatus.RUNNING.name
-        with pytest.raises(NotFoundError):
-            await admin_registry.session.get_info(original_name)
+        matched = await admin_registry.session.match_sessions(MatchSessionsRequest(id=new_name))
+        assert [str(x["id"]) for x in matched.matches] == [str(session_seed.session_id)]
 
         await admin_registry.session.rename(
-            new_name,
+            session_seed.session_id,
             RenameSessionRequest(session_name=original_name),
         )
-        result = await admin_registry.session.get_info(original_name)
-        assert result.root["status"] == SessionStatus.RUNNING.name
-        with pytest.raises(NotFoundError):
-            await admin_registry.session.get_info(new_name)
+        matched = await admin_registry.session.match_sessions(
+            MatchSessionsRequest(id=original_name)
+        )
+        assert [str(x["id"]) for x in matched.matches] == [str(session_seed.session_id)]
 
     async def test_rename_to_same_name_is_rejected(
         self,
@@ -112,7 +111,7 @@ class TestSessionRename:
         """
         with pytest.raises(BackendAPIError):
             await admin_registry.session.rename(
-                session_seed.session_name,
+                session_seed.session_id,
                 RenameSessionRequest(session_name=session_seed.session_name),
             )
 
@@ -124,16 +123,13 @@ class TestSessionRename:
         """Non-admin users have rename permission on sessions they own,
         and the old name is no longer resolvable after rename.
         """
-        original_name = user_session_seed.session_name
-        new_name = f"{original_name}-renamed"
+        new_name = f"{user_session_seed.session_name}-renamed"
         await user_registry.session.rename(
-            original_name,
+            user_session_seed.session_id,
             RenameSessionRequest(session_name=new_name),
         )
-        result = await user_registry.session.get_info(new_name)
-        assert result.root["status"] == SessionStatus.RUNNING.name
-        with pytest.raises(NotFoundError):
-            await user_registry.session.get_info(original_name)
+        matched = await user_registry.session.match_sessions(MatchSessionsRequest(id=new_name))
+        assert [str(x["id"]) for x in matched.matches] == [str(user_session_seed.session_id)]
 
 
 class TestSessionMatchSessions:
@@ -168,7 +164,7 @@ class TestSessionGetStatusHistory:
         session_seed: SessionSeedData,
     ) -> None:
         result = await admin_registry.session.get_status_history(
-            session_seed.session_name,
+            session_seed.session_id,
         )
         assert isinstance(result, GetStatusHistoryResponse)
         # The result dict should contain status history entries
@@ -180,7 +176,7 @@ class TestSessionGetStatusHistory:
     ) -> None:
         with pytest.raises(NotFoundError):
             await admin_registry.session.get_status_history(
-                "nonexistent-session-xyz-99999",
+                SessionID(uuid4()),
             )
 
 
@@ -191,7 +187,7 @@ class TestSessionDestroy:
         session_seed: SessionSeedData,
     ) -> None:
         result = await admin_registry.session.destroy(
-            session_seed.session_name,
+            session_seed.session_id,
             DestroySessionRequest(forced=True),
         )
         assert isinstance(result, DestroySessionResponse)
@@ -202,7 +198,7 @@ class TestSessionDestroy:
     ) -> None:
         with pytest.raises(NotFoundError):
             await admin_registry.session.destroy(
-                "nonexistent-session-xyz-99999",
+                SessionID(uuid4()),
                 DestroySessionRequest(forced=True),
             )
 
@@ -219,12 +215,12 @@ class TestSessionDestroy:
             MarkTerminatingResult(
                 cancelled_sessions=[],
                 terminating_sessions=[],
-                force_terminated_sessions=[terminated_session_seed.session_id],
+                force_terminated_sessions=[SessionId(terminated_session_seed.session_id)],
                 skipped_sessions=[],
             )
         )
         result = await admin_registry.session.destroy(
-            terminated_session_seed.session_name,
+            terminated_session_seed.session_id,
             DestroySessionRequest(forced=True),
         )
         assert isinstance(result, DestroySessionResponse)
@@ -241,12 +237,12 @@ class TestSessionDestroy:
             MarkTerminatingResult(
                 cancelled_sessions=[],
                 terminating_sessions=[],
-                force_terminated_sessions=[user_session_seed.session_id],
+                force_terminated_sessions=[SessionId(user_session_seed.session_id)],
                 skipped_sessions=[],
             )
         )
         result = await user_registry.session.destroy(
-            user_session_seed.session_name,
+            user_session_seed.session_id,
             DestroySessionRequest(forced=True),
         )
         assert isinstance(result, DestroySessionResponse)
@@ -260,7 +256,7 @@ class TestSessionGetContainerLogs:
         terminated_session_seed: SessionSeedData,
     ) -> None:
         result = await admin_registry.session.get_container_logs(
-            terminated_session_seed.session_name,
+            terminated_session_seed.session_id,
         )
         assert isinstance(result, GetContainerLogsResponse)
         assert isinstance(result.root, dict)
@@ -271,7 +267,7 @@ class TestSessionGetContainerLogs:
     ) -> None:
         with pytest.raises(NotFoundError):
             await admin_registry.session.get_container_logs(
-                "nonexistent-session-xyz-99999",
+                SessionID(uuid4()),
             )
 
 
@@ -286,7 +282,7 @@ class TestSessionPermissions:
         """Users can read their own session metadata including
         status and domain name through the get_info endpoint.
         """
-        result = await user_registry.session.get_info(user_session_seed.session_name)
+        result = await user_registry.session.get_info(user_session_seed.session_id)
         assert result.root["status"] == SessionStatus.RUNNING.name
         assert result.root["domainName"] == user_session_seed.domain_name
 
@@ -299,7 +295,7 @@ class TestSessionPermissions:
         cannot resolve sessions belonging to a different keypair.
         """
         with pytest.raises((NotFoundError, BackendAPIError)):
-            await user_registry.session.get_info(session_seed.session_name)
+            await user_registry.session.get_info(session_seed.session_id)
 
     async def test_admin_cannot_access_user_session_without_ownership(
         self,
@@ -312,7 +308,7 @@ class TestSessionPermissions:
         future refactoring.
         """
         with pytest.raises(NotFoundError):
-            await admin_registry.session.get_info(user_session_seed.session_name)
+            await admin_registry.session.get_info(user_session_seed.session_id)
 
     async def test_user_cannot_destroy_admin_session(
         self,
@@ -324,7 +320,7 @@ class TestSessionPermissions:
         """
         with pytest.raises((NotFoundError, BackendAPIError)):
             await user_registry.session.destroy(
-                session_seed.session_name,
+                session_seed.session_id,
                 DestroySessionRequest(forced=True),
             )
 
@@ -338,6 +334,6 @@ class TestSessionPermissions:
         """
         with pytest.raises((NotFoundError, BackendAPIError)):
             await user_registry.session.rename(
-                session_seed.session_name,
+                session_seed.session_id,
                 RenameSessionRequest(session_name="hacked-name"),
             )

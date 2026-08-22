@@ -9,15 +9,15 @@ from typing import cast
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
     IdleCheckPhase,
 )
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.idle_checker.types import (
@@ -34,19 +34,20 @@ from ai.backend.manager.errors.idle_checker import (
 )
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.idle_checker.conditions import SessionIdleCheckConditions
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
-from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
-from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.conditions import ResourceGroupConditions
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
@@ -145,17 +146,20 @@ class IdleCheckerDBSource:
                     result = await w.batch_query_in_global(sa.select(DomainRow), querier)
                     scope_exists = bool(result.rows)
                 case ScopeType.PROJECT:
-                    row = await w.query(Querier(row_class=GroupRow, pk_value=spec.scope_id))
+                    row = await w.query(Querier(row_class=ProjectRow, pk_value=spec.scope_id))
                     scope_exists = row is not None
                 case ScopeType.RESOURCE_GROUP:
                     querier = BatchQuerier(
                         pagination=OffsetPagination(limit=1),
                         conditions=[
-                            ScalingGroupConditions.by_ids([ResourceGroupID(spec.scope_id)])
+                            ResourceGroupConditions.by_ids([ResourceGroupID(spec.scope_id)])
                         ],
                     )
-                    result = await w.batch_query_in_global(sa.select(ScalingGroupRow), querier)
+                    result = await w.batch_query_in_global(sa.select(ResourceGroupRow), querier)
                     scope_exists = bool(result.rows)
+                case ScopeType.USER:
+                    user_row = await w.query(Querier(row_class=UserRow, pk_value=spec.scope_id))
+                    scope_exists = user_row is not None
                 case _:
                     scope_exists = False
             if not scope_exists:
@@ -359,6 +363,10 @@ class IdleCheckerDBSource:
             sa.and_(
                 IdleCheckerBindingRow.scope_type == ScopeType.DOMAIN.value,
                 IdleCheckerBindingRow.scope_id == SessionRow.domain_id,
+            ),
+            sa.and_(
+                IdleCheckerBindingRow.scope_type == ScopeType.USER.value,
+                IdleCheckerBindingRow.scope_id == SessionRow.user_uuid,
             ),
         )
         desired_query = (

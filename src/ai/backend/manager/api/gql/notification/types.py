@@ -108,6 +108,7 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_enum,
     gql_field,
     gql_node_type,
@@ -117,6 +118,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.notification import NotificationChannelNotFound
 
 # GraphQL enum types
 
@@ -234,10 +236,27 @@ class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
     name: str
     description: str | None
     rule_type: NotificationRuleTypeGQL
-    channel: NotificationChannel
+    channel_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description="ID of the channel this rule dispatches through.",
+        )
+    )
     message_template: str
     enabled: bool
     created_at: datetime
+
+    @gql_field(description="The channel this rule dispatches through.")  # type: ignore[misc]
+    async def channel(self, info: Info[StrawberryGQLContext]) -> NotificationChannel:
+        """Loaded on demand rather than carried by the rule.
+
+        The rule names its channel by id, so a client that skips the channel skips the
+        read. Non-null because ``notification_rules.channel_id`` is.
+        """
+        channel = await info.context.data_loaders.notification_channel_loader.load(self.channel_id)
+        if channel is None:
+            raise NotificationChannelNotFound(f"Notification channel {self.channel_id} not found")
+        return channel
 
     @classmethod
     @override

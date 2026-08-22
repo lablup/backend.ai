@@ -10,7 +10,7 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 
 
@@ -40,7 +40,7 @@ def mock_user_repository() -> AsyncMock:
 
 @pytest.fixture
 def mock_group_repository() -> AsyncMock:
-    repo = AsyncMock(spec=GroupRepository)
+    repo = AsyncMock(spec=ProjectRepository)
     repo.project_id_by_name_in_domain.return_value = None
     return repo
 

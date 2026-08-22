@@ -3,11 +3,11 @@ from datetime import datetime
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.data.entity.notification import NOTIFICATION_RULE_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-
-from .base import NotificationAction
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
 
 @dataclass
@@ -20,7 +20,7 @@ class ProcessedRuleSuccess:
 
 
 @dataclass
-class ProcessNotificationAction(NotificationAction):
+class ProcessNotificationAction(BaseGlobalAction):
     """Action to process a notification event."""
 
     rule_type: NotificationRuleType
@@ -28,8 +28,14 @@ class ProcessNotificationAction(NotificationAction):
     notification_data: NotifiableMessage
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.rule_type)
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return NOTIFICATION_RULE_ENTITY_TYPE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "process_notification"
 
     @override
     @classmethod
@@ -38,14 +44,10 @@ class ProcessNotificationAction(NotificationAction):
 
 
 @dataclass
-class ProcessNotificationActionResult(BaseActionResult):
+class ProcessNotificationActionResult:
     """Result of processing a notification."""
 
     rule_type: NotificationRuleType
     rules_matched: int
     successes: list[ProcessedRuleSuccess]
     errors: list[BaseException]
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.rule_type)

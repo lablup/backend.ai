@@ -10,7 +10,7 @@ from .base import (
 )
 from .bulk import (
     BaseBulkAction,
-    BaseBulkActionResult,
+    BasePartialBulkActionResult,
 )
 from .rbac import (
     BaseRBACAction,
@@ -128,7 +128,7 @@ __all__ = (
     "BaseActionResultMeta",
     "BaseActionTriggerMeta",
     "BaseBulkAction",
-    "BaseBulkActionResult",
+    "BasePartialBulkActionResult",
     "ActionTarget",
     "SearchableActionTarget",
     "BaseRBACAction",

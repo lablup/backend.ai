@@ -10,9 +10,10 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
-from ai.backend.common.identifier.container_registry import ContainerRegistryID
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
@@ -33,10 +34,10 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -46,6 +47,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -54,7 +56,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
@@ -113,7 +114,7 @@ class _RegistryWithGroups:
     """Registry with associated group IDs."""
 
     registry: ContainerRegistryData
-    group_ids: list[UUID]
+    group_ids: list[ProjectID]
 
 
 class TestContainerRegistryRepository:
@@ -129,7 +130,7 @@ class TestContainerRegistryRepository:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -137,7 +138,7 @@ class TestContainerRegistryRepository:
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
@@ -183,10 +184,10 @@ class TestContainerRegistryRepository:
     @pytest.fixture
     async def sample_groups(
         self, db_with_cleanup: ExtendedAsyncSAEngine, sample_domain: DomainFixtureData
-    ) -> list[UUID]:
+    ) -> list[ProjectID]:
         """Pre-created 2 groups with required policies. Depends on sample_domain.domain_name."""
         resource_policy_name = f"test-policy-{sample_domain.domain_name}"
-        group_ids: list[UUID] = []
+        group_ids: list[ProjectID] = []
 
         async with db_with_cleanup.begin_session() as session:
             # Create resource policies
@@ -209,7 +210,7 @@ class TestContainerRegistryRepository:
 
             # Create 2 groups
             for i in range(2):
-                group = GroupRow(
+                group = ProjectRow(
                     name=f"test-group-{i}-{sample_domain.domain_name}",
                     domain_name=sample_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
@@ -230,7 +231,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -251,7 +252,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -276,7 +277,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -319,14 +320,14 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry1 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
                 project="project-" + str(uuid.uuid4())[:8],
             )
             registry2 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -367,14 +368,14 @@ class TestContainerRegistryRepository:
             registry2_name = str(uuid.uuid4())[:8] + ".example.com"
 
             registry1 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry1_name}",
                 registry_name=registry1_name,
                 type=ContainerRegistryType.HARBOR2,
                 project="project-" + str(uuid.uuid4())[:8],
             )
             registry2 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry2_name}",
                 registry_name=registry2_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -467,7 +468,7 @@ class TestContainerRegistryRepository:
 
             # Create 2 groups
             for i in range(2):
-                group = GroupRow(
+                group = ProjectRow(
                     name=f"test-group-for-registry-{i}-{registry_name}",
                     domain_name=domain_name,
                     total_resource_slots=ResourceSlot(),
@@ -530,7 +531,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -622,14 +623,14 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry1 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
                 project=project1,
             )
             registry2 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -740,7 +741,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -826,11 +827,11 @@ class TestContainerRegistryRepository:
         """Registry with available groups for adding."""
 
         registry: ContainerRegistryData
-        group_ids: list[UUID]
+        group_ids: list[ProjectID]
 
     @pytest.fixture
     async def registry_and_groups_for_adding(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_groups: list[UUID]
+        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_groups: list[ProjectID]
     ) -> _RegistryWithAvailableGroups:
         """Pre-created registry and 2 groups for testing adding allowed_groups."""
         registry_name = str(uuid.uuid4())[:8] + ".example.com"
@@ -838,7 +839,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -914,12 +915,12 @@ class TestContainerRegistryRepository:
         registry_name = str(uuid.uuid4())[:8] + ".example.com"
         project = "project-" + str(uuid.uuid4())[:8]
         resource_policy_name = f"test-policy-{sample_domain.domain_name}-3groups"
-        group_ids: list[UUID] = []
+        group_ids: list[ProjectID] = []
 
         async with db_with_cleanup.begin_session() as session:
             # Create registry
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -947,7 +948,7 @@ class TestContainerRegistryRepository:
 
             # Create 3 groups and associate them
             for i in range(3):
-                group = GroupRow(
+                group = ProjectRow(
                     name=f"test-group-{i}-{sample_domain.domain_name}-assoc",
                     domain_name=sample_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
@@ -1029,9 +1030,9 @@ class TestContainerRegistryRepository:
         """Registry with 2 groups associated out of 4 available."""
 
         registry: ContainerRegistryData
-        all_group_ids: list[UUID]
-        initially_associated_group_ids: list[UUID]
-        available_group_ids: list[UUID]
+        all_group_ids: list[ProjectID]
+        initially_associated_group_ids: list[ProjectID]
+        available_group_ids: list[ProjectID]
 
     @pytest.fixture
     async def registry_with_partial_groups(
@@ -1041,12 +1042,12 @@ class TestContainerRegistryRepository:
         registry_name = str(uuid.uuid4())[:8] + ".example.com"
         project = "project-" + str(uuid.uuid4())[:8]
         resource_policy_name = f"test-policy-{sample_domain.domain_name}-4groups"
-        group_ids: list[UUID] = []
+        group_ids: list[ProjectID] = []
 
         async with db_with_cleanup.begin_session() as session:
             # Create registry
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -1074,7 +1075,7 @@ class TestContainerRegistryRepository:
 
             # Create 4 groups
             for i in range(4):
-                group = GroupRow(
+                group = ProjectRow(
                     name=f"test-group-{i}-{sample_domain.domain_name}-partial",
                     domain_name=sample_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
@@ -1346,7 +1347,7 @@ class TestSearchContainerRegistries:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -1354,7 +1355,7 @@ class TestSearchContainerRegistries:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
@@ -1395,7 +1396,7 @@ class TestSearchContainerRegistries:
         async with db_with_cleanup.begin_session() as session:
             for reg_type, reg_name, project in configs:
                 row = ContainerRegistryRow(
-                    id=uuid.uuid4(),
+                    id=ContainerRegistryID(uuid.uuid4()),
                     url=f"https://{reg_name}.example.com",
                     registry_name=reg_name,
                     type=reg_type,

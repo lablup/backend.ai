@@ -9,12 +9,12 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
 )
-from ai.backend.common.identifier.entity import EntityID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.rbac_role_invitation import (
     CreateRoleInvitationResult,
@@ -81,7 +81,7 @@ from ai.backend.manager.errors.role_invitation import (
     RoleInvitationNotFound,
 )
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -351,7 +351,7 @@ class PermissionDBSource:
             spec=UserRoleCreatorSpec(
                 user_id=data.user_id,
                 role_id=data.role_id,
-                granted_by=data.granted_by,
+                granted_by=None if data.granted_by is None else UserID(data.granted_by),
             )
         )
         result = await execute_creator(db_session, creator)
@@ -379,7 +379,7 @@ class PermissionDBSource:
             await db_session.flush()
 
             # Used by PermissionControllerService.revoke_role() to decide whether
-            # to call GroupDBSource.unbind_user_from_project().
+            # to call ProjectDBSource.unbind_user_from_project().
             # TODO: remove this query when unbind_user_from_project() is retired
             # (i.e. association_groups_users is fully migrated to
             # association_scopes_entities).
@@ -813,7 +813,7 @@ class PermissionDBSource:
     ) -> ScopeListResult:
         """Search all projects using BatchQuerier."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(GroupRow.id, GroupRow.name)
+            query = sa.select(ProjectRow.id, ProjectRow.name)
 
             result = await execute_batch_querier(
                 db_sess,
@@ -1262,8 +1262,8 @@ class PermissionDBSource:
             groups[
                 _VirtualScopePermissionGroupKey(
                     user_id=key.user_id,
-                    entity_type=key.entity.entity_type,
-                    subject_entity_type=key.entity.entity_type,
+                    entity_type=key.entity.entity_type(),
+                    subject_entity_type=key.entity.entity_type(),
                 )
             ].append(key)
 
@@ -1273,10 +1273,10 @@ class PermissionDBSource:
                 granted = await self._resolve_permissions_for_virtual_scope_group(
                     db_session=db_session,
                     group_key=group_key,
-                    entity_ids=[k.entity.entity_id for k in members],
+                    entity_ids=[k.entity for k in members],
                 )
                 for key in members:
-                    result[key] = granted.get(key.entity.entity_id, Permission.NONE)
+                    result[key] = granted.get(key.entity, Permission.NONE)
         return result
 
     async def _resolve_effective_scope_permissions_via_virtual_scope(

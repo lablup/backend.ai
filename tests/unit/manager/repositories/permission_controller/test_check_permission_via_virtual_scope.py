@@ -12,13 +12,15 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 
 import pytest
+import sqlalchemy as sa
 
-from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeType
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.user import UserID
-from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
@@ -47,16 +49,21 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.repositories.ops.rbac.provider import (
+    EntityMembersAddition,
+    RBACOpsProvider,
+    ScopeUserMember,
+)
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
 )
@@ -64,7 +71,7 @@ from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
     AgentRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
 )
 
 _TARGET_ENTITY_TYPE = EntityType("vfolder")
@@ -351,7 +358,7 @@ class TestCheckPermissionViaVirtualScope:
     ) -> None:
         key = EntityPermissionCheckKey(
             user_id=chain.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
+            entity=VFolderUUID(chain.entity_id),
         )
         result = await db_source.check_single_entity_permission_via_virtual_scope(key, permission)
         assert result is expected
@@ -384,7 +391,7 @@ class TestCheckPermissionViaVirtualScope:
     ) -> None:
         key = EntityPermissionCheckKey(
             user_id=chain.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
+            entity=VFolderUUID(chain.entity_id),
         )
         resolved = await db_source.resolve_effective_permissions_via_virtual_scope([key])
         assert resolved[key] == expected
@@ -401,11 +408,11 @@ class TestCheckPermissionViaVirtualScope:
     ) -> None:
         reachable = EntityPermissionCheckKey(
             user_id=chain.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
+            entity=VFolderUUID(chain.entity_id),
         )
         unreachable = EntityPermissionCheckKey(
             user_id=chain.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=uuid.uuid4()),
+            entity=VFolderUUID(uuid.uuid4()),
         )
         result = await db_source.check_bulk_permission_via_virtual_scope(
             [reachable, unreachable], Permission.READ
@@ -429,7 +436,7 @@ class TestCheckPermissionViaVirtualScope:
     ) -> None:
         reachable = EntityPermissionCheckKey(
             user_id=chain.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
+            entity=VFolderUUID(chain.entity_id),
         )
         result = await db_source.check_bulk_permission_via_virtual_scope(
             [reachable], Permission.CREATE | Permission.UPDATE
@@ -448,9 +455,197 @@ class TestCheckPermissionViaVirtualScope:
     ) -> None:
         key = EntityPermissionCheckKey(
             user_id=UserID(uuid.uuid4()),
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
+            entity=VFolderUUID(chain.entity_id),
         )
         result = await db_source.check_single_entity_permission_via_virtual_scope(
             key, Permission.READ
         )
         assert result is False
+
+
+class TestScopeMemberEnrollmentCascade:
+    """Enrolling a member under a scope only cascades the scope's permissions onto the
+    member's own entities when the member is attached as an inheriting member."""
+
+    @pytest.fixture
+    async def db_with_rbac_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                RoleRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                PermissionRow,
+                ObjectPermissionRow,
+                AssociationScopesEntitiesRow,
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def db_source(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+    ) -> PermissionDBSource:
+        return PermissionDBSource(db_with_rbac_tables)
+
+    @pytest.fixture
+    def ops_provider(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+    ) -> RBACOpsProvider:
+        return RBACOpsProvider(db_with_rbac_tables)
+
+    @pytest.fixture
+    def ids(self) -> VSChainFixture:
+        return VSChainFixture()
+
+    async def _grant_vfolder_read_on_project(
+        self,
+        db: ExtendedAsyncSAEngine,
+        ids: VSChainFixture,
+        project_id: uuid.UUID,
+    ) -> None:
+        """Give the user a role holding vfolder READ on the project scope."""
+        async with db.begin_session() as db_sess:
+            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+            domain_id = DomainID(uuid.uuid4())
+            db_sess.add(
+                DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
+            )
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name="test-rbac-policy",
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_session_count_per_model_session=0,
+                    max_customized_image_count=0,
+                )
+            )
+            db_sess.add(
+                UserRow(
+                    uuid=ids.user_id,
+                    username=f"user-{ids.user_id.hex[:8]}",
+                    email="member@test.com",
+                    resource_policy="test-rbac-policy",
+                    status=UserStatus.ACTIVE,
+                    need_password_change=False,
+                    sudo_session_enabled=False,
+                    domain_name=domain_name,
+                    domain_id=domain_id,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(RoleRow(id=ids.role_id, name="project-role", status=RoleStatus.ACTIVE))
+            await db_sess.flush()
+            db_sess.add(UserRoleRow(user_id=ids.user_id, role_id=ids.role_id))
+            db_sess.add(
+                PermissionRow(
+                    role_id=ids.role_id,
+                    scope_type=PermScopeType.PROJECT,
+                    scope_id=str(project_id),
+                    entity_type=PermEntityType.VFOLDER,
+                    operation=OperationType.READ,
+                    permission=Permission.READ,
+                )
+            )
+            await db_sess.flush()
+
+    async def _own_vfolder_in_user_vs(
+        self,
+        db: ExtendedAsyncSAEngine,
+        ids: VSChainFixture,
+    ) -> None:
+        """Enroll the user's personal vfolder in the user's own virtual scope, as the
+        virtual-scope backfill does for ordinary resource entities."""
+        async with db.begin_session() as db_sess:
+            user_vs_id = await db_sess.scalar(
+                sa.select(VirtualScopeRow.id).where(
+                    VirtualScopeRow.scope_type == USER_SCOPE_TYPE,
+                    VirtualScopeRow.scope_id == ids.user_id,
+                )
+            )
+            db_sess.add(
+                EntityMembershipRow(
+                    virtual_scope_id=user_vs_id,
+                    entity_type=_TARGET_ENTITY_TYPE,
+                    entity_id=ids.entity_id,
+                    permission_cap=None,
+                )
+            )
+            await db_sess.flush()
+
+    async def test_project_member_keeps_own_entities_out_of_reach(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        db_source: PermissionDBSource,
+        ops_provider: RBACOpsProvider,
+        ids: VSChainFixture,
+    ) -> None:
+        """A project-scope grant must not resolve onto a vfolder the member user owns:
+        joining a project makes the user an ordinary member, not an inheriting one."""
+        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
+        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
+        await self._grant_vfolder_read_on_project(db_with_rbac_tables, ids, ids.owner_scope_id)
+
+        async with ops_provider.write_ops() as w:
+            await w.ensure_scope(project_scope)
+            await w.ensure_scope(user_scope)
+            await w.add_bulk_members(
+                EntityMembersAddition(
+                    scope=project_scope, members=[ScopeUserMember(user_id=ids.user_id)]
+                )
+            )
+        await self._own_vfolder_in_user_vs(db_with_rbac_tables, ids)
+
+        key = EntityPermissionCheckKey(
+            user_id=ids.user_id,
+            entity=VFolderUUID(ids.entity_id),
+        )
+        result = await db_source.check_single_entity_permission_via_virtual_scope(
+            key, Permission.READ
+        )
+        assert result is False
+
+    async def test_inheriting_enrollment_does_cascade(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        db_source: PermissionDBSource,
+        ops_provider: RBACOpsProvider,
+        ids: VSChainFixture,
+    ) -> None:
+        """The same topology attached as an inheriting member does reach the vfolder, so
+        the check above fails for the intended reason and not by accident."""
+        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
+        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
+        await self._grant_vfolder_read_on_project(db_with_rbac_tables, ids, ids.owner_scope_id)
+
+        async with ops_provider.write_ops() as w:
+            await w.ensure_scope(project_scope)
+            await w.ensure_scope(user_scope)
+            await w.add_bulk_inheriting_members(
+                EntityMembersAddition(
+                    scope=project_scope, members=[ScopeUserMember(user_id=ids.user_id)]
+                )
+            )
+        await self._own_vfolder_in_user_vs(db_with_rbac_tables, ids)
+
+        key = EntityPermissionCheckKey(
+            user_id=ids.user_id,
+            entity=VFolderUUID(ids.entity_id),
+        )
+        result = await db_source.check_single_entity_permission_via_virtual_scope(
+            key, Permission.READ
+        )
+        assert result is True

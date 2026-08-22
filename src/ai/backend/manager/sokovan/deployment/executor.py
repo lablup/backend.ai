@@ -11,6 +11,8 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
 )
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     BulkCreateEndpointRequest,
     BulkDeleteEndpointRequest,
@@ -27,8 +29,6 @@ from ai.backend.common.exception import (
     FailedToGetMetric,
     PrometheusConnectionError,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import (
     AutoScalingMetricSource,
 )
@@ -42,7 +42,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
 )
 from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
-from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
+from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.repositories.deployment.repository import (
     AutoScalingMetricsData,
@@ -133,9 +133,11 @@ class DeploymentExecutor:
 
         with DeploymentRecorderContext.shared_phase("load_configuration"):
             with DeploymentRecorderContext.shared_step("load_proxy_targets"):
-                scaling_groups = {dep.deployment_info.metadata.resource_group for dep, _ in entries}
-                scaling_group_targets = (
-                    await self._deployment_repo.fetch_scaling_group_proxy_targets(scaling_groups)
+                resource_groups = {
+                    dep.deployment_info.metadata.resource_group for dep, _ in entries
+                }
+                resource_group_targets = (
+                    await self._deployment_repo.fetch_resource_group_proxy_targets(resource_groups)
                 )
 
         registered: list[DeploymentWithHistory] = []
@@ -144,11 +146,11 @@ class DeploymentExecutor:
         # Group entries by proxy target so each target receives one bulk call.
         groups: dict[
             tuple[str, str],
-            list[tuple[DeploymentWithHistory, DeploymentRevisionID, ScalingGroupProxyTarget]],
+            list[tuple[DeploymentWithHistory, DeploymentRevisionID, ResourceGroupProxyTarget]],
         ] = {}
         for deployment, revision_id in entries:
             info = deployment.deployment_info
-            target = scaling_group_targets.get(info.metadata.resource_group)
+            target = resource_group_targets.get(info.metadata.resource_group)
             if not target:
                 log.warning(
                     "No proxy target found for scaling group {} of deployment {}",
@@ -193,7 +195,7 @@ class DeploymentExecutor:
         addr: str,
         token: str,
         group_entries: Sequence[
-            tuple[DeploymentWithHistory, DeploymentRevisionID, ScalingGroupProxyTarget]
+            tuple[DeploymentWithHistory, DeploymentRevisionID, ResourceGroupProxyTarget]
         ],
         registered: list[DeploymentWithHistory],
         failures: list[DeploymentExecutionError],
@@ -371,11 +373,11 @@ class DeploymentExecutor:
         deployment_ids = {dep.deployment_info.id for dep in deployments}
         with DeploymentRecorderContext.shared_phase("load_termination_config"):
             with DeploymentRecorderContext.shared_step("load_proxy_config"):
-                scaling_groups = {
+                resource_groups = {
                     dep.deployment_info.metadata.resource_group for dep in deployments
                 }
-                proxy_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
-                    scaling_groups
+                proxy_targets = await self._deployment_repo.fetch_resource_group_proxy_targets(
+                    resource_groups
                 )
 
         # Phase 2: Retire replica groups and clear the deploying-revision pointer in one

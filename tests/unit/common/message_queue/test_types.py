@@ -4,8 +4,8 @@ import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.contexts.user import current_user, triggered_user
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.message_queue.types import MessageMetadata
 

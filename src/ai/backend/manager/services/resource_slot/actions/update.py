@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import UpdateGlobalOpsAction
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
-from ai.backend.manager.repositories.resource_slot.updaters import ResourceSlotTypeUpdater
+from ai.backend.manager.models.resource_slot.updaters import ResourceSlotTypeUpdater
 
 
 @dataclass
@@ -18,7 +18,7 @@ class UpdateResourceSlotTypeAction(
     """Update the display and scheduling flags of one resource slot type.
 
     ``slot_name`` and ``slot_type`` are not updatable — see
-    :class:`~ai.backend.manager.repositories.resource_slot.updaters.ResourceSlotTypeUpdater`.
+    :class:`~ai.backend.manager.models.resource_slot.updaters.ResourceSlotTypeUpdater`.
     """
 
     updater: ResourceSlotTypeUpdater

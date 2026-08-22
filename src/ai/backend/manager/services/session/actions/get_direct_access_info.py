@@ -1,9 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.session.base import SessionAction
@@ -16,12 +14,8 @@ class GetDirectAccessInfoAction(SessionAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.SESSION_DIRECT_ACCESS
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    def action_name(cls) -> str:
+        return "get_direct_access_info"
 
     @override
     @classmethod
@@ -30,11 +24,7 @@ class GetDirectAccessInfoAction(SessionAction):
 
 
 @dataclass
-class GetDirectAccessInfoActionResult(BaseActionResult):
+class GetDirectAccessInfoActionResult:
     # TODO: Add proper type
     result: Any
     session_data: SessionData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.session_data.id)

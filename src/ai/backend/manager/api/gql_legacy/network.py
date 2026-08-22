@@ -22,11 +22,11 @@ from ai.backend.manager.errors.common import (
     ObjectNotFound,
     ServerMisconfiguredError,
 )
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.network import NetworkRow
+from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
@@ -253,7 +253,7 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             try:
-                project = await GroupRow.get(db_session, project_id, load_resource_policy=True)
+                project = await ProjectRow.get(db_session, project_id, load_resource_policy=True)
             except NoResultFound as e:
                 raise ObjectNotFound(object_name="project") from e
 

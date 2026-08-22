@@ -1,43 +1,43 @@
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseAction
-from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
-from ai.backend.manager.actions.action.single_entity import (
-    BaseSingleEntityAction,
-    BaseSingleEntityActionResult,
-)
-from ai.backend.manager.actions.action.types import FieldData
+from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 
 
-class ModelServiceAction(BaseAction):
+@dataclass
+class ModelServiceAction(BaseSingleEntityAction):
+    """Base for a legacy model service operation on one deployment.
+
+    The routes, tokens, rules and errors a service carries are answered for by
+    the deployment, so those operations carry its id.
+    """
+
+    deployment_id: DeploymentID
+
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.MODEL_DEPLOYMENT
+    def entity_id(self) -> EntityIdentifier:
+        return self.deployment_id
 
 
+@dataclass
 class ModelServiceScopeAction(BaseScopeAction):
+    """Base for a legacy model service operation bounded by a scope."""
+
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.MODEL_DEPLOYMENT
+        return DEPLOYMENT_ENTITY_TYPE
 
 
+@dataclass
 class ModelServiceScopeActionResult(BaseScopeActionResult):
-    pass
-
-
-class ModelServiceSingleEntityAction(BaseSingleEntityAction):
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.MODEL_DEPLOYMENT
+    """A scoped model service read names no entity."""
 
     @override
-    def field_data(self) -> FieldData | None:
-        return None
-
-
-class ModelServiceSingleEntityActionResult(BaseSingleEntityActionResult):
-    pass
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return ()

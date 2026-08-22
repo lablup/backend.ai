@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any, Self, override
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.types import (
     AgentId,
     DeviceName,
@@ -70,12 +72,13 @@ class AgentDataForHeartbeatUpdate:
 
 
 @dataclass
-class AgentData:
+class AgentData(EntityData):
+    uuid: AgentUUID
     id: AgentId
     status: AgentStatus
     status_changed: datetime | None
     region: str
-    scaling_group: str
+    resource_group: str
     schedulable: bool
     available_slots: ResourceSlot
     cached_occupied_slots: ResourceSlot
@@ -90,13 +93,17 @@ class AgentData:
     public_key: PublicKey | None
     auto_terminate_abusing_kernel: bool
 
+    @override
+    def entity_id(self) -> AgentUUID:
+        return self.uuid
+
 
 @dataclass
 class AgentMetadata:
     id: AgentId
     status: AgentStatus
     region: str | None
-    scaling_group: str | None
+    resource_group: str | None
     architecture: str
     version: str
     auto_terminate_abusing_kernel: bool
@@ -169,7 +176,7 @@ class AgentHeartbeatUpsert:
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 region=agent_info.region,
-                scaling_group=agent_info.scaling_group,
+                resource_group=agent_info.scaling_group,
                 architecture=agent_info.architecture,
                 auto_terminate_abusing_kernel=agent_info.auto_terminate_abusing_kernel,
                 version=agent_info.version,

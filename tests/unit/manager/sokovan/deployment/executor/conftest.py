@@ -11,10 +11,10 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica import ReplicaID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -28,7 +28,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
+from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.types import DeploymentWithHistory
@@ -42,7 +42,7 @@ from ai.backend.manager.sokovan.deployment.types import DeploymentWithHistory
 def mock_deployment_repo() -> AsyncMock:
     """Mock DeploymentRepository."""
     repo = AsyncMock()
-    repo.fetch_scaling_group_proxy_targets = AsyncMock(return_value={})
+    repo.fetch_resource_group_proxy_targets = AsyncMock(return_value={})
     repo.fetch_active_routes_by_endpoint_ids = AsyncMock(return_value={})
     repo.update_endpoint_url = AsyncMock(return_value=None)
     repo.update_desired_replicas_bulk = AsyncMock(return_value=None)
@@ -325,9 +325,9 @@ def destroying_deployments_multiple() -> list[DeploymentWithHistory]:
 
 
 @pytest.fixture
-def proxy_target_default() -> ScalingGroupProxyTarget:
+def proxy_target_default() -> ResourceGroupProxyTarget:
     """Default proxy target for tests."""
-    return ScalingGroupProxyTarget(
+    return ResourceGroupProxyTarget(
         addr="http://proxy:8080",
         api_token="test-token",
     )
@@ -335,8 +335,8 @@ def proxy_target_default() -> ScalingGroupProxyTarget:
 
 @pytest.fixture
 def proxy_targets_by_scaling_group(
-    proxy_target_default: ScalingGroupProxyTarget,
-) -> dict[str, ScalingGroupProxyTarget]:
+    proxy_target_default: ResourceGroupProxyTarget,
+) -> dict[str, ResourceGroupProxyTarget]:
     """Proxy targets mapped by scaling group."""
     return {
         "default": proxy_target_default,

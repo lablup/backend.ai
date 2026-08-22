@@ -27,9 +27,9 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dependencies import DependencyBuilderStack
-from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import LocalLogger, LogLevel
@@ -53,18 +53,18 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.composer import DependencyInput, ManagerDependencyComposer
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import DomainRow, domains
-from ai.backend.manager.models.group import GroupRow, association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.project import ProjectRow, association_groups_users
+from ai.backend.manager.models.resource_group import resource_groups, sgroups_for_domains
+from ai.backend.manager.models.resource_group.row import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
     keypair_resource_policies,
 )
-from ai.backend.manager.models.scaling_group import scaling_groups, sgroups_for_domains
-from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import SessionTemplateRow
 from ai.backend.manager.models.user import users
@@ -513,6 +513,7 @@ async def resource_policy_fixture(
         await conn.execute(
             sa.insert(keypair_resource_policies).values(
                 name=policy_name,
+                is_default=True,
                 default_for_unspecified=DefaultForUnspecified.UNLIMITED,
                 total_resource_slots=ResourceSlot(),
                 max_session_lifetime=0,
@@ -542,7 +543,7 @@ async def resource_policy_fixture(
 
 
 @pytest.fixture()
-async def scaling_group_fixture(
+async def resource_group_fixture(
     db_engine: SAEngine,
     domain_fixture: str,
 ) -> AsyncIterator[ResourceGroupName]:
@@ -554,7 +555,7 @@ async def scaling_group_fixture(
             await conn.execute(sa.select(domains.c.id).where(domains.c.name == domain_fixture))
         ).scalar_one()
         await conn.execute(
-            sa.insert(scaling_groups).values(
+            sa.insert(resource_groups).values(
                 id=sgroup_id,
                 name=sgroup_name,
                 description=f"Test scaling group {sgroup_name}",
@@ -562,7 +563,7 @@ async def scaling_group_fixture(
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
         )
         await conn.execute(
@@ -576,7 +577,7 @@ async def scaling_group_fixture(
         await conn.execute(
             sgroups_for_domains.delete().where(sgroups_for_domains.c.resource_group_id == sgroup_id)
         )
-        await conn.execute(scaling_groups.delete().where(scaling_groups.c.name == sgroup_name))
+        await conn.execute(resource_groups.delete().where(resource_groups.c.name == sgroup_name))
 
 
 @pytest.fixture()
@@ -590,7 +591,7 @@ async def group_fixture(
     group_name = f"group-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description=f"Test group {group_name}",
@@ -601,7 +602,9 @@ async def group_fixture(
         )
     yield group_id
     async with db_engine.begin() as conn:
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )
 
 
 @pytest.fixture()
@@ -648,7 +651,6 @@ async def admin_user_fixture(
         )
         await conn.execute(
             sa.insert(keypairs).values(
-                user_id=email,
                 access_key=data.keypair.access_key,
                 secret_key=data.keypair.secret_key,
                 is_active=True,
@@ -730,7 +732,6 @@ async def regular_user_fixture(
         )
         await conn.execute(
             sa.insert(keypairs).values(
-                user_id=email,
                 access_key=data.keypair.access_key,
                 secret_key=data.keypair.secret_key,
                 is_active=True,
@@ -764,7 +765,7 @@ async def regular_user_fixture(
 async def database_fixture(
     admin_user_fixture: UserFixtureData,
     regular_user_fixture: UserFixtureData,
-    scaling_group_fixture: str,
+    resource_group_fixture: str,
 ) -> AsyncIterator[None]:
     """Backward-compatible aggregate: requests all seed data fixtures."""
     yield

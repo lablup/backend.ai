@@ -1,54 +1,63 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
+from __future__ import annotations
+
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+)
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    PublicSingleEntityActionProcessor,
+    SingleEntityActionProcessor,
+)
+from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.services.login_client_type.actions.create import (
     CreateLoginClientTypeAction,
-    CreateLoginClientTypeActionResult,
-)
-from ai.backend.manager.services.login_client_type.actions.delete import (
-    DeleteLoginClientTypeAction,
-    DeleteLoginClientTypeActionResult,
 )
 from ai.backend.manager.services.login_client_type.actions.get import (
     GetLoginClientTypeAction,
-    GetLoginClientTypeActionResult,
+)
+from ai.backend.manager.services.login_client_type.actions.purge import (
+    PurgeLoginClientTypeAction,
 )
 from ai.backend.manager.services.login_client_type.actions.search import (
     SearchLoginClientTypesAction,
-    SearchLoginClientTypesActionResult,
 )
 from ai.backend.manager.services.login_client_type.actions.update import (
     UpdateLoginClientTypeAction,
-    UpdateLoginClientTypeActionResult,
 )
-from ai.backend.manager.services.login_client_type.admin_service import (
-    LoginClientTypeAdminService,
-)
-from ai.backend.manager.services.login_client_type.service import LoginClientTypeService
 
 
 class LoginClientTypeProcessors:
-    get: ActionProcessor[GetLoginClientTypeAction, GetLoginClientTypeActionResult]
-    search: ActionProcessor[SearchLoginClientTypesAction, SearchLoginClientTypesActionResult]
+    """The catalog's reads are open to every authenticated user; its writes are not.
 
-    def __init__(
-        self,
-        service: LoginClientTypeService,
-        action_monitors: list[ActionMonitor],
-    ) -> None:
-        self.get = ActionProcessor(service.get, action_monitors)
-        self.search = ActionProcessor(service.search, action_monitors)
+    One class per domain: the gate belongs to the operation, and a separate admin
+    class would state it twice.
+    """
 
+    public_get: PublicSingleEntityActionProcessor[
+        GetLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]
+    ]
+    public_search: PublicActionProcessor[
+        SearchLoginClientTypesAction, BatchOpsResult[LoginClientTypeData]
+    ]
+    global_create: GlobalActionProcessor[
+        CreateLoginClientTypeAction, CreatedEntityOpsResult[LoginClientTypeData]
+    ]
+    update: SingleEntityActionProcessor[
+        UpdateLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]
+    ]
+    purge: SingleEntityActionProcessor[
+        PurgeLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]
+    ]
 
-class LoginClientTypeAdminProcessors:
-    create: ActionProcessor[CreateLoginClientTypeAction, CreateLoginClientTypeActionResult]
-    update: ActionProcessor[UpdateLoginClientTypeAction, UpdateLoginClientTypeActionResult]
-    delete: ActionProcessor[DeleteLoginClientTypeAction, DeleteLoginClientTypeActionResult]
-
-    def __init__(
-        self,
-        service: LoginClientTypeAdminService,
-        action_monitors: list[ActionMonitor],
-    ) -> None:
-        self.create = ActionProcessor(service.create, action_monitors)
-        self.update = ActionProcessor(service.update, action_monitors)
-        self.delete = ActionProcessor(service.delete, action_monitors)
+    def __init__(self, group: ProcessorGroup[LoginClientTypeData]) -> None:
+        self.public_get = group.public_get_ops(GetLoginClientTypeAction)
+        self.public_search = group.public_search_ops(SearchLoginClientTypesAction)
+        self.global_create = group.global_create_ops(CreateLoginClientTypeAction)
+        self.update = group.single_update_ops(UpdateLoginClientTypeAction)
+        self.purge = group.entity_purge_ops(PurgeLoginClientTypeAction)

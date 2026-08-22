@@ -11,8 +11,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.types import (
     AccessKey,
     DefaultForUnspecified,
@@ -32,20 +31,20 @@ from ai.backend.manager.errors.resource import (
     DomainNotFound,
     InvalidPresetQuery,
     ProjectNotFound,
+    ResourceGroupNotFound,
     ResourcePresetNotFound,
-    ScalingGroupNotFound,
 )
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.project import groups
+from ai.backend.manager.models.resource_group import query_allowed_sgroups
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
@@ -66,7 +65,7 @@ from .types import (
     DomainNameFilter,
     GroupIdFilter,
     KeypairResourceData,
-    PerScalingGroupResourceData,
+    PerResourceGroupResourceData,
     PresetAllocatabilityData,
     ResourceOccupancyFilter,
     ResourceUsageData,
@@ -143,7 +142,7 @@ class ResourcePresetDBSource:
             raise ResourcePresetNotFound()
         return preset_row
 
-    async def modify_preset(self, updater: Updater[ResourcePresetRow]) -> ResourcePresetData:
+    async def update_preset(self, updater: Updater[ResourcePresetRow]) -> ResourcePresetData:
         """
         Modifies an existing resource preset.
         Raises ResourcePresetNotFound if the preset doesn't exist.
@@ -168,18 +167,20 @@ class ResourcePresetDBSource:
             await session.delete(preset_row)
         return data
 
-    async def list_presets(self, scaling_group_name: str | None = None) -> list[ResourcePresetData]:
+    async def list_presets(
+        self, resource_group_name: str | None = None
+    ) -> list[ResourcePresetData]:
         """
         Lists all resource presets.
         If scaling_group_name is provided, returns presets for that scaling group and global presets.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(ResourcePresetRow)
-            if scaling_group_name is not None:
+            if resource_group_name is not None:
                 query = query.where(
                     sa.or_(
                         ResourcePresetRow.scaling_group_name.is_(None),
-                        ResourcePresetRow.scaling_group_name == scaling_group_name,
+                        ResourcePresetRow.scaling_group_name == resource_group_name,
                     )
                 )
             else:
@@ -215,7 +216,7 @@ class ResourcePresetDBSource:
         domain_name: str,
         resource_policy: Mapping[str, Any],
         known_slot_types: Mapping[SlotName, SlotTypes],
-        scaling_group: str | None = None,
+        resource_group: str | None = None,
     ) -> CheckPresetsDBData:
         """
         Fetch all data needed for checking presets from database.
@@ -231,7 +232,7 @@ class ResourcePresetDBSource:
                 domain_name,
                 resource_policy,
                 known_slot_types,
-                scaling_group,
+                resource_group,
             )
 
     async def _get_group_info(
@@ -428,11 +429,11 @@ class ResourcePresetDBSource:
         per_sgroup_remaining: dict[str, list[SlotQuantity]] = {sg: [] for sg in sgroup_names}
         agent_slots: list[list[SlotQuantity]] = []
 
-        for _aid, (scaling_group, remaining) in agent_data.items():
+        for _aid, (resource_group, remaining) in agent_data.items():
             agent_slots.append(remaining)
-            if scaling_group:
-                per_sgroup_remaining[scaling_group] = add_quantities(
-                    per_sgroup_remaining[scaling_group], remaining
+            if resource_group:
+                per_sgroup_remaining[resource_group] = add_quantities(
+                    per_sgroup_remaining[resource_group], remaining
                 )
 
         # Zero-fill missing slot types per scaling group. Without this, slots no
@@ -565,7 +566,7 @@ class ResourcePresetDBSource:
         domain_name: str,
         resource_policy: Mapping[str, Any],
         known_slot_types: Mapping[SlotName, SlotTypes],
-        scaling_group: str | None = None,
+        resource_group: str | None = None,
     ) -> CheckPresetsDBData:
         """
         Fetch all data needed for check_presets in a single method.
@@ -599,12 +600,12 @@ class ResourcePresetDBSource:
             db_conn, domain_name, ProjectID(group_id), str(access_key)
         )
         sgroup_names = [sg.name for sg in sgroups]
-        if scaling_group is not None:
-            if scaling_group not in sgroup_names:
-                raise ScalingGroupNotFound(
-                    f"Scaling group not found or not allowed (name: {scaling_group})"
+        if resource_group is not None:
+            if resource_group not in sgroup_names:
+                raise ResourceGroupNotFound(
+                    f"Scaling group not found or not allowed (name: {resource_group})"
                 )
-            sgroup_names = [scaling_group]
+            sgroup_names = [resource_group]
 
         # Get user's session occupancy per scaling group
         per_sgroup_occupancy = await self._get_user_session_occupancy_per_sgroup(
@@ -617,10 +618,10 @@ class ResourcePresetDBSource:
         )
 
         # Build per scaling group data
-        per_sgroup: dict[str, PerScalingGroupResourceData] = {}
+        per_sgroup: dict[str, PerResourceGroupResourceData] = {}
         empty_quantities: list[SlotQuantity] = []
         for sgname in sgroup_names:
-            per_sgroup[sgname] = PerScalingGroupResourceData(
+            per_sgroup[sgname] = PerResourceGroupResourceData(
                 using=per_sgroup_occupancy.get(sgname, empty_quantities),
                 remaining=per_sgroup_agent_remaining.get(sgname, empty_quantities),
             )
@@ -637,7 +638,7 @@ class ResourcePresetDBSource:
         sgroup_remaining = min_quantities(final_remaining, sgroup_remaining)
 
         # Fetch resource presets
-        preset_data_list = await self.list_presets(scaling_group)
+        preset_data_list = await self.list_presets(resource_group)
 
         # Check preset allocatability
         presets = []
@@ -668,7 +669,7 @@ class ResourcePresetDBSource:
             group_limits=group_usage.limits,
             group_occupied=group_usage.occupied,
             group_remaining=group_usage.remaining,
-            scaling_group_remaining=sgroup_remaining,
+            resource_group_remaining=sgroup_remaining,
         )
 
         return CheckPresetsDBData(

@@ -33,11 +33,9 @@ class ScopeActionPrometheusMonitor(ScopeActionMonitor):
     async def done(self, action: BaseScopeAction, result: ScopeActionProcessResult) -> None:
         meta = result.meta
         self._observer.observe_action(
-            entity_type=action.entity_type(),
             operation_type=action.operation_type(),
             status=meta.status,
             duration=meta.duration.total_seconds(),
-            error_code=meta.error_code,
         )
         for _ in meta.entity_ids:
             self._observer.observe_action_entity(

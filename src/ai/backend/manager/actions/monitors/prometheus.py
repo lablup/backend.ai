@@ -1,6 +1,5 @@
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.metrics.metric import ActionMetricObserver
 from ai.backend.manager.actions.action import BaseAction, BaseActionTriggerMeta, ProcessResult
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
@@ -19,9 +18,7 @@ class PrometheusMonitor(ActionMonitor):
     @override
     async def done(self, action: BaseAction, result: ProcessResult) -> None:
         self._observer.observe_action(
-            entity_type=EntityType(action.entity_type()),
             operation_type=action.operation_type(),
             status=result.meta.status,
             duration=result.meta.duration.total_seconds(),
-            error_code=result.meta.error_code,
         )

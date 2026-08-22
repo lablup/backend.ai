@@ -92,7 +92,7 @@ class TestCPUPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
         """CGROUP stat context with CPU cgroup v2 path mocks."""
         cgroup_stat_context.agent.docker_info = {"CgroupVersion": "2"}
 
-        def mock_get_cgroup_path(subsys: str, cid: str) -> MagicMock:
+        async def mock_get_cgroup_path(subsys: str, cid: str) -> MagicMock:
             path = MagicMock()
             stat_file = MagicMock()
             stat_file.read_text.return_value = "usage_usec 1000000\n"
@@ -167,7 +167,7 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
         io_stat.read_text.return_value = ""
         io_path.__truediv__ = MagicMock(return_value=io_stat)
 
-        def mock_get_cgroup_path(subsys: str, cid: str) -> MagicMock:
+        async def mock_get_cgroup_path(subsys: str, cid: str) -> MagicMock:
             if subsys == "memory":
                 return mem_path
             return io_path
@@ -209,7 +209,9 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
     async def test_init_creates_docker_client(self, memory_plugin: MemoryPlugin) -> None:
         """Verify init() creates a Docker client instance."""
         with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
-            mock_docker_cls.return_value = AsyncMock()
+            mock_docker = AsyncMock()
+            mock_docker.system.info.return_value = {"DockerRootDir": "/var/lib/docker"}
+            mock_docker_cls.return_value = mock_docker
             await memory_plugin.init()
             mock_docker_cls.assert_called_once()
             assert memory_plugin._docker is not None
@@ -277,7 +279,7 @@ class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
         io_stat.read_text.return_value = ""
         io_path.__truediv__ = MagicMock(return_value=io_stat)
 
-        def mock_get_cgroup_path(subsys: str, cid: str) -> MagicMock:
+        async def mock_get_cgroup_path(subsys: str, cid: str) -> MagicMock:
             if subsys == "memory":
                 return mem_path
             return io_path
@@ -410,7 +412,11 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         io_stat = MagicMock()
         io_stat.read_text.return_value = ""
         io_path.__truediv__ = MagicMock(return_value=io_stat)
-        ctx.agent.get_cgroup_path = lambda subsys, cid: mem_path if subsys == "memory" else io_path
+
+        async def mock_get_cgroup_path(subsys: str, cid: str) -> MagicMock:
+            return mem_path if subsys == "memory" else io_path
+
+        ctx.agent.get_cgroup_path = mock_get_cgroup_path
 
         container_data: dict[str, Any] = {
             "State": {"Pid": 12345},

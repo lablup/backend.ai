@@ -26,9 +26,11 @@ from ai.backend.manager.models.prometheus_query_preset.conditions import (
     PrometheusQueryPresetConditions,
 )
 from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
+from ai.backend.manager.models.prometheus_query_preset.searchers import (
+    PrometheusQueryPresetSearcher,
+)
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
     Updater,
 )
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
@@ -104,11 +106,13 @@ class PrometheusQueryPresetAdapter(BaseFilterAdapter):
         )
         return Updater(spec=spec, pk_value=preset_id)
 
-    def build_querier(self, request: SearchQueryDefinitionsRequest) -> BatchQuerier:
-        """Build a BatchQuerier from search request."""
+    def build_searcher(
+        self, request: SearchQueryDefinitionsRequest
+    ) -> PrometheusQueryPresetSearcher:
+        """Build the searcher from a search request."""
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(o) for o in request.order] if request.order else []
-        return BatchQuerier(
+        return PrometheusQueryPresetSearcher(
             conditions=conditions,
             orders=orders,
             pagination=OffsetPagination(limit=request.limit, offset=request.offset),

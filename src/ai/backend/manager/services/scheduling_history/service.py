@@ -6,10 +6,6 @@ from .actions.global_search_replica_group_history import (
     GlobalSearchReplicaGroupHistoryAction,
     GlobalSearchReplicaGroupHistoryActionResult,
 )
-from .actions.resolve_kernel_session import (
-    ResolveKernelSessionAction,
-    ResolveKernelSessionActionResult,
-)
 from .actions.scoped_search_replica_group_history import (
     ScopedSearchReplicaGroupHistoryAction,
     ScopedSearchReplicaGroupHistoryActionResult,
@@ -156,14 +152,6 @@ class SchedulingHistoryService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
-
-    async def resolve_kernel_session(
-        self,
-        action: ResolveKernelSessionAction,
-    ) -> ResolveKernelSessionActionResult:
-        """Resolves the session owning a kernel; raises KernelNotFound if absent."""
-        session_id = await self._repository.resolve_session_id(action.kernel_id)
-        return ResolveKernelSessionActionResult(session_id=session_id)
 
     async def search_kernel_scoped_history(
         self,

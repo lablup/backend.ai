@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Self
 from uuid import UUID
 
-from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import CIStrEnum
 
 

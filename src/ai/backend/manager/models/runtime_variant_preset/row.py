@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import uuid
-
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
@@ -35,10 +35,15 @@ class RuntimeVariantPresetRow(LifecycleTimestampsMixin, Base):
         sa.Index("ix_runtime_variant_presets_variant_rank", "runtime_variant", "rank"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[RuntimeVariantPresetID] = mapped_column(
+        "id",
+        GUID(RuntimeVariantPresetID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
-    runtime_variant: Mapped[uuid.UUID] = mapped_column("runtime_variant", GUID, nullable=False)
+    runtime_variant: Mapped[RuntimeVariantID] = mapped_column(
+        "runtime_variant", GUID(RuntimeVariantID), nullable=False
+    )
     name: Mapped[str] = mapped_column("name", sa.String(length=256), nullable=False)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
     rank: Mapped[int] = mapped_column("rank", sa.Integer, nullable=False)
@@ -87,8 +92,8 @@ class RuntimeVariantPresetRow(LifecycleTimestampsMixin, Base):
     def to_data(self) -> RuntimeVariantPresetData:
         ui_option_data = self._convert_ui_option_to_data(self.ui_option)
         return RuntimeVariantPresetData(
-            id=self.id,
-            runtime_variant_id=self.runtime_variant,
+            id=RuntimeVariantPresetID(self.id),
+            runtime_variant_id=RuntimeVariantID(self.runtime_variant),
             name=self.name,
             description=self.description,
             rank=self.rank,

@@ -16,14 +16,14 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.exception import (
     ErrorCode,
     ErrorDetail,
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
 

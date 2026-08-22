@@ -1,46 +1,64 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
+from __future__ import annotations
+
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, EntityOpsResult
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    PublicSingleEntityActionProcessor,
+    SingleEntityActionProcessor,
+)
+from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.services.runtime_variant_preset.actions.create import (
     CreateRuntimeVariantPresetAction,
     CreateRuntimeVariantPresetActionResult,
 )
-from ai.backend.manager.services.runtime_variant_preset.actions.delete import (
-    DeleteRuntimeVariantPresetAction,
-    DeleteRuntimeVariantPresetActionResult,
+from ai.backend.manager.services.runtime_variant_preset.actions.get import (
+    GetRuntimeVariantPresetAction,
+)
+from ai.backend.manager.services.runtime_variant_preset.actions.purge import (
+    PurgeRuntimeVariantPresetAction,
 )
 from ai.backend.manager.services.runtime_variant_preset.actions.search import (
     SearchRuntimeVariantPresetsAction,
-    SearchRuntimeVariantPresetsActionResult,
 )
 from ai.backend.manager.services.runtime_variant_preset.actions.update import (
     UpdateRuntimeVariantPresetAction,
     UpdateRuntimeVariantPresetActionResult,
 )
-from ai.backend.manager.services.runtime_variant_preset.service import RuntimeVariantPresetService
+from ai.backend.manager.services.runtime_variant_preset.service import (
+    RuntimeVariantPresetService,
+)
 
 
 class RuntimeVariantPresetProcessors:
-    create: ActionProcessor[
+    """Reads and the removal run against ops; the two writes keep their service."""
+
+    public_get: PublicSingleEntityActionProcessor[
+        GetRuntimeVariantPresetAction, EntityOpsResult[RuntimeVariantPresetData]
+    ]
+    global_create: GlobalActionProcessor[
         CreateRuntimeVariantPresetAction, CreateRuntimeVariantPresetActionResult
     ]
-    update: ActionProcessor[
+    update: SingleEntityActionProcessor[
         UpdateRuntimeVariantPresetAction, UpdateRuntimeVariantPresetActionResult
     ]
-    delete: ActionProcessor[
-        DeleteRuntimeVariantPresetAction, DeleteRuntimeVariantPresetActionResult
+    purge: SingleEntityActionProcessor[
+        PurgeRuntimeVariantPresetAction, EntityOpsResult[RuntimeVariantPresetData]
     ]
-    search: ActionProcessor[
-        SearchRuntimeVariantPresetsAction, SearchRuntimeVariantPresetsActionResult
+    public_search: PublicActionProcessor[
+        SearchRuntimeVariantPresetsAction, BatchOpsResult[RuntimeVariantPresetData]
     ]
 
     def __init__(
         self,
+        group: ProcessorGroup[RuntimeVariantPresetData],
         service: RuntimeVariantPresetService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
     ) -> None:
-        self.create = ActionProcessor(service.create, action_monitors)
-        self.update = ActionProcessor(service.update, action_monitors)
-        self.delete = ActionProcessor(service.delete, action_monitors)
-        self.search = ActionProcessor(service.search, action_monitors)
+        self.public_get = group.public_get_ops(GetRuntimeVariantPresetAction)
+        self.global_create = group.global_scope(CreateRuntimeVariantPresetAction, service.create)
+        self.update = group.single_entity(UpdateRuntimeVariantPresetAction, service.update)
+        self.purge = group.entity_purge_ops(PurgeRuntimeVariantPresetAction)
+        self.public_search = group.public_search_ops(SearchRuntimeVariantPresetsAction)

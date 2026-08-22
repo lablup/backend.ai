@@ -20,8 +20,8 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
-from .group import GroupRow
 from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow
+from .project import ProjectRow
 from .session import SessionRow
 from .user import UserRow
 from .utils import ExtendedAsyncSAEngine
@@ -117,7 +117,7 @@ class BaseResourceUsageGroup:
     group_unit: ResourceGroupUnit
     child_usage_group: dict[str, Any] = attrs.field(factory=dict)
 
-    project_row: GroupRow | None = attrs.field(default=None)
+    project_row: ProjectRow | None = attrs.field(default=None)
     session_row: SessionRow | None = attrs.field(default=None)
     kernel_row: KernelRow | None = attrs.field(default=None)
 
@@ -236,7 +236,7 @@ class KernelResourceUsage(BaseResourceUsageGroup):
     # child_usage_group intentionally not redefined as kernels have no children
     agent: str
     kernel_id: UUID
-    project_row: GroupRow
+    project_row: ProjectRow
     session_row: SessionRow
     kernel_row: KernelRow
 
@@ -286,7 +286,7 @@ class SessionResourceUsage(BaseResourceUsageGroup):
     group_unit: ResourceGroupUnit = ResourceGroupUnit.SESSION
     child_usage_group: dict[UUID, KernelResourceUsage] = attrs.Factory(dict)  # type: ignore[assignment]
     session_id: UUID
-    project_row: GroupRow
+    project_row: ProjectRow
     session_row: SessionRow
 
     def to_json(self, child: bool = False) -> dict[str, Any]:
@@ -354,7 +354,7 @@ class ProjectResourceUsage(BaseResourceUsageGroup):
     group_unit: ResourceGroupUnit = ResourceGroupUnit.PROJECT
     child_usage_group: dict[UUID, SessionResourceUsage] = attrs.Factory(dict)  # type: ignore[assignment]
     project_id: UUID
-    project_row: GroupRow
+    project_row: ProjectRow
 
     def to_json(self, child: bool = False) -> dict[str, Any]:
         return_val = {
@@ -562,10 +562,10 @@ SESSION_RESOURCE_SELECT_COLS = (
 )
 
 PROJECT_RESOURCE_SELECT_COLS = (
-    GroupRow.created_at,
-    GroupRow.id,
-    GroupRow.name,
-    GroupRow.domain_name,
+    ProjectRow.created_at,
+    ProjectRow.id,
+    ProjectRow.name,
+    ProjectRow.domain_name,
 )
 
 KERNEL_RESOURCE_SELECT_COLS = (
@@ -625,7 +625,7 @@ async def fetch_resource_usage(
 ) -> list[KernelRow]:
     project_cond = None
     if project_ids:
-        project_cond = GroupRow.id.in_(project_ids)
+        project_cond = ProjectRow.id.in_(project_ids)
     session_cond = None
     if session_ids:
         session_cond = SessionRow.id.in_(session_ids)

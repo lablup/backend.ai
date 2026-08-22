@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from graphql import Undefined, UndefinedType
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
-from ai.backend.common.identifier.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
@@ -46,8 +46,8 @@ from ai.backend.manager.services.container_registry.actions.create_container_reg
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
 )
-from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
-    ModifyContainerRegistryAction,
+from ai.backend.manager.services.container_registry.actions.update_container_registry import (
+    UpdateContainerRegistryAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -400,11 +400,7 @@ class CreateContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
             )
         )
 
-        result = (
-            await ctx.processors.container_registry.create_container_registry.wait_for_complete(
-                action
-            )
-        )
+        result = await ctx.processors.container_registry.create_container_registry.run(action)
 
         return cls(
             container_registry=ContainerRegistryNode.from_dataclass(result.data),
@@ -460,7 +456,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
 
-        action = ModifyContainerRegistryAction(
+        action = UpdateContainerRegistryAction(
             updater=Updater(
                 spec=ContainerRegistryUpdaterSpec(
                     url=OptionalState.from_graphql(url),
@@ -479,11 +475,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
         )
 
         # Execute action through processor
-        result = (
-            await ctx.processors.container_registry.modify_container_registry.wait_for_complete(
-                action
-            )
-        )
+        result = await ctx.processors.container_registry.update_container_registry.run(action)
 
         return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
 
@@ -517,12 +509,10 @@ class DeleteContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
 
-        result = (
-            await ctx.processors.container_registry.delete_container_registry.wait_for_complete(
-                DeleteContainerRegistryAction(
-                    purger=Purger(
-                        spec=ContainerRegistryPurgerSpec(registry_id=ContainerRegistryID(reg_id))
-                    )
+        result = await ctx.processors.container_registry.delete_container_registry.run(
+            DeleteContainerRegistryAction(
+                purger=Purger(
+                    spec=ContainerRegistryPurgerSpec(registry_id=ContainerRegistryID(reg_id))
                 )
             )
         )
@@ -782,7 +772,7 @@ class CreateContainerRegistry(graphene.Mutation):  # type: ignore[misc]
         set_if_set(props, input_config, "is_global")
 
         async with ctx.db.begin_session() as db_session:
-            reg_row = ContainerRegistryRow(id=uuid.uuid4(), **input_config)
+            reg_row = ContainerRegistryRow(id=ContainerRegistryID(uuid.uuid4()), **input_config)
             db_session.add(reg_row)
             await db_session.flush()
             await db_session.refresh(reg_row)

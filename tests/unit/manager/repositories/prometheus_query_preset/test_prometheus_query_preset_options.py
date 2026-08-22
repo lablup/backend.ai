@@ -13,18 +13,23 @@ import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset.conditions import (
     PrometheusQueryPresetConditions,
 )
 from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
 from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
+from ai.backend.manager.models.prometheus_query_preset.searchers import (
+    PrometheusQueryPresetSearcher,
+)
 from ai.backend.manager.models.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryRow,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
 )
@@ -37,7 +42,7 @@ class PresetSeed:
 
     name: str
     metric_name: str = "backendai_metric"
-    query_template: str = "{metric_name}{{{labels}}}"
+    query_template: str = "{metric_name}{${{labels}}}"
     time_window: str | None = "5m"
     filter_labels: tuple[str, ...] = ()
     group_labels: tuple[str, ...] = ()
@@ -93,6 +98,14 @@ class TestPrometheusQueryPresetOptions:
             [PrometheusQueryPresetCategoryRow, PrometheusQueryPresetRow],
         ):
             yield database_connection
+
+    @pytest.fixture
+    def preset_ops(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> OpsRepository[PrometheusQueryPresetData]:
+        """Writes and searches run through the generic ops repository."""
+        return OpsRepository(V2DBOpsProvider(database_connection))
 
     @pytest.fixture
     def preset_repository(
@@ -201,18 +214,19 @@ class TestPrometheusQueryPresetOptions:
     )
     async def test_search_by_condition(
         self,
+        preset_ops: OpsRepository[PrometheusQueryPresetData],
         preset_repository: PrometheusQueryPresetRepository,
         test_case: SearchContext,
     ) -> None:
         assert isinstance(
             test_case.case, ConditionCase
         )  # ensure type checker understands the case type for accessing expected fields
-        querier = BatchQuerier(
+        searcher = PrometheusQueryPresetSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=test_case.case.conditions,
             orders=[],
         )
-        result = await preset_repository.search(querier=querier)
+        result = await preset_ops.search_in_global(searcher)
 
         assert len(result.items) == test_case.case.expected_count
         assert result.total_count == test_case.case.expected_count
@@ -230,16 +244,17 @@ class TestPrometheusQueryPresetOptions:
 
     async def test_search_by_ids(
         self,
+        preset_ops: OpsRepository[PrometheusQueryPresetData],
         preset_repository: PrometheusQueryPresetRepository,
         ids_presets: list[uuid.UUID],
     ) -> None:
         target_ids = ids_presets[:2]
-        querier = BatchQuerier(
+        searcher = PrometheusQueryPresetSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[PrometheusQueryPresetConditions.by_ids(target_ids)],
             orders=[],
         )
-        result = await preset_repository.search(querier=querier)
+        result = await preset_ops.search_in_global(searcher)
 
         assert len(result.items) == 2
         assert {p.id for p in result.items} == set(target_ids)
@@ -288,17 +303,18 @@ class TestPrometheusQueryPresetOptions:
     )
     async def test_search_with_order(
         self,
+        preset_ops: OpsRepository[PrometheusQueryPresetData],
         preset_repository: PrometheusQueryPresetRepository,
         test_case: SearchContext,
     ) -> None:
         assert isinstance(test_case.case, OrderCase), (
             f"Expected OrderCase but got {type(test_case.case).__name__}"
         )
-        querier = BatchQuerier(
+        searcher = PrometheusQueryPresetSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=test_case.case.orders,
         )
-        result = await preset_repository.search(querier=querier)
+        result = await preset_ops.search_in_global(searcher)
 
         assert tuple(p.name for p in result.items) == test_case.case.expected_ordered_names

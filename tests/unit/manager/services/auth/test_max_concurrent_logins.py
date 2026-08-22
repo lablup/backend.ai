@@ -8,6 +8,9 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
+from ai.backend.common.data.entity.resource_policy import (
+    UserResourcePolicyUUID,
+)
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import UserResourcePolicyNotFound
 from ai.backend.manager.config.unified import AuthConfig
@@ -52,8 +55,8 @@ def _make_mock_user(resource_policy: str = _DEFAULT_RESOURCE_POLICY) -> MagicMoc
     return mock_user
 
 
-def _make_mock_keypair_row() -> MagicMock:
-    """Create a mock keypair row."""
+def _make_mock_keypair() -> MagicMock:
+    """The keypair data a default-keypair read answers with."""
     mock_keypair = MagicMock()
     mock_keypair.access_key = "AKIAIOSFODNN7EXAMPLE"
     mock_keypair.secret_key = "secret"
@@ -76,6 +79,7 @@ def _make_action(*, force: bool = False) -> AuthorizeAction:
 
 def _make_policy(max_concurrent_logins: int | None) -> UserResourcePolicyData:
     return UserResourcePolicyData(
+        uuid=UserResourcePolicyUUID(uuid4()),
         name=_DEFAULT_RESOURCE_POLICY,
         max_vfolder_count=10,
         max_quota_scope_size=0,
@@ -242,7 +246,7 @@ class TestMaxConcurrentLoginsEnforcement:
             await auth_service._create_login_session(
                 action=_make_action(force=case.force_evict_oldest),
                 user=_make_mock_user(),
-                keypair_row=_make_mock_keypair_row(),
+                keypair=_make_mock_keypair(),
                 live_sessions=_make_live_sessions(case.existing_active_sessions),
                 auth_config=_make_auth_config(),
                 login_client_type_id=uuid4(),
@@ -343,7 +347,7 @@ class TestMaxConcurrentLoginsEnforcement:
         result = await auth_service._create_login_session(
             action=_make_action(force=case.force_evict_oldest),
             user=_make_mock_user(),
-            keypair_row=_make_mock_keypair_row(),
+            keypair=_make_mock_keypair(),
             live_sessions=_make_live_sessions(case.existing_active_sessions),
             auth_config=_make_auth_config(),
             login_client_type_id=uuid4(),

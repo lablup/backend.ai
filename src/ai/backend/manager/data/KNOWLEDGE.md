@@ -1,15 +1,15 @@
 ---
 name: data-boundary-and-sentinel
 type: design-rationale
-description: The data/views/dto boundary criterion (does the value leave the process), the Undefined sentinel for partial updates, the known gap between the stated purity rules and the current code
+description: the data/views/dto boundary criterion (does the value leave the process), why EntityData/FieldData carries only its own domain's row, the Undefined sentinel for partial updates, the known gap between the stated purity rules and the current code
 scope: src/ai/backend/manager/data
-keywords: [dataclass, frozen, Undefined, sentinel, TriState, views, dto, value-object]
+keywords: [dataclass, frozen, Undefined, sentinel, TriState, views, dto, value-object, EntityData, FieldData, MissingGreenlet, row projection]
 sources:
   - src/ai/backend/manager/data/common/sentinel.py
 generated:
-  by: claude-code/fable-5
-  at: 2026-08-10
-status: stable
+  by: claude-code/opus-5
+  at: 2026-08-22
+status: draft
 ---
 
 # Manager data — Knowledge
@@ -32,6 +32,15 @@ the manager. Ask where the value goes:
 
 `data/` is what repositories return instead of ORM rows. It flows upward
 freely; rows do not.
+
+## Carrying only the domain's own row keeps reads to what was asked for
+
+- A value from another table makes every read that produces it reach that row too. On a
+  list read that cost is multiplied by the number of rows.
+- In an async session such a read raises `MissingGreenlet`. An eager load stops the
+  crash, not the cost.
+- A domain covered by an eager load falls outside the single-entity read/write specs
+  (`models/specs/`), which assume a read expressible as one `sa.select(Row)`.
 
 ## The Undefined sentinel is the "not provided" marker for partial updates
 

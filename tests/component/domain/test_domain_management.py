@@ -27,10 +27,10 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import DomainRow, domains
-from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts, scaling_groups
+from ai.backend.manager.models.project import groups
+from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, resource_groups
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import users
 
@@ -150,7 +150,7 @@ class TestDomainPurgeValidation:
         async with db_engine.begin() as conn:
             sgroup_id = (
                 await conn.execute(
-                    sa.insert(scaling_groups)
+                    sa.insert(resource_groups)
                     .values(
                         name=sgroup_name,
                         description="Test scaling group",
@@ -158,9 +158,9 @@ class TestDomainPurgeValidation:
                         driver="static",
                         driver_opts={},
                         scheduler="fifo",
-                        scheduler_opts=ScalingGroupOpts(),
+                        scheduler_opts=ResourceGroupOpts(),
                     )
-                    .returning(scaling_groups.c.id)
+                    .returning(resource_groups.c.id)
                 )
             ).scalar_one()
             await conn.execute(
@@ -216,7 +216,7 @@ class TestDomainPurgeValidation:
                     SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)
                 )
                 await conn.execute(
-                    scaling_groups.delete().where(scaling_groups.c.name == sgroup_name)
+                    resource_groups.delete().where(resource_groups.c.name == sgroup_name)
                 )
 
     async def test_purge_nonexistent_domain_raises_not_found(
@@ -255,7 +255,7 @@ class TestDomainPurgeValidation:
         async with db_engine.begin() as conn:
             sgroup_id = (
                 await conn.execute(
-                    sa.insert(scaling_groups)
+                    sa.insert(resource_groups)
                     .values(
                         name=sgroup_name,
                         description="Test scaling group",
@@ -263,9 +263,9 @@ class TestDomainPurgeValidation:
                         driver="static",
                         driver_opts={},
                         scheduler="fifo",
-                        scheduler_opts=ScalingGroupOpts(),
+                        scheduler_opts=ResourceGroupOpts(),
                     )
-                    .returning(scaling_groups.c.id)
+                    .returning(resource_groups.c.id)
                 )
             ).scalar_one()
             await conn.execute(
@@ -346,7 +346,7 @@ class TestDomainPurgeValidation:
                     SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)
                 )
                 await conn.execute(
-                    scaling_groups.delete().where(scaling_groups.c.name == sgroup_name)
+                    resource_groups.delete().where(resource_groups.c.name == sgroup_name)
                 )
                 await conn.execute(users.delete().where(users.c.uuid == str(user_uuid)))
 

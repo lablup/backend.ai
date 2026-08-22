@@ -11,7 +11,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryData,
@@ -121,7 +121,7 @@ class TestArtifactRegistryService:
     @pytest.fixture
     def sample_registry_data(self) -> ArtifactRegistryData:
         return ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=uuid4(),
             name="test-huggingface-registry",
             type=ArtifactRegistryType.HUGGINGFACE,
@@ -306,7 +306,7 @@ class TestGetHuggingFaceRegistryAction:
         )
         mock_huggingface_repository.get_registry_data_by_id = AsyncMock(return_value=expected)
 
-        action = GetHuggingFaceRegistryAction(registry_id=registry_id)
+        action = GetHuggingFaceRegistryAction(registry_id=ArtifactRegistryID(registry_id))
         result = await service.get_huggingface_registry(action)
 
         assert result.result == expected
@@ -322,7 +322,7 @@ class TestGetHuggingFaceRegistryAction:
             side_effect=ArtifactRegistryNotFoundError
         )
 
-        action = GetHuggingFaceRegistryAction(registry_id=registry_id)
+        action = GetHuggingFaceRegistryAction(registry_id=ArtifactRegistryID(registry_id))
         with pytest.raises(ArtifactRegistryNotFoundError):
             await service.get_huggingface_registry(action)
 
@@ -390,7 +390,9 @@ class TestUpdateHuggingFaceRegistryAction:
         updater.pk_value = registry_id
         meta = ArtifactRegistryModifierMeta()
 
-        action = UpdateHuggingFaceRegistryAction(updater=updater, meta=meta)
+        action = UpdateHuggingFaceRegistryAction(
+            registry_id=ArtifactRegistryID(uuid4()), updater=updater, meta=meta
+        )
         result = await service.update_huggingface_registry(action)
 
         assert result.result == updated
@@ -418,7 +420,7 @@ class TestDeleteHuggingFaceRegistryAction:
         registry_id = uuid4()
         mock_huggingface_repository.delete = AsyncMock(return_value=registry_id)
 
-        action = DeleteHuggingFaceRegistryAction(registry_id=registry_id)
+        action = DeleteHuggingFaceRegistryAction(registry_id=ArtifactRegistryID(registry_id))
         result = await service.delete_huggingface_registry(action)
 
         assert result.deleted_registry_id == registry_id
@@ -432,7 +434,7 @@ class TestDeleteHuggingFaceRegistryAction:
         registry_id = uuid4()
         mock_huggingface_repository.delete = AsyncMock(side_effect=ArtifactRegistryNotFoundError)
 
-        action = DeleteHuggingFaceRegistryAction(registry_id=registry_id)
+        action = DeleteHuggingFaceRegistryAction(registry_id=ArtifactRegistryID(registry_id))
         with pytest.raises(ArtifactRegistryNotFoundError):
             await service.delete_huggingface_registry(action)
 
@@ -576,7 +578,9 @@ class TestGetReservoirRegistryAction:
             return_value=expected
         )
 
-        action = GetReservoirRegistryAction(reservoir_id=reservoir_id)
+        action = GetReservoirRegistryAction(
+            registry_id=ArtifactRegistryID(reservoir_id), reservoir_id=reservoir_id
+        )
         result = await service.get_reservoir_registry(action)
 
         assert result.result == expected
@@ -594,7 +598,9 @@ class TestGetReservoirRegistryAction:
             side_effect=ArtifactRegistryNotFoundError
         )
 
-        action = GetReservoirRegistryAction(reservoir_id=reservoir_id)
+        action = GetReservoirRegistryAction(
+            registry_id=ArtifactRegistryID(reservoir_id), reservoir_id=reservoir_id
+        )
         with pytest.raises(ArtifactRegistryNotFoundError):
             await service.get_reservoir_registry(action)
 
@@ -668,7 +674,9 @@ class TestUpdateReservoirRegistryAction:
         updater.pk_value = reservoir_id
         meta = ArtifactRegistryModifierMeta()
 
-        action = UpdateReservoirRegistryAction(updater=updater, meta=meta)
+        action = UpdateReservoirRegistryAction(
+            registry_id=ArtifactRegistryID(uuid4()), updater=updater, meta=meta
+        )
         result = await service.update_reservoir_registry(action)
 
         assert result.result == updated
@@ -696,7 +704,9 @@ class TestDeleteReservoirRegistryAction:
         reservoir_id = uuid4()
         mock_reservoir_repository.delete = AsyncMock(return_value=reservoir_id)
 
-        action = DeleteReservoirRegistryAction(reservoir_id=reservoir_id)
+        action = DeleteReservoirRegistryAction(
+            registry_id=ArtifactRegistryID(reservoir_id), reservoir_id=reservoir_id
+        )
         result = await service.delete_reservoir_registry(action)
 
         assert result.deleted_reservoir_id == reservoir_id
@@ -832,7 +842,7 @@ class TestGetArtifactRegistryMetaAction:
     ) -> None:
         registry_id = uuid4()
         expected = ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=registry_id,
             name="test-registry",
             type=ArtifactRegistryType.HUGGINGFACE,
@@ -841,35 +851,12 @@ class TestGetArtifactRegistryMetaAction:
             return_value=expected
         )
 
-        action = GetArtifactRegistryMetaAction(registry_id=registry_id)
+        action = GetArtifactRegistryMetaAction(registry_id=ArtifactRegistryID(registry_id))
         result = await service.get_registry_meta(action)
 
         assert result.result == expected
         mock_artifact_registry_repository.get_artifact_registry_data.assert_called_once_with(
             registry_id
-        )
-
-    async def test_get_registry_meta_by_name(
-        self,
-        service: ArtifactRegistryService,
-        mock_artifact_registry_repository: MagicMock,
-    ) -> None:
-        expected = ArtifactRegistryData(
-            id=uuid4(),
-            registry_id=uuid4(),
-            name="my-registry",
-            type=ArtifactRegistryType.RESERVOIR,
-        )
-        mock_artifact_registry_repository.get_artifact_registry_data_by_name = AsyncMock(
-            return_value=expected
-        )
-
-        action = GetArtifactRegistryMetaAction(registry_name="my-registry")
-        result = await service.get_registry_meta(action)
-
-        assert result.result == expected
-        mock_artifact_registry_repository.get_artifact_registry_data_by_name.assert_called_once_with(
-            "my-registry"
         )
 
     async def test_get_registry_meta_not_found_by_id(
@@ -881,29 +868,8 @@ class TestGetArtifactRegistryMetaAction:
             side_effect=ArtifactRegistryNotFoundError
         )
 
-        action = GetArtifactRegistryMetaAction(registry_id=uuid4())
+        action = GetArtifactRegistryMetaAction(registry_id=ArtifactRegistryID(uuid4()))
         with pytest.raises(ArtifactRegistryNotFoundError):
-            await service.get_registry_meta(action)
-
-    async def test_get_registry_meta_not_found_by_name(
-        self,
-        service: ArtifactRegistryService,
-        mock_artifact_registry_repository: MagicMock,
-    ) -> None:
-        mock_artifact_registry_repository.get_artifact_registry_data_by_name = AsyncMock(
-            side_effect=ArtifactRegistryNotFoundError
-        )
-
-        action = GetArtifactRegistryMetaAction(registry_name="nonexistent")
-        with pytest.raises(ArtifactRegistryNotFoundError):
-            await service.get_registry_meta(action)
-
-    async def test_get_registry_meta_no_id_or_name_raises(
-        self,
-        service: ArtifactRegistryService,
-    ) -> None:
-        action = GetArtifactRegistryMetaAction()
-        with pytest.raises(InvalidAPIParameters):
             await service.get_registry_meta(action)
 
 
@@ -928,10 +894,16 @@ class TestGetArtifactRegistryMetasAction:
         id1, id2 = uuid4(), uuid4()
         items = [
             ArtifactRegistryData(
-                id=uuid4(), registry_id=id1, name="reg-1", type=ArtifactRegistryType.HUGGINGFACE
+                id=ArtifactRegistryID(uuid4()),
+                registry_id=id1,
+                name="reg-1",
+                type=ArtifactRegistryType.HUGGINGFACE,
             ),
             ArtifactRegistryData(
-                id=uuid4(), registry_id=id2, name="reg-2", type=ArtifactRegistryType.RESERVOIR
+                id=ArtifactRegistryID(uuid4()),
+                registry_id=id2,
+                name="reg-2",
+                type=ArtifactRegistryType.RESERVOIR,
             ),
         ]
         mock_artifact_registry_repository.get_artifact_registry_datas = AsyncMock(
@@ -953,7 +925,10 @@ class TestGetArtifactRegistryMetasAction:
         id_missing = uuid4()
         items = [
             ArtifactRegistryData(
-                id=uuid4(), registry_id=id1, name="reg-1", type=ArtifactRegistryType.HUGGINGFACE
+                id=ArtifactRegistryID(uuid4()),
+                registry_id=id1,
+                name="reg-1",
+                type=ArtifactRegistryType.HUGGINGFACE,
             ),
         ]
         mock_artifact_registry_repository.get_artifact_registry_datas = AsyncMock(

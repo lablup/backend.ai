@@ -60,11 +60,6 @@ from ai.backend.manager.services.image.actions.get_images import (
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
 )
-from ai.backend.manager.services.image.actions.modify_image import (
-    ModifyImageAction,
-    ModifyImageActionResult,
-    ModifyImageActionUnknownImageReferenceError,
-)
 from ai.backend.manager.services.image.actions.preload_image import (
     PreloadImageAction,
     PreloadImageActionResult,
@@ -101,6 +96,11 @@ from ai.backend.manager.services.image.actions.unload_image import (
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
     UntagImageFromRegistryActionResult,
+)
+from ai.backend.manager.services.image.actions.update_image import (
+    UpdateImageAction,
+    UpdateImageActionResult,
+    UpdateImageActionUnknownImageReferenceError,
 )
 from ai.backend.manager.services.image.actions.update_image_by_id import (
     UpdateImageByIdAction,
@@ -254,7 +254,7 @@ class ImageService:
             image_alias=alias_data,
         )
 
-    async def modify_image(self, action: ModifyImageAction) -> ModifyImageActionResult:
+    async def update_image(self, action: UpdateImageAction) -> UpdateImageActionResult:
         try:
             # Resolve image first to get its ID
             image_data = await self._image_repository.resolve_image([
@@ -266,9 +266,9 @@ class ImageService:
             # Pass Updater to repository
             updated_image_data = await self._image_repository.update_image_properties(updater)
         except UnknownImageReference as e:
-            raise ModifyImageActionUnknownImageReferenceError from e
+            raise UpdateImageActionUnknownImageReferenceError from e
 
-        return ModifyImageActionResult(image=updated_image_data)
+        return UpdateImageActionResult(image=updated_image_data)
 
     async def update_image_by_id(
         self, action: UpdateImageByIdAction

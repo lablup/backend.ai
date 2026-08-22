@@ -7,8 +7,8 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import PageInfo
 
+from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.dto.manager.v2.group.request import AdminSearchProjectsInput
-from ai.backend.common.identifier.domain import DomainName
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,

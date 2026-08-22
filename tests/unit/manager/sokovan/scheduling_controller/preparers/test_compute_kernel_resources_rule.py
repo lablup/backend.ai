@@ -17,8 +17,8 @@ from typing import Any
 
 import pytest
 
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import BinarySize, ResourceSlotEntry
 from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.resource.types import SlotTypeInfo

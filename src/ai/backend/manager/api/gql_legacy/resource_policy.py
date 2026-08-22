@@ -12,11 +12,15 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.entity.resource_policy import (
+    KeyPairResourcePolicyUUID,
+    ProjectResourcePolicyUUID,
+    UserResourcePolicyUUID,
+)
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.resource_policy import (
-    KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
     keypair_resource_policies,
@@ -24,8 +28,6 @@ from ai.backend.manager.models.resource_policy import (
     user_resource_policies,
 )
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import (
@@ -34,74 +36,18 @@ from .base import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.repositories.keypair_resource_policy.creators import (
-        KeyPairResourcePolicyCreatorSpec,
+    from ai.backend.manager.models.resource_policy.creators import (
+        KeyPairResourcePolicyCreator,
+        ProjectResourcePolicyCreator,
+        UserResourcePolicyCreator,
     )
-    from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
-        KeyPairResourcePolicyUpdaterSpec,
-    )
-    from ai.backend.manager.repositories.project_resource_policy.creators import (
-        ProjectResourcePolicyCreatorSpec,
-    )
-    from ai.backend.manager.repositories.project_resource_policy.updaters import (
-        ProjectResourcePolicyUpdaterSpec,
-    )
-    from ai.backend.manager.repositories.user_resource_policy.creators import (
-        UserResourcePolicyCreatorSpec,
-    )
-    from ai.backend.manager.repositories.user_resource_policy.updaters import (
-        UserResourcePolicyUpdaterSpec,
+    from ai.backend.manager.models.resource_policy.updaters import (
+        KeyPairResourcePolicyUpdater,
+        ProjectResourcePolicyUpdater,
+        UserResourcePolicyUpdater,
     )
 
     from .schema import GraphQueryContext
-
-
-def _get_keypair_resource_policy_creator_spec() -> type[KeyPairResourcePolicyCreatorSpec]:
-    from ai.backend.manager.repositories.keypair_resource_policy.creators import (
-        KeyPairResourcePolicyCreatorSpec,
-    )
-
-    return KeyPairResourcePolicyCreatorSpec
-
-
-def _get_keypair_resource_policy_updater_spec() -> type[KeyPairResourcePolicyUpdaterSpec]:
-    from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
-        KeyPairResourcePolicyUpdaterSpec,
-    )
-
-    return KeyPairResourcePolicyUpdaterSpec
-
-
-def _get_project_resource_policy_creator_spec() -> type[ProjectResourcePolicyCreatorSpec]:
-    from ai.backend.manager.repositories.project_resource_policy.creators import (
-        ProjectResourcePolicyCreatorSpec,
-    )
-
-    return ProjectResourcePolicyCreatorSpec
-
-
-def _get_project_resource_policy_updater_spec() -> type[ProjectResourcePolicyUpdaterSpec]:
-    from ai.backend.manager.repositories.project_resource_policy.updaters import (
-        ProjectResourcePolicyUpdaterSpec,
-    )
-
-    return ProjectResourcePolicyUpdaterSpec
-
-
-def _get_user_resource_policy_creator_spec() -> type[UserResourcePolicyCreatorSpec]:
-    from ai.backend.manager.repositories.user_resource_policy.creators import (
-        UserResourcePolicyCreatorSpec,
-    )
-
-    return UserResourcePolicyCreatorSpec
-
-
-def _get_user_resource_policy_updater_spec() -> type[UserResourcePolicyUpdaterSpec]:
-    from ai.backend.manager.repositories.user_resource_policy.updaters import (
-        UserResourcePolicyUpdaterSpec,
-    )
-
-    return UserResourcePolicyUpdaterSpec
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -193,9 +139,9 @@ class KeyPairResourcePolicy(graphene.ObjectType):  # type: ignore[misc]
             sa.select(keypair_resource_policies)
             .select_from(j)
             .where(
-                keypairs.c.user_id
+                keypairs.c.user
                 == (
-                    sa.select(keypairs.c.user_id)
+                    sa.select(keypairs.c.user)
                     .select_from(keypairs)
                     .where(keypairs.c.access_key == access_key)
                     .as_scalar()
@@ -302,7 +248,7 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):  # type: ignor
     max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
     max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
-    def to_creator(self, name: str) -> Creator[KeyPairResourcePolicyRow]:
+    def to_creator(self, name: str) -> KeyPairResourcePolicyCreator:
         default_for_unspecified = DefaultForUnspecified[self.default_for_unspecified]
         total_resource_slots = ResourceSlot.from_user_input(self.total_resource_slots, None)
 
@@ -315,27 +261,23 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):  # type: ignor
         def value_or_none(value: Any) -> Any:
             return value if value is not Undefined else None
 
-        CreatorSpec = _get_keypair_resource_policy_creator_spec()
-        return Creator(
-            spec=CreatorSpec(
-                name=name,
-                default_for_unspecified=default_for_unspecified,
-                total_resource_slots=total_resource_slots,
-                max_session_lifetime=value_or_none(self.max_session_lifetime),
-                max_concurrent_sessions=value_or_none(self.max_concurrent_sessions),
-                max_concurrent_sftp_sessions=value_or_none(self.max_concurrent_sftp_sessions),
-                max_containers_per_session=value_or_none(self.max_containers_per_session),
-                idle_timeout=value_or_none(self.idle_timeout),
-                allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
-                max_vfolder_count=value_or_none(self.max_vfolder_count),
-                max_vfolder_size=value_or_none(self.max_vfolder_size),
-                max_quota_scope_size=value_or_none(self.max_quota_scope_size),
-                max_pending_session_count=value_or_none(self.max_pending_session_count),
-                max_pending_session_resource_slots=value_or_none(
-                    max_pending_session_resource_slots
-                ),
-                max_priority=None,
-            )
+        from ai.backend.manager.models.resource_policy.creators import (
+            KeyPairResourcePolicyCreator,
+        )
+
+        return KeyPairResourcePolicyCreator(
+            name=name,
+            default_for_unspecified=default_for_unspecified,
+            total_resource_slots=total_resource_slots,
+            max_session_lifetime=value_or_none(self.max_session_lifetime),
+            max_concurrent_sessions=value_or_none(self.max_concurrent_sessions),
+            max_concurrent_sftp_sessions=value_or_none(self.max_concurrent_sftp_sessions),
+            max_containers_per_session=value_or_none(self.max_containers_per_session),
+            idle_timeout=value_or_none(self.idle_timeout),
+            allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
+            max_pending_session_count=value_or_none(self.max_pending_session_count),
+            max_pending_session_resource_slots=value_or_none(max_pending_session_resource_slots),
+            max_priority=None,
         )
 
 
@@ -354,7 +296,7 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):  # type: ignor
     max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
     max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
-    def to_updater(self, name: str) -> Updater[KeyPairResourcePolicyRow]:
+    def to_updater(self, policy_id: KeyPairResourcePolicyUUID) -> KeyPairResourcePolicyUpdater:
         default_for_unspecified = (
             DefaultForUnspecified[self.default_for_unspecified]
             if self.default_for_unspecified is not Undefined
@@ -367,40 +309,37 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):  # type: ignor
             else Undefined
         )
 
-        UpdaterSpec = _get_keypair_resource_policy_updater_spec()
-        return Updater(
-            spec=UpdaterSpec(
-                default_for_unspecified=OptionalState[DefaultForUnspecified].from_graphql(
-                    default_for_unspecified
-                ),
-                total_resource_slots=OptionalState[ResourceSlot].from_graphql(total_resource_slots),
-                max_session_lifetime=OptionalState[int].from_graphql(self.max_session_lifetime),
-                max_concurrent_sessions=OptionalState[int].from_graphql(
-                    self.max_concurrent_sessions
-                ),
-                max_concurrent_sftp_sessions=OptionalState[int].from_graphql(
-                    self.max_concurrent_sftp_sessions
-                ),
-                max_containers_per_session=OptionalState[int].from_graphql(
-                    self.max_containers_per_session
-                ),
-                idle_timeout=OptionalState[int].from_graphql(self.idle_timeout),
-                allowed_vfolder_hosts=OptionalState[dict[str, Any]].from_graphql(
-                    self.allowed_vfolder_hosts
-                ),
-                max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
-                max_vfolder_size=OptionalState[int].from_graphql(self.max_vfolder_size),
-                max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
-                max_pending_session_count=TriState[int].from_graphql(
-                    self.max_pending_session_count
-                ),
-                max_pending_session_resource_slots=TriState[ResourceSlot].from_graphql(
-                    ResourceSlot.from_user_input(self.max_pending_session_resource_slots, None)
-                    if isinstance(self.max_pending_session_resource_slots, dict)
-                    else self.max_pending_session_resource_slots
-                ),
+        from ai.backend.manager.models.resource_policy.updaters import (
+            KeyPairResourcePolicyUpdater,
+        )
+
+        return KeyPairResourcePolicyUpdater(
+            policy_id=policy_id,
+            default_for_unspecified=OptionalState[DefaultForUnspecified].from_graphql(
+                default_for_unspecified
             ),
-            pk_value=name,
+            total_resource_slots=OptionalState[ResourceSlot].from_graphql(total_resource_slots),
+            max_session_lifetime=OptionalState[int].from_graphql(self.max_session_lifetime),
+            max_concurrent_sessions=OptionalState[int].from_graphql(self.max_concurrent_sessions),
+            max_concurrent_sftp_sessions=OptionalState[int].from_graphql(
+                self.max_concurrent_sftp_sessions
+            ),
+            max_containers_per_session=OptionalState[int].from_graphql(
+                self.max_containers_per_session
+            ),
+            idle_timeout=OptionalState[int].from_graphql(self.idle_timeout),
+            allowed_vfolder_hosts=OptionalState[dict[str, Any]].from_graphql(
+                self.allowed_vfolder_hosts
+            ),
+            max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
+            max_vfolder_size=OptionalState[int].from_graphql(self.max_vfolder_size),
+            max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
+            max_pending_session_count=TriState[int].from_graphql(self.max_pending_session_count),
+            max_pending_session_resource_slots=TriState[ResourceSlot].from_graphql(
+                ResourceSlot.from_user_input(self.max_pending_session_resource_slots, None)
+                if isinstance(self.max_pending_session_resource_slots, dict)
+                else self.max_pending_session_resource_slots
+            ),
         )
 
 
@@ -428,7 +367,7 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.keypair_resource_policy.create_keypair_resource_policy.wait_for_complete(
+        await graph_ctx.processors.keypair_resource_policy.global_create.run(
             CreateKeyPairResourcePolicyAction(props.to_creator(name))
         )
 
@@ -456,13 +395,19 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         name: str,
         props: ModifyKeyPairResourcePolicyInput,
     ) -> ModifyKeyPairResourcePolicy:
-        from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
-            ModifyKeyPairResourcePolicyAction,
+        from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
+            LookupKeypairResourcePolicyAction,
+        )
+        from ai.backend.manager.services.keypair_resource_policy.actions.update_keypair_resource_policy import (
+            UpdateKeyPairResourcePolicyAction,
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.keypair_resource_policy.modify_keypair_resource_policy.wait_for_complete(
-            ModifyKeyPairResourcePolicyAction(name, props.to_updater(name))
+        target = await graph_ctx.processors.keypair_resource_policy.lookup.run(
+            LookupKeypairResourcePolicyAction(name=name)
+        )
+        await graph_ctx.processors.keypair_resource_policy.update.run(
+            UpdateKeyPairResourcePolicyAction(updater=props.to_updater(target.entity_id()))
         )
 
         return ModifyKeyPairResourcePolicy(
@@ -487,13 +432,19 @@ class DeleteKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         name: str,
     ) -> DeleteKeyPairResourcePolicy:
-        from ai.backend.manager.services.keypair_resource_policy.actions.delete_keypair_resource_policy import (
-            DeleteKeyPairResourcePolicyAction,
+        from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
+            LookupKeypairResourcePolicyAction,
+        )
+        from ai.backend.manager.services.keypair_resource_policy.actions.purge_keypair_resource_policy import (
+            PurgeKeyPairResourcePolicyAction,
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.keypair_resource_policy.delete_keypair_resource_policy.wait_for_complete(
-            DeleteKeyPairResourcePolicyAction(name)
+        target = await graph_ctx.processors.keypair_resource_policy.lookup.run(
+            LookupKeypairResourcePolicyAction(name=name)
+        )
+        await graph_ctx.processors.keypair_resource_policy.purge.run(
+            PurgeKeyPairResourcePolicyAction(name=name, policy_id=target.entity_id())
         )
         return DeleteKeyPairResourcePolicy(
             ok=True,
@@ -605,21 +556,20 @@ class CreateUserResourcePolicyInput(graphene.InputObjectType):  # type: ignore[m
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
 
-    def to_creator(self, name: str) -> Creator[UserResourcePolicyRow]:
+    def to_creator(self, name: str) -> UserResourcePolicyCreator:
+        from ai.backend.manager.models.resource_policy.creators import UserResourcePolicyCreator
+
         def value_or_default(value: Any, default: int) -> int:
             return value if value is not Undefined and value is not None else default
 
-        CreatorSpec = _get_user_resource_policy_creator_spec()
-        return Creator(
-            spec=CreatorSpec(
-                name=name,
-                max_vfolder_count=value_or_default(self.max_vfolder_count, 0),
-                max_quota_scope_size=value_or_default(self.max_quota_scope_size, 0),
-                max_session_count_per_model_session=value_or_default(
-                    self.max_session_count_per_model_session, 0
-                ),
-                max_customized_image_count=value_or_default(self.max_customized_image_count, 3),
-            )
+        return UserResourcePolicyCreator(
+            name=name,
+            max_vfolder_count=value_or_default(self.max_vfolder_count, 0),
+            max_quota_scope_size=value_or_default(self.max_quota_scope_size, 0),
+            max_session_count_per_model_session=value_or_default(
+                self.max_session_count_per_model_session, 0
+            ),
+            max_customized_image_count=value_or_default(self.max_customized_image_count, 3),
         )
 
 
@@ -637,20 +587,21 @@ class ModifyUserResourcePolicyInput(graphene.InputObjectType):  # type: ignore[m
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
 
-    def to_updater(self, name: str) -> Updater[UserResourcePolicyRow]:
-        UpdaterSpec = _get_user_resource_policy_updater_spec()
-        return Updater(
-            spec=UpdaterSpec(
-                max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
-                max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
-                max_session_count_per_model_session=OptionalState[int].from_graphql(
-                    self.max_session_count_per_model_session
-                ),
-                max_customized_image_count=OptionalState[int].from_graphql(
-                    self.max_customized_image_count
-                ),
+    def to_updater(self, policy_id: UserResourcePolicyUUID) -> UserResourcePolicyUpdater:
+        from ai.backend.manager.models.resource_policy.updaters import (
+            UserResourcePolicyUpdater,
+        )
+
+        return UserResourcePolicyUpdater(
+            policy_id=policy_id,
+            max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
+            max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
+            max_session_count_per_model_session=OptionalState[int].from_graphql(
+                self.max_session_count_per_model_session
             ),
-            pk_value=name,
+            max_customized_image_count=OptionalState[int].from_graphql(
+                self.max_customized_image_count
+            ),
         )
 
 
@@ -678,10 +629,8 @@ class CreateUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await (
-            graph_ctx.processors.user_resource_policy.create_user_resource_policy.wait_for_complete(
-                CreateUserResourcePolicyAction(props.to_creator(name))
-            )
+        await graph_ctx.processors.user_resource_policy.global_create.run(
+            CreateUserResourcePolicyAction(props.to_creator(name))
         )
 
         return CreateUserResourcePolicy(
@@ -708,15 +657,19 @@ class ModifyUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         name: str,
         props: ModifyUserResourcePolicyInput,
     ) -> ModifyUserResourcePolicy:
-        from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
-            ModifyUserResourcePolicyAction,
+        from ai.backend.manager.services.user_resource_policy.actions.lookup import (
+            LookupUserResourcePolicyAction,
+        )
+        from ai.backend.manager.services.user_resource_policy.actions.update_user_resource_policy import (
+            UpdateUserResourcePolicyAction,
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await (
-            graph_ctx.processors.user_resource_policy.modify_user_resource_policy.wait_for_complete(
-                ModifyUserResourcePolicyAction(name, props.to_updater(name))
-            )
+        target = await graph_ctx.processors.user_resource_policy.lookup.run(
+            LookupUserResourcePolicyAction(name=name)
+        )
+        await graph_ctx.processors.user_resource_policy.update.run(
+            UpdateUserResourcePolicyAction(updater=props.to_updater(target.entity_id()))
         )
 
         return ModifyUserResourcePolicy(
@@ -741,15 +694,19 @@ class DeleteUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         name: str,
     ) -> DeleteUserResourcePolicy:
-        from ai.backend.manager.services.user_resource_policy.actions.delete_user_resource_policy import (
-            DeleteUserResourcePolicyAction,
+        from ai.backend.manager.services.user_resource_policy.actions.lookup import (
+            LookupUserResourcePolicyAction,
+        )
+        from ai.backend.manager.services.user_resource_policy.actions.purge_user_resource_policy import (
+            PurgeUserResourcePolicyAction,
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await (
-            graph_ctx.processors.user_resource_policy.delete_user_resource_policy.wait_for_complete(
-                DeleteUserResourcePolicyAction(name)
-            )
+        target = await graph_ctx.processors.user_resource_policy.lookup.run(
+            LookupUserResourcePolicyAction(name=name)
+        )
+        await graph_ctx.processors.user_resource_policy.purge.run(
+            PurgeUserResourcePolicyAction(name=name, policy_id=target.entity_id())
         )
 
         return DeleteUserResourcePolicy(
@@ -833,13 +790,13 @@ class ProjectResourcePolicy(graphene.ObjectType):  # type: ignore[misc]
         ctx: GraphQueryContext,
         project_uuids: Sequence[uuid.UUID],
     ) -> Sequence[ProjectResourcePolicy]:
-        from ai.backend.manager.models.group import GroupRow
+        from ai.backend.manager.models.project import ProjectRow
 
         query = (
-            sa.select(GroupRow)
-            .where(GroupRow.id.in_(project_uuids))
-            .order_by(GroupRow.resource_policy)
-            .options(selectinload(GroupRow.resource_policy_row))
+            sa.select(ProjectRow)
+            .where(ProjectRow.id.in_(project_uuids))
+            .order_by(ProjectRow.resource_policy)
+            .options(selectinload(ProjectRow.resource_policy_row))
         )
         async with ctx.db.begin_readonly_session() as sess:
             return [
@@ -861,18 +818,19 @@ class CreateProjectResourcePolicyInput(graphene.InputObjectType):  # type: ignor
         description="Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks."
     )
 
-    def to_creator(self, name: str) -> Creator[ProjectResourcePolicyRow]:
+    def to_creator(self, name: str) -> ProjectResourcePolicyCreator:
+        from ai.backend.manager.models.resource_policy.creators import (
+            ProjectResourcePolicyCreator,
+        )
+
         def value_or_default(value: Any, default: int) -> int:
             return value if value is not Undefined and value is not None else default
 
-        CreatorSpec = _get_project_resource_policy_creator_spec()
-        return Creator(
-            spec=CreatorSpec(
-                name=name,
-                max_vfolder_count=value_or_default(self.max_vfolder_count, 0),
-                max_quota_scope_size=value_or_default(self.max_quota_scope_size, 0),
-                max_network_count=value_or_default(self.max_network_count, 0),
-            )
+        return ProjectResourcePolicyCreator(
+            name=name,
+            max_vfolder_count=value_or_default(self.max_vfolder_count, 0),
+            max_quota_scope_size=value_or_default(self.max_quota_scope_size, 0),
+            max_network_count=value_or_default(self.max_network_count, 0),
         )
 
 
@@ -888,16 +846,17 @@ class ModifyProjectResourcePolicyInput(graphene.InputObjectType):  # type: ignor
         description="Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks."
     )
 
-    def to_updater(self, name: str) -> Updater[ProjectResourcePolicyRow]:
-        UpdaterSpec = _get_project_resource_policy_updater_spec()
-        return Updater(
-            spec=UpdaterSpec(
-                max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
-                max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
-                max_vfolder_size=OptionalState[int].from_graphql(self.max_vfolder_size),
-                max_network_count=OptionalState[int].from_graphql(self.max_network_count),
-            ),
-            pk_value=name,
+    def to_updater(self, policy_id: ProjectResourcePolicyUUID) -> ProjectResourcePolicyUpdater:
+        from ai.backend.manager.models.resource_policy.updaters import (
+            ProjectResourcePolicyUpdater,
+        )
+
+        return ProjectResourcePolicyUpdater(
+            policy_id=policy_id,
+            max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
+            max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
+            max_vfolder_size=OptionalState[int].from_graphql(self.max_vfolder_size),
+            max_network_count=OptionalState[int].from_graphql(self.max_network_count),
         )
 
 
@@ -925,7 +884,7 @@ class CreateProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.project_resource_policy.create_project_resource_policy.wait_for_complete(
+        await graph_ctx.processors.project_resource_policy.global_create.run(
             CreateProjectResourcePolicyAction(props.to_creator(name))
         )
 
@@ -953,13 +912,19 @@ class ModifyProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         name: str,
         props: ModifyProjectResourcePolicyInput,
     ) -> ModifyProjectResourcePolicy:
-        from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
-            ModifyProjectResourcePolicyAction,
+        from ai.backend.manager.services.project_resource_policy.actions.lookup import (
+            LookupProjectResourcePolicyAction,
+        )
+        from ai.backend.manager.services.project_resource_policy.actions.update_project_resource_policy import (
+            UpdateProjectResourcePolicyAction,
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.project_resource_policy.modify_project_resource_policy.wait_for_complete(
-            ModifyProjectResourcePolicyAction(name, props.to_updater(name))
+        target = await graph_ctx.processors.project_resource_policy.lookup.run(
+            LookupProjectResourcePolicyAction(name=name)
+        )
+        await graph_ctx.processors.project_resource_policy.update.run(
+            UpdateProjectResourcePolicyAction(updater=props.to_updater(target.entity_id()))
         )
 
         return ModifyProjectResourcePolicy(
@@ -984,13 +949,19 @@ class DeleteProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         name: str,
     ) -> DeleteProjectResourcePolicy:
-        from ai.backend.manager.services.project_resource_policy.actions.delete_project_resource_policy import (
-            DeleteProjectResourcePolicyAction,
+        from ai.backend.manager.services.project_resource_policy.actions.lookup import (
+            LookupProjectResourcePolicyAction,
+        )
+        from ai.backend.manager.services.project_resource_policy.actions.purge_project_resource_policy import (
+            PurgeProjectResourcePolicyAction,
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.project_resource_policy.delete_project_resource_policy.wait_for_complete(
-            DeleteProjectResourcePolicyAction(name)
+        target = await graph_ctx.processors.project_resource_policy.lookup.run(
+            LookupProjectResourcePolicyAction(name=name)
+        )
+        await graph_ctx.processors.project_resource_policy.purge.run(
+            PurgeProjectResourcePolicyAction(name=name, policy_id=target.entity_id())
         )
 
         return DeleteProjectResourcePolicy(

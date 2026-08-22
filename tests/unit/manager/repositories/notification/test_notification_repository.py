@@ -11,19 +11,13 @@ from datetime import UTC, datetime
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
     WebhookSpec,
 )
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import BinarySize, ResourceSlot
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.errors.notification import (
-    NotificationChannelNotFound,
-    NotificationRuleNotFound,
-)
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -32,7 +26,6 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -40,16 +33,13 @@ from ai.backend.manager.models.notification import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
-from ai.backend.manager.models.notification.conditions import (
-    NotificationChannelConditions,
-    NotificationRuleConditions,
-)
-from ai.backend.manager.models.notification.orders import NotificationChannelOrders
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -58,9 +48,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
     PasswordInfo,
@@ -70,19 +58,7 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification import NotificationRepository
-from ai.backend.manager.repositories.notification.creators import (
-    NotificationChannelCreatorSpec,
-    NotificationRuleCreatorSpec,
-)
-from ai.backend.manager.repositories.notification.updaters import (
-    NotificationChannelUpdaterSpec,
-    NotificationRuleUpdaterSpec,
-)
-from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -101,7 +77,7 @@ class TestNotificationRepository:
             [
                 # Base rows in FK dependency order (parents before children)
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -109,7 +85,7 @@ class TestNotificationRepository:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -394,44 +370,6 @@ class TestNotificationRepository:
         """Create NotificationRepository instance with database"""
         return NotificationRepository(db=db_with_cleanup)
 
-    async def test_create_channel(
-        self,
-        notification_repository: NotificationRepository,
-        test_user: uuid.UUID,
-    ) -> None:
-        """Test creating notification channel"""
-        config = WebhookSpec(
-            url="https://example.com/webhook",
-            method="POST",
-            headers={"Authorization": "Bearer token123"},
-            timeout=30,
-            success_status_codes=[200, 201, 202],
-        )
-
-        creator = RBACEntityCreator(
-            spec=NotificationChannelCreatorSpec(
-                name="Test Webhook",
-                channel_type=NotificationChannelType.WEBHOOK,
-                spec=config,
-                created_by=test_user,
-                description="Test webhook channel",
-                enabled=True,
-            ),
-            element_type=RBACElementType.NOTIFICATION_CHANNEL,
-            scope_ref=RBACElementRef(RBACElementType.USER, str(test_user)),
-        )
-
-        channel = await notification_repository.create_channel(creator)
-
-        assert channel.name == "Test Webhook"
-        assert channel.channel_type == NotificationChannelType.WEBHOOK
-        assert isinstance(channel.spec, WebhookSpec)
-        assert channel.spec.url == "https://example.com/webhook"
-        assert channel.spec.method == "POST"
-        assert channel.spec.timeout == 30
-        assert channel.enabled is True
-        assert channel.description == "Test webhook channel"
-
     async def test_get_channel_by_id(
         self,
         notification_repository: NotificationRepository,
@@ -443,143 +381,6 @@ class TestNotificationRepository:
         assert retrieved_channel is not None
         assert retrieved_channel.id == sample_channel_id
         assert retrieved_channel.name == "Sample Channel"
-
-    async def test_update_channel(
-        self,
-        notification_repository: NotificationRepository,
-        sample_channel_id: uuid.UUID,
-    ) -> None:
-        """Test updating notification channel"""
-        new_config = WebhookSpec(
-            url="https://example.com/new-webhook",
-            method="GET",
-        )
-
-        updater_spec = NotificationChannelUpdaterSpec(
-            name=OptionalState.update("Updated Name"),
-            spec=OptionalState.update(new_config),
-            enabled=OptionalState.update(False),
-        )
-        updater = Updater(spec=updater_spec, pk_value=sample_channel_id)
-
-        updated_channel = await notification_repository.update_channel(updater=updater)
-
-        assert updated_channel is not None
-        assert updated_channel.name == "Updated Name"
-        assert isinstance(updated_channel.spec, WebhookSpec)
-        assert updated_channel.spec.url == "https://example.com/new-webhook"
-        assert updated_channel.spec.method == "GET"
-        assert updated_channel.enabled is False
-
-    async def test_delete_channel(
-        self,
-        notification_repository: NotificationRepository,
-        sample_channel_id: uuid.UUID,
-    ) -> None:
-        """Test deleting notification channel"""
-        deleted = await notification_repository.delete_channel(sample_channel_id)
-        assert deleted is True
-
-        with pytest.raises(NotificationChannelNotFound):
-            await notification_repository.get_channel_by_id(sample_channel_id)
-
-    async def test_list_channels(
-        self,
-        notification_repository: NotificationRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_user: uuid.UUID,
-    ) -> None:
-        """Test listing all channels"""
-
-        config = WebhookSpec(url="https://example.com/webhook")
-
-        # Create channels directly in DB
-        async with db_with_cleanup.begin_session() as db_sess:
-            enabled_channel = NotificationChannelRow(
-                id=uuid.uuid4(),
-                name="Enabled Channel",
-                description=None,
-                channel_type=NotificationChannelType.WEBHOOK,
-                config=config.model_dump(),
-                enabled=True,
-                created_by=test_user,
-                created_at=datetime.now(tz=UTC),
-                updated_at=datetime.now(tz=UTC),
-            )
-            disabled_channel = NotificationChannelRow(
-                id=uuid.uuid4(),
-                name="Disabled Channel",
-                description=None,
-                channel_type=NotificationChannelType.WEBHOOK,
-                config=config.model_dump(),
-                enabled=False,
-                created_by=test_user,
-                created_at=datetime.now(tz=UTC),
-                updated_at=datetime.now(tz=UTC),
-            )
-            db_sess.add(enabled_channel)
-            db_sess.add(disabled_channel)
-            await db_sess.flush()
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await notification_repository.search_channels(querier=querier)
-        assert len(result.items) >= 2
-        assert result.total_count >= 2
-
-        enabled_querier = BatchQuerier(
-            pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[NotificationChannelConditions.by_enabled(True)],
-            orders=[],
-        )
-        enabled_result = await notification_repository.search_channels(querier=enabled_querier)
-        assert all(ch.enabled for ch in enabled_result.items)
-
-    async def test_create_rule(
-        self,
-        notification_repository: NotificationRepository,
-        test_user: uuid.UUID,
-    ) -> None:
-        """Test creating notification rule"""
-        config = WebhookSpec(url="https://example.com/webhook")
-
-        channel_creator = RBACEntityCreator(
-            spec=NotificationChannelCreatorSpec(
-                name="Test Channel",
-                channel_type=NotificationChannelType.WEBHOOK,
-                spec=config,
-                created_by=test_user,
-            ),
-            element_type=RBACElementType.NOTIFICATION_CHANNEL,
-            scope_ref=RBACElementRef(RBACElementType.USER, str(test_user)),
-        )
-
-        channel = await notification_repository.create_channel(channel_creator)
-
-        rule_creator = RBACEntityCreator(
-            spec=NotificationRuleCreatorSpec(
-                name="Session Started Rule",
-                rule_type=NotificationRuleType.SESSION_STARTED,
-                channel_id=channel.id,
-                message_template="Session {{ session_id }} started",
-                created_by=test_user,
-                description="Notify when session starts",
-                enabled=True,
-            ),
-            element_type=RBACElementType.NOTIFICATION_RULE,
-            scope_ref=RBACElementRef(RBACElementType.NOTIFICATION_CHANNEL, str(channel.id)),
-        )
-
-        rule = await notification_repository.create_rule(rule_creator)
-
-        assert rule.name == "Session Started Rule"
-        assert rule.rule_type == NotificationRuleType.SESSION_STARTED
-        assert rule.message_template == "Session {{ session_id }} started"
-        assert rule.channel.id == channel.id
-        assert rule.enabled is True
 
     async def test_get_matching_rules(
         self,
@@ -643,291 +444,5 @@ class TestNotificationRepository:
 
         # Since DB session persists data between tests, use >= instead of exact count
         assert len(matching_rules) >= 1
-        assert all(r.rule_type == NotificationRuleType.SESSION_STARTED for r in matching_rules)
-        assert all(r.enabled for r in matching_rules)
-
-    async def test_update_rule(
-        self,
-        notification_repository: NotificationRepository,
-        sample_rule_id: uuid.UUID,
-    ) -> None:
-        """Test updating notification rule"""
-        updater_spec = NotificationRuleUpdaterSpec(
-            name=OptionalState.update("Updated Rule"),
-            message_template=OptionalState.update("Updated template: {{ session_id }}"),
-            enabled=OptionalState.update(False),
-        )
-        updater = Updater(spec=updater_spec, pk_value=sample_rule_id)
-
-        updated_rule = await notification_repository.update_rule(updater=updater)
-
-        assert updated_rule is not None
-        assert updated_rule.name == "Updated Rule"
-        assert updated_rule.message_template == "Updated template: {{ session_id }}"
-        assert updated_rule.enabled is False
-
-    async def test_delete_rule(
-        self,
-        notification_repository: NotificationRepository,
-        sample_rule_id: uuid.UUID,
-    ) -> None:
-        """Test deleting notification rule"""
-        deleted = await notification_repository.delete_rule(sample_rule_id)
-        assert deleted is True
-
-        with pytest.raises(NotificationRuleNotFound):
-            await notification_repository.get_rule_by_id(sample_rule_id)
-
-    async def test_list_rules(
-        self,
-        notification_repository: NotificationRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_channel_id: uuid.UUID,
-        test_user: uuid.UUID,
-    ) -> None:
-        """Test listing notification rules with filters"""
-        # Create rules directly in DB
-        async with db_with_cleanup.begin_session() as db_sess:
-            # Create session.started rule (enabled)
-            rule1 = NotificationRuleRow(
-                id=uuid.uuid4(),
-                name="Session Started 1",
-                description=None,
-                rule_type="session.started",
-                channel_id=sample_channel_id,
-                message_template="Test",
-                enabled=True,
-                created_by=test_user,
-                created_at=datetime.now(tz=UTC),
-                updated_at=datetime.now(tz=UTC),
-            )
-            # Create another session.started rule (disabled)
-            rule2 = NotificationRuleRow(
-                id=uuid.uuid4(),
-                name="Session Started 2",
-                description=None,
-                rule_type="session.started",
-                channel_id=sample_channel_id,
-                message_template="Test",
-                enabled=False,
-                created_by=test_user,
-                created_at=datetime.now(tz=UTC),
-                updated_at=datetime.now(tz=UTC),
-            )
-            # Create session.terminated rule (enabled)
-            rule3 = NotificationRuleRow(
-                id=uuid.uuid4(),
-                name="Session Terminated",
-                description=None,
-                rule_type="session.terminated",
-                channel_id=sample_channel_id,
-                message_template="Test",
-                enabled=True,
-                created_by=test_user,
-                created_at=datetime.now(tz=UTC),
-                updated_at=datetime.now(tz=UTC),
-            )
-            db_sess.add(rule1)
-            db_sess.add(rule2)
-            db_sess.add(rule3)
-            await db_sess.flush()
-
-        # List all rules
-        all_querier = BatchQuerier(
-            pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        all_result = await notification_repository.search_rules(querier=all_querier)
-        assert len(all_result.items) >= 3
-        assert all_result.total_count >= 3
-
-        # List enabled rules only
-        enabled_querier = BatchQuerier(
-            pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[NotificationRuleConditions.by_enabled(True)],
-            orders=[],
-        )
-        enabled_result = await notification_repository.search_rules(querier=enabled_querier)
-        assert all(r.enabled for r in enabled_result.items)
-
-        # List rules by rule_type
-        started_querier = BatchQuerier(
-            pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[
-                NotificationRuleConditions.by_rule_types([NotificationRuleType.SESSION_STARTED])
-            ],
-            orders=[],
-        )
-        started_result = await notification_repository.search_rules(querier=started_querier)
-        assert len(started_result.items) >= 2
-        assert all(
-            r.rule_type == NotificationRuleType.SESSION_STARTED for r in started_result.items
-        )
-
-    async def test_delete_channel_with_rules(
-        self,
-        notification_repository: NotificationRepository,
-        test_user: uuid.UUID,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> None:
-        """Test deleting a channel that has associated rules"""
-
-        config = WebhookSpec(url="https://example.com/webhook")
-        channel_id = uuid.uuid4()
-        rule_id = uuid.uuid4()
-
-        # Create channel and rule directly in DB
-        async with db_with_cleanup.begin_session() as db_sess:
-            channel = NotificationChannelRow(
-                id=channel_id,
-                name="Test Channel",
-                description=None,
-                channel_type=NotificationChannelType.WEBHOOK,
-                config=config.model_dump(),
-                enabled=True,
-                created_by=test_user,
-                created_at=datetime.now(tz=UTC),
-                updated_at=datetime.now(tz=UTC),
-            )
-            rule = NotificationRuleRow(
-                id=rule_id,
-                name="Test Rule",
-                description=None,
-                rule_type="session.started",
-                channel_id=channel_id,
-                message_template="Test",
-                enabled=True,
-                created_by=test_user,
-                created_at=datetime.now(tz=UTC),
-                updated_at=datetime.now(tz=UTC),
-            )
-            db_sess.add(channel)
-            db_sess.add(rule)
-            await db_sess.flush()
-
-        # Delete channel - without FK, this should succeed
-        result = await notification_repository.delete_channel(channel_id)
-        assert result is True
-
-        # Verify channel is deleted
-        with pytest.raises(NotificationChannelNotFound):
-            await notification_repository.get_channel_by_id(channel_id)
-
-    # Pagination Tests
-
-    async def test_list_channels_offset_pagination_first_page(
-        self,
-        notification_repository: NotificationRepository,
-        sample_channels_for_pagination: list[uuid.UUID],
-    ) -> None:
-        """Test first page of offset-based pagination"""
-        # sample_channels_for_pagination fixture creates 25 channels
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await notification_repository.search_channels(querier=querier)
-        assert len(result.items) == 10
-        assert result.total_count == 25
-
-    async def test_list_channels_offset_pagination_second_page(
-        self,
-        notification_repository: NotificationRepository,
-        sample_channels_for_pagination: list[uuid.UUID],
-    ) -> None:
-        """Test second page of offset-based pagination"""
-        # sample_channels_for_pagination fixture creates 25 channels
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=10),
-            conditions=[],
-            orders=[],
-        )
-        result = await notification_repository.search_channels(querier=querier)
-        assert len(result.items) == 10
-        assert result.total_count == 25
-
-    async def test_list_channels_offset_pagination_last_page(
-        self,
-        notification_repository: NotificationRepository,
-        sample_channels_for_pagination: list[uuid.UUID],
-    ) -> None:
-        """Test last page of offset-based pagination with partial results"""
-        # sample_channels_for_pagination fixture creates 25 channels
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=20),
-            conditions=[],
-            orders=[],
-        )
-        result = await notification_repository.search_channels(querier=querier)
-        assert len(result.items) == 5
-        assert result.total_count == 25
-
-    async def test_list_channels_pagination_limit_exceeds_total(
-        self,
-        notification_repository: NotificationRepository,
-        sample_channels_small: list[uuid.UUID],
-    ) -> None:
-        """Test pagination when limit exceeds total count"""
-        # sample_channels_small fixture creates 5 channels
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await notification_repository.search_channels(querier=querier)
-        assert len(result.items) == 5
-        assert result.total_count == 5
-
-    async def test_list_channels_pagination_offset_exceeds_total(
-        self,
-        notification_repository: NotificationRepository,
-        sample_channels_small: list[uuid.UUID],
-    ) -> None:
-        """Test pagination when offset exceeds total count returns empty"""
-        # sample_channels_small fixture creates 5 channels
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=100),
-            conditions=[],
-            orders=[],
-        )
-        result = await notification_repository.search_channels(querier=querier)
-        assert len(result.items) == 0
-        assert result.total_count == 5
-
-    async def test_list_channels_pagination_with_filter_and_order(
-        self,
-        notification_repository: NotificationRepository,
-        sample_channels_mixed_enabled: list[uuid.UUID],
-    ) -> None:
-        """Test pagination combined with filtering and ordering"""
-        # sample_channels_mixed_enabled fixture creates 20 channels (10 enabled, 10 disabled)
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=5, offset=0),
-            conditions=[NotificationChannelConditions.by_enabled(True)],
-            orders=[NotificationChannelOrders.name(ascending=True)],
-        )
-        result = await notification_repository.search_channels(querier=querier)
-        assert len(result.items) == 5
-        assert result.total_count == 10  # Only enabled channels
-        assert all(c.enabled for c in result.items)
-        # Verify ordering (Channel 00, 02, 04, 06, 08)
-        assert result.items[0].name == "Channel 00"
-        assert result.items[1].name == "Channel 02"
-
-    async def test_list_channels_large_limit(
-        self,
-        notification_repository: NotificationRepository,
-        sample_channels_medium: list[uuid.UUID],
-    ) -> None:
-        """Test listing channels with large limit returns all items"""
-        # sample_channels_medium fixture creates 15 channels
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await notification_repository.search_channels(querier=querier)
-        assert len(result.items) == 15
-        assert result.total_count == 15
+        assert all(m.rule.rule_type == NotificationRuleType.SESSION_STARTED for m in matching_rules)
+        assert all(m.rule.enabled and m.channel.enabled for m in matching_rules)

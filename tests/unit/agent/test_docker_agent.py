@@ -11,8 +11,15 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aiodocker.exceptions import DockerError
 
+from ai.backend.agent.config.unified import (
+    AgentUnifiedConfig,
+    ContainerLogDriver,
+    ContainerLogsConfig,
+)
 from ai.backend.agent.docker.agent import (
     DockerKernelCreationContext,
+    LogDriverOptions,
+    _build_log_config,
     _parse_distro_from_ldd_output,
 )
 
@@ -287,3 +294,56 @@ class TestAttachAdditionalNetworks:
 
         with pytest.raises(DockerError):
             await context._attach_additional_networks(docker, container, {"bridge"})
+
+
+def _log_config(driver: ContainerLogDriver) -> AgentUnifiedConfig:
+    """Only ``container_logs`` is read, so leave the rest of the schema unpopulated."""
+    fields: dict[str, Any] = {
+        "container_logs": ContainerLogsConfig.model_validate({
+            "driver": driver,
+            "max_length": "10M",
+        }),
+    }
+    return AgentUnifiedConfig.model_construct(**fields)
+
+
+class TestBuildLogConfig:
+    @pytest.mark.parametrize(
+        "driver",
+        [ContainerLogDriver.LOCAL, ContainerLogDriver.JSON_FILE],
+    )
+    def test_drivers_carry_size_options(self, driver: ContainerLogDriver) -> None:
+        log_config = _build_log_config(_log_config(driver))
+
+        assert log_config.type == driver
+        assert log_config.config == LogDriverOptions(max_size="2m", max_file="5", compress="false")
+
+    @pytest.mark.parametrize(
+        ("driver", "expected"),
+        [
+            (
+                ContainerLogDriver.LOCAL,
+                {
+                    "Type": "local",
+                    "Config": {"max-size": "2m", "max-file": "5", "compress": "false"},
+                },
+            ),
+            (
+                ContainerLogDriver.JSON_FILE,
+                {
+                    "Type": "json-file",
+                    "Config": {"max-size": "2m", "max-file": "5", "compress": "false"},
+                },
+            ),
+        ],
+    )
+    def test_dumped_payload_uses_docker_api_keys(
+        self, driver: ContainerLogDriver, expected: dict[str, Any]
+    ) -> None:
+        """The dump is what actually goes into the container creation request."""
+        log_config = _build_log_config(_log_config(driver))
+
+        dumped = log_config.model_dump(mode="json", by_alias=True)
+
+        assert dumped == expected
+        assert type(dumped["Type"]) is str

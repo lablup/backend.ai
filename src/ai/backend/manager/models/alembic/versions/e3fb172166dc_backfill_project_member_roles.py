@@ -14,7 +14,7 @@ historical gaps:
    permissions / user-role mappings are preserved.
 
 Runtime creation of the member role is introduced alongside this migration in
-GroupDBSource.create(), so new projects created after this migration lands
+ProjectDBSource.create(), so new projects created after this migration lands
 will already have both roles and the migration will be a no-op for them.
 
 Revision ID: e3fb172166dc

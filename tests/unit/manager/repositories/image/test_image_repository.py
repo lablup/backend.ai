@@ -15,24 +15,25 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import BinarySize, KernelId, ResourceSlot, SessionId
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 from ai.backend.manager.models.image.conditions import ImageConditions
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
@@ -74,7 +75,7 @@ class TestImageRepositorySearch:
 
         async with db_with_cleanup.begin_session() as db_sess:
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://registry.example.com",
                 registry_name="registry.example.com",
                 type=ContainerRegistryType.DOCKER,
@@ -449,13 +450,13 @@ class TestImageRepositoryLastUsedAt:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -499,21 +500,21 @@ class TestImageRepositoryLastUsedAt:
         return domain
 
     @pytest.fixture
-    async def scaling_group(
+    async def resource_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> str:
-        scaling_group = ScalingGroupRow(
+        resource_group = ResourceGroupRow(
             name="test-sg",
             driver="static",
             driver_opts={},
             scheduler="fifo",
-            scheduler_opts=ScalingGroupOpts(),
+            scheduler_opts=ResourceGroupOpts(),
         )
         async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(scaling_group)
+            db_sess.add(resource_group)
             await db_sess.flush()
-        return scaling_group.name
+        return resource_group.name
 
     @pytest.fixture
     async def user_policy(
@@ -574,8 +575,8 @@ class TestImageRepositoryLastUsedAt:
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain: DomainRow,
         group_policy: ProjectResourcePolicyRow,
-    ) -> GroupRow:
-        group = GroupRow(
+    ) -> ProjectRow:
+        group = ProjectRow(
             id=uuid4(),
             name=f"test-group-{uuid4().hex[:8]}",
             domain_name=domain.name,
@@ -594,7 +595,7 @@ class TestImageRepositoryLastUsedAt:
         registry_id = uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://registry.example.com",
                 registry_name="registry.example.com",
                 type=ContainerRegistryType.DOCKER,
@@ -647,9 +648,9 @@ class TestImageRepositoryLastUsedAt:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         user: UserRow,
-        group: GroupRow,
+        group: ProjectRow,
         domain: DomainRow,
-        scaling_group: str,
+        resource_group: str,
     ) -> CreateKernelForImageFunc:
         """Return a factory that creates a session + kernel for the given image."""
 
@@ -662,7 +663,7 @@ class TestImageRepositoryLastUsedAt:
                     user_uuid=user.uuid,
                     group_id=group.id,
                     domain_name=domain.name,
-                    scaling_group_name=scaling_group,
+                    scaling_group_name=resource_group,
                     occupying_slots=ResourceSlot(),
                     requested_slots=ResourceSlot(),
                     vfolder_mounts=[],

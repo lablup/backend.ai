@@ -4,12 +4,12 @@ import uuid
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.group.types import GroupData, ProjectType
 from ai.backend.manager.data.permission.types import OperationType
+from ai.backend.manager.data.project.types import ProjectData, ProjectType
 
 
-def _make_group_data() -> GroupData:
-    return GroupData(
+def _make_group_data() -> ProjectData:
+    return ProjectData(
         id=uuid.uuid4(),
         name="test-project",
         description=None,

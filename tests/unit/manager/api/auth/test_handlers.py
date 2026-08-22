@@ -22,6 +22,7 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.api_handlers import BodyParam, QueryParam
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
     GetRoleRequest,
@@ -33,6 +34,7 @@ from ai.backend.common.dto.manager.auth.request import (
     UploadSSHKeypairRequest,
     VerifyAuthRequest,
 )
+from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.middleware.auth import (
     TRUSTED_PROXY_NETWORKS_KEY,
@@ -240,9 +242,9 @@ class TestAuthorize:
         return AuthorizeActionResult(
             stream_response=None,
             authorization_result=AuthorizationResult(
-                user_id=uuid.uuid4(),
-                access_key="TESTKEY",
-                secret_key="TESTSECRET",
+                user_id=UserID(uuid.uuid4()),
+                access_key=AccessKey("TESTKEY"),
+                secret_key=SecretKey("TESTSECRET"),
                 role=UserRole.USER,
                 status=UserStatus.ACTIVE,
                 session_token="test_session_token",

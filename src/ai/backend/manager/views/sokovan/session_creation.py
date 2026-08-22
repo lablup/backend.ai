@@ -4,8 +4,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     VFolderMount,
 )
@@ -14,7 +14,7 @@ from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePoli
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
     ImageInfo,
-    ScalingGroupNetworkInfo,
+    ResourceGroupNetworkInfo,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 
@@ -24,7 +24,7 @@ class ResourceGroupEnqueueInfo:
     """Enqueue-time information read from the target resource group."""
 
     defaults: DefaultSessionOptions
-    network: ScalingGroupNetworkInfo | None
+    network: ResourceGroupNetworkInfo | None
     allow_fractional: bool
     # Slot names served by the group's non-terminated agents (membership
     # only; unit metadata lives in the global registry SlotTypeInfo)

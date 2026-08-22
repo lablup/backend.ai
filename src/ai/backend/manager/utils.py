@@ -13,8 +13,8 @@ from .errors.api import InvalidAPIParameters
 from .errors.auth import AccessKeyNotFound, UserNotFound
 from .errors.common import InternalServerError
 from .models.domain import domains
-from .models.group import groups
 from .models.keypair import keypairs
+from .models.project import groups
 from .models.resource_policy import keypair_resource_policies
 from .models.user import UserRole, users
 from .models.virtual_scope.queries import user_scope_membership_exists

@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.manager.data.app_config_allow_list.types import AppConfigAllowListData
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
+from ai.backend.manager.data.app_config.types import AppConfigAllowListData
 from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
@@ -25,6 +26,10 @@ class AppConfigAllowListCreator(GlobalEntityCreator[AppConfigAllowListRow, AppCo
     config_name: str
     scope_type: AppConfigScopeType
     rank: int | None = None
+
+    @override
+    def entity_id(self, row: AppConfigAllowListRow) -> AppConfigAllowListID:
+        return AppConfigAllowListID(row.id)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

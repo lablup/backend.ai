@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import (
     BinarySize,
     ResourceSlot,
@@ -28,19 +28,19 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
     UserRole,
@@ -95,7 +95,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -103,7 +103,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 AssociationScopesEntitiesRow,
                 VirtualScopeRow,
@@ -207,7 +207,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
         gid = uuid4()
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=gid,
                     name=f"group-a-{gid.hex[:8]}",
                     domain_name=domain_fixture.domain_name,
@@ -232,7 +232,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
         gid = uuid4()
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=gid,
                     name=f"group-b-{gid.hex[:8]}",
                     domain_name=domain_fixture.domain_name,

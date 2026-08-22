@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.bgtask.types import TaskID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.storage.response import FileDeleteAsyncResponse
 from ai.backend.common.types import (
     QuotaScopeID,
@@ -149,7 +150,7 @@ class TestCreateUploadSessionAction:
         action = CreateUploadSessionAction(
             keypair_resource_policy=keypair_resource_policy,
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             path="data/file.bin",
             size="4096",
         )
@@ -172,7 +173,7 @@ class TestCreateUploadSessionAction:
         action = CreateUploadSessionAction(
             keypair_resource_policy=keypair_resource_policy,
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             path="data/file.bin",
             size="4096",
         )
@@ -196,7 +197,7 @@ class TestCreateUploadSessionAction:
         action = CreateUploadSessionAction(
             keypair_resource_policy=keypair_resource_policy,
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             path="data/file.bin",
             size="4096",
         )
@@ -220,7 +221,7 @@ class TestCreateDownloadSessionAction:
         action = CreateDownloadSessionAction(
             keypair_resource_policy=keypair_resource_policy,
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             path="data/file.bin",
             archive=False,
         )
@@ -246,7 +247,7 @@ class TestCreateDownloadSessionAction:
         action = CreateDownloadSessionAction(
             keypair_resource_policy=keypair_resource_policy,
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             path="data/",
             archive=True,
         )
@@ -275,7 +276,7 @@ class TestCreateDownloadSessionAction:
         action = CreateDownloadSessionAction(
             keypair_resource_policy=keypair_resource_policy,
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             path="data/file.bin",
             archive=False,
         )
@@ -296,7 +297,7 @@ class TestListFilesAction:
 
         action = ListFilesAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             path=".",
         )
         result = await file_service.list_files(action)
@@ -323,7 +324,7 @@ class TestListFilesAction:
 
         action = ListFilesAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             path="subdir/nested",
         )
         await file_service.list_files(action)
@@ -351,7 +352,7 @@ class TestRenameFileAction:
         action = RenameFileAction(
             user_uuid=user_uuid,
             keypair_resource_policy=keypair_resource_policy,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             target_path="old_name.txt",
             new_name="new_name.txt",
         )
@@ -378,7 +379,7 @@ class TestRenameFileAction:
         action = RenameFileAction(
             user_uuid=user_uuid,
             keypair_resource_policy=keypair_resource_policy,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             target_path="old_name.txt",
             new_name="new_name.txt",
         )
@@ -400,7 +401,7 @@ class TestDeleteFilesAction:
 
         action = DeleteFilesAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             files=["file.txt"],
             recursive=False,
         )
@@ -423,7 +424,7 @@ class TestDeleteFilesAction:
 
         action = DeleteFilesAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             files=["dir1/", "dir2/", "file.txt"],
             recursive=True,
         )
@@ -449,7 +450,7 @@ class TestDeleteFilesAsyncAction:
 
         action = DeleteFilesAsyncAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             files=["large_dir/"],
             recursive=True,
         )
@@ -469,7 +470,7 @@ class TestDeleteFilesAsyncAction:
 
         action = DeleteFilesAsyncAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             files=["file.txt"],
             recursive=False,
         )
@@ -490,7 +491,7 @@ class TestMkdirAction:
 
         action = MkdirAction(
             user_id=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             path="newdir",
             parents=False,
             exist_ok=False,
@@ -514,7 +515,7 @@ class TestMkdirAction:
 
         action = MkdirAction(
             user_id=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             path="a/b/c",
             parents=True,
             exist_ok=False,
@@ -534,7 +535,7 @@ class TestMkdirAction:
         dirs = [f"dir{i}" for i in range(51)]
         action = MkdirAction(
             user_id=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             path=dirs,
             parents=False,
             exist_ok=False,

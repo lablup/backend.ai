@@ -177,7 +177,7 @@ def mock_graph_ctx() -> MagicMock:
 
     # Mock processors.user.create_user
     ctx.processors.user.create_user.wait_for_complete = AsyncMock()
-    ctx.processors.user.modify_user.wait_for_complete = AsyncMock()
+    ctx.processors.user.update_user.wait_for_complete = AsyncMock()
 
     return ctx
 
@@ -278,7 +278,7 @@ class TestModifyUserMutationValidation:
             await ModifyUser.mutate(None, mock_info, "test@example.com", props)
 
         # Verify processor was NOT called
-        mock_graph_ctx.processors.user.modify_user.wait_for_complete.assert_not_called()
+        mock_graph_ctx.processors.user.update_user.wait_for_complete.assert_not_called()
 
     async def test_modify_user_with_negative_gid_raises_before_processor(
         self,
@@ -294,4 +294,4 @@ class TestModifyUserMutationValidation:
             await ModifyUser.mutate(None, mock_info, "test@example.com", props)
 
         # Verify processor was NOT called
-        mock_graph_ctx.processors.user.modify_user.wait_for_complete.assert_not_called()
+        mock_graph_ctx.processors.user.update_user.wait_for_complete.assert_not_called()

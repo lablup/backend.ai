@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from typing import override
 from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.model_card.actions.base import ModelCardAction
 
@@ -13,8 +12,9 @@ class ScanProjectModelCardsAction(ModelCardAction):
     requester_id: UUID
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.project_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "scan_project_model_cards"
 
     @override
     @classmethod
@@ -23,11 +23,7 @@ class ScanProjectModelCardsAction(ModelCardAction):
 
 
 @dataclass
-class ScanProjectModelCardsActionResult(BaseActionResult):
+class ScanProjectModelCardsActionResult:
     created_count: int
     updated_count: int
     errors: list[str] = field(default_factory=list)
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

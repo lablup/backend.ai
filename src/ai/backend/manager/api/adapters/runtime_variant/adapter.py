@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     CreateRuntimeVariantInput,
     DeleteRuntimeVariantsInput,
@@ -22,30 +23,27 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     UpdateRuntimeVariantPayload,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.types import RuntimeVariantOrderField
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
-from ai.backend.manager.errors.resource import RuntimeVariantNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.runtime_variant.conditions import RuntimeVariantConditions
+from ai.backend.manager.models.runtime_variant.creators import RuntimeVariantCreator
 from ai.backend.manager.models.runtime_variant.orders import RuntimeVariantOrders
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.runtime_variant.searchers import RuntimeVariantSearcher
+from ai.backend.manager.models.runtime_variant.updaters import RuntimeVariantUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.runtime_variant.creators import RuntimeVariantCreatorSpec
-from ai.backend.manager.repositories.runtime_variant.updaters import RuntimeVariantUpdaterSpec
 from ai.backend.manager.services.runtime_variant.actions.create import CreateRuntimeVariantAction
-from ai.backend.manager.services.runtime_variant.actions.delete import DeleteRuntimeVariantAction
-from ai.backend.manager.services.runtime_variant.actions.resolve_by_name import (
-    ResolveRuntimeVariantByNameAction,
+from ai.backend.manager.services.runtime_variant.actions.get import GetRuntimeVariantAction
+from ai.backend.manager.services.runtime_variant.actions.lookup import (
+    LookupRuntimeVariantAction,
 )
+from ai.backend.manager.services.runtime_variant.actions.purge import PurgeRuntimeVariantAction
 from ai.backend.manager.services.runtime_variant.actions.search import SearchRuntimeVariantsAction
 from ai.backend.manager.services.runtime_variant.actions.update import UpdateRuntimeVariantAction
 from ai.backend.manager.types import OptionalState, TriState
@@ -65,12 +63,12 @@ class RuntimeVariantAdapter(BaseAdapter):
     async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[RuntimeVariantNode | None]:
         if not ids:
             return []
-        querier = BatchQuerier(
+        searcher = RuntimeVariantSearcher(
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[RuntimeVariantConditions.by_ids(ids)],
         )
-        result = await self._processors.runtime_variant.search.wait_for_complete(
-            SearchRuntimeVariantsAction(querier=querier)
+        result = await self._processors.runtime_variant.public_search.run(
+            SearchRuntimeVariantsAction(searcher=searcher)
         )
         variant_map = {item.id: self._data_to_node(item) for item in result.items}
         return [variant_map.get(RuntimeVariantID(variant_id)) for variant_id in ids]
@@ -81,7 +79,8 @@ class RuntimeVariantAdapter(BaseAdapter):
     ) -> SearchRuntimeVariantsPayload:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            RuntimeVariantSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_runtime_variant_pagination_spec(),
@@ -92,8 +91,8 @@ class RuntimeVariantAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.runtime_variant.search.wait_for_complete(
-            SearchRuntimeVariantsAction(querier=querier)
+        result = await self._processors.runtime_variant.public_search.run(
+            SearchRuntimeVariantsAction(searcher=searcher)
         )
         return SearchRuntimeVariantsPayload(
             items=[self._data_to_node(d) for d in result.items],
@@ -103,42 +102,32 @@ class RuntimeVariantAdapter(BaseAdapter):
         )
 
     async def get(self, variant_id: UUID) -> RuntimeVariantNode:
-        conditions: list[QueryCondition] = [lambda: RuntimeVariantRow.id == variant_id]
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=[],
-            pagination_spec=_runtime_variant_pagination_spec(),
-            limit=1,
+        result = await self._processors.runtime_variant.public_get.run(
+            GetRuntimeVariantAction(variant_id=RuntimeVariantID(variant_id))
         )
-        result = await self._processors.runtime_variant.search.wait_for_complete(
-            SearchRuntimeVariantsAction(querier=querier)
-        )
-        if not result.items:
-            raise RuntimeVariantNotFound()
-        return self._data_to_node(result.items[0])
+        return self._data_to_node(result.data)
 
     async def create(
         self,
         input: CreateRuntimeVariantInput,
     ) -> CreateRuntimeVariantPayload:
-        creator = Creator(
-            spec=RuntimeVariantCreatorSpec(
-                name=input.name,
-                description=input.description,
-            )
+        creator = RuntimeVariantCreator(
+            name=input.name,
+            description=input.description,
         )
-        result = await self._processors.runtime_variant.create.wait_for_complete(
+        result = await self._processors.runtime_variant.global_create.run(
             CreateRuntimeVariantAction(creator=creator)
         )
         return CreateRuntimeVariantPayload(
-            runtime_variant=self._data_to_node(result.runtime_variant),
+            runtime_variant=self._data_to_node(result.data),
         )
 
     async def update(
         self,
         input: UpdateRuntimeVariantInput,
     ) -> UpdateRuntimeVariantPayload:
-        spec = RuntimeVariantUpdaterSpec(
+        updater = RuntimeVariantUpdater(
+            variant_id=RuntimeVariantID(input.id),
             name=OptionalState.update(input.name)
             if input.name is not None
             else OptionalState.nop(),
@@ -150,25 +139,24 @@ class RuntimeVariantAdapter(BaseAdapter):
                 else TriState.update(input.description)
             ),
         )
-        updater: Updater[RuntimeVariantRow] = Updater(spec=spec, pk_value=input.id)
-        result = await self._processors.runtime_variant.update.wait_for_complete(
-            UpdateRuntimeVariantAction(id=input.id, updater=updater)
+        result = await self._processors.runtime_variant.update.run(
+            UpdateRuntimeVariantAction(updater=updater)
         )
         return UpdateRuntimeVariantPayload(
-            runtime_variant=self._data_to_node(result.runtime_variant),
+            runtime_variant=self._data_to_node(result.data),
         )
 
     async def delete(self, variant_id: UUID) -> DeleteRuntimeVariantPayload:
-        result = await self._processors.runtime_variant.delete.wait_for_complete(
-            DeleteRuntimeVariantAction(id=variant_id)
+        result = await self._processors.runtime_variant.purge.run(
+            PurgeRuntimeVariantAction(id=RuntimeVariantID(variant_id))
         )
-        return DeleteRuntimeVariantPayload(id=result.runtime_variant.id)
+        return DeleteRuntimeVariantPayload(id=result.data.id)
 
     async def bulk_delete(self, input: DeleteRuntimeVariantsInput) -> DeleteRuntimeVariantsPayload:
         """Delete multiple runtime variants by ID."""
         for variant_id in input.ids:
-            await self._processors.runtime_variant.delete.wait_for_complete(
-                DeleteRuntimeVariantAction(id=variant_id)
+            await self._processors.runtime_variant.purge.run(
+                PurgeRuntimeVariantAction(id=RuntimeVariantID(variant_id))
             )
         return DeleteRuntimeVariantsPayload(deleted_count=len(input.ids))
 
@@ -180,10 +168,10 @@ class RuntimeVariantAdapter(BaseAdapter):
         not form part of the v2 surface — v2 clients pass the id
         directly.
         """
-        result = await self._processors.runtime_variant.resolve_by_name.wait_for_complete(
-            ResolveRuntimeVariantByNameAction(name=name)
+        result = await self._processors.runtime_variant.public_lookup.run(
+            LookupRuntimeVariantAction(name=name)
         )
-        return result.runtime_variant_id
+        return result.entity_id()
 
     def _convert_filter(self, filter_: RuntimeVariantFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

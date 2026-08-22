@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -38,13 +38,13 @@ from ai.backend.manager.errors.kernel import (
     TooManySessionsMatched,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import groups
+from ai.backend.manager.models.resource_group import resource_groups
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
-from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (
     DEAD_SESSION_STATUSES,
     TERMINAL_SESSION_STATUSES,
@@ -345,15 +345,15 @@ class SessionDBSource:
             )
             return await conn.scalar(query)
 
-    async def get_scaling_group_wsproxy_addr(
+    async def get_resource_group_wsproxy_addr(
         self,
-        scaling_group_name: str,
+        resource_group_name: str,
     ) -> str | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(scaling_groups.c.wsproxy_addr)
-                .select_from(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.select(resource_groups.c.wsproxy_addr)
+                .select_from(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
             )
             result = await conn.execute(query)
             sgroup = result.first()
@@ -373,7 +373,7 @@ class SessionDBSource:
             )
             return cast(SessionRow | None, await db_session.scalar(stmt))
 
-    async def modify_session(
+    async def update_session(
         self,
         updater: Updater[SessionRow],
         session_name: str | None = None,

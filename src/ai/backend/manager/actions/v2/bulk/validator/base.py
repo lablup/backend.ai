@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
-from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 
 __all__ = ("BulkActionValidator",)
 
@@ -14,5 +13,5 @@ class BulkActionValidator(ABC):
     """
 
     @abstractmethod
-    async def validate(self, action: BaseBulkAction, meta: BaseActionTriggerMeta) -> None:
+    async def validate(self, meta: BulkActionTriggerMeta) -> None:
         raise NotImplementedError("Subclasses must implement the validate method")

@@ -1,0 +1,130 @@
+name: Import etty binary
+
+on:
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: "Release tag to download (e.g., v1.0.4). Leave empty for latest."
+                required: false
+                type: string
+    repository_dispatch:
+        types: [etty-release]
+
+permissions:
+    contents: write
+
+jobs:
+    import-binary:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v6
+
+            - name: Get release tag
+              id: get-tag
+              env:
+                  GH_TOKEN: ${{ secrets.OCTODOG }}
+                  EVENT_NAME: ${{ github.event_name }}
+                  DISPATCH_TAG: ${{ github.event.client_payload.tag }}
+                  INPUT_TAG: ${{ github.event.inputs.tag }}
+              run: |
+                  if [ "$EVENT_NAME" = "repository_dispatch" ]; then
+                    TAG="$DISPATCH_TAG"
+                  elif [ -n "$INPUT_TAG" ]; then
+                    TAG="$INPUT_TAG"
+                  else
+                    # Get latest release tag (etty is private → use OCTODOG PAT)
+                    TAG=$(curl -s -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/lablup/etty/releases/latest | jq -r .tag_name)
+                  fi
+                  # Validate tag format (semver with optional prerelease) — reject anything that could inject shell syntax
+                  if ! echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$'; then
+                    echo "Invalid tag format: $TAG"; exit 1
+                  fi
+                  echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+                  echo "Using tag: $TAG"
+
+            - name: Download etty binaries
+              env:
+                  GH_TOKEN: ${{ secrets.OCTODOG }}
+              run: |
+                  TAG="${{ steps.get-tag.outputs.tag }}"
+                  for ARCH in aarch64 x86_64; do
+                    URL="https://github.com/lablup/etty/releases/download/${TAG}/etty-linux-${ARCH}-musl.tar.gz"
+                    echo "Downloading from: $URL"
+                    # etty is private — need PAT for asset download too
+                    curl -fL -H "Authorization: Bearer $GH_TOKEN" -o etty.tar.gz "$URL"
+                    tar -xzf etty.tar.gz
+                    if [ -f "etty" ]; then
+                      mv etty "etty.${ARCH}.bin"
+                      chmod +x "etty.${ARCH}.bin"
+                      echo "Binary extracted and renamed to etty.${ARCH}.bin"
+                    else
+                      echo "Error: etty binary not found in the archive for $ARCH"
+                      exit 1
+                    fi
+                    rm -f etty.tar.gz
+                  done
+
+            - name: Move binaries to target location
+              run: |
+                  TARGET_DIR="src/ai/backend/runner"
+                  mkdir -p "${TARGET_DIR}"
+                  # Move executable binaries
+                  for ARCH in aarch64 x86_64; do
+                    mv "etty.${ARCH}.bin" "${TARGET_DIR}/"
+                    echo "Binary moved to ${TARGET_DIR}/etty.${ARCH}.bin"
+                    ls -la "${TARGET_DIR}/etty.${ARCH}.bin"
+                  done
+                  # Move manpages (if present in the archive)
+                  if [ -f "etty.1" ]; then
+                    mv etty.1 "${TARGET_DIR}/"
+                  fi
+
+            - name: Add news fragment
+              run: |
+                  echo "Update etty binaries to ${{ steps.get-tag.outputs.tag }}" > changes/.deps.md
+
+            - name: Create pull request
+              uses: peter-evans/create-pull-request@v7
+              with:
+                  token: ${{ secrets.OCTODOG }}
+                  commit-message: "chore: Update etty binaries to ${{ steps.get-tag.outputs.tag }}"
+                  title: "deps: Update etty binaries to ${{ steps.get-tag.outputs.tag }}"
+                  author: "Lablup Octodog <mu001@lablup.com>"
+                  body: |
+                      This PR updates the etty binaries (musl variant) for both aarch64 and x86_64 architectures to version ${{ steps.get-tag.outputs.tag }}.
+
+                      Source: https://github.com/lablup/etty/releases/tag/${{ steps.get-tag.outputs.tag }}
+
+                      This update was triggered by:
+                      - Event: ${{ github.event_name }}
+                      ${{ github.event_name == 'repository_dispatch' && '- Automated trigger from etty repository release' || '- Manual workflow dispatch' }}
+                  branch: deps/update-etty-${{ steps.get-tag.outputs.tag }}
+                  delete-branch: true
+
+    setup-webhook:
+        if: github.event_name == 'workflow_dispatch'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Instructions for automated trigger
+              run: |
+                  echo "To enable automated triggers when etty releases occur:"
+                  echo ""
+                  echo "1. Go to https://github.com/lablup/etty/settings/hooks"
+                  echo "2. Add a new webhook with:"
+                  echo "   - Payload URL: https://api.github.com/repos/${{ github.repository }}/dispatches"
+                  echo "   - Content type: application/json"
+                  echo "   - Secret: (generate a secure secret)"
+                  echo "   - Events: Select 'Releases'"
+                  echo ""
+                  echo "3. Configure the webhook payload:"
+                  echo '   {'
+                  echo '     "event_type": "etty-release",'
+                  echo '     "client_payload": {'
+                  echo '       "tag": "{{ .Release.TagName }}"'
+                  echo '     }'
+                  echo '   }'
+                  echo ""
+                  echo "4. Add a GitHub Personal Access Token with 'repo' scope as a secret"
+                  echo "   in the webhook Authorization header:"
+                  echo "   Authorization: token YOUR_GITHUB_TOKEN"

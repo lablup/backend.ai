@@ -10,10 +10,10 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica import ReplicaID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -42,7 +42,7 @@ def mock_deployment_repo() -> AsyncMock:
     repo.update_route_sessions = AsyncMock(return_value=None)
     repo.fetch_session_statuses_by_route_ids = AsyncMock(return_value={})
     repo.fetch_route_service_discovery_info = AsyncMock(return_value=[])
-    repo.get_scaling_group_cleanup_configs = AsyncMock(return_value={})
+    repo.get_resource_group_cleanup_configs = AsyncMock(return_value={})
     repo.fetch_deployment_context = AsyncMock(return_value=MagicMock())
     return repo
 

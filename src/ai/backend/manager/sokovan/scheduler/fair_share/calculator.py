@@ -23,6 +23,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, TypedDict
 from uuid import UUID
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 
 if TYPE_CHECKING:
@@ -164,10 +165,10 @@ class FairShareFactorCalculator:
             weight = default_weight
             domain_name = ""
             if project_id in fair_shares.project:
-                spec_weight = fair_shares.project[project_id].data.spec.weight
+                spec_weight = fair_shares.project[ProjectID(project_id)].data.spec.weight
                 if spec_weight is not None:
                     weight = spec_weight
-                domain_name = fair_shares.project[project_id].domain_name
+                domain_name = fair_shares.project[ProjectID(project_id)].domain_name
             if not domain_name:
                 domain_name = context.project_domain_names.get(project_id, "")
 
@@ -175,7 +176,7 @@ class FairShareFactorCalculator:
                 usage=usage,
                 weight=weight,
                 resource_weights=self._get_resource_weights(
-                    fair_shares.project.get(project_id), default_resource_weights
+                    fair_shares.project.get(ProjectID(project_id)), default_resource_weights
                 ),
                 cluster_capacity=cluster_capacity,
                 lookback_days=lookback_days,

@@ -5,12 +5,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user import UserRole
 
-from .base import TemplateAction
+from .base import TemplateProjectScopeAction, TemplateScopeActionResult
 
 
 @dataclass
@@ -32,11 +30,10 @@ class CreatedTaskTemplateItem:
 
 
 @dataclass
-class CreateTaskTemplateAction(TemplateAction):
+class CreateTaskTemplateAction(TemplateProjectScopeAction):
     """Action to create one or more task templates."""
 
     domain_name: str
-    requesting_project: ProjectID
     requester_uuid: uuid.UUID
     requester_access_key: str
     requester_role: UserRole
@@ -46,20 +43,17 @@ class CreateTaskTemplateAction(TemplateAction):
 
     @override
     @classmethod
+    def action_name(cls) -> str:
+        return "create_task_template"
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
 
 @dataclass
-class CreateTaskTemplateActionResult(BaseActionResult):
+class CreateTaskTemplateActionResult(TemplateScopeActionResult):
     """Result of creating task templates."""
 
     created: list[CreatedTaskTemplateItem] = field(default_factory=list)
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

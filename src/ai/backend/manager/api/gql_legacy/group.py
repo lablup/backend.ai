@@ -17,24 +17,26 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.exception import (
     GroupNotFound,
     InvalidAPIParameters,
 )
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
-from ai.backend.manager.models.group import (
-    GroupRow,
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.project import (
+    ProjectRow,
     ProjectType,
     get_permission_ctx,
     groups,
 )
-from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
-from ai.backend.manager.models.minilang.ordering import QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.project.creators import ProjectCreator
+from ai.backend.manager.models.project.updaters import ProjectSoftDeleteUpdater, ProjectUpdater
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.user import UserRole
@@ -42,19 +44,15 @@ from ai.backend.manager.models.virtual_scope.queries import (
     user_scope_membership_exists,
     user_scope_membership_query,
 )
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
-from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
-from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
-from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
-from ai.backend.manager.services.group.actions.delete_group import (
-    DeleteGroupAction,
+from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
+from ai.backend.manager.services.project.actions.delete_project import (
+    DeleteProjectAction,
 )
-from ai.backend.manager.services.group.actions.modify_group import ModifyGroupAction
-from ai.backend.manager.services.group.actions.purge_group import (
-    PurgeGroupAction,
+from ai.backend.manager.services.project.actions.purge_project import (
+    PurgeProjectAction,
 )
+from ai.backend.manager.services.project.actions.update_project import UpdateProjectAction
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import (
@@ -147,7 +145,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     def from_row(
         cls,
         graph_ctx: GraphQueryContext,
-        row: GroupRow,
+        row: ProjectRow,
     ) -> Self:
         return cls(
             id=row.id,
@@ -242,7 +240,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
         _, group_id = AsyncNode.resolve_global_id(info, id)
-        query = sa.select(GroupRow).where(GroupRow.id == group_id)
+        query = sa.select(ProjectRow).where(ProjectRow.id == group_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_row = (await db_session.scalars(query)).first()
             if group_row is None:
@@ -284,8 +282,8 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             page_size,
         ) = generate_sql_info_for_gql_connection(
             info,
-            GroupRow,
-            GroupRow.id,
+            ProjectRow,
+            ProjectRow.id,
             _filter_arg,
             _order_expr,
             offset,
@@ -386,7 +384,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         )
 
     @classmethod
-    def from_dto(cls, dto: GroupData | None) -> Self | None:
+    def from_dto(cls, dto: ProjectData | None) -> Self | None:
         if dto is None:
             return None
         return cls(
@@ -401,7 +399,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             if dto.total_resource_slots
             else {},
             allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
-            integration_id=dto.integration_name,  # GroupData uses integration_name
+            integration_id=dto.integration_name,  # ProjectData uses integration_name
             resource_policy=dto.resource_policy,
             type=dto.type.name,
             container_registry=dto.container_registry,
@@ -555,7 +553,7 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
         required=False, default_value={}, description="Added in 24.03.0"
     )
 
-    def to_action(self, name: str, domain_id: DomainID) -> CreateGroupAction:
+    def to_action(self, name: str, domain_id: DomainID) -> CreateProjectAction:
         def value_or_none(value: Any) -> Any:
             return value if value is not Undefined else None
 
@@ -576,23 +574,21 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
         resource_policy_val = value_or_none(self.resource_policy)
         container_registry_val = value_or_none(self.container_registry)
 
-        return CreateGroupAction(
-            creator=Creator(
-                spec=GroupCreatorSpec(
-                    name=name,
-                    domain_name=self.domain_name,
-                    type=type_val,
-                    description=description_val,
-                    is_active=is_active_val,
-                    total_resource_slots=total_resource_slots_val,
-                    allowed_vfolder_hosts=allowed_vfolder_hosts_val,
-                    integration_name=integration_id_val,
-                    resource_policy=resource_policy_val,
-                    container_registry=container_registry_val,
-                )
+        return CreateProjectAction(
+            domain_id=domain_id,
+            creator=ProjectCreator(
+                name=name,
+                domain_id=domain_id,
+                domain_name=self.domain_name,
+                type=type_val,
+                description=description_val,
+                is_active=is_active_val,
+                total_resource_slots=total_resource_slots_val,
+                allowed_vfolder_hosts=allowed_vfolder_hosts_val,
+                integration_name=integration_id_val,
+                resource_policy=resource_policy_val,
+                container_registry=container_registry_val,
             ),
-            _domain_name=self.domain_name,
-            _domain_id=domain_id,
         )
 
 
@@ -611,8 +607,9 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
         required=False, default_value={}, description="Added in 24.03.0"
     )
 
-    def to_action(self, group_id: uuid.UUID) -> ModifyGroupAction:
-        spec = GroupUpdaterSpec(
+    def to_action(self, group_id: uuid.UUID) -> UpdateProjectAction:
+        updater = ProjectUpdater(
+            project_id=ProjectID(group_id),
             name=OptionalState[str].from_graphql(
                 self.name,
             ),
@@ -643,8 +640,8 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
                 self.container_registry,
             ),
         )
-        return ModifyGroupAction(
-            updater=Updater[GroupRow](spec=spec, pk_value=group_id),
+        return UpdateProjectAction(
+            updater=updater,
             user_update_mode=OptionalState[str].from_graphql(
                 self.user_update_mode,
             ),
@@ -683,13 +680,13 @@ class CreateGroup(graphene.Mutation):  # type: ignore[misc]
                 "Group name cannot be empty or whitespace and must not exceed 64 characters."
             )
 
-        domain_data = (
-            await graph_ctx.processors.domain.get_domain.wait_for_complete(
-                GetDomainAction(domain_name=props.domain_name)
+        domain_id = (
+            await graph_ctx.processors.domain.lookup.run(
+                LookupDomainAction(name=DomainName(props.domain_name))
             )
-        ).data
-        action = props.to_action(name, domain_data.id)
-        res = await graph_ctx.processors.group.create_group.wait_for_complete(action)
+        ).entity_id()
+        action = props.to_action(name, domain_id)
+        res = await graph_ctx.processors.project.create_project.run(action)
         return cls(
             ok=True,
             msg="success",
@@ -723,7 +720,7 @@ class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
         graph_ctx: GraphQueryContext = info.context
 
         action = props.to_action(gid)
-        res = await graph_ctx.processors.group.modify_group.wait_for_complete(action)
+        res = await graph_ctx.processors.project.update_project.run(action)
         return cls(
             ok=True,
             msg="success",
@@ -751,7 +748,10 @@ class DeleteGroup(graphene.Mutation):  # type: ignore[misc]
     )
     async def mutate(cls, root: Any, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteGroup:
         ctx: GraphQueryContext = info.context
-        await ctx.processors.group.delete_group.wait_for_complete(DeleteGroupAction(gid))
+        project_id = ProjectID(gid)
+        await ctx.processors.project.delete_project.run(
+            DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=project_id))
+        )
         return cls(ok=True, msg="success")
 
 
@@ -780,5 +780,7 @@ class PurgeGroup(graphene.Mutation):  # type: ignore[misc]
     async def mutate(cls, root: Any, info: graphene.ResolveInfo, gid: uuid.UUID) -> PurgeGroup:
         graph_ctx: GraphQueryContext = info.context
 
-        await graph_ctx.processors.group.purge_group.wait_for_complete(PurgeGroupAction(gid))
+        await graph_ctx.processors.project.purge_project.run(
+            PurgeProjectAction(project_id=ProjectID(gid))
+        )
         return cls(ok=True, msg="success")

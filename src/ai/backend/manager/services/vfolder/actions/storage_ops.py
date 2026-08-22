@@ -1,19 +1,26 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user import UserRole
 
-from .base import VFolderAction
+from .base import (
+    VFolderAction,
+    VFolderGlobalAction,
+    VFolderScopeAction,
+    VFolderScopeActionResult,
+)
 
 
 @dataclass
-class ListAllowedTypesAction(VFolderAction):
+class GlobalListAllowedTypesAction(VFolderGlobalAction):
     """Query allowed vfolder types from etcd config."""
 
     @override
@@ -22,21 +29,18 @@ class ListAllowedTypesAction(VFolderAction):
         return ActionOperationType.SEARCH
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_list_allowed_types"
 
 
 @dataclass
-class ListAllowedTypesActionResult(BaseActionResult):
+class GlobalListAllowedTypesActionResult:
     allowed_types: list[str]
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
 
 @dataclass
-class ListAllHostsAction(VFolderAction):
+class GlobalListAllHostsAction(VFolderGlobalAction):
     """List all storage hosts/volumes with default host info."""
 
     @override
@@ -45,22 +49,19 @@ class ListAllHostsAction(VFolderAction):
         return ActionOperationType.SEARCH
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_list_all_hosts"
 
 
 @dataclass
-class ListAllHostsActionResult(BaseActionResult):
+class GlobalListAllHostsActionResult:
     default: str | None
     allowed: list[str]
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
 
 @dataclass
-class GetVolumePerfMetricAction(VFolderAction):
+class GlobalGetVolumePerfMetricAction(VFolderGlobalAction):
     """Get performance metrics for a specific storage volume."""
 
     folder_host: str
@@ -71,17 +72,14 @@ class GetVolumePerfMetricAction(VFolderAction):
         return ActionOperationType.GET
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_get_volume_perf_metric"
 
 
 @dataclass
-class GetVolumePerfMetricActionResult(BaseActionResult):
+class GlobalGetVolumePerfMetricActionResult:
     data: dict[str, Any]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
 
 @dataclass
@@ -95,7 +93,8 @@ class GetVFolderUsageLegacyAction(VFolderAction):
     """
 
     folder_host: str
-    vfolder_id: str
+    # The quota-scope-qualified path key the storage proxy addresses.
+    vfid: str
     unmanaged_path: str | None
 
     @override
@@ -104,17 +103,14 @@ class GetVFolderUsageLegacyAction(VFolderAction):
         return ActionOperationType.GET
 
     @override
-    def entity_id(self) -> str | None:
-        return self.vfolder_id
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_vfolder_usage_legacy"
 
 
 @dataclass
-class GetVFolderUsageLegacyActionResult(BaseActionResult):
+class GetVFolderUsageLegacyActionResult:
     data: dict[str, Any]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
 
 @dataclass
@@ -122,7 +118,8 @@ class GetVFolderUsedBytesAction(VFolderAction):
     """Get used bytes for a specific vfolder from storage proxy."""
 
     folder_host: str
-    vfolder_id: str
+    # The quota-scope-qualified path key the storage proxy addresses.
+    vfid: str
     unmanaged_path: str | None
 
     @override
@@ -131,21 +128,18 @@ class GetVFolderUsedBytesAction(VFolderAction):
         return ActionOperationType.GET
 
     @override
-    def entity_id(self) -> str | None:
-        return self.vfolder_id
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_vfolder_used_bytes"
 
 
 @dataclass
-class GetVFolderUsedBytesActionResult(BaseActionResult):
+class GetVFolderUsedBytesActionResult:
     data: dict[str, Any]
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
 
 @dataclass
-class ListHostsAction(VFolderAction):
+class SearchHostsAction(VFolderScopeAction):
     """List allowed storage hosts with permission filtering and volume info."""
 
     user_uuid: uuid.UUID
@@ -154,24 +148,28 @@ class ListHostsAction(VFolderAction):
     resource_policy: Mapping[str, Any]
 
     @override
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        """A project folder is bounded by the project, a user folder by its owner."""
+        if self.group_id is not None:
+            return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.group_id),)
+        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_uuid),)
+
+    @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_hosts"
 
 
 @dataclass
-class ListHostsActionResult(BaseActionResult):
+class SearchHostsActionResult(VFolderScopeActionResult):
     default: str | None
     allowed: list[str]
     volume_info: dict[str, Any]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
 
 @dataclass
@@ -179,8 +177,8 @@ class GetQuotaAction(VFolderAction):
     """Get quota for a specific vfolder from storage proxy."""
 
     folder_host: str
+    # The quota-scope-qualified path key the storage proxy addresses.
     vfid: str
-    vfolder_id: uuid.UUID
     unmanaged_path: str | None
     user_role: UserRole
     user_uuid: uuid.UUID
@@ -192,17 +190,14 @@ class GetQuotaAction(VFolderAction):
         return ActionOperationType.GET
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_vfolder_quota"
 
 
 @dataclass
-class GetQuotaActionResult(BaseActionResult):
+class GetQuotaActionResult:
     data: dict[str, Any]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
 
 @dataclass
@@ -210,8 +205,8 @@ class UpdateQuotaAction(VFolderAction):
     """Update quota for a specific vfolder."""
 
     folder_host: str
+    # The quota-scope-qualified path key the storage proxy addresses.
     vfid: str
-    vfolder_id: uuid.UUID
     unmanaged_path: str | None
     user_role: UserRole
     user_uuid: uuid.UUID
@@ -225,24 +220,20 @@ class UpdateQuotaAction(VFolderAction):
         return ActionOperationType.UPDATE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_vfolder_quota"
 
 
 @dataclass
-class UpdateQuotaActionResult(BaseActionResult):
+class UpdateQuotaActionResult:
     size_bytes: int
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
 
 @dataclass
 class ChangeVFolderOwnershipAction(VFolderAction):
     """Change ownership of a user vfolder to another user."""
 
-    vfolder_id: uuid.UUID
     user_email: str
 
     @override
@@ -251,15 +242,14 @@ class ChangeVFolderOwnershipAction(VFolderAction):
         return ActionOperationType.UPDATE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "change_vfolder_ownership"
 
 
 @dataclass
-class ChangeVFolderOwnershipActionResult(BaseActionResult):
-    @override
-    def entity_id(self) -> str | None:
-        return None
+class ChangeVFolderOwnershipActionResult:
+    pass
 
 
 # ------------------------------------------------------------------
@@ -277,7 +267,7 @@ class MountResultData:
 
 
 @dataclass
-class ListMountsAction(VFolderAction):
+class GlobalListMountsAction(VFolderGlobalAction):
     """List mount points from manager, storage proxy, and agents."""
 
     @override
@@ -286,30 +276,27 @@ class ListMountsAction(VFolderAction):
         return ActionOperationType.SEARCH
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_list_mounts"
 
 
 @dataclass
-class ListMountsActionResult(BaseActionResult):
+class GlobalListMountsActionResult:
     manager: MountResultData
     storage_proxy: MountResultData
     agents: dict[str, MountResultData] = field(default_factory=dict)
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
 
 @dataclass
-class MountHostAction(VFolderAction):
+class GlobalMountHostAction(VFolderGlobalAction):
     """Mount a filesystem on agents via agent watchers."""
 
     name: str
     fs_location: str
     fs_type: str | None = None
     options: str | None = None
-    scaling_group: str | None = None
+    resource_group: str | None = None
     fstab_path: str | None = None
     edit_fstab: bool = False
 
@@ -319,26 +306,23 @@ class MountHostAction(VFolderAction):
         return ActionOperationType.UPDATE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_mount_host"
 
 
 @dataclass
-class MountHostActionResult(BaseActionResult):
+class GlobalMountHostActionResult:
     manager: MountResultData
     agents: dict[str, MountResultData] = field(default_factory=dict)
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
 
 @dataclass
-class UmountHostAction(VFolderAction):
+class GlobalUmountHostAction(VFolderGlobalAction):
     """Unmount a filesystem from agents via agent watchers."""
 
     name: str
-    scaling_group: str | None = None
+    resource_group: str | None = None
     fstab_path: str | None = None
     edit_fstab: bool = False
 
@@ -348,22 +332,19 @@ class UmountHostAction(VFolderAction):
         return ActionOperationType.UPDATE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_umount_host"
 
 
 @dataclass
-class UmountHostActionResult(BaseActionResult):
+class GlobalUmountHostActionResult:
     manager: MountResultData
     agents: dict[str, MountResultData] = field(default_factory=dict)
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
 
 @dataclass
-class GetFstabContentsAction(VFolderAction):
+class GlobalGetFstabContentsAction(VFolderGlobalAction):
     """Get fstab contents from an agent watcher or return a manager stub."""
 
     agent_id: str | None
@@ -375,16 +356,13 @@ class GetFstabContentsAction(VFolderAction):
         return ActionOperationType.GET
 
     @override
-    def entity_id(self) -> str | None:
-        return self.agent_id
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_get_fstab_contents"
 
 
 @dataclass
-class GetFstabContentsActionResult(BaseActionResult):
+class GlobalGetFstabContentsActionResult:
     content: str
     node: str
     node_id: str
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

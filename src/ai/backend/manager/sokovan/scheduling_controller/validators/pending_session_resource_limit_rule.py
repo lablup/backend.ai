@@ -12,7 +12,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import override
 
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.kernel import QuotaExceeded
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import (

@@ -35,9 +35,9 @@ from ai.backend.manager.errors.image import (
     AliasImageActionValueError,
     ImageAliasNotFound,
     ImageNotFound,
-    ModifyImageActionValueError,
     PurgeImageActionByIdObjectDBError,
     RegistryNotFoundForImage,
+    UpdateImageActionValueError,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import (
@@ -332,7 +332,7 @@ class ImageDBSource:
                     raise ImageNotFound(f"Image not found (id:{updater.pk_value})")
                 return result.row.to_dataclass()
         except (ValueError, DBAPIError) as e:
-            raise ModifyImageActionValueError from e
+            raise UpdateImageActionValueError from e
 
     async def clear_image_resource_limits(
         self, image_canonical: str, architecture: str

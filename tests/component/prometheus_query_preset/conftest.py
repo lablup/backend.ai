@@ -6,7 +6,7 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -16,7 +16,11 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.common.data.entity.prometheus_query_preset import (
+    PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
+)
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
     PrometheusQueryPresetAdapter,
 )
@@ -29,12 +33,15 @@ from ai.backend.manager.api.rest.v2.prometheus_query_preset.registry import (
     register_v2_prometheus_query_preset_routes,
 )
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
 from ai.backend.manager.models.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
 )
@@ -75,17 +82,18 @@ def prometheus_client_mock() -> MagicMock:
 def prometheus_query_preset_processors(
     database_engine: ExtendedAsyncSAEngine,
     prometheus_client_mock: MagicMock,
+    processor_registry: ProcessorRegistry[Any],
 ) -> PrometheusQueryPresetProcessors:
     repo = PrometheusQueryPresetRepository(database_engine, prometheus_client_mock)
     service = PrometheusQueryPresetService(
         repository=repo,
         prometheus_client=prometheus_client_mock,
         default_timewindow="5m",
+        template_renderer=PromQLTemplateRenderer(),
+        ops_repository=OpsRepository(V2DBOpsProvider(database_engine)),
     )
     return PrometheusQueryPresetProcessors(
-        service=service,
-        action_monitors=[],
-        validators=MagicMock(spec=ActionValidators),
+        processor_registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)), service
     )
 
 
@@ -113,6 +121,25 @@ async def admin_v2_registry(
         HMACAuth(
             access_key=admin_user_fixture.keypair.access_key,
             secret_key=admin_user_fixture.keypair.secret_key,
+        ),
+    )
+    try:
+        yield registry
+    finally:
+        await registry.close()
+
+
+@pytest.fixture()
+async def user_v2_registry(
+    server: ServerInfo,
+    regular_user_fixture: UserFixtureData,
+) -> AsyncIterator[V2ClientRegistry]:
+    """V2 client registry authenticated as a regular (non-admin) user."""
+    registry = await V2ClientRegistry.create(
+        ClientConfig(endpoint=yarl.URL(server.url)),
+        HMACAuth(
+            access_key=regular_user_fixture.keypair.access_key,
+            secret_key=regular_user_fixture.keypair.secret_key,
         ),
     )
     try:

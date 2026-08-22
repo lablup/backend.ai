@@ -4,24 +4,13 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.services.vfolder.actions.base import (
-    VFolderSingleEntityAction,
-    VFolderSingleEntityActionResult,
-)
+from ai.backend.manager.services.vfolder.actions.base import VFolderAction
 
 
 @dataclass
-class DeleteVFolderV2Action(VFolderSingleEntityAction):
+class DeleteVFolderV2Action(VFolderAction):
     """Soft-delete a vfolder by ID with RBAC enforcement."""
-
-    vfolder_id: uuid.UUID
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_id)
 
     @override
     @classmethod
@@ -29,32 +18,18 @@ class DeleteVFolderV2Action(VFolderSingleEntityAction):
         return ActionOperationType.DELETE
 
     @override
-    def target_entity_id(self) -> str:
-        return str(self.vfolder_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.VFOLDER,
-            element_id=str(self.vfolder_id),
-        )
+    @classmethod
+    def action_name(cls) -> str:
+        return "delete_vfolder_v2"
 
 
 @dataclass
-class DeleteVFolderV2ActionResult(VFolderSingleEntityActionResult):
+class DeleteVFolderV2ActionResult:
     vfolder_id: uuid.UUID
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_id)
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.vfolder_id)
-
 
 @dataclass
-class PurgeVFolderV2Action(VFolderSingleEntityAction):
+class PurgeVFolderV2Action(VFolderAction):
     """Permanently purge a vfolder by ID with RBAC enforcement.
 
     By default the call is rejected when any model card references the
@@ -66,13 +41,8 @@ class PurgeVFolderV2Action(VFolderSingleEntityAction):
     a purgable status. Set ``force=True`` to bypass those in-use guards.
     """
 
-    vfolder_id: uuid.UUID
     cascade_model_card: bool = False
     force: bool = False
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_id)
 
     @override
     @classmethod
@@ -80,25 +50,11 @@ class PurgeVFolderV2Action(VFolderSingleEntityAction):
         return ActionOperationType.PURGE
 
     @override
-    def target_entity_id(self) -> str:
-        return str(self.vfolder_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.VFOLDER,
-            element_id=str(self.vfolder_id),
-        )
+    @classmethod
+    def action_name(cls) -> str:
+        return "purge_vfolder_v2"
 
 
 @dataclass
-class PurgeVFolderV2ActionResult(VFolderSingleEntityActionResult):
+class PurgeVFolderV2ActionResult:
     vfolder_id: uuid.UUID
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_id)
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.vfolder_id)

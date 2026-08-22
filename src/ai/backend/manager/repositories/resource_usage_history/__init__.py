@@ -1,5 +1,21 @@
 """Resource Usage History repository package."""
 
+from ai.backend.manager.data.resource_usage_history.types import (
+    DomainUsageBucketData,
+    KernelUsageRecordData,
+    ProjectUsageBucketData,
+    UserUsageBucketData,
+)
+from ai.backend.manager.repositories.resource_usage_history.types import (
+    DomainUsageBucketOperationScope,
+    DomainUsageBucketSearchResult,
+    KernelUsageRecordSearchResult,
+    ProjectUsageBucketOperationScope,
+    ProjectUsageBucketSearchResult,
+    UserUsageBucketOperationScope,
+    UserUsageBucketSearchResult,
+)
+
 from .creators import (
     DomainUsageBucketCreatorSpec,
     KernelUsageRecordCreatorSpec,
@@ -18,19 +34,6 @@ from .options import (
 )
 from .repositories import ResourceUsageHistoryRepositories
 from .repository import ResourceUsageHistoryRepository
-from .types import (
-    DomainUsageBucketData,
-    DomainUsageBucketOperationScope,
-    DomainUsageBucketSearchResult,
-    KernelUsageRecordData,
-    KernelUsageRecordSearchResult,
-    ProjectUsageBucketData,
-    ProjectUsageBucketOperationScope,
-    ProjectUsageBucketSearchResult,
-    UserUsageBucketData,
-    UserUsageBucketOperationScope,
-    UserUsageBucketSearchResult,
-)
 from .upserters import (
     DomainUsageBucketUpserterSpec,
     ProjectUsageBucketUpserterSpec,

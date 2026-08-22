@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.repositories.base.updater import UpdaterSpec

@@ -19,9 +19,9 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -49,16 +49,23 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import (
+    ResourceGroupOpts,
+    ResourceGroupRow,
+    sgroups_for_domains,
+    sgroups_for_groups,
+    sgroups_for_keypairs,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -72,13 +79,6 @@ from ai.backend.manager.models.resource_slot import (
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupOpts,
-    ScalingGroupRow,
-    sgroups_for_domains,
-    sgroups_for_groups,
-    sgroups_for_keypairs,
-)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -122,7 +122,7 @@ class TestCheckPresetsOccupiedSlots:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -130,7 +130,7 @@ class TestCheckPresetsOccupiedSlots:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -213,12 +213,12 @@ class TestCheckPresetsOccupiedSlots:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sg = ScalingGroupRow(
+            sg = ResourceGroupRow(
                 id=test_scaling_group_id,
                 name=sg_name,
                 driver="test-driver",
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(
+                scheduler_opts=ResourceGroupOpts(
                     allowed_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
                     pending_timeout=timedelta(seconds=300),
                     agent_selection_strategy=AgentSelectionStrategy.ROUNDROBIN,
@@ -306,7 +306,7 @@ class TestCheckPresetsOccupiedSlots:
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{group_id.hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -346,7 +346,7 @@ class TestCheckPresetsOccupiedSlots:
         """Get group name from group ID"""
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             group_result = await db_sess.execute(
-                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
+                sa.select(ProjectRow.name).where(ProjectRow.id == test_group_id)
             )
             group_name = group_result.scalar_one()
 
@@ -404,15 +404,9 @@ class TestCheckPresetsOccupiedSlots:
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Get user email for user_id field
-            user_result = await db_sess.execute(
-                sa.select(UserRow.email).where(UserRow.uuid == test_user_uuid)
-            )
-            user_email = user_result.scalar_one()
-
             keypair = KeyPairRow(
                 access_key=access_key,
                 secret_key="test-secret",
-                user_id=user_email,  # user_id is email (string)
                 user=test_user_uuid,  # user is UUID (required NOT NULL)
                 is_active=True,
                 resource_policy=test_resource_policy_name,
@@ -429,7 +423,7 @@ class TestCheckPresetsOccupiedSlots:
     async def _create_agent(
         self,
         db: ExtendedAsyncSAEngine,
-        scaling_group_name: str,
+        resource_group_name: str,
         addr: str,
         *,
         status: AgentStatus = AgentStatus.ALIVE,
@@ -449,14 +443,14 @@ class TestCheckPresetsOccupiedSlots:
         })
         async with db.begin_session() as db_sess:
             resource_group_id = await db_sess.scalar(
-                sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == scaling_group_name)
+                sa.select(ResourceGroupRow.id).where(ResourceGroupRow.name == resource_group_name)
             )
             agent = AgentRow(
                 id=agent_id,
                 status=status,
                 status_changed=datetime.now(tzutc()),
                 region="test-region",
-                scaling_group=scaling_group_name,
+                scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 schedulable=schedulable,
                 available_slots=_available,
@@ -724,7 +718,7 @@ class TestCheckPresetsOccupiedSlots:
         # Get group name for the API call
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             group_result = await db_sess.execute(
-                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
+                sa.select(ProjectRow.name).where(ProjectRow.id == test_group_id)
             )
             group_name = group_result.scalar_one()
 
@@ -747,11 +741,11 @@ class TestCheckPresetsOccupiedSlots:
             group_name=group_name,
             domain_name=test_domain.domain_name,
             resource_policy=resource_policy_dict,
-            scaling_group=test_scaling_group_name,
+            resource_group=test_scaling_group_name,
         )
 
         # Verify: available (16 CPU, 32GB) - occupied (4 CPU, 8GB) = remaining (12 CPU, 24GB)
-        sg_data = result.scaling_groups[test_scaling_group_name]
+        sg_data = result.resource_groups[test_scaling_group_name]
         assert _qty(sg_data.remaining, "cpu") == Decimal("12")
         assert _qty(sg_data.remaining, "mem") == Decimal("24576")
         assert _qty(sg_data.using, "cpu") == Decimal("4")
@@ -860,7 +854,7 @@ class TestCheckPresetsOccupiedSlots:
         # Test: Repository.check_presets should include TERMINATING kernels
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             group_result = await db_sess.execute(
-                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
+                sa.select(ProjectRow.name).where(ProjectRow.id == test_group_id)
             )
             group_name = group_result.scalar_one()
 
@@ -883,11 +877,11 @@ class TestCheckPresetsOccupiedSlots:
             group_name=group_name,
             domain_name=test_domain.domain_name,
             resource_policy=resource_policy_dict,
-            scaling_group=test_scaling_group_name,
+            resource_group=test_scaling_group_name,
         )
 
         # Verify: available (16 CPU, 32GB) - occupied (2 CPU, 4GB) = remaining (14 CPU, 28GB)
-        sg_data = result.scaling_groups[test_scaling_group_name]
+        sg_data = result.resource_groups[test_scaling_group_name]
         assert _qty(sg_data.remaining, "cpu") == Decimal("14")
         assert _qty(sg_data.remaining, "mem") == Decimal("28672")
         assert _qty(sg_data.using, "cpu") == Decimal("2")
@@ -988,7 +982,7 @@ class TestCheckPresetsOccupiedSlots:
         # Test: Repository.check_presets should ignore PENDING kernels
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             group_result = await db_sess.execute(
-                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
+                sa.select(ProjectRow.name).where(ProjectRow.id == test_group_id)
             )
             group_name = group_result.scalar_one()
 
@@ -1011,11 +1005,11 @@ class TestCheckPresetsOccupiedSlots:
             group_name=group_name,
             domain_name=test_domain.domain_name,
             resource_policy=resource_policy_dict,
-            scaling_group=test_scaling_group_name,
+            resource_group=test_scaling_group_name,
         )
 
         # Verify: available (16 CPU, 32GB) - occupied (0) = remaining (16 CPU, 32GB)
-        sg_data = result.scaling_groups[test_scaling_group_name]
+        sg_data = result.resource_groups[test_scaling_group_name]
         assert _qty(sg_data.remaining, "cpu") == Decimal("16")
         assert _qty(sg_data.remaining, "mem") == Decimal("32768")
         assert _qty(sg_data.using, "cpu") == Decimal("0")
@@ -1164,7 +1158,7 @@ class TestCheckPresetsOccupiedSlots:
         # Test: Repository.check_presets should use ACTUAL kernel occupied slots, not cached agent value
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             group_result = await db_sess.execute(
-                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
+                sa.select(ProjectRow.name).where(ProjectRow.id == test_group_id)
             )
             group_name = group_result.scalar_one()
 
@@ -1187,12 +1181,12 @@ class TestCheckPresetsOccupiedSlots:
             group_name=group_name,
             domain_name=test_domain.domain_name,
             resource_policy=resource_policy_dict,
-            scaling_group=test_scaling_group_name,
+            resource_group=test_scaling_group_name,
         )
 
         # Verify: Should use actual kernel occupied (3 CPU, 6GB) NOT cached (10 CPU, 20GB)
         # available (16 CPU, 32GB) - actual occupied (3 CPU, 6GB) = remaining (13 CPU, 26GB)
-        sg_data = result.scaling_groups[test_scaling_group_name]
+        sg_data = result.resource_groups[test_scaling_group_name]
         assert _qty(sg_data.remaining, "cpu") == Decimal("13")
         assert _qty(sg_data.remaining, "mem") == Decimal("26624")
         assert _qty(sg_data.using, "cpu") == Decimal("3")
@@ -1219,12 +1213,12 @@ class TestCheckPresetsOccupiedSlots:
             group_name=test_group_name,
             domain_name=test_domain.domain_name,
             resource_policy=test_resource_policy_dict,
-            scaling_group=test_scaling_group_name,
+            resource_group=test_scaling_group_name,
         )
 
         # Verify: Only ALIVE agents (2 x 16 CPU, 2 x 32GB) should be counted
         # Non-ALIVE agents (3 x 100 CPU) should be excluded
-        sg_data = result.scaling_groups[test_scaling_group_name]
+        sg_data = result.resource_groups[test_scaling_group_name]
         assert _qty(sg_data.remaining, "cpu") == Decimal("32")
         assert _qty(sg_data.remaining, "mem") == Decimal("65536")
 
@@ -1251,7 +1245,7 @@ class TestCheckPresetsZeroValues:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -1259,7 +1253,7 @@ class TestCheckPresetsZeroValues:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -1341,12 +1335,12 @@ class TestCheckPresetsZeroValues:
         sg_name = f"test-sgroup-zero-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sg = ScalingGroupRow(
+            sg = ResourceGroupRow(
                 id=test_scaling_group_id,
                 name=sg_name,
                 driver="test-driver",
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(
+                scheduler_opts=ResourceGroupOpts(
                     allowed_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
                     pending_timeout=timedelta(seconds=300),
                     agent_selection_strategy=AgentSelectionStrategy.ROUNDROBIN,
@@ -1468,7 +1462,7 @@ class TestCheckPresetsZeroValues:
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-zero-{group_id.hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -1510,15 +1504,9 @@ class TestCheckPresetsZeroValues:
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Get user email for user_id field
-            user_result = await db_sess.execute(
-                sa.select(UserRow.email).where(UserRow.uuid == test_user_uuid)
-            )
-            user_email = user_result.scalar_one()
-
             keypair = KeyPairRow(
                 access_key=access_key,
                 secret_key="test-secret",
-                user_id=user_email,
                 user=test_user_uuid,
                 is_active=True,
                 resource_policy=test_resource_policy_name,
@@ -1587,7 +1575,7 @@ class TestCheckPresetsZeroValues:
     async def _create_agent(
         self,
         db: ExtendedAsyncSAEngine,
-        scaling_group_name: str,
+        resource_group_name: str,
         addr: str,
         *,
         available_slots: ResourceSlot | None = None,
@@ -1604,14 +1592,14 @@ class TestCheckPresetsZeroValues:
         })
         async with db.begin_session() as db_sess:
             resource_group_id = await db_sess.scalar(
-                sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == scaling_group_name)
+                sa.select(ResourceGroupRow.id).where(ResourceGroupRow.name == resource_group_name)
             )
             agent = AgentRow(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 status_changed=datetime.now(tzutc()),
                 region="test-region",
-                scaling_group=scaling_group_name,
+                scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 schedulable=True,
                 available_slots=_available,
@@ -1665,7 +1653,7 @@ class TestCheckPresetsZeroValues:
         # Get group name for the API call
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             group_result = await db_sess.execute(
-                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
+                sa.select(ProjectRow.name).where(ProjectRow.id == test_group_id)
             )
             group_name = group_result.scalar_one()
 
@@ -1688,12 +1676,12 @@ class TestCheckPresetsZeroValues:
             group_name=group_name,
             domain_name=test_domain.domain_name,
             resource_policy=resource_policy_dict,
-            scaling_group=test_scaling_group_name,
+            resource_group=test_scaling_group_name,
         )
 
-        # Verify: scaling_group.using must contain known slot types with zero values,
+        # Verify: resource_group.using must contain known slot types with zero values,
         # not an empty list/dict -- this was the regression (BA-5275)
-        sg_data = result.scaling_groups[test_scaling_group_name]
+        sg_data = result.resource_groups[test_scaling_group_name]
         sg_using_slots = {sq.slot_name for sq in sg_data.using}
         assert "cpu" in sg_using_slots, (
             "scaling_group.using must contain 'cpu' slot even when no sessions exist"

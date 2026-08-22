@@ -12,8 +12,8 @@ from sqlalchemy.orm import contains_eager, selectinload
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -26,7 +26,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.group.types import ProjectResourceInfo
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
@@ -39,6 +38,7 @@ from ai.backend.manager.data.permission.types import (
     RoleSource,
     ScopeType,
 )
+from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     UserWithVFolderHostPermissions,
@@ -72,10 +72,10 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent import agents
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -296,8 +296,8 @@ class VfolderRepository:
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             if group_uuid:
-                group_row: GroupRow | None = await db_session.scalar(
-                    sa.select(GroupRow).where(GroupRow.id == group_uuid)
+                group_row: ProjectRow | None = await db_session.scalar(
+                    sa.select(ProjectRow).where(ProjectRow.id == group_uuid)
                 )
                 if group_row is None:
                     raise ProjectNotFound(f"Project with {group_uuid} not found.")
@@ -391,10 +391,10 @@ class VfolderRepository:
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             if group_uuid:
-                group_row: GroupRow | None = await db_session.scalar(
-                    sa.select(GroupRow)
-                    .where(GroupRow.id == group_uuid)
-                    .options(selectinload(GroupRow.resource_policy_row))
+                group_row: ProjectRow | None = await db_session.scalar(
+                    sa.select(ProjectRow)
+                    .where(ProjectRow.id == group_uuid)
+                    .options(selectinload(ProjectRow.resource_policy_row))
                 )
                 if group_row is None:
                     raise ProjectNotFound(f"Project with {group_uuid} not found.")
@@ -1124,19 +1124,21 @@ class VfolderRepository:
         async with self._db.begin_readonly_session_read_committed() as session:
             if isinstance(group_id_or_name, str):
                 query = (
-                    sa.select(GroupRow)
+                    sa.select(ProjectRow)
                     .where(
-                        (GroupRow.domain_name == domain_name) & (GroupRow.name == group_id_or_name)
+                        (ProjectRow.domain_name == domain_name)
+                        & (ProjectRow.name == group_id_or_name)
                     )
-                    .options(selectinload(GroupRow.resource_policy_row))
+                    .options(selectinload(ProjectRow.resource_policy_row))
                 )
             else:  # UUID
                 query = (
-                    sa.select(GroupRow)
+                    sa.select(ProjectRow)
                     .where(
-                        (GroupRow.domain_name == domain_name) & (GroupRow.id == group_id_or_name)
+                        (ProjectRow.domain_name == domain_name)
+                        & (ProjectRow.id == group_id_or_name)
                     )
-                    .options(selectinload(GroupRow.resource_policy_row))
+                    .options(selectinload(ProjectRow.resource_policy_row))
                 )
 
             result = await session.execute(query)
@@ -2176,7 +2178,7 @@ class VfolderRepository:
         # Step 1: Get target user info and their allowed hosts
         async with self._db.begin_readonly_session() as session:
             conn = await session.connection()
-            j = sa.join(users, keypairs, users.c.email == keypairs.c.user_id)
+            j = sa.join(users, keypairs, users.c.uuid == keypairs.c.user)
             db_query = (
                 sa.select(users.c.uuid, users.c.domain_name, keypairs.c.resource_policy)
                 .select_from(j)
@@ -2340,14 +2342,14 @@ class VfolderRepository:
     @vfolder_repository_resilience.apply()
     async def get_alive_agent_ids(
         self,
-        scaling_group: str | None = None,
+        resource_group: str | None = None,
     ) -> list[str]:
         """Get IDs of agents with ALIVE status, optionally filtered by scaling group."""
         async with self._db.begin_readonly_session() as session:
             conn = await session.connection()
             stmt = sa.select(agents.c.id).where(agents.c.status == AgentStatus.ALIVE)
-            if scaling_group is not None:
-                stmt = stmt.where(agents.c.scaling == scaling_group)
+            if resource_group is not None:
+                stmt = stmt.where(agents.c.scaling == resource_group)
             result = await conn.execute(stmt)
             return [row.id for row in result.fetchall()]
 

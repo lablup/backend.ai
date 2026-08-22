@@ -5,8 +5,8 @@ from typing import Any
 import pytest
 
 from ai.backend.common.data.agent.types import AgentInfo
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.events.event_types.agent.anycast import AgentHeartbeatEvent
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import DeviceName, ResourceSlotEntry, SlotName, SlotTypes
 
 
@@ -113,7 +113,7 @@ class TestAgentHeartbeatEvent:
         ],
         ids=["string_keys", "slotname_keys", "mixed_keys"],
     )
-    async def test_serialization_deserialization_round_trip_with_different_key_formats(
+    async def test_message_roundtrip_with_different_key_formats(
         self,
         agent_info_dict: dict[str, Any],
         expected_slot_keys: dict[SlotName, SlotTypes],
@@ -121,7 +121,6 @@ class TestAgentHeartbeatEvent:
         """The slot key form used to build the event does not survive into a difference."""
         event = AgentHeartbeatEvent(agent_info=AgentInfo.model_validate(agent_info_dict))
 
-        serialized = event.serialize()
-        deserialized = AgentHeartbeatEvent.deserialize(serialized)
+        deserialized = AgentHeartbeatEvent.from_message(event.to_message())
 
         assert deserialized.agent_info.slot_key_and_units == expected_slot_keys

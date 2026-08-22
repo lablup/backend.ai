@@ -21,7 +21,7 @@ from .resolver import (
     update_resource_group_fair_share_spec,
 )
 from .types import (
-    FairShareScalingGroupSpecGQL,
+    FairShareResourceGroupSpecGQL,
     ResourceGroupFilterGQL,
     ResourceGroupGQL,
     ResourceGroupOrderByGQL,
@@ -34,7 +34,7 @@ from .types import (
 
 __all__ = (
     # Types
-    "FairShareScalingGroupSpecGQL",
+    "FairShareResourceGroupSpecGQL",
     "ResourceGroupGQL",
     "ResourceGroupFilterGQL",
     "ResourceGroupOrderByGQL",

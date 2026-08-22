@@ -7,7 +7,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
@@ -16,17 +16,17 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.group.row import resolve_group_name_or_id
+from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.project.row import resolve_group_name_or_id
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 _ORM_CLUSTER = (
     AgentRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
 )
 
 
@@ -44,7 +44,7 @@ class TestResolveGroupNameOrId:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                GroupRow,
+                ProjectRow,
             ],
         ):
             yield database_connection
@@ -101,7 +101,7 @@ class TestResolveGroupNameOrId:
         """Create a test group and return its UUID."""
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as session:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name="test-group",
                 description="Test group",

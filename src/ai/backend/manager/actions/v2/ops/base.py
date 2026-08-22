@@ -1,20 +1,21 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
-from typing import override
+from typing import Any, override
 
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.entity import EntityID as OwnerEntityID
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier as OwnerEntityID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
+from ai.backend.manager.actions.v2.ops.backend import OpsBackendAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.creator import (
     EntityCreator,
-    FieldEntityCreator,
+    FieldCreator,
     GlobalEntityCreator,
     RoleManagedEntityCreator,
 )
@@ -22,17 +23,15 @@ from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.purger import (
     DataBatchPurger,
     EntityPurger,
-    FieldEntityPurger,
-    GlobalEntityPurger,
+    FieldPurger,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.querier import DataQuerier, OwnedFieldQuerier
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.models.specs.upserter import (
     EntityUpserter,
-    FieldEntityUpserter,
+    FieldUpserter,
     GlobalEntityUpserter,
-    RoleManagedEntityUpserter,
 )
 
 __all__ = (
@@ -42,25 +41,24 @@ __all__ = (
     "SearchOpsAction",
     "GlobalSearchOpsAction",
     "GlobalEntityCreateOpsAction",
+    "GlobalEntityWithFieldsCreateOpsAction",
     "EntityCreateOpsAction",
     "RoleManagedEntityCreateOpsAction",
-    "FieldEntityCreateOpsAction",
-    "GlobalEntityBulkCreateOpsAction",
-    "EntityBulkCreateOpsAction",
-    "RoleManagedEntityBulkCreateOpsAction",
-    "FieldEntityBulkCreateOpsAction",
-    "GlobalEntityPurgeOpsAction",
+    "FieldCreateOpsAction",
+    "GlobalEntityAtomicCreateOpsAction",
+    "EntityAtomicCreateOpsAction",
+    "RoleManagedEntityAtomicCreateOpsAction",
+    "FieldAtomicCreateOpsAction",
     "EntityPurgeOpsAction",
-    "FieldEntityPurgeOpsAction",
-    "GlobalEntityBulkPurgeOpsAction",
-    "EntityBulkPurgeOpsAction",
-    "FieldEntityBulkPurgeOpsAction",
+    "FieldPurgeOpsAction",
+    "GlobalEntityPartialBulkPurgeOpsAction",
+    "EntityPartialBulkPurgeOpsAction",
+    "FieldPartialBulkPurgeOpsAction",
     "GlobalEntityUpsertOpsAction",
     "EntityUpsertOpsAction",
-    "RoleManagedEntityUpsertOpsAction",
-    "FieldEntityUpsertOpsAction",
+    "FieldUpsertOpsAction",
     "UpdateOpsAction",
-    "BulkUpdateOpsAction",
+    "PartialBulkUpdateOpsAction",
     "BatchUpdateOpsAction",
     "GlobalBatchUpdateOpsAction",
     "BatchPurgeOpsAction",
@@ -68,55 +66,38 @@ __all__ = (
     "LookupEntityOpsAction",
     "GetSingleEntityOpsAction",
     "OperationScopeOpsAction",
+    "BulkScopedSearchOpsAction",
     "SearchGlobalOpsAction",
     "CreateGlobalOpsAction",
+    "CreateGlobalWithFieldsOpsAction",
     "CreateEntityOpsAction",
     "CreateRoleManagedEntityOpsAction",
-    "CreateFieldEntityOpsAction",
-    "BulkCreateGlobalEntityOpsAction",
-    "BulkCreateEntityOpsAction",
-    "BulkCreateRoleManagedEntityOpsAction",
-    "BulkCreateFieldEntityOpsAction",
-    "PurgeGlobalOpsAction",
+    "CreateFieldOpsAction",
+    "AtomicCreateGlobalEntityOpsAction",
+    "AtomicCreateEntityOpsAction",
+    "AtomicCreateRoleManagedEntityOpsAction",
+    "AtomicCreateFieldOpsAction",
     "PurgeEntityOpsAction",
-    "PurgeFieldEntityOpsAction",
-    "BulkPurgeGlobalEntityOpsAction",
-    "BulkPurgeEntityOpsAction",
-    "BulkPurgeFieldEntityOpsAction",
+    "PartialBulkPurgeGlobalEntityOpsAction",
+    "PartialBulkPurgeEntityOpsAction",
     "UpsertGlobalOpsAction",
     "UpsertEntityOpsAction",
-    "UpsertRoleManagedEntityOpsAction",
-    "UpsertFieldEntityOpsAction",
+    "UpsertFieldOpsAction",
     "UpdateGlobalOpsAction",
     "UpdateSingleEntityOpsAction",
     "DeleteSingleEntityOpsAction",
-    "UpdateBulkOpsAction",
-    "DeleteBulkOpsAction",
+    "RestoreSingleEntityOpsAction",
+    "UpdatePartialBulkOpsAction",
+    "DeletePartialBulkOpsAction",
+    "RestorePartialBulkOpsAction",
     "BatchUpdateScopeOpsAction",
     "BatchUpdateGlobalOpsAction",
     "BatchPurgeScopeOpsAction",
     "BatchPurgeGlobalOpsAction",
     "GetGlobalOpsAction",
+    "OwnedFieldGetOpsAction",
+    "BulkGetOwnedFieldOpsAction",
 )
-
-
-class OpsBackendAction(ABC):
-    """Executed directly against repository ops; no service method needed.
-
-    Mixed in alongside the shape axis (``BaseScopeAction``, ``BaseSingleEntityAction``,
-    ...), which stays responsible for RBAC and audit. This axis only says how the action
-    is backed: it carries the repository spec instead of a hand-written service method.
-    Promote the action to a real service method as soon as it grows a branch.
-
-    Not a new contract: actions across the codebase already hold a ``Creator`` /
-    ``Updater`` / ``Purger`` / ``Upserter`` as a field. This names that contract so a
-    generic service can execute it.
-
-    There is deliberately no ``delete`` variant. A soft delete is a status transition,
-    so it carries a ``DataUpdater`` like any other write and runs through the update
-    service; ``repositories/base/`` has no deleter spec because there is no delete
-    operation to generalize.
-    """
 
 
 class GetOpsAction[TRow: Base, TData](OpsBackendAction):
@@ -133,16 +114,41 @@ class GetOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class LookupOpsAction[TRow: Base, TData](OpsBackendAction):
+class OwnedFieldGetOpsAction[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
+    OpsBackendAction
+):
+    """A read of the field row each named entity designates.
+
+    Keyed by the owner, not the row: the caller names entities, and which row each of
+    them designates is the querier's answer. That is also what makes it authorizable
+    without a lookup — the entity to check is already named.
+    """
+
+    @abstractmethod
+    def to_querier(self) -> OwnedFieldQuerier[TOwnerID, TRow, TData]:
+        """Return the read spec this action executes."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def owner_ids(self) -> Sequence[TOwnerID]:
+        """Return the entities whose designated row is read.
+
+        The same entities ``entity_ids()`` reports, narrowed to the type the querier
+        keys on.
+        """
+        raise NotImplementedError
+
+
+class LookupOpsAction[TRow: Base, TEntityID: EntityIdentifier](OpsBackendAction):
     """A read by a key that is not the entity's id.
 
     The lookup shape's whole point is producing an id, so the spec has to say which
-    columns the key is and how the row becomes data; there is nothing on the action for
+    columns the key is and how the row names its entity; there is nothing on the action for
     it to lean on the way the single-entity shape leans on ``entity_id()``.
     """
 
     @abstractmethod
-    def to_lookup(self) -> DataLookup[TRow, TData]:
+    def to_lookup(self) -> DataLookup[TRow, TEntityID]:
         """Return the key-resolution spec this action executes."""
         raise NotImplementedError
 
@@ -189,11 +195,34 @@ class GlobalSearchOpsAction[TRow: Base, TData](OpsBackendAction):
 
 
 class GlobalEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
-    """Carries the global-family insert spec; no scope membership involved."""
+    """Carries the global insert spec; no scope membership involved."""
 
     @abstractmethod
     def to_creator(self) -> GlobalEntityCreator[TRow, TData]:
         """Return the insert spec this action executes."""
+        raise NotImplementedError
+
+
+class GlobalEntityWithFieldsCreateOpsAction[
+    TRow: Base,
+    TData,
+    TFieldRow: Base,
+    TFieldData: FieldData,
+](OpsBackendAction):
+    """Carries a global insert spec together with the field specs it owns.
+
+    One action so the two writes share a transaction: split apart, the parent could
+    survive a failed field row.
+    """
+
+    @abstractmethod
+    def to_creator(self) -> GlobalEntityCreator[TRow, TData]:
+        """Return the insert spec for the owning row."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_field_creators(self) -> Sequence[FieldCreator[Any, TFieldRow, TFieldData]]:
+        """Return one insert spec per field row created under the owner."""
         raise NotImplementedError
 
 
@@ -207,6 +236,26 @@ class EntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
+class EntityWithFieldsCreateOpsAction[TRow: Base, TData, TFieldRow: Base, TFieldData: FieldData](
+    OpsBackendAction
+):
+    """Carries an entity insert spec together with the field specs it owns.
+
+    One action so the two writes share a transaction: split apart, the parent could
+    survive a failed field row.
+    """
+
+    @abstractmethod
+    def to_creator(self) -> EntityCreator[TRow, TData]:
+        """Return the insert spec for the owning row."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_field_creators(self) -> Sequence[FieldCreator[Any, TFieldRow, TFieldData]]:
+        """Return one insert spec per field row created under the owner."""
+        raise NotImplementedError
+
+
 class RoleManagedEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
     """Carries the role-managed entity insert spec: the entity create plus the
     preset-role provisioning the combined spec declares."""
@@ -217,8 +266,8 @@ class RoleManagedEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class FieldEntityCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](OpsBackendAction):
-    """Carries the field-family insert spec plus the owner's identifier.
+class FieldCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](OpsBackendAction):
+    """Carries the field insert spec plus the owner's identifier.
 
     The owner id is declared here rather than leaning on the shape's
     ``entity_id()``: the shape names the RBAC target (the owner), while this axis
@@ -227,7 +276,7 @@ class FieldEntityCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](Ops
     """
 
     @abstractmethod
-    def to_creator(self) -> FieldEntityCreator[TOwnerID, TRow, TData]:
+    def to_creator(self) -> FieldCreator[TOwnerID, TRow, TData]:
         """Return the insert spec this action executes."""
         raise NotImplementedError
 
@@ -237,7 +286,7 @@ class FieldEntityCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](Ops
         raise NotImplementedError
 
 
-class GlobalEntityBulkCreateOpsAction[TRow: Base, TData](OpsBackendAction):
+class GlobalEntityAtomicCreateOpsAction[TRow: Base, TData](OpsBackendAction):
     """A create of several global rows at once, atomically; nothing is registered."""
 
     @abstractmethod
@@ -246,7 +295,7 @@ class GlobalEntityBulkCreateOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class EntityBulkCreateOpsAction[TRow: Base, TData](OpsBackendAction):
+class EntityAtomicCreateOpsAction[TRow: Base, TData](OpsBackendAction):
     """A create of several entity rows at once, atomically; each row's scope is
     provisioned with it."""
 
@@ -256,7 +305,7 @@ class EntityBulkCreateOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class RoleManagedEntityBulkCreateOpsAction[TRow: Base, TData](OpsBackendAction):
+class RoleManagedEntityAtomicCreateOpsAction[TRow: Base, TData](OpsBackendAction):
     """An atomic create of several role-managed entity rows, preset roles included."""
 
     @abstractmethod
@@ -265,11 +314,13 @@ class RoleManagedEntityBulkCreateOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class FieldEntityBulkCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](OpsBackendAction):
+class FieldAtomicCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](
+    OpsBackendAction
+):
     """A create of several field rows sharing one owner, atomically."""
 
     @abstractmethod
-    def to_creators(self) -> Sequence[FieldEntityCreator[TOwnerID, TRow, TData]]:
+    def to_creators(self) -> Sequence[FieldCreator[TOwnerID, TRow, TData]]:
         """Return one insert spec per row this action creates."""
         raise NotImplementedError
 
@@ -279,18 +330,8 @@ class FieldEntityBulkCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData]
         raise NotImplementedError
 
 
-class GlobalEntityPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
-    """Carries the global-family delete spec; no membership to remove."""
-
-    @abstractmethod
-    def to_purger(self) -> GlobalEntityPurger[TRow, TData]:
-        """Return the hard-delete spec this action executes."""
-        raise NotImplementedError
-
-
 class EntityPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
-    """Carries the entity delete spec: purging tears the row's scope down with
-    it, symmetrically with the create."""
+    """Carries the delete spec of one entity named by id."""
 
     @abstractmethod
     def to_purger(self) -> EntityPurger[TRow, TData]:
@@ -298,43 +339,45 @@ class EntityPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class FieldEntityPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
-    """Carries the field-family delete spec; authorized through the owner the
+class FieldPurgeOpsAction[TRow: Base, TData: FieldData](OpsBackendAction):
+    """Carries the field delete spec; authorized through the owner the
     shape names, like an update to the owning entity."""
 
     @abstractmethod
-    def to_purger(self) -> FieldEntityPurger[TRow, TData]:
+    def to_purger(self) -> FieldPurger[TRow, TData]:
         """Return the hard-delete spec this action executes."""
         raise NotImplementedError
 
 
-class GlobalEntityBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
+class GlobalEntityPartialBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
     """A hard delete of global entities the caller named, each answered for
     separately; no membership involved."""
 
     @abstractmethod
-    def to_purgers(self) -> Mapping[EntityID, GlobalEntityPurger[TRow, TData]]:
+    def to_purgers(self) -> Mapping[EntityIdentifier, EntityPurger[TRow, TData]]:
         """Return the delete spec for each entity this action names."""
         raise NotImplementedError
 
 
-class EntityBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
+class EntityPartialBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
     """A hard delete of entities the caller named, each answered for separately;
     every row's scope is torn down with it."""
 
     @abstractmethod
-    def to_purgers(self) -> Mapping[EntityID, EntityPurger[TRow, TData]]:
+    def to_purgers(self) -> Mapping[EntityIdentifier, EntityPurger[TRow, TData]]:
         """Return the delete spec for each entity this action names."""
         raise NotImplementedError
 
 
-class FieldEntityBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
-    """A hard delete of field rows the caller named, each answered for
-    separately; authorized through the owner the shape names."""
+class FieldPartialBulkPurgeOpsAction[TFieldID: FieldIdentifier, TRow: Base, TData: FieldData](
+    OpsBackendAction
+):
+    """A hard delete of field rows the caller named, each answered for separately;
+    authorized through the entities owning them."""
 
     @abstractmethod
-    def to_purgers(self) -> Mapping[EntityID, FieldEntityPurger[TRow, TData]]:
-        """Return the delete spec for each entity this action names."""
+    def to_purgers(self) -> Mapping[TFieldID, FieldPurger[TRow, TData]]:
+        """Return the delete spec for each row this action names."""
         raise NotImplementedError
 
 
@@ -356,21 +399,31 @@ class EntityUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class RoleManagedEntityUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
-    """A create-or-update of a role-managed entity; preset roles are provisioned
-    only when the upsert actually created the scope."""
+class GlobalEntityAtomicUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
+    """A create-or-update of several global rows at once, atomically; each node stays
+    provisioned, and none belongs under another scope."""
 
     @abstractmethod
-    def to_upserter(self) -> RoleManagedEntityUpserter[TRow, TData]:
-        """Return the upsert spec this action executes."""
+    def to_upserters(self) -> Sequence[GlobalEntityUpserter[TRow, TData]]:
+        """Return one upsert spec per row this action writes."""
         raise NotImplementedError
 
 
-class FieldEntityUpsertOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](OpsBackendAction):
+class EntityAtomicUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
+    """A create-or-update of several entity rows at once, atomically; each row's scope is
+    provisioned with it."""
+
+    @abstractmethod
+    def to_upserters(self) -> Sequence[EntityUpserter[TRow, TData]]:
+        """Return one upsert spec per row this action writes."""
+        raise NotImplementedError
+
+
+class FieldUpsertOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](OpsBackendAction):
     """A create-or-update of a field row under its owner's settled identifier."""
 
     @abstractmethod
-    def to_upserter(self) -> FieldEntityUpserter[TOwnerID, TRow, TData]:
+    def to_upserter(self) -> FieldUpserter[TOwnerID, TRow, TData]:
         """Return the upsert spec this action executes."""
         raise NotImplementedError
 
@@ -392,7 +445,7 @@ class UpdateOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class BulkUpdateOpsAction[TRow: Base, TData](OpsBackendAction):
+class PartialBulkUpdateOpsAction[TRow: Base, TData](OpsBackendAction):
     """An update of entities the caller named, each answered for separately.
 
     A mapping rather than a list: the bulk shape reports per entity, and pairing the
@@ -404,7 +457,7 @@ class BulkUpdateOpsAction[TRow: Base, TData](OpsBackendAction):
     """
 
     @abstractmethod
-    def to_updaters(self) -> Mapping[EntityID, DataUpdater[TRow, TData]]:
+    def to_updaters(self) -> Mapping[EntityIdentifier, DataUpdater[TRow, TData]]:
         """Return the update spec for each entity this action names."""
         raise NotImplementedError
 
@@ -465,7 +518,9 @@ class GlobalBatchPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class LookupEntityOpsAction[TRow: Base, TData](BaseLookupAction, LookupOpsAction[TRow, TData], ABC):
+class LookupEntityOpsAction[TRow: Base, TEntityID: EntityIdentifier](
+    BaseLookupAction, LookupOpsAction[TRow, TEntityID], ABC
+):
     """A key resolution backed by ops: the lookup shape paired with its spec.
 
     Declares nothing further — the shape fixes the operation, and the spec carries
@@ -500,6 +555,38 @@ class OperationScopeOpsAction[TRow: Base, TData](
         return ActionOperationType.SEARCH
 
 
+class BulkScopedSearchOpsAction[TRow: Base, TData](
+    BaseBulkAction, SearchOpsAction[TRow, TData], ABC
+):
+    """A page of the field rows owned by the entities the caller named.
+
+    Bulk-shaped for the check and the record — every named owner is answered for — while
+    the result is a page, since a read reports what it found rather than each owner's
+    fate. A caller reaching for one owner they cannot see is refused the whole read.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
+class BulkGetOwnedFieldOpsAction[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
+    BaseBulkAction, OwnedFieldGetOpsAction[TOwnerID, TRow, TData], ABC
+):
+    """The row each named entity designates, answered for every one of them.
+
+    Bulk-shaped like :class:`BulkScopedSearchOpsAction` and for the same reason — the
+    owners are named rather than being a scope — while the answer is one row per owner
+    instead of a page.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+
 class SearchGlobalOpsAction[TRow: Base, TData](
     BaseGlobalAction, GlobalSearchOpsAction[TRow, TData], ABC
 ):
@@ -522,6 +609,19 @@ class CreateGlobalOpsAction[TRow: Base, TData](
         return ActionOperationType.CREATE
 
 
+class CreateGlobalWithFieldsOpsAction[TRow: Base, TData, TFieldRow: Base, TFieldData: FieldData](
+    BaseGlobalAction,
+    GlobalEntityWithFieldsCreateOpsAction[TRow, TData, TFieldRow, TFieldData],
+    ABC,
+):
+    """An insert of one row of system-wide state together with the rows it owns."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+
 class CreateEntityOpsAction[TRow: Base, TData](
     BaseScopeAction, EntityCreateOpsAction[TRow, TData], ABC
 ):
@@ -529,6 +629,23 @@ class CreateEntityOpsAction[TRow: Base, TData](
 
     Scope-shaped: the new entity's id does not exist until the row does, so the
     action targets the scope context it creates in rather than an entity.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+
+class CreateEntityWithFieldsOpsAction[TRow: Base, TData, TFieldRow: Base, TFieldData: FieldData](
+    BaseScopeAction,
+    EntityWithFieldsCreateOpsAction[TRow, TData, TFieldRow, TFieldData],
+    ABC,
+):
+    """An insert of one entity row together with the rows it owns.
+
+    Scope-shaped for the same reason as :class:`CreateEntityOpsAction`: neither the
+    entity nor its fields exist until the write runs.
     """
 
     @override
@@ -548,8 +665,8 @@ class CreateRoleManagedEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.CREATE
 
 
-class CreateFieldEntityOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](
-    BaseSingleEntityAction, FieldEntityCreateOpsAction[TOwnerID, TRow, TData], ABC
+class CreateFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](
+    BaseSingleEntityAction, FieldCreateOpsAction[TOwnerID, TRow, TData], ABC
 ):
     """An insert of a field row, authorized against its owner.
 
@@ -560,11 +677,11 @@ class CreateFieldEntityOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
+        return ActionOperationType.UPDATE
 
 
-class BulkCreateGlobalEntityOpsAction[TRow: Base, TData](
-    BaseGlobalAction, GlobalEntityBulkCreateOpsAction[TRow, TData], ABC
+class AtomicCreateGlobalEntityOpsAction[TRow: Base, TData](
+    BaseGlobalAction, GlobalEntityAtomicCreateOpsAction[TRow, TData], ABC
 ):
     """An atomic insert of several rows of system-wide state."""
 
@@ -574,8 +691,8 @@ class BulkCreateGlobalEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.CREATE
 
 
-class BulkCreateEntityOpsAction[TRow: Base, TData](
-    BaseScopeAction, EntityBulkCreateOpsAction[TRow, TData], ABC
+class AtomicCreateEntityOpsAction[TRow: Base, TData](
+    BaseScopeAction, EntityAtomicCreateOpsAction[TRow, TData], ABC
 ):
     """An atomic insert of several entity rows."""
 
@@ -585,8 +702,8 @@ class BulkCreateEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.CREATE
 
 
-class BulkCreateRoleManagedEntityOpsAction[TRow: Base, TData](
-    BaseScopeAction, RoleManagedEntityBulkCreateOpsAction[TRow, TData], ABC
+class AtomicCreateRoleManagedEntityOpsAction[TRow: Base, TData](
+    BaseScopeAction, RoleManagedEntityAtomicCreateOpsAction[TRow, TData], ABC
 ):
     """An atomic insert of several role-managed entity rows."""
 
@@ -596,26 +713,15 @@ class BulkCreateRoleManagedEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.CREATE
 
 
-class BulkCreateFieldEntityOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](
-    BaseSingleEntityAction, FieldEntityBulkCreateOpsAction[TOwnerID, TRow, TData], ABC
+class AtomicCreateFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](
+    BaseSingleEntityAction, FieldAtomicCreateOpsAction[TOwnerID, TRow, TData], ABC
 ):
     """An atomic insert of several field rows, authorized against their one owner."""
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-
-class PurgeGlobalOpsAction[TRow: Base, TData](
-    BaseGlobalAction, GlobalEntityPurgeOpsAction[TRow, TData], ABC
-):
-    """A hard delete of one row of system-wide state."""
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.PURGE
+        return ActionOperationType.UPDATE
 
 
 class PurgeEntityOpsAction[TRow: Base, TData](
@@ -629,19 +735,8 @@ class PurgeEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.PURGE
 
 
-class PurgeFieldEntityOpsAction[TRow: Base, TData](
-    BaseSingleEntityAction, FieldEntityPurgeOpsAction[TRow, TData], ABC
-):
-    """A hard delete of a field row, authorized against its owner."""
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.PURGE
-
-
-class BulkPurgeGlobalEntityOpsAction[TRow: Base, TData](
-    BaseBulkAction, GlobalEntityBulkPurgeOpsAction[TRow, TData], ABC
+class PartialBulkPurgeGlobalEntityOpsAction[TRow: Base, TData](
+    BaseBulkAction, GlobalEntityPartialBulkPurgeOpsAction[TRow, TData], ABC
 ):
     """A hard delete over the global entities the caller named."""
 
@@ -651,21 +746,10 @@ class BulkPurgeGlobalEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.PURGE
 
 
-class BulkPurgeEntityOpsAction[TRow: Base, TData](
-    BaseBulkAction, EntityBulkPurgeOpsAction[TRow, TData], ABC
+class PartialBulkPurgeEntityOpsAction[TRow: Base, TData](
+    BaseBulkAction, EntityPartialBulkPurgeOpsAction[TRow, TData], ABC
 ):
     """A hard delete over the entities the caller named."""
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.PURGE
-
-
-class BulkPurgeFieldEntityOpsAction[TRow: Base, TData](
-    BaseBulkAction, FieldEntityBulkPurgeOpsAction[TRow, TData], ABC
-):
-    """A hard delete over the field rows the caller named."""
 
     @override
     @classmethod
@@ -695,10 +779,10 @@ class UpsertEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.UPSERT
 
 
-class UpsertRoleManagedEntityOpsAction[TRow: Base, TData](
-    BaseSingleEntityAction, RoleManagedEntityUpsertOpsAction[TRow, TData], ABC
+class AtomicUpsertGlobalEntityOpsAction[TRow: Base, TData](
+    BaseGlobalAction, GlobalEntityAtomicUpsertOpsAction[TRow, TData], ABC
 ):
-    """A create-or-update of a role-managed entity, backed by ops."""
+    """An atomic create-or-update of several rows of system-wide state."""
 
     @override
     @classmethod
@@ -706,15 +790,30 @@ class UpsertRoleManagedEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.UPSERT
 
 
-class UpsertFieldEntityOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](
-    BaseSingleEntityAction, FieldEntityUpsertOpsAction[TOwnerID, TRow, TData], ABC
+class AtomicUpsertEntityOpsAction[TRow: Base, TData](
+    BaseScopeAction, EntityAtomicUpsertOpsAction[TRow, TData], ABC
+):
+    """An atomic create-or-update of several entity rows.
+
+    Scope-shaped like :class:`AtomicCreateEntityOpsAction`: a row that does not exist yet
+    has no entity to be answered for, so the scope the rows are written in answers.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPSERT
+
+
+class UpsertFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](
+    BaseSingleEntityAction, FieldUpsertOpsAction[TOwnerID, TRow, TData], ABC
 ):
     """A create-or-update of a field row, authorized against its owner."""
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPSERT
+        return ActionOperationType.UPDATE
 
 
 class GetGlobalOpsAction[TRow: Base, TData](BaseGlobalAction, GetOpsAction[TRow, TData], ABC):
@@ -732,7 +831,7 @@ class GetGlobalOpsAction[TRow: Base, TData](BaseGlobalAction, GetOpsAction[TRow,
 
 
 class UpdateGlobalOpsAction[TRow: Base, TData](BaseGlobalAction, UpdateOpsAction[TRow, TData], ABC):
-    """A write to one row of system-wide state, named by a key that is not an ``EntityID``.
+    """A write to one row of system-wide state, named by a key that is not an ``EntityIdentifier``.
 
     Global rather than single-entity because the row it names belongs to no RBAC scope:
     the SUPERADMIN gate is what answers for the write, and the catalogs this shape
@@ -767,7 +866,22 @@ class DeleteSingleEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.DELETE
 
 
-class UpdateBulkOpsAction[TRow: Base, TData](BaseBulkAction, BulkUpdateOpsAction[TRow, TData], ABC):
+class RestoreSingleEntityOpsAction[TRow: Base, TData](
+    BaseSingleEntityAction, UpdateOpsAction[TRow, TData], ABC
+):
+    """A single-entity restore: the soft delete run backwards, so it carries an
+    updater too. Recorded as ``RESTORE`` while checking the soft-delete permission —
+    undoing a delete reaches nothing the deleter could not already reach."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.RESTORE
+
+
+class UpdatePartialBulkOpsAction[TRow: Base, TData](
+    BaseBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
+):
     """A write over the entities the caller named. A bulk soft delete carries this too."""
 
     @override
@@ -776,13 +890,26 @@ class UpdateBulkOpsAction[TRow: Base, TData](BaseBulkAction, BulkUpdateOpsAction
         return ActionOperationType.UPDATE
 
 
-class DeleteBulkOpsAction[TRow: Base, TData](BaseBulkAction, BulkUpdateOpsAction[TRow, TData], ABC):
+class DeletePartialBulkOpsAction[TRow: Base, TData](
+    BaseBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
+):
     """A soft delete over the entities the caller named."""
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.DELETE
+
+
+class RestorePartialBulkOpsAction[TRow: Base, TData](
+    BaseBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
+):
+    """A restore over the entities the caller named."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.RESTORE
 
 
 class BatchUpdateScopeOpsAction[TRow: Base, TData](

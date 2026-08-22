@@ -1,30 +1,38 @@
-from dataclasses import dataclass, field
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.common.bulk import BulkUpdateFailure
+from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import DeletePartialBulkOpsAction
 from ai.backend.manager.data.role_preset.types import RolePresetData
-from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.services.role_preset.actions.base import RolePresetBulkAction
+from ai.backend.manager.models.rbac_models.role_preset.row import (
+    RolePresetRow,
+)
+from ai.backend.manager.models.rbac_models.role_preset.updaters import (
+    RolePresetSoftDeleteUpdater,
+)
 
 
 @dataclass
-class BulkDeleteRolePresetsAction(RolePresetBulkAction):
-    updaters: list[Updater[RolePresetRow]]
+class BulkDeleteRolePresetsAction(DeletePartialBulkOpsAction[RolePresetRow, RolePresetData]):
+    """Mark the named presets deleted, answering for each one."""
+
+    ids: Sequence[RolePresetID]
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
-
-
-@dataclass
-class BulkDeleteRolePresetsActionResult(BaseActionResult):
-    successes: list[RolePresetData] = field(default_factory=list)
-    failures: list[BulkUpdateFailure] = field(default_factory=list)
+    def action_name(cls) -> str:
+        return "bulk_delete_role_presets"
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(self.ids)
+
+    @override
+    def to_updaters(self) -> Mapping[EntityIdentifier, RolePresetSoftDeleteUpdater]:
+        return {
+            preset_id: RolePresetSoftDeleteUpdater(preset_id=preset_id) for preset_id in self.ids
+        }
