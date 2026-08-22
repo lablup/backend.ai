@@ -704,7 +704,7 @@ class ProjectDBSource:
             query = sa.select(ProjectRow)
             result = await execute_batch_querier(db_sess, query, querier)
 
-            items = [row.GroupRow.to_data() for row in result.rows]
+            items = [row.ProjectRow.to_data() for row in result.rows]
 
             return ProjectSearchResult(
                 items=items,
@@ -731,7 +731,7 @@ class ProjectDBSource:
             query = sa.select(ProjectRow)
             result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
-            items = [row.GroupRow.to_data() for row in result.rows]
+            items = [row.ProjectRow.to_data() for row in result.rows]
 
             return ProjectSearchResult(
                 items=items,
@@ -761,7 +761,7 @@ class ProjectDBSource:
             query = sa.select(ProjectRow).select_from(ProjectRow)
             result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
-            items = [row.GroupRow.to_data() for row in result.rows]
+            items = [row.ProjectRow.to_data() for row in result.rows]
 
             return ProjectSearchResult(
                 items=items,

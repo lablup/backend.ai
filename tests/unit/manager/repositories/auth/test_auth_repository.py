@@ -265,6 +265,7 @@ class TestAuthRepository:
                 secret_key="test_secret_key",
                 user=user_uuid,
                 is_active=True,
+                is_default=True,
                 resource_policy=keypair_resource_policy.name,
                 ssh_public_key=ssh_public_key,
                 ssh_private_key=ssh_private_key,
