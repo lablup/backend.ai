@@ -23,8 +23,9 @@ resource slot amounts along with it, so this package covers two tables.
 
 ## The processor fields
 
-배선된 목록은 `backend.ai mgr ops list --concern deployment_preset`이 낸다. entity type,
-모양, 연산, 관문, 실행 주체는 그 출력이 답한다.
+`backend.ai mgr ops list --concern deployment --entity deployment_preset` prints the
+wired list. Its output
+answers the entity type, shape, operation, gate and backing.
 
 ## The slot rows are field rows of the preset
 

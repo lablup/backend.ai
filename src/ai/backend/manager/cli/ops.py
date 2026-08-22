@@ -12,7 +12,7 @@ from typing import Any, Final
 import click
 from tabulate import tabulate
 
-from ai.backend.manager.actions.registry.types import WiredProcessor
+from ai.backend.manager.actions.registry.types import Concern, WiredProcessor
 from ai.backend.manager.actions.types import (
     ActionBacking,
     ActionGate,
@@ -247,7 +247,12 @@ Examples:
 
 
 @cli.command(name="list", help=_LIST_HELP.format(legend=_column_legend()))
-@click.option("--concern", default=None, help="Keep only the operations of this area.")
+@click.option(
+    "--concern",
+    default=None,
+    type=click.Choice([concern.value for concern in Concern]),
+    help="Keep only the operations of this area.",
+)
 @click.option("--entity", default=None, help="Keep only the operations on this entity type.")
 @click.option("--field", default=None, help="Keep only the operations on this field type.")
 @click.option(
@@ -343,9 +348,10 @@ def list_entities(output: str) -> None:
             concerns = 0
             entity_types: set[str] = set()
             field_types: set[str] = set()
+            width = max(len(entity.concern) for entity in entities) if entities else 0
             for concern, group in groupby(entities, key=lambda entity: entity.concern):
                 concerns += 1
-                print(concern)
+                print(f"{concern:<{width}}  {Concern(concern).describe()}")
                 for entity in group:
                     entity_types.add(entity.entity_type)
                     print(f"  {entity.entity_type} ({entity.operations})")

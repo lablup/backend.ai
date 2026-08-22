@@ -25,12 +25,12 @@ the preset that owns them.
 
 ## The processor fields
 
-배선된 목록은 `backend.ai mgr ops list --concern role_preset`이 낸다. entity type, 모양,
-연산, 관문, 실행 주체는 그 출력이 답한다.
+`backend.ai mgr ops list --concern rbac` prints the wired list. Its output
+answers the entity type, shape, operation, gate and backing.
 
-`ProcessorGroup` 하나가 배선된다. preset이 entity이고 권한 항목은 그 field 행이라,
-권한 항목을 다루는 연산은 그 그룹이 내주는 field 하위 그룹에서 나온다. 기록되는 entity는
-언제나 preset이다.
+One `ProcessorGroup` is wired. The preset is the entity and its permission entries are
+field rows of it, so the operations over those entries come from the field sub-group
+that group hands out. The entity recorded is always the preset.
 
 ## A preset is global state that owns field rows
 

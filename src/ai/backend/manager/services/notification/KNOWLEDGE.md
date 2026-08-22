@@ -19,21 +19,20 @@ status: stable
 
 A channel is somewhere a message can be sent; a rule says which events go to
 which channel. They live in one package because a rule is meaningless without
-the channel it names, and both are installation-wide configuration rather than
+the channel it names, and both are system-wide configuration rather than
 anything a user owns.
 
 ## The processor fields
 
-배선된 목록은 `backend.ai mgr ops list --concern notification_channel`과
-`--concern notification_rule`이 낸다. entity type, 모양, 연산, 관문, 실행 주체는 그 출력이
-답한다.
+`backend.ai mgr ops list --concern notification_center` prints the wired list. Their output answers the entity type, shape,
+operation, gate and backing.
 
 Two `ProcessorGroup`s are wired, one per entity type. All thirteen REST routes
 declare `superadmin_required`, so the global gate matches the surface.
 
 ## Global is the right shape here
 
-- Neither table joins a scope: a channel is an endpoint the installation owns,
+- Neither table joins a scope: a channel is an endpoint the system owns,
   and a rule is a routing entry against it.
 - Nothing is granted per channel or per rule, so there is no per-entity
   permission to express and nothing to share.

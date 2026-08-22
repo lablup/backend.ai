@@ -35,17 +35,17 @@ class ActionKind(enum.StrEnum):
         """What the operation targets, as the catalog listing explains it."""
         match self:
             case ActionKind.SINGLE_ENTITY:
-                return "one entity the caller named by id"
+                return "an action naming one entity by id and operating on it"
             case ActionKind.BULK:
-                return "several entities the caller named"
+                return "an action taking several entity ids and operating on each"
             case ActionKind.SCOPE:
-                return "the scope itself, which a search stays inside and a create writes into"
+                return "an action reaching every entity under a scope at once"
             case ActionKind.GLOBAL:
-                return "the installation, naming nothing else"
+                return "an action operating over everything, divided by no scope"
             case ActionKind.LOOKUP:
-                return "an external key, resolved into an internal id"
+                return "an action reading an entity id from a natural key"
             case ActionKind.UNKNOWN:
-                return "declared by nothing: the action is still on the legacy base"
+                return "an action still on the legacy base, to be removed"
 
 
 class ActionGate(enum.StrEnum):
@@ -61,28 +61,28 @@ class ActionGate(enum.StrEnum):
         """Who gets through, as the catalog listing explains it."""
         match self:
             case ActionGate.ANONYMOUS:
-                return "anyone: the operation asks for no caller"
+                return "an action asking the caller for no permission"
             case ActionGate.PUBLIC:
-                return "every authenticated caller, whatever their roles"
+                return "an action any authenticated user passes"
             case ActionGate.PERMISSION:
-                return "a caller holding the permission, checked where the kind says"
+                return "an action only a user holding the permission may perform"
 
 
 class ActionBacking(enum.StrEnum):
     """What runs a wired processor's operation."""
 
-    # A generic service over the repository's ops, driven by the spec on the action.
-    OPS = "ops"
-    # A method the domain wrote.
-    SERVICE = "service"
+    # The shared implementation over the repository's ops, driven by the action's spec.
+    GENERIC = "generic"
+    # An implementation the domain wrote for this operation alone.
+    CUSTOM = "custom"
 
     def describe(self) -> str:
         """What runs the operation, as the catalog listing explains it."""
         match self:
-            case ActionBacking.OPS:
-                return "a generic service over the repository's ops, driven by the action's spec"
-            case ActionBacking.SERVICE:
-                return "a method the domain wrote"
+            case ActionBacking.GENERIC:
+                return "an action the shared implementation performs from its spec"
+            case ActionBacking.CUSTOM:
+                return "an action the domain implemented itself"
 
 
 class ActionOperationType(enum.StrEnum):

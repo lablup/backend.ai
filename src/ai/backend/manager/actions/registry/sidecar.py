@@ -93,7 +93,7 @@ class SidecarProcessorGroup[TSidecarData]:
         Scope-shaped like every other search that names where it looks, and the scope's
         condition is written against the row's own columns — there is no owner to look up.
         """
-        self._record(action_cls, ActionKind.SCOPE, ActionGate.PERMISSION, ActionBacking.OPS)
+        self._record(action_cls, ActionKind.SCOPE, ActionGate.PERMISSION, ActionBacking.GENERIC)
         return ScopeActionProcessor(
             SearchFieldsService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.scope, *monitors),
@@ -110,7 +110,7 @@ class SidecarProcessorGroup[TSidecarData]:
         """A read across every row of this sidecar type, behind the SUPERADMIN gate.
 
         For the rows of named scopes use :meth:`search_ops`; this one names none."""
-        self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.OPS)
+        self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.GENERIC)
         return GlobalActionProcessor(
             GlobalSearchService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.global_scope, *monitors),

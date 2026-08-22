@@ -48,7 +48,7 @@ three tables, so no row corresponds to the value.
 
 Both carry the entity type `app_config`.
 
-배선된 목록은 `backend.ai mgr ops list --concern app_config`이 낸다.
+`backend.ai mgr ops list --concern app_config` prints the wired list.
 
 - Several names arrive at once, which is what makes it `SEARCH` rather than `GET`.
 - The user-scope read's three query conditions (public, that user's domain, that user)

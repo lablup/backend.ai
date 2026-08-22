@@ -25,8 +25,8 @@ the action layer.
 
 ## The processor fields
 
-배선된 목록은 `backend.ai mgr ops list --field error_log`가 낸다. entity type, 모양, 연산,
-관문, 실행 주체는 그 출력이 답한다.
+`backend.ai mgr ops list --field error_log` prints the wired list. Its output answers
+the entity type, shape, operation, gate and backing.
 
 ## Recording is user-scoped, not global
 

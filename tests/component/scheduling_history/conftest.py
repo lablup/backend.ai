@@ -29,6 +29,7 @@ from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRollou
 from ai.backend.common.types import KernelId, ResourceSlot
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
     ConcernMeta,
     GroupMeta,
 )
@@ -83,7 +84,7 @@ def scheduling_history_processors(
 ) -> SchedulingHistoryProcessors:
     repo = SchedulingHistoryRepository(database_engine)
     service = SchedulingHistoryService(repo)
-    groups = processor_registry.concern(ConcernMeta("scheduling_history"))
+    groups = processor_registry.concern(ConcernMeta(Concern.SESSION))
     return SchedulingHistoryProcessors(
         groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
         groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),

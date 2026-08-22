@@ -30,6 +30,7 @@ from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import AgentId, ResourceSlot, SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
     ConcernMeta,
     GroupMeta,
 )
@@ -128,7 +129,7 @@ async def session_processors(
         user_repository=AsyncMock(),
     )
     service = SessionService(args)
-    groups = processor_registry.concern(ConcernMeta("resource_allocation"))
+    groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     return SessionProcessors(
         processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
         ResourceAllocationProcessors(

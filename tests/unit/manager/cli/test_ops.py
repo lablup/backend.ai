@@ -7,6 +7,7 @@ from typing import cast
 
 from click.testing import CliRunner
 
+from ai.backend.manager.actions.registry.types import Concern
 from ai.backend.manager.actions.types import ActionBacking, ActionGate, ActionKind
 from ai.backend.manager.cli.ops import cli
 
@@ -60,9 +61,9 @@ def test_gate_filters_the_listing() -> None:
 
 
 def test_backing_filters_the_listing() -> None:
-    rows = _list("--backing", "ops")
+    rows = _list("--backing", "generic")
     assert rows
-    assert {row["backing"] for row in rows} == {"ops"}
+    assert {row["backing"] for row in rows} == {"generic"}
 
 
 def _entities() -> list[dict[str, str]]:
@@ -98,8 +99,18 @@ def test_a_field_type_hangs_under_the_entity_answering_for_it() -> None:
         assert len(listed) == int(row["operations"])
 
 
+def test_every_wiring_names_a_declared_area() -> None:
+    declared = {concern.value for concern in Concern}
+    assert {entry["concern"] for entry in _list()} <= declared
+
+
+def test_an_undeclared_area_is_rejected() -> None:
+    result = CliRunner().invoke(cli, ["list", "--concern", "no_such_area"])
+    assert result.exit_code != 0
+
+
 def test_every_declared_column_value_is_explained() -> None:
-    for members in (tuple(ActionKind), tuple(ActionGate), tuple(ActionBacking)):
+    for members in (tuple(ActionKind), tuple(ActionGate), tuple(ActionBacking), tuple(Concern)):
         for member in members:
             assert member.describe()
 
@@ -108,7 +119,7 @@ def test_the_listing_help_explains_the_column_values() -> None:
     result = CliRunner().invoke(cli, ["list", "--help"])
     assert result.exit_code == 0, result.output
     assert ActionGate.ANONYMOUS.describe() in result.output
-    assert ActionBacking.OPS.describe() in result.output
+    assert ActionBacking.GENERIC.describe() in result.output
 
 
 def test_no_type_name_carries_a_colon() -> None:

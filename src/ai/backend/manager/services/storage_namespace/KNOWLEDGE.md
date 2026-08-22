@@ -26,8 +26,9 @@ own rather than living as a column on the storage.
 
 ## The processor fields
 
-배선된 목록은 `backend.ai mgr ops list --concern storage_namespace`가 낸다. entity type,
-모양, 연산, 관문, 실행 주체는 그 출력이 답한다.
+`backend.ai mgr ops list --concern artifact_registry --entity storage_namespace` prints
+the wired list. Its output
+answers the entity type, shape, operation, gate and backing.
 
 Every REST route in this domain declares `superadmin_required`, so the global
 gate matches what the surface promises. The same holds for the object and VFS

@@ -135,16 +135,19 @@ which is why handlers call processors, not services.
   action has none until its owner is read — so the name alone has to tell two runs
   apart.
 
-## 배선 카탈로그를 읽어내는 명령
+## The command that reads the catalog out
 
-- `backend.ai mgr ops list`가 배선 기록 전량을 낸다. `--concern`, `--entity`, `--field`,
-  `--operation`, `--gate`, `--backing`으로 거르고, `--output json|tsv`로 형식을 바꾼다.
-  `backend.ai mgr ops describe <entity_type> <action_name>`은 한 건의 입력 필드와 정의
-  위치까지 낸다.
-- concern, entity_type, field_type, kind, gate, backing은 배선이 정하므로 액션 클래스에
-  없다. operation과 action_name은 클래스가 선언한다.
-- 의존성을 한 단계도 세우지 않는다. 조립은 실행 객체를 핸들러로 저장할 뿐 호출하지
-  않으므로, 실행 객체 자리를 대역으로 채우면 DB도 리더 선출도 이벤트 소비자도 없이 조립만
-  돈다. 운영 중인 매니저 옆에서 돌려도 부딪히지 않는다.
-- 레지스트리가 기록하는 것만 나온다. 레거시 베이스에 남은 처리기는 `ProcessorGroup`을
-  거치지 않으므로 이 목록에 없다.
+- `backend.ai mgr ops list` prints every wiring record. It filters on `--concern`,
+  `--entity`, `--field`, `--operation`, `--gate` and `--backing`, and `--output
+  json|tsv` changes the format. `backend.ai mgr ops entities` prints the entity types
+  and the field types under each; `backend.ai mgr ops describe <entity_type>
+  <action_name>` adds one operation's input fields and where it is defined.
+- The wiring decides concern, entity_type, field_type, kind, gate and backing, so the
+  action class carries none of them. The class declares operation and action_name.
+- The areas are declared as `Concern` members with a line each on what they hold, so a
+  new domain picks one rather than coining a name.
+- No dependency stage is started. Assembly stores handlers rather than calling them, so
+  a stand-in in place of the runtime is enough: no database, no leader election, no
+  event consumer, and nothing that collides with a running manager.
+- Only what the registry records appears. A processor still on the legacy base is wired
+  outside `ProcessorGroup` and is absent from the listing.

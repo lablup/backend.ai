@@ -68,10 +68,12 @@ grows a branch; the generic services take no hook or callback to hide one in.
   live in `actions/AGENTS.md`.
 - `Processors.__init__` takes its `ProcessorGroup`s first and the service after them.
   Several groups are listed together, before the service.
-- 도메인의 처리기 구성을 `KNOWLEDGE.md`에 표로 옮겨 적지 않는다. entity type, 모양, 연산,
-  관문, 실행 주체는 `backend.ai mgr ops list --concern <name>`이 답한다.
-- 문서에는 그 명령이 답하지 못하는 것만 적는다 — 처리기 필드 이름, 실패 모드(atomic /
-  partial bulk), 무엇에 대해 인가되는지, 그리고 그 모양을 고른 이유.
+- Do NOT transcribe a domain's processor composition into `KNOWLEDGE.md` as a table.
+  `backend.ai mgr ops list --concern <name>` answers the entity type, shape, operation,
+  gate and backing.
+- Write only what that command cannot answer: the processor field names, the failure
+  mode (atomic / partial bulk), what the operation is authorized against, and why each
+  shape was chosen.
 - A domain whose composition changes and has no `KNOWLEDGE.md` yet gets one, following
   the `/knowledge` skill's schema. Record what the shapes are and why the surprising
   ones were chosen — not the wiring, which the code already shows.
