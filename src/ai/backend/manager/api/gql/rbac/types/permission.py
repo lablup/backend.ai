@@ -12,6 +12,8 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import (
     BulkAddRolePermissionsInput as BulkAddRolePermissionsInputDTO,
@@ -77,8 +79,6 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeFilter as OperationTypeFilterDTO,
 )
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (

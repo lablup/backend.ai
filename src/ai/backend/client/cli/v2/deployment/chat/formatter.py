@@ -6,7 +6,7 @@ from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCacheEntry,
     DeploymentChatConfigEntry,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentID
 
 
 def mask_token(token: str | None) -> str:

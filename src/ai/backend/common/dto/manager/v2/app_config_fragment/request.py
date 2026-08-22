@@ -8,6 +8,8 @@ from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.entity.app_config import AppConfigScopeID
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     AppConfigFragmentOrderField,
@@ -15,8 +17,6 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
-from ai.backend.common.identifier.app_config import AppConfigScopeID
-from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 
 __all__ = (
     "AdminSearchAppConfigFragmentInput",

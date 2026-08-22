@@ -17,8 +17,8 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -37,17 +37,17 @@ from ai.backend.manager.models.agent import (
     agents,
     get_permission_ctx,
 )
-from ai.backend.manager.models.group import AssocGroupUserRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.project import AssocGroupUserRow
 from ai.backend.manager.models.rbac import (
     ScopeType,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
 from ai.backend.manager.services.agent.actions.update_resource_group import (
@@ -189,7 +189,7 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
             status=data.status.name,
             status_changed=data.status_changed,
             region=data.region,
-            scaling_group=data.scaling_group,
+            scaling_group=data.resource_group,
             schedulable=data.schedulable,
             available_slots=data.available_slots.to_json(),
             occupied_slots=data.actual_occupied_slots.to_json(),
@@ -406,7 +406,7 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
             status=data.status.name,
             status_changed=data.status_changed,
             region=data.region,
-            scaling_group=data.scaling_group,
+            scaling_group=data.resource_group,
             schedulable=data.schedulable,
             available_slots=data.available_slots.to_json(),
             occupied_slots=data.actual_occupied_slots.to_json(),
@@ -706,7 +706,7 @@ async def _append_sgroup_from_clause(
     domain_name: str | None,
     scaling_group: str | None = None,
 ) -> sa.sql.Select[Any]:
-    from ai.backend.manager.models.scaling_group import query_allowed_sgroups
+    from ai.backend.manager.models.resource_group import query_allowed_sgroups
 
     if scaling_group is not None:
         query = query.where(AgentRow.scaling_group == scaling_group)
@@ -746,7 +746,7 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
         return cls(
             id=data.id,
             status=data.status.name,
-            scaling_group=data.scaling_group,
+            scaling_group=data.resource_group,
             schedulable=data.schedulable,
             available_slots=data.available_slots.to_json(),
             occupied_slots=data.actual_occupied_slots.to_json(),
@@ -923,7 +923,7 @@ class ModifyAgent(graphene.Mutation):  # type: ignore[misc]
         if scaling_group is not None:
             async with graph_ctx.db.begin_readonly_read_committed() as conn:
                 resource_group_id = await conn.scalar(
-                    sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == scaling_group)
+                    sa.select(ResourceGroupRow.id).where(ResourceGroupRow.name == scaling_group)
                 )
             if resource_group_id is None:
                 return cls(False, f"no such scaling group: {scaling_group}")

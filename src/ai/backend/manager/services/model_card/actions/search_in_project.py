@@ -1,53 +1,45 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.types import EntityType, ScopeRef
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.model_card.types import ModelCardData
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.searchers import ModelCardSearcher
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.model_card.types import ProjectModelCardOperationScope
-from ai.backend.manager.services.model_card.actions.base import ModelCardScopeAction
 
 
-@dataclass
-class SearchModelCardsInProjectAction(ModelCardScopeAction):
-    """Search model cards within a MODEL_STORE project scope."""
+@dataclass(frozen=True)
+class SearchModelCardsInProjectAction(OperationScopeOpsAction[ModelCardRow, ModelCardData]):
+    """Page through the model cards of a MODEL_STORE project."""
 
-    scope: ProjectModelCardOperationScope
-    querier: BatchQuerier
+    project_id: ProjectID
+    searcher: ModelCardSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def entity_type(cls) -> EntityType:
+        return MODEL_CARD_ENTITY_TYPE
 
     @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.PROJECT
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id),)
 
     @override
-    def scope_id(self) -> str:
-        return str(self.scope.project_id)
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return (ProjectModelCardOperationScope(project_id=self.project_id),)
 
     @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.PROJECT,
-            element_id=str(self.scope.project_id),
-        )
-
-
-@dataclass
-class SearchModelCardsInProjectActionResult(BaseActionResult):
-    items: list[ModelCardData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_model_cards_in_project"
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def to_searcher(self) -> ModelCardSearcher:
+        return self.searcher

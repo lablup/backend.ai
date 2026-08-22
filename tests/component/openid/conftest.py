@@ -30,8 +30,8 @@ from authlib.jose import JsonWebKey  # pants: no-infer-dep
 from authlib.jose import jwt as jose_jwt  # pants: no-infer-dep
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.permission.types import EntityType, ScopeType
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
     ResourceSlot,
@@ -47,10 +47,10 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.group import association_groups_users, groups
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.project import association_groups_users, groups
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
     ProjectResourcePolicyRow,
@@ -440,6 +440,7 @@ async def seed_data(
         await conn.execute(
             keypair_resource_policies.insert().values(
                 name="default",
+                is_default=True,
                 default_for_unspecified=DefaultForUnspecified.LIMITED,
                 total_resource_slots=ResourceSlot({}),
                 max_session_lifetime=0,
@@ -452,7 +453,7 @@ async def seed_data(
                 allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             )
         )
-        project = GroupRow(
+        project = ProjectRow(
             name="default",
             domain_name="default",
             total_resource_slots=ResourceSlot({}),

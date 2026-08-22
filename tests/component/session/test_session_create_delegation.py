@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.session.request import CreateFromParamsRequest
 from ai.backend.common.types import SessionTypes
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.types import UserScope
@@ -79,7 +79,9 @@ class TestDelegatedSessionCreation:
         """Resolve the group name corresponding to ``group_fixture`` (a UUID)."""
         async with db_engine.begin() as conn:
             result = await conn.execute(
-                sa.select(GroupRow.__table__.c.name).where(GroupRow.__table__.c.id == group_fixture)
+                sa.select(ProjectRow.__table__.c.name).where(
+                    ProjectRow.__table__.c.id == group_fixture
+                )
             )
             name = result.scalar()
         assert name is not None, "group_fixture row missing name"

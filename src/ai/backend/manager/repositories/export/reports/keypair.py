@@ -7,8 +7,8 @@ from decimal import Decimal
 from typing import Any
 
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_group import ResourceGroupForKeypairsRow, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForKeypairsRow, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.export import (
@@ -60,12 +60,12 @@ RESOURCE_POLICY_JOIN = JoinDef(
 
 # Resource Group JOINs (1:N, causes duplication)
 SGROUP_FOR_KEYPAIR_JOIN = JoinDef(
-    table=ScalingGroupForKeypairsRow.__table__,
-    condition=KeyPairRow.access_key == ScalingGroupForKeypairsRow.access_key,
+    table=ResourceGroupForKeypairsRow.__table__,
+    condition=KeyPairRow.access_key == ResourceGroupForKeypairsRow.access_key,
 )
 RESOURCE_GROUP_JOIN = JoinDef(
-    table=ScalingGroupRow.__table__,
-    condition=ScalingGroupForKeypairsRow.resource_group_id == ScalingGroupRow.id,
+    table=ResourceGroupRow.__table__,
+    condition=ResourceGroupForKeypairsRow.resource_group_id == ResourceGroupRow.id,
 )
 RESOURCE_GROUP_JOINS = (SGROUP_FOR_KEYPAIR_JOIN, RESOURCE_GROUP_JOIN)
 
@@ -275,7 +275,7 @@ KEYPAIR_FIELDS: list[ExportFieldDef] = [
         name="Resource Group Name",
         description="Resource group name",
         field_type=ExportFieldType.STRING,
-        column=ScalingGroupRow.name,
+        column=ResourceGroupRow.name,
         joins=RESOURCE_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -283,7 +283,7 @@ KEYPAIR_FIELDS: list[ExportFieldDef] = [
         name="Resource Group Description",
         description="Resource group description",
         field_type=ExportFieldType.STRING,
-        column=ScalingGroupRow.description,
+        column=ResourceGroupRow.description,
         joins=RESOURCE_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -291,7 +291,7 @@ KEYPAIR_FIELDS: list[ExportFieldDef] = [
         name="Resource Group Active",
         description="Resource group active status",
         field_type=ExportFieldType.BOOLEAN,
-        column=ScalingGroupRow.is_active,
+        column=ResourceGroupRow.is_active,
         joins=RESOURCE_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -299,7 +299,7 @@ KEYPAIR_FIELDS: list[ExportFieldDef] = [
         name="Resource Group Scheduler",
         description="Resource group scheduler type",
         field_type=ExportFieldType.STRING,
-        column=ScalingGroupRow.scheduler,
+        column=ResourceGroupRow.scheduler,
         joins=RESOURCE_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -307,7 +307,7 @@ KEYPAIR_FIELDS: list[ExportFieldDef] = [
         name="Resource Group WSProxy Address",
         description="WebSocket proxy address for resource group",
         field_type=ExportFieldType.STRING,
-        column=ScalingGroupRow.wsproxy_addr,
+        column=ResourceGroupRow.wsproxy_addr,
         joins=RESOURCE_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -315,7 +315,7 @@ KEYPAIR_FIELDS: list[ExportFieldDef] = [
         name="Resource Group Fair Share Spec",
         description="Fair share specification for resource group",
         field_type=ExportFieldType.JSON,
-        column=ScalingGroupRow.fair_share_spec,
+        column=ResourceGroupRow.fair_share_spec,
         formatter=_serialize_json,
         joins=RESOURCE_GROUP_JOINS,
     ),

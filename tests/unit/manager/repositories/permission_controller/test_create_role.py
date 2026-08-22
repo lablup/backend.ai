@@ -32,7 +32,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.permission_controller.creators import RoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
@@ -55,7 +55,7 @@ CREATE_ROLE_TABLES: Sequence[TableOrORM] = [
 
 _ORM_CLUSTER = (
     AgentRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
 )
 
 

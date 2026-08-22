@@ -4,10 +4,10 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.types import MountInfoEntry, MountPermission
 from ai.backend.manager.data.deployment.types import (

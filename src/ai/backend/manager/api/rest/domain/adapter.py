@@ -6,6 +6,7 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.domain import (
     DomainDTO,
     DomainFilter,
@@ -18,14 +19,12 @@ from ai.backend.common.dto.manager.domain import (
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.orders import DomainOrders
+from ai.backend.manager.models.domain.searchers import DomainSearcher
+from ai.backend.manager.models.domain.updaters import DomainUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.domain.updaters import DomainUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
 __all__ = ("DomainAdapter",)
@@ -48,7 +47,7 @@ class DomainAdapter(BaseFilterAdapter):
             integration_id=data.integration_name,  # data type uses integration_name, v1 DTO uses integration_id
         )
 
-    def build_updater(self, request: UpdateDomainRequest, domain_name: str) -> Updater[DomainRow]:
+    def build_updater(self, request: UpdateDomainRequest, domain_id: DomainID) -> DomainUpdater:
         """Convert update request to updater."""
         name = OptionalState[str].nop()
         description = TriState[str].nop()
@@ -73,8 +72,9 @@ class DomainAdapter(BaseFilterAdapter):
         if request.integration_id is not None:
             integration_name = TriState.update(request.integration_id)
 
-        updater_spec = DomainUpdaterSpec(
-            name=name,
+        return DomainUpdater(
+            domain_id=domain_id,
+            new_name=name,
             description=description,
             is_active=is_active,
             total_resource_slots=total_resource_slots,
@@ -82,15 +82,14 @@ class DomainAdapter(BaseFilterAdapter):
             allowed_docker_registries=allowed_docker_registries,
             integration_name=integration_name,
         )
-        return Updater(spec=updater_spec, pk_value=domain_name)
 
-    def build_querier(self, request: SearchDomainsRequest) -> BatchQuerier:
-        """Build a BatchQuerier for domains from search request."""
+    def build_searcher(self, request: SearchDomainsRequest) -> DomainSearcher:
+        """Build a domain searcher from the search request."""
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(o) for o in request.order] if request.order else []
         pagination = self._build_pagination(request.limit, request.offset)
 
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return DomainSearcher(conditions=conditions, orders=orders, pagination=pagination)
 
     def _convert_filter(self, filter_req: DomainFilter) -> list[QueryCondition]:
         """Convert domain filter to list of query conditions."""

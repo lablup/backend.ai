@@ -8,8 +8,9 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.types import EntityRef, ScopeRef
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.status import PermissionStatus, RoleStatus
 from ai.backend.manager.data.permission.types import (
@@ -105,7 +106,7 @@ class UserRoleCreatorSpec(CreatorSpec[UserRoleRow]):
 
     user_id: uuid.UUID
     role_id: uuid.UUID
-    granted_by: uuid.UUID | None = None
+    granted_by: UserID | None = None
 
     @property
     @override

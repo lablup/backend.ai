@@ -1,28 +1,32 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
-from ai.backend.manager.services.vfs_storage.actions.base import VFSStorageAction
+from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
+from ai.backend.manager.models.vfs_storage.searchers import VFSStorageSearcher
 
 
 @dataclass
-class ListVFSStorageAction(VFSStorageAction):
-    @override
-    def entity_id(self) -> str | None:
-        return None
+class ListVFSStorageAction(SearchGlobalOpsAction[VFSStorageRow, VFSStorageData]):
+    """Every registered VFS storage, unpaged."""
+
+    searcher: VFSStorageSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class ListVFSStorageActionResult(BaseActionResult):
-    data: list[VFSStorageData]
+    def entity_type(cls) -> EntityType:
+        return VFS_STORAGE_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "list_vfs_storages"
+
+    @override
+    def to_searcher(self) -> VFSStorageSearcher:
+        return self.searcher

@@ -6,14 +6,14 @@ from typing import TYPE_CHECKING
 
 from strawberry.dataloader import DataLoader
 
-from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
-from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
-from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.permission.id import ObjectId
 

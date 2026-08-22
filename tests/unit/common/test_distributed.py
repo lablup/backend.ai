@@ -74,15 +74,6 @@ def dslice(start: Decimal, stop: Decimal, num: int) -> Iterable[Decimal]:
 class NoopAnycastEvent(AbstractAnycastEvent):
     test_case_ns: str
 
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return (self.test_case_ns,)
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> NoopAnycastEvent:
-        return cls(test_case_ns=value[0])
-
     @classmethod
     @override
     def event_domain(cls) -> EventDomain:

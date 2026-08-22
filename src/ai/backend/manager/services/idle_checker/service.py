@@ -1,8 +1,8 @@
 from typing import cast
 
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.idle_checker.types import IdleCheckerSpec
 from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.manager.repositories.base import BulkUpserter
 from ai.backend.manager.repositories.idle_checker.creators import IdleCheckerCreatorSpec
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository

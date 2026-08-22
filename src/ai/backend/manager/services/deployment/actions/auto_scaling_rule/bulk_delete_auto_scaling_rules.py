@@ -2,20 +2,18 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.deployment.actions.auto_scaling_rule.base import (
-    AutoScalingRuleBaseAction,
-)
+from ai.backend.manager.services.deployment.actions.base import DeploymentGlobalAction
 
 
 @dataclass
-class BulkDeleteAutoScalingRulesAction(AutoScalingRuleBaseAction):
+class BulkDeleteAutoScalingRulesAction(DeploymentGlobalAction):
     auto_scaling_rule_ids: list[UUID]
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "bulk_delete_auto_scaling_rules"
 
     @override
     @classmethod
@@ -24,9 +22,5 @@ class BulkDeleteAutoScalingRulesAction(AutoScalingRuleBaseAction):
 
 
 @dataclass
-class BulkDeleteAutoScalingRulesActionResult(BaseActionResult):
+class BulkDeleteAutoScalingRulesActionResult:
     deleted_ids: list[UUID]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

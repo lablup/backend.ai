@@ -22,7 +22,7 @@ def register_v2_user_routes(
     reg.add("POST", "/search", handler.admin_search, middlewares=[superadmin_required])
     reg.add("GET", "/{user_id}", handler.get, middlewares=[auth_required])
     reg.add("POST", "", handler.create_user, middlewares=[superadmin_required])
-    reg.add("PATCH", "/{user_id}", handler.modify_user, middlewares=[superadmin_required])
+    reg.add("PATCH", "/{user_id}", handler.update_user, middlewares=[superadmin_required])
     reg.add("POST", "/delete", handler.delete_user, middlewares=[superadmin_required])
     reg.add(
         "POST",

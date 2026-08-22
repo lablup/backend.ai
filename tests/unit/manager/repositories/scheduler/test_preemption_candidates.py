@@ -14,9 +14,9 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.schema.resource_group import PreemptionConfig
 from ai.backend.common.types import (
     AccessKey,
@@ -33,9 +33,9 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -57,7 +57,7 @@ async def _create_allocated_session(
     domain_name: str,
     domain_id: DomainID,
     resource_group_id: ResourceGroupID,
-    scaling_group_name: str,
+    resource_group_name: str,
     group_id: uuid.UUID,
     user_uuid: uuid.UUID,
     access_key: AccessKey,
@@ -74,7 +74,7 @@ async def _create_allocated_session(
         domain_id=domain_id,
         domain_name=domain_name,
         resource_group_id=resource_group_id,
-        scaling_group_name=scaling_group_name,
+        resource_group_name=resource_group_name,
         group_id=group_id,
         user_uuid=user_uuid,
         access_key=access_key,
@@ -118,7 +118,6 @@ async def _create_extra_user(
         await db_sess.flush()
         db_sess.add(
             KeyPairRow(
-                user_id=email,
                 access_key=access_key,
                 secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
                 is_active=True,
@@ -143,7 +142,7 @@ async def _create_extra_project(
     group_id = uuid.uuid4()
     async with db.begin_session() as db_sess:
         db_sess.add(
-            GroupRow(
+            ProjectRow(
                 id=group_id,
                 name=f"extra-group-{uuid.uuid4().hex[:8]}",
                 description="Extra test group",
@@ -182,7 +181,7 @@ async def _create_extra_domain(
 async def _create_extra_agent(
     db: ExtendedAsyncSAEngine,
     *,
-    scaling_group_name: str,
+    resource_group_name: str,
     resource_group_id: ResourceGroupID,
 ) -> str:
     agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
@@ -192,7 +191,7 @@ async def _create_extra_agent(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 region="local",
-                scaling_group=scaling_group_name,
+                scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
                 occupied_slots=ResourceSlot(),
@@ -212,10 +211,10 @@ async def _set_preemption_config(
 ) -> None:
     async with db.begin_session() as db_sess:
         await db_sess.execute(
-            sa.update(ScalingGroupRow)
-            .where(ScalingGroupRow.id == resource_group_id)
+            sa.update(ResourceGroupRow)
+            .where(ResourceGroupRow.id == resource_group_id)
             .values(
-                scheduler_opts=ScalingGroupOpts(
+                scheduler_opts=ResourceGroupOpts(
                     allowed_session_types=[],
                     pending_timeout=timedelta(hours=1),
                     config={},
@@ -245,10 +244,10 @@ async def preemption_enabled(
     """Turn on preemption for the test scaling group."""
     async with db_with_cleanup.begin_session() as db_sess:
         await db_sess.execute(
-            sa.update(ScalingGroupRow)
-            .where(ScalingGroupRow.id == test_scaling_group_id)
+            sa.update(ResourceGroupRow)
+            .where(ResourceGroupRow.id == test_scaling_group_id)
             .values(
-                scheduler_opts=ScalingGroupOpts(
+                scheduler_opts=ResourceGroupOpts(
                     allowed_session_types=[],
                     pending_timeout=timedelta(hours=1),
                     config={},
@@ -281,7 +280,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -294,7 +293,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -329,7 +328,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -342,7 +341,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -355,7 +354,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -369,7 +368,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -384,7 +383,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -398,7 +397,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -446,7 +445,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -460,7 +459,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -507,7 +506,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -519,7 +518,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -540,7 +539,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=other_user,
             access_key=other_access_key,
@@ -554,7 +553,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=other_user,
             access_key=other_access_key,
@@ -567,7 +566,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=other_user,
             access_key=other_access_key,
@@ -612,7 +611,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -624,7 +623,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -644,7 +643,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=other_user,
             access_key=other_access_key,
@@ -656,7 +655,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=other_user,
             access_key=other_access_key,
@@ -693,7 +692,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -714,7 +713,7 @@ class TestFetchPreemptionCandidates:
                     domain_id=test_domain_id,
                     domain_name=test_domain.domain_name,
                     resource_group_id=test_scaling_group_id,
-                    scaling_group_name=test_scaling_group_name,
+                    resource_group_name=test_scaling_group_name,
                     group_id=test_group_id,
                     user_uuid=test_user_uuid,
                     access_key=test_access_key,
@@ -750,7 +749,7 @@ class TestFetchPreemptionCandidates:
     ) -> None:
         second_agent_id = await _create_extra_agent(
             db_with_cleanup,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             resource_group_id=test_scaling_group_id,
         )
         await create_pending_session_with_kernels(
@@ -760,7 +759,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -775,7 +774,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -839,7 +838,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -852,7 +851,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -865,7 +864,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -883,7 +882,7 @@ class TestFetchPreemptionCandidates:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -931,7 +930,7 @@ class TestPreemptionVictimScope:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -951,7 +950,7 @@ class TestPreemptionVictimScope:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=other_user,
             access_key=other_access_key,
@@ -964,7 +963,7 @@ class TestPreemptionVictimScope:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=other_user,
             access_key=other_access_key,
@@ -982,7 +981,7 @@ class TestPreemptionVictimScope:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=other_project,
             user_uuid=other_user,
             access_key=other_access_key,
@@ -1029,7 +1028,7 @@ class TestPreemptionVictimScope:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -1054,7 +1053,7 @@ class TestPreemptionVictimScope:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=other_project,
             user_uuid=other_user,
             access_key=other_access_key,
@@ -1080,7 +1079,7 @@ class TestPreemptionVictimScope:
             domain_id=extra_domain_id,
             domain_name=extra_domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=extra_domain_project,
             user_uuid=extra_domain_user,
             access_key=extra_domain_access_key,
@@ -1127,7 +1126,7 @@ class TestPreemptionVictimScope:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -1153,7 +1152,7 @@ class TestPreemptionVictimScope:
             domain_id=extra_domain_id,
             domain_name=extra_domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=extra_domain_project,
             user_uuid=extra_domain_user,
             access_key=extra_domain_access_key,
@@ -1166,7 +1165,7 @@ class TestPreemptionVictimScope:
             domain_id=extra_domain_id,
             domain_name=extra_domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=extra_domain_project,
             user_uuid=extra_domain_user,
             access_key=extra_domain_access_key,

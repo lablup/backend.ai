@@ -18,7 +18,7 @@ class ResourcePresetUpdaterSpec(UpdaterSpec[ResourcePresetRow]):
     )
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     shared_memory: TriState[BinarySize] = field(default_factory=TriState[BinarySize].nop)
-    scaling_group_name: TriState[str] = field(default_factory=TriState[str].nop)
+    resource_group_name: TriState[str] = field(default_factory=TriState[str].nop)
 
     @property
     @override
@@ -31,5 +31,5 @@ class ResourcePresetUpdaterSpec(UpdaterSpec[ResourcePresetRow]):
         self.resource_slots.update_dict(to_update, "resource_slots")
         self.name.update_dict(to_update, "name")
         self.shared_memory.update_dict(to_update, "shared_memory")
-        self.scaling_group_name.update_dict(to_update, "scaling_group_name")
+        self.resource_group_name.update_dict(to_update, "scaling_group_name")
         return to_update

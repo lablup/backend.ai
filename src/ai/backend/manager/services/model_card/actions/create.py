@@ -1,32 +1,60 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.model_card.types import ModelCardData
+from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.types import EntityType, ScopeRef
+from ai.backend.manager.actions.v2.ops.base import CreateEntityWithFieldsOpsAction
+from ai.backend.manager.data.model_card.types import (
+    ModelCardData,
+    ModelCardResourceRequirementData,
+    ResourceRequirementEntry,
+)
+from ai.backend.manager.models.model_card.creators import (
+    ModelCardCreator,
+    ModelCardResourceRequirementCreator,
+)
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.services.model_card.actions.base import ModelCardAction
+from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
 
 
-@dataclass
-class CreateModelCardAction(ModelCardAction):
-    creator: RBACEntityCreator[ModelCardRow]
+@dataclass(frozen=True)
+class CreateModelCardAction(
+    CreateEntityWithFieldsOpsAction[
+        ModelCardRow,
+        ModelCardData,
+        ModelCardResourceRequirementRow,
+        ModelCardResourceRequirementData,
+    ]
+):
+    """Register a model card in a project, with the minimum resources it declares."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    creator: ModelCardCreator
+    min_resource: Sequence[ResourceRequirementEntry]
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-
-@dataclass
-class CreateModelCardActionResult(BaseActionResult):
-    model_card: ModelCardData
+    def entity_type(cls) -> EntityType:
+        return MODEL_CARD_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.model_card.id)
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (
+            ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(self.creator.project_id)),
+        )
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_model_card"
+
+    @override
+    def to_creator(self) -> ModelCardCreator:
+        return self.creator
+
+    @override
+    def to_field_creators(self) -> Sequence[ModelCardResourceRequirementCreator]:
+        return [ModelCardResourceRequirementCreator(entry=entry) for entry in self.min_resource]

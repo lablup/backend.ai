@@ -1,8 +1,8 @@
 import logging
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import aiofiles
 
@@ -18,6 +18,12 @@ from ai.backend.common.types import DeviceName, SlotName
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+_HOST_CONFIG_FIELD: Final[str] = "HostConfig"
+_MOUNTS_FIELD: Final[str] = "Mounts"
+_MOUNT_TARGET_FIELD: Final[str] = "Target"
+_MOUNT_DESTINATION_FIELD: Final[str] = "Destination"
+_MOUNT_SOURCE_FIELD: Final[str] = "Source"
 
 
 async def load_resources(
@@ -84,12 +90,32 @@ async def scan_available_resources(
     return slots
 
 
+def _get_container_mounts(container_info: Mapping[str, Any]) -> Sequence[Mapping[str, Any]]:
+    host_config_mounts: Sequence[Mapping[str, Any]] | None
+    try:
+        host_config_mounts = container_info[_HOST_CONFIG_FIELD][_MOUNTS_FIELD]
+    except KeyError:
+        host_config_mounts = None
+    if host_config_mounts:
+        return host_config_mounts
+
+    mounts: Sequence[Mapping[str, Any]] | None
+    try:
+        mounts = container_info[_MOUNTS_FIELD]
+    except KeyError:
+        mounts = None
+    return mounts or []
+
+
+def _get_mount_target(mount: Mapping[str, Any]) -> str | None:
+    return mount.get(_MOUNT_TARGET_FIELD) or mount.get(_MOUNT_DESTINATION_FIELD)
+
+
 async def get_resource_spec_from_container(
     container_info: Mapping[str, Any],
 ) -> KernelResourceSpec | None:
-    for mount in container_info["HostConfig"]["Mounts"]:
-        if mount["Target"] == "/home/config":
-            async with aiofiles.open(Path(mount["Source"]) / "resource.txt") as f:
+    for mount in _get_container_mounts(container_info):
+        if _get_mount_target(mount) == "/home/config":
+            async with aiofiles.open(Path(mount[_MOUNT_SOURCE_FIELD]) / "resource.txt") as f:
                 return await KernelResourceSpec.aread_from_file(f)
-    else:
-        return None
+    return None

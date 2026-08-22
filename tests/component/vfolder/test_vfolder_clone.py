@@ -24,9 +24,12 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.bgtask.types import TaskID
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.common.dto.manager.v2.vfolder.request import CloneVFolderInput
 from ai.backend.common.dto.manager.vfolder import CloneVFolderReq
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -66,10 +69,11 @@ VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
 @pytest.fixture()
 def vfolder_admin_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
 ) -> VFolderAdminProcessors:
     repo = VFolderAdminRepository(database_engine)
     service = VFolderAdminService(vfolder_admin_repository=repo)
-    return VFolderAdminProcessors(service=service, action_monitors=[])
+    return VFolderAdminProcessors(processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()

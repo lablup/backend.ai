@@ -5,6 +5,7 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     CreateIdleCheckerAssignmentInput,
     IdleCheckerAssignmentScopeDTO,
@@ -12,7 +13,6 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
 )
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import IdleCheckerScopeTypeDTO
 from ai.backend.common.exception import BackendAISchemaValidationFailed
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
 
 _DOMAIN_SCOPE_ID = uuid.UUID("7b56b1f4-2936-4d29-9db9-621cc5b1cf8f")
 

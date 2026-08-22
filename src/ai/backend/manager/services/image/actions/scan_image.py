@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.services.image.actions.base import ImageAction
@@ -15,12 +13,8 @@ class ScanImageAction(ImageAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.IMAGE_SCAN
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    def action_name(cls) -> str:
+        return "scan_image"
 
     @override
     @classmethod
@@ -29,10 +23,6 @@ class ScanImageAction(ImageAction):
 
 
 @dataclass
-class ScanImageActionResult(BaseActionResult):
+class ScanImageActionResult:
     image: ImageData
     errors: list[str]
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.image.id)

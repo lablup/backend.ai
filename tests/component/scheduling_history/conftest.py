@@ -5,8 +5,8 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock
+from typing import TYPE_CHECKING, Any
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -16,17 +16,22 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.common.identifier.replica_group_history import ReplicaGroupHistoryID
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.identifier.session import SessionID
-from ai.backend.common.identifier.session_group import SessionGroupID
+from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
+from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.replica_group_history import (
+    ReplicaGroupHistoryID,
+)
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import KernelId, ResourceSlot
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    ConcernMeta,
+    GroupMeta,
+)
 from ai.backend.manager.api.adapters.scheduling_history.adapter import SchedulingHistoryAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
@@ -60,9 +65,11 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduling_history.repository import (
     SchedulingHistoryRepository,
 )
+from ai.backend.manager.services.resource_slot.actions.lookup_kernel_owner import (
+    LookupKernelOwnerAction,
+)
 from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
 from ai.backend.manager.services.scheduling_history.service import SchedulingHistoryService
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
@@ -72,30 +79,35 @@ if TYPE_CHECKING:
 @pytest.fixture()
 def scheduling_history_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
 ) -> SchedulingHistoryProcessors:
     repo = SchedulingHistoryRepository(database_engine)
     service = SchedulingHistoryService(repo)
+    groups = processor_registry.concern(ConcernMeta("scheduling_history"))
     return SchedulingHistoryProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
-        ),
+        groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
+        groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
+        service,
     )
 
 
 @pytest.fixture()
 def scheduling_history_adapter(
     scheduling_history_processors: SchedulingHistoryProcessors,
+    processor_registry: ProcessorRegistry[Any],
 ) -> SchedulingHistoryAdapter:
-    """Build an adapter wired only with scheduling-history processors.
+    """Build an adapter wired with the processors its call sites reach.
 
-    Every call site in the adapter goes through ``self._processors.scheduling_history``,
-    so a MagicMock backing object with that attribute set is sufficient.
+    The scoped kernel search resolves each kernel's owner through the resource-slot
+    group, so that lookup is wired for real beside the scheduling-history ones.
     """
     processors = MagicMock()
     processors.scheduling_history = scheduling_history_processors
+    processors.resource_slot = MagicMock()
+    processors.resource_slot.lookup_kernel_owner = processor_registry.group(
+        GroupMeta(SESSION_ENTITY_TYPE)
+    ).key_owner_lookup_ops(LookupKernelOwnerAction)
     return SchedulingHistoryAdapter(processors)
 
 
@@ -189,7 +201,7 @@ async def kernel_history_seed(
     database_engine: ExtendedAsyncSAEngine,
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
     admin_user_fixture: UserFixtureData,
 ) -> AsyncIterator[KernelHistorySeed]:
@@ -240,7 +252,7 @@ async def kernel_history_seed(
                 domain_id=domain_fixture.domain_id,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
-                scaling_group_name=scaling_group_name,
+                scaling_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 occupying_slots=slots,
                 requested_slots=slots,
@@ -260,7 +272,7 @@ async def kernel_history_seed(
                 repl_out_port=0,
                 stdin_port=0,
                 stdout_port=0,
-                scaling_group=scaling_group_name,
+                scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
             )
             for kid in (kernel_id, other_kernel_id)
@@ -349,7 +361,7 @@ async def replica_group_history_seed(
     database_engine: ExtendedAsyncSAEngine,
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     admin_user_fixture: UserFixtureData,
 ) -> AsyncIterator[ReplicaGroupHistorySeed]:
     """Seed one deployment with two replica groups so the scope has rows to exclude."""
@@ -380,7 +392,7 @@ async def replica_group_history_seed(
                 session_owner=admin_user_fixture.user_uuid,
                 domain=domain_fixture.domain_name,
                 project=group_fixture,
-                resource_group=scaling_group_name,
+                resource_group=resource_group_name,
                 lifecycle_stage=EndpointLifecycle.CREATED,
                 replicas=1,
             )

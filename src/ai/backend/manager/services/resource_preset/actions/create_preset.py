@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
@@ -14,8 +13,9 @@ class CreateResourcePresetAction(ResourcePresetAction):
     creator: Creator[ResourcePresetRow]
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_create_resource_preset"
 
     @override
     @classmethod
@@ -24,12 +24,8 @@ class CreateResourcePresetAction(ResourcePresetAction):
 
 
 @dataclass
-class CreateResourcePresetActionResult(BaseActionResult):
+class CreateResourcePresetActionResult:
     resource_preset: ResourcePresetData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.resource_preset.id)
 
 
 # TODO: Create exceptions.

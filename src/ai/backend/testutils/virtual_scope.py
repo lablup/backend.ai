@@ -64,23 +64,15 @@ class VirtualScopeSeeder:
         self, sess: AsyncSession, group_id: uuid.UUID, user_id: uuid.UUID
     ) -> None:
         """Write the chain rows the enrollment path creates for a user-project
-        membership: the user joins the project's virtual scope and the project is
-        bound into the user's own virtual scope."""
+        membership: the user joins the project's virtual scope. The project is not bound
+        into the user's own virtual scope — a member does not hand the project its
+        personal entities."""
         project_scope_id = await self.get_or_create_scope(sess, ScopeType.PROJECT, group_id)
-        user_scope_id = await self.get_or_create_scope(sess, ScopeType.USER, user_id)
         sess.add(
             EntityMembershipRow(
                 virtual_scope_id=project_scope_id,
                 entity_type=EntityType.USER,
                 entity_id=user_id,
-                permission_cap=None,
-            )
-        )
-        sess.add(
-            ScopeBindingRow(
-                virtual_scope_id=user_scope_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=group_id,
                 permission_cap=None,
             )
         )

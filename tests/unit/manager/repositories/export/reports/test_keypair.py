@@ -6,8 +6,8 @@ import pytest
 
 from ai.backend.manager.api.rest.export.adapter import ExportAdapter
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_group import ResourceGroupForKeypairsRow, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForKeypairsRow, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.export import ExportFieldDef
@@ -139,11 +139,11 @@ class TestJoinDefinitions:
 
     def test_sgroup_for_keypair_join_table(self) -> None:
         """ScalingGroupForKeypairs JOIN should use correct table."""
-        assert SGROUP_FOR_KEYPAIR_JOIN.table is ScalingGroupForKeypairsRow.__table__
+        assert SGROUP_FOR_KEYPAIR_JOIN.table is ResourceGroupForKeypairsRow.__table__
 
     def test_resource_group_join_table(self) -> None:
-        """Resource group JOIN should use ScalingGroupRow table."""
-        assert RESOURCE_GROUP_JOIN.table is ScalingGroupRow.__table__
+        """Resource group JOIN should use ResourceGroupRow table."""
+        assert RESOURCE_GROUP_JOIN.table is ResourceGroupRow.__table__
 
     def test_session_join_table(self) -> None:
         """Session JOIN should use SessionRow table."""

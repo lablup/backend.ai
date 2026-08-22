@@ -6,8 +6,8 @@ import logging
 from collections.abc import Sequence
 from datetime import datetime
 
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy

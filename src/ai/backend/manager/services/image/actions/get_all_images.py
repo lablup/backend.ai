@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.types import ImageID
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import (
     ImageStatus,
@@ -24,8 +23,9 @@ class GetAllImagesAction(ImageAction):
     status_filter: list[ImageStatus] | None
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_all_images"
 
     @override
     @classmethod
@@ -34,9 +34,5 @@ class GetAllImagesAction(ImageAction):
 
 
 @dataclass
-class GetAllImagesActionResult(BaseActionResult):
+class GetAllImagesActionResult:
     data: Mapping[ImageID, ImageWithAgentInstallStatus]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

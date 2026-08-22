@@ -17,7 +17,7 @@ from ai.backend.common.exception import PermissionDeniedError
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.bulk import (
     BaseBulkAction,
-    BaseBulkActionResult,
+    BasePartialBulkActionResult,
 )
 from ai.backend.manager.actions.action.types import ActionTarget
 from ai.backend.manager.actions.processor.bulk import (
@@ -78,7 +78,7 @@ class _MockBulkAction(BaseBulkAction[ActionTarget]):
 
 
 @dataclass
-class _MockBulkActionResult(BaseBulkActionResult):
+class _MockBulkActionResult(BasePartialBulkActionResult):
     processed_refs: list[RBACElementRef] = field(default_factory=list)
 
     @override

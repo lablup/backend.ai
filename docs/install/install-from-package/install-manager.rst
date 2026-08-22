@@ -256,10 +256,10 @@ You can run the service:
 Check if the service is running. The default Manager API port is 8081, but it
 can be configured from ``manager.toml``:
 
-.. code-block:: console
+.. parsed-literal::
 
    $ curl bai-m1:8081
-   {"version": "v6.20220615", "manager": "22.09.6"}
+   {"version": "|latest_api_version|", "manager": "|release|"}
 
 Press ``Ctrl-C`` to stop the service.
 

@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Final
 from aiohttp import web
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
     BulkDeleteAutoScalingRulesInput,
     CreateAutoScalingRuleInput,
@@ -40,8 +42,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     SearchAllocatedResourceSlotsInput,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import (
     DeploymentIdPathParam,

@@ -7,6 +7,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.base import GUID, Base
 
@@ -30,8 +31,8 @@ class AssociationContainerRegistriesGroupsRow(Base):
         GUID,
         nullable=False,
     )
-    group_id: Mapped[uuid.UUID] = mapped_column(
+    group_id: Mapped[ProjectID] = mapped_column(
         "group_id",
-        GUID,
+        GUID(ProjectID),
         nullable=False,
     )

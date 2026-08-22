@@ -114,13 +114,13 @@ def compute_schedule(
 ) -> None:
     """Probe whether a would-be session fits a resource group, without provisioning."""
 
+    from ai.backend.common.data.entity.resource_group import ResourceGroupID
     from ai.backend.common.dto.manager.v2.scheduler.request import (
         ComputeScheduleInput,
         ComputeScheduleKernelResourceInput,
     )
     from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
     from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
-    from ai.backend.common.identifier.resource_group import ResourceGroupID
     from ai.backend.common.json import load_json
     from ai.backend.common.types import AgentId
 
@@ -241,12 +241,12 @@ def exclude_idle_checks(targets: tuple[str, ...]) -> None:
     Each TARGET is a CHECKER_ID:SESSION_ID pair.
     """
 
+    from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+    from ai.backend.common.data.entity.session import SessionID
     from ai.backend.common.dto.manager.v2.session.request import (
         ExcludeSessionIdleChecksInput,
         SessionIdleCheckTargetInput,
     )
-    from ai.backend.common.identifier.idle_checker import IdleCheckerID
-    from ai.backend.common.identifier.session import SessionID
 
     parsed_targets: list[SessionIdleCheckTargetInput] = []
     for target in targets:
@@ -280,12 +280,12 @@ def include_idle_checks(targets: tuple[str, ...]) -> None:
     Each TARGET is a CHECKER_ID:SESSION_ID pair.
     """
 
+    from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+    from ai.backend.common.data.entity.session import SessionID
     from ai.backend.common.dto.manager.v2.session.request import (
         IncludeSessionIdleChecksInput,
         SessionIdleCheckTargetInput,
     )
-    from ai.backend.common.identifier.idle_checker import IdleCheckerID
-    from ai.backend.common.identifier.session import SessionID
 
     parsed_targets: list[SessionIdleCheckTargetInput] = []
     for target in targets:

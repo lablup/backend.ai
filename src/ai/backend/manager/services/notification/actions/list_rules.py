@@ -3,39 +3,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.notification import NotificationRuleData
-from ai.backend.manager.repositories.base import BatchQuerier
-
-from .base import NotificationAction
+from ai.backend.common.data.entity.notification import NOTIFICATION_RULE_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
+from ai.backend.manager.data.notification.types import NotificationRuleData
+from ai.backend.manager.models.notification.row import NotificationRuleRow
+from ai.backend.manager.models.notification.searchers import NotificationRuleSearcher
 
 
 @dataclass
-class SearchRulesAction(NotificationAction):
-    """Action to search notification rules."""
+class SearchRulesAction(SearchGlobalOpsAction[NotificationRuleRow, NotificationRuleData]):
+    """Page through the notification rules."""
 
-    querier: BatchQuerier
+    searcher: NotificationRuleSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def entity_type(cls) -> EntityType:
+        return NOTIFICATION_RULE_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-@dataclass
-class SearchRulesActionResult(BaseActionResult):
-    """Result of searching notification rules."""
-
-    rules: list[NotificationRuleData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_notification_rules"
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def to_searcher(self) -> NotificationRuleSearcher:
+        return self.searcher

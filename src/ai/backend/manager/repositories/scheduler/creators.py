@@ -33,7 +33,7 @@ from datetime import datetime
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.types import ClusterMode, ResourceSlot, ResourceSlotEntry
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.creation import ImageInfo

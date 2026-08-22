@@ -1,25 +1,37 @@
 """Action for creating deployments."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.creator import NewDeploymentCreator
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
-from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
+from ai.backend.manager.services.deployment.actions.base import (
+    DeploymentScopeAction,
+    DeploymentScopeActionResult,
+)
 
 
 @dataclass
-class CreateDeploymentAction(DeploymentBaseAction):
+class CreateDeploymentAction(DeploymentScopeAction):
     """Action to create a new deployment(Model Service)."""
+
+    project_id: ProjectID
 
     creator: NewDeploymentCreator
     auto_activate: bool
 
     @override
-    def entity_id(self) -> str | None:
-        return None  # New deployment doesn't have an ID yet
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id),)
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_deployment"
 
     @override
     @classmethod
@@ -28,9 +40,5 @@ class CreateDeploymentAction(DeploymentBaseAction):
 
 
 @dataclass
-class CreateDeploymentActionResult(BaseActionResult):
+class CreateDeploymentActionResult(DeploymentScopeActionResult):
     data: ModelDeploymentData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)

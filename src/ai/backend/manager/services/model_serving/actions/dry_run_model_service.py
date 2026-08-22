@@ -2,23 +2,29 @@ from __future__ import annotations
 
 import dataclasses
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
 
 from pydantic import AnyUrl
 
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.types import ClusterMode, RuntimeVariant
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import ModelServicePrepareCtx, ServiceConfig
-from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
+from ai.backend.manager.services.model_serving.actions.base import (
+    ModelServiceScopeAction,
+    ModelServiceScopeActionResult,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.types import ModelRevisionSpec
 
 
 @dataclass
-class DryRunModelServiceAction(ModelServiceAction):
+class DryRunModelServiceAction(ModelServiceScopeAction):
+    project_id: ProjectID
     service_name: str
     replicas: int
     image: str | None
@@ -42,8 +48,8 @@ class DryRunModelServiceAction(ModelServiceAction):
     model_service_prepare_ctx: ModelServicePrepareCtx
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id),)
 
     @override
     @classmethod
@@ -73,11 +79,12 @@ class DryRunModelServiceAction(ModelServiceAction):
             config=overrided_service_config,
         )
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "dry_run_model_service"
+
 
 @dataclass
-class DryRunModelServiceActionResult(BaseActionResult):
+class DryRunModelServiceActionResult(ModelServiceScopeActionResult):
     task_id: uuid.UUID
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

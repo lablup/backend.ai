@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Self, override
+from typing import override
 from unittest.mock import AsyncMock
 
 from ai.backend.common.events.hub import WILDCARD, EventHub, EventPropagator
@@ -20,15 +20,6 @@ class DummyBaseEvent(AbstractEvent):
     @override
     def delivery_pattern(cls) -> DeliveryPattern:
         return DeliveryPattern.BROADCAST
-
-    @override
-    def serialize(self) -> tuple[bytes, ...]:
-        raise NotImplementedError
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[bytes, ...]) -> Self:
-        raise NotImplementedError
 
     @classmethod
     @override

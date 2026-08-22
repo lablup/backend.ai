@@ -7,8 +7,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
@@ -46,7 +46,7 @@ class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):
     )
     endpoint: Mapped[DeploymentID] = mapped_column(
         "endpoint",
-        GUID,
+        GUID(DeploymentID),
         sa.ForeignKey("endpoints.id", name="fk_deployment_policies_endpoint", ondelete="CASCADE"),
         nullable=False,
     )

@@ -31,12 +31,14 @@ from ai.backend.common.message_queue.payload import (
     CachedBroadcastMessagePayload,
 )
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
-from ai.backend.common.message_queue.types import MessageMetadata, MessageName
+from ai.backend.common.message_queue.types import MessageMetadata
 from ai.backend.common.types import (
     AgentId,
 )
 from ai.backend.logging import BraceStyleAdapter
 
+from .exceptions import EventPayloadDecodingError
+from .message import EventMessage
 from .reporter import AbstractEventReporter, CompleteEventReportArgs, PrepareEventReportArgs
 from .types import AbstractAnycastEvent, AbstractBroadcastEvent, AbstractEvent
 
@@ -81,7 +83,6 @@ class EventHandler[TContext, TEvent: "AbstractEvent"]:
     handler_type: _EventHandlerType
     coalescing_opts: CoalescingOptions | None
     coalescing_state: CoalescingState
-    args_matcher: Callable[[tuple[Any, ...]], bool] | None
     event_start_reporters: tuple[AbstractEventReporter, ...] = attrs.field(factory=tuple)
     event_complete_reporters: tuple[AbstractEventReporter, ...] = attrs.field(factory=tuple)
 
@@ -214,7 +215,6 @@ class EventDispatcherGroup(ABC):
         coalescing_opts: CoalescingOptions | None = None,
         *,
         name: str | None = None,
-        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
     ) -> EventHandler[TContext, TConsumedEvent]:
         raise NotImplementedError
 
@@ -228,7 +228,6 @@ class EventDispatcherGroup(ABC):
         *,
         name: str | None = None,
         override_event_name: str | None = None,
-        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
     ) -> EventHandler[TContext, TSubscirbedEvent]:
         raise NotImplementedError
 
@@ -270,7 +269,6 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
         coalescing_opts: CoalescingOptions | None = None,
         *,
         name: str | None = None,
-        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
     ) -> EventHandler[TContext, TConsumedEvent]:
         return self._event_dispatcher.consume(
             event_cls,
@@ -278,7 +276,6 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
             callback,
             coalescing_opts=coalescing_opts,
             name=name,
-            args_matcher=args_matcher,
             start_reporters=tuple(self._start_reporters),
             complete_reporters=tuple(self._complete_reporters),
         )
@@ -293,7 +290,6 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
         *,
         name: str | None = None,
         override_event_name: str | None = None,
-        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
     ) -> EventHandler[TContext, TSubscirbedEvent]:
         return self._event_dispatcher.subscribe(
             event_cls,
@@ -302,7 +298,6 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
             coalescing_opts=coalescing_opts,
             name=name,
             override_event_name=override_event_name,
-            args_matcher=args_matcher,
             start_reporters=tuple(self._start_reporters),
             complete_reporters=tuple(self._complete_reporters),
         )
@@ -408,17 +403,12 @@ class EventDispatcher(EventDispatcherGroup):
         coalescing_opts: CoalescingOptions | None = None,
         *,
         name: str | None = None,
-        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
         start_reporters: Sequence[AbstractEventReporter] = tuple(),
         complete_reporters: Sequence[AbstractEventReporter] = tuple(),
     ) -> EventHandler[TContext, TConsumedEvent]:
         """
         Register a callback as a consumer. When multiple callback registers as a consumer
         on a single event, only one callable among those will be called.
-
-        args_matcher:
-          Optional. A callable which accepts event argument and supplies a bool as a return value.
-          When specified, EventDispatcher will only execute callback when this lambda returns True.
         """
 
         if name is None:
@@ -431,7 +421,6 @@ class EventDispatcher(EventDispatcherGroup):
             _EventHandlerType.CONSUMER,
             coalescing_opts,
             CoalescingState(),
-            args_matcher,
             event_start_reporters=tuple(start_reporters),
             event_complete_reporters=tuple(complete_reporters),
         )
@@ -456,16 +445,11 @@ class EventDispatcher(EventDispatcherGroup):
         *,
         name: str | None = None,
         override_event_name: str | None = None,
-        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
         start_reporters: Sequence[AbstractEventReporter] = tuple(),
         complete_reporters: Sequence[AbstractEventReporter] = tuple(),
     ) -> EventHandler[TContext, TSubscirbedEvent]:
         """
         Subscribes to given event. All handlers will be called when certain event pops up.
-
-        args_matcher:
-          Optional. A callable which accepts event argument and supplies a bool as a return value.
-          When specified, EventDispatcher will only execute callback when this lambda returns True.
         """
 
         if name is None:
@@ -478,7 +462,6 @@ class EventDispatcher(EventDispatcherGroup):
             _EventHandlerType.SUBSCRIBER,
             coalescing_opts,
             CoalescingState(),
-            args_matcher,
             event_start_reporters=tuple(start_reporters),
             event_complete_reporters=tuple(complete_reporters),
         )
@@ -501,12 +484,10 @@ class EventDispatcher(EventDispatcherGroup):
         self,
         evh: EventHandler,  # type: ignore[type-arg]
         source: AgentId,
-        args: tuple[Any, ...],
+        message: EventMessage,
         post_callbacks: Sequence[PostCallback] = tuple(),
         metadata: MessageMetadata | None = None,
     ) -> None:
-        if evh.args_matcher and not evh.args_matcher(args):
-            return
         coalescing_opts = evh.coalescing_opts
         coalescing_state = evh.coalescing_state
         cb = evh.callback
@@ -515,8 +496,26 @@ class EventDispatcher(EventDispatcherGroup):
         if self._closed:
             return
         event_type = event_cls.event_name()
-        event = event_cls.deserialize(args)
         start = time.perf_counter()
+        try:
+            event = event_cls.from_message(message)
+        except EventPayloadDecodingError as e:
+            # A body this consumer cannot read will never become readable, so ack it via
+            # the post callbacks instead of leaving it to be redelivered until discarded.
+            log.exception(
+                "EventDispatcher.{}(ev:{}, evh:{}): undecodable-payload",
+                evh_type.name,
+                event_type,
+                evh.name,
+            )
+            self._metric_observer.observe_event_failure(
+                event_type=event_type,
+                duration=time.perf_counter() - start,
+                exception=e,
+            )
+            for post_callback in post_callbacks:
+                await post_callback.done()
+            return
         for start_reporter in evh.event_start_reporters:
             await start_reporter.prepare_event_report(event, PrepareEventReportArgs())
         try:
@@ -588,13 +587,13 @@ class EventDispatcher(EventDispatcherGroup):
         if self._log_events:
             log.debug("DISPATCH_CONSUMERS(ev:{})", event_name)
         payload = mq_msg.payload
-        args = payload.decode_args()
+        message = EventMessage(name=payload.name, payload=payload.payload)
         for consumer in consumer_handlers.copy():
             self._consumer_taskgroup.create_task(
                 self._handle(
                     consumer,
                     AgentId(payload.legacy_source),
-                    args,
+                    message,
                     [post_callback],
                     payload.metadata,
                 ),
@@ -611,13 +610,13 @@ class EventDispatcher(EventDispatcherGroup):
             return
         if self._log_events:
             log.debug("DISPATCH_SUBSCRIBERS(ev:{})", event_name)
-        args = payload.decode_args()
+        message = EventMessage(name=payload.name, payload=payload.payload)
         for subscriber in subscriber_handlers.copy():
             self._subscriber_taskgroup.create_task(
                 self._handle(
                     subscriber,
                     AgentId(payload.legacy_source),
-                    args,
+                    message,
                     tuple(),
                     payload.metadata,
                 ),
@@ -697,10 +696,11 @@ class EventProducer:
             user=user,
             triggered_user=triggered,
         )
-        payload = AnycastMessagePayload.from_event_args(
-            name=MessageName(event.event_name()),
+        message = event.to_message()
+        payload = AnycastMessagePayload.from_event_body(
+            name=message.name,
             source=source,
-            args=event.serialize(),
+            payload=message.payload,
             metadata=metadata,
         )
         await self._msg_queue.send(payload)
@@ -724,10 +724,11 @@ class EventProducer:
             user=user,
             triggered_user=triggered,
         )
-        payload = BroadcastMessagePayload.from_event_args(
-            name=MessageName(event.event_name()),
+        message = event.to_message()
+        payload = BroadcastMessagePayload.from_event_body(
+            name=message.name,
             source=source,
-            args=event.serialize(),
+            payload=message.payload,
             metadata=metadata,
         )
         await self._msg_queue.broadcast(payload)
@@ -750,10 +751,11 @@ class EventProducer:
             user=user,
             triggered_user=triggered,
         )
-        payload = BroadcastMessagePayload.from_event_args(
-            name=MessageName(event.event_name()),
+        message = event.to_message()
+        payload = BroadcastMessagePayload.from_event_body(
+            name=message.name,
             source=str(self._source),
-            args=event.serialize(),
+            payload=message.payload,
             metadata=metadata,
         )
         await self._msg_queue.broadcast_with_cache(
@@ -786,10 +788,11 @@ class EventProducer:
 
         broadcast_payloads: list[CachedBroadcastMessagePayload] = []
         for event in events:
-            payload = BroadcastMessagePayload.from_event_args(
-                name=MessageName(event.event_name()),
+            message = event.to_message()
+            payload = BroadcastMessagePayload.from_event_body(
+                name=message.name,
                 source=str(self._source),
-                args=event.serialize(),
+                payload=message.payload,
                 metadata=metadata,
             )
             broadcast_payloads.append(

@@ -11,6 +11,7 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     AppConfigDefinitionFilter as AppConfigDefinitionFilterDTO,
 )
@@ -32,7 +33,6 @@ from ai.backend.common.dto.manager.v2.app_config_definition.response import (
 from ai.backend.common.dto.manager.v2.app_config_definition.response import (
     PurgeAppConfigDefinitionPayload as PurgeAppConfigDefinitionPayloadDTO,
 )
-from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,

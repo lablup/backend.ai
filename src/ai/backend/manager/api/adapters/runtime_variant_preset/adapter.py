@@ -4,6 +4,8 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     CreateRuntimeVariantPresetInput,
     RuntimeVariantPresetFilter,
@@ -35,16 +37,17 @@ from ai.backend.manager.data.runtime_variant_preset.types import (
     RuntimeVariantPresetData,
     UIOptionData,
 )
-from ai.backend.manager.errors.resource import RuntimeVariantPresetNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.runtime_variant_preset.conditions import (
     RuntimeVariantPresetConditions,
 )
 from ai.backend.manager.models.runtime_variant_preset.orders import RuntimeVariantPresetOrders
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
+from ai.backend.manager.models.runtime_variant_preset.searchers import (
+    RuntimeVariantPresetSearcher,
+)
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
     combine_conditions_or,
     negate_conditions,
 )
@@ -59,8 +62,11 @@ from ai.backend.manager.repositories.runtime_variant_preset.updaters import (
 from ai.backend.manager.services.runtime_variant_preset.actions.create import (
     CreateRuntimeVariantPresetAction,
 )
-from ai.backend.manager.services.runtime_variant_preset.actions.delete import (
-    DeleteRuntimeVariantPresetAction,
+from ai.backend.manager.services.runtime_variant_preset.actions.get import (
+    GetRuntimeVariantPresetAction,
+)
+from ai.backend.manager.services.runtime_variant_preset.actions.purge import (
+    PurgeRuntimeVariantPresetAction,
 )
 from ai.backend.manager.services.runtime_variant_preset.actions.search import (
     SearchRuntimeVariantPresetsAction,
@@ -106,7 +112,8 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
     ) -> SearchRuntimeVariantPresetsPayload:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            RuntimeVariantPresetSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_preset_pagination_spec(),
@@ -117,8 +124,8 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.runtime_variant_preset.search.wait_for_complete(
-            SearchRuntimeVariantPresetsAction(querier=querier)
+        result = await self._processors.runtime_variant_preset.public_search.run(
+            SearchRuntimeVariantPresetsAction(searcher=searcher)
         )
         return SearchRuntimeVariantPresetsPayload(
             items=[self._data_to_node(d) for d in result.items],
@@ -128,33 +135,24 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         )
 
     async def get(self, preset_id: UUID) -> RuntimeVariantPresetNode:
-        conditions: list[QueryCondition] = [lambda: RuntimeVariantPresetRow.id == preset_id]
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=[],
-            pagination_spec=_preset_pagination_spec(),
-            limit=1,
+        result = await self._processors.runtime_variant_preset.public_get.run(
+            GetRuntimeVariantPresetAction(preset_id=RuntimeVariantPresetID(preset_id))
         )
-        result = await self._processors.runtime_variant_preset.search.wait_for_complete(
-            SearchRuntimeVariantPresetsAction(querier=querier)
-        )
-        if not result.items:
-            raise RuntimeVariantPresetNotFound()
-        return self._data_to_node(result.items[0])
+        return self._data_to_node(result.data)
 
     async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[RuntimeVariantPresetNode | None]:
         """Batch-load presets by id, aligned to ``ids`` order (``None`` for missing)."""
         if not ids:
             return []
-        querier = BatchQuerier(
+        searcher = RuntimeVariantPresetSearcher(
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[RuntimeVariantPresetConditions.by_ids(ids)],
         )
-        result = await self._processors.runtime_variant_preset.search.wait_for_complete(
-            SearchRuntimeVariantPresetsAction(querier=querier)
+        result = await self._processors.runtime_variant_preset.public_search.run(
+            SearchRuntimeVariantPresetsAction(searcher=searcher)
         )
         node_map = {item.id: self._data_to_node(item) for item in result.items}
-        return [node_map.get(preset_id) for preset_id in ids]
+        return [node_map.get(RuntimeVariantPresetID(preset_id)) for preset_id in ids]
 
     async def create(
         self,
@@ -162,7 +160,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
     ) -> CreateRuntimeVariantPresetPayload:
         creator = Creator(
             spec=RuntimeVariantPresetCreatorSpec(
-                runtime_variant_id=input.runtime_variant_id,
+                runtime_variant_id=RuntimeVariantID(input.runtime_variant_id),
                 name=input.name,
                 description=input.description,
                 rank=0,
@@ -176,7 +174,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 ui_option=input.ui_option,
             )
         )
-        result = await self._processors.runtime_variant_preset.create.wait_for_complete(
+        result = await self._processors.runtime_variant_preset.global_create.run(
             CreateRuntimeVariantPresetAction(creator=creator)
         )
         return CreateRuntimeVariantPresetPayload(preset=self._data_to_node(result.preset))
@@ -245,16 +243,16 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             ),
         )
         updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=input.id)
-        result = await self._processors.runtime_variant_preset.update.wait_for_complete(
-            UpdateRuntimeVariantPresetAction(id=input.id, updater=updater)
+        result = await self._processors.runtime_variant_preset.update.run(
+            UpdateRuntimeVariantPresetAction(id=RuntimeVariantPresetID(input.id), updater=updater)
         )
         return UpdateRuntimeVariantPresetPayload(preset=self._data_to_node(result.preset))
 
     async def delete(self, preset_id: UUID) -> DeleteRuntimeVariantPresetPayload:
-        result = await self._processors.runtime_variant_preset.delete.wait_for_complete(
-            DeleteRuntimeVariantPresetAction(id=preset_id)
+        result = await self._processors.runtime_variant_preset.purge.run(
+            PurgeRuntimeVariantPresetAction(id=RuntimeVariantPresetID(preset_id))
         )
-        return DeleteRuntimeVariantPresetPayload(id=result.preset.id)
+        return DeleteRuntimeVariantPresetPayload(id=result.data.id)
 
     def _convert_filter(self, filter_: RuntimeVariantPresetFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

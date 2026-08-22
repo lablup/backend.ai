@@ -13,14 +13,14 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.exception import UserNotFound
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
-from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.auth import AccessKeyNotFound, GroupMembershipNotFoundError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -30,11 +30,11 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -44,6 +44,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -52,7 +53,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -102,7 +102,7 @@ class TestAuthRepository:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -113,7 +113,7 @@ class TestAuthRepository:
                 RolePermissionPresetRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AssocGroupUserRow,
                 AssociationScopesEntitiesRow,
                 ContainerRegistryRow,
@@ -263,9 +263,9 @@ class TestAuthRepository:
             keypair = KeyPairRow(
                 access_key=access_key,
                 secret_key="test_secret_key",
-                user_id=email,
                 user=user_uuid,
                 is_active=True,
+                is_default=True,
                 resource_policy=keypair_resource_policy.name,
                 ssh_public_key=ssh_public_key,
                 ssh_private_key=ssh_private_key,
@@ -325,14 +325,14 @@ class TestAuthRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_user_data: UserTestData,
         project_resource_policy: ResourcePolicyTestData,
-    ) -> AsyncGenerator[GroupData, None]:
+    ) -> AsyncGenerator[ProjectData, None]:
         """Create a sample group with user membership for testing"""
         group_id = uuid.uuid4()
         group_name = f"test-group-{uuid.uuid4()}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Create test group
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=group_name,
                 description="Test Group",
@@ -362,7 +362,7 @@ class TestAuthRepository:
             )
             await db_sess.refresh(group)
 
-            group_data = GroupData(
+            group_data = ProjectData(
                 id=group.id,
                 name=group.name,
                 description=group.description,
@@ -384,7 +384,7 @@ class TestAuthRepository:
         self,
         auth_repository: AuthRepository,
         sample_user_data: UserTestData,
-        sample_group_data: GroupData,
+        sample_group_data: ProjectData,
     ) -> None:
         """Test successful group membership retrieval"""
         result = await auth_repository.get_group_membership(
@@ -556,23 +556,22 @@ class TestAuthRepository:
             assert keypair.ssh_public_key == update_public_key
             assert keypair.ssh_private_key == update_private_key
 
-    async def test_get_user_row_by_uuid(
+    async def test_default_keypair(
         self, auth_repository: AuthRepository, sample_user_data: UserTestData
     ) -> None:
-        """Test getting user row by UUID"""
-        result = await auth_repository.get_user_row_by_uuid(sample_user_data.uuid)
+        """The user's active keypair comes back as data, not a row."""
+        result = await auth_repository.default_keypair(sample_user_data.uuid)
 
         assert result is not None
-        assert isinstance(result, UserRow)
-        assert result.uuid == sample_user_data.uuid
-        assert result.email == sample_user_data.email
+        assert result.access_key == sample_user_data.access_key
+        assert result.user_id == sample_user_data.uuid
 
-    async def test_get_user_row_by_uuid_not_found(self, auth_repository: AuthRepository) -> None:
-        """Test getting user row by UUID when user doesn't exist"""
+    async def test_default_keypair_user_not_found(self, auth_repository: AuthRepository) -> None:
+        """An unknown user is refused rather than answered with None."""
         non_existent_uuid = UUID("99999999-9999-9999-9999-999999999999")
 
         with pytest.raises(UserNotFound):
-            await auth_repository.get_user_row_by_uuid(non_existent_uuid)
+            await auth_repository.default_keypair(non_existent_uuid)
 
     async def test_get_current_time(self, auth_repository: AuthRepository) -> None:
         """Test getting current time from database"""

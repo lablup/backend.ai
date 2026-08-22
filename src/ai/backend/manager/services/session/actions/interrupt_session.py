@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.session.base import SessionAction
@@ -14,8 +13,9 @@ class InterruptSessionAction(SessionAction):
     owner_access_key: AccessKey
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "interrupt_session"
 
     @override
     @classmethod
@@ -24,11 +24,7 @@ class InterruptSessionAction(SessionAction):
 
 
 @dataclass
-class InterruptSessionActionResult(BaseActionResult):
+class InterruptSessionActionResult:
     # TODO: Add proper type
     result: Any
     session_data: SessionData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.session_data.id)

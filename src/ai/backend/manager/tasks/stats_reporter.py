@@ -91,7 +91,7 @@ class StatsReporterTask(PeriodicTask):
                     sa.select(sa.func.count())
                     .select_from(keypairs)
                     .where(keypairs.c.is_active == true())
-                    .group_by(keypairs.c.user_id)
+                    .group_by(keypairs.c.user)
                 )
                 query = sa.select(sa.func.count()).select_from(subquery.alias())
                 n = await conn.scalar(query)

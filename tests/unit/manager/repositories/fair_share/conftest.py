@@ -26,11 +26,16 @@ from ai.backend.manager.models.fair_share import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.resource_group import (
+    ResourceGroupForDomainRow,
+    ResourceGroupForProjectRow,
+    ResourceGroupRow,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -38,11 +43,6 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupForDomainRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupRow,
-)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -56,7 +56,7 @@ async def fair_share_row_tables(
     """Create the fair-share tables and register the related ORM mappers.
 
     Rows are listed in FK dependency order (parents before children); the
-    relationship targets (e.g. ``ScalingGroupForDomainRow``) must be present so
+    relationship targets (e.g. ``ResourceGroupForDomainRow``) must be present so
     SQLAlchemy can configure the ``DomainFairShareRow`` / ``ProjectFairShareRow``
     / ``UserFairShareRow`` mappers.
     """
@@ -65,8 +65,8 @@ async def fair_share_row_tables(
         [
             # Base rows in FK dependency order (parents before children)
             DomainRow,
-            ScalingGroupRow,
-            ScalingGroupForDomainRow,
+            ResourceGroupRow,
+            ResourceGroupForDomainRow,
             UserResourcePolicyRow,
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
@@ -74,8 +74,8 @@ async def fair_share_row_tables(
             UserRoleRow,
             UserRow,
             KeyPairRow,
-            GroupRow,
-            ScalingGroupForProjectRow,
+            ProjectRow,
+            ResourceGroupForProjectRow,
             AssocGroupUserRow,
             AgentRow,
             ContainerRegistryRow,

@@ -10547,7 +10547,8 @@
         "enum": [
           "domain",
           "project",
-          "resource_group"
+          "resource_group",
+          "user"
         ],
         "title": "IdleCheckerScopeTypeDTO",
         "type": "string"
@@ -17143,7 +17144,7 @@
             "type": "string"
           },
           "query_template": {
-            "description": "PromQL template with placeholders",
+            "description": "PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}})",
             "title": "Query Template",
             "type": "string"
           },
@@ -17481,7 +17482,7 @@
               }
             ],
             "default": null,
-            "description": "Updated PromQL template with placeholders",
+            "description": "Updated PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}})",
             "title": "Query Template"
           },
           "time_window": {
@@ -20767,7 +20768,7 @@
         "type": "string"
       },
       "KernelExecutionSpecInput": {
-        "description": "Per-kernel execution spec shared by all replicas of one group.\n\nEvery field is optional. The resolver fills gaps from\n`ScalingGroupRow.default_session_options.default_kernel_execution_spec`\nbefore a session is enqueued; any remaining gaps are surfaced as\nvalidation errors (e.g. an image must ultimately be resolved).",
+        "description": "Per-kernel execution spec shared by all replicas of one group.\n\nEvery field is optional. The resolver fills gaps from\n`ResourceGroupRow.default_session_options.default_kernel_execution_spec`\nbefore a session is enqueued; any remaining gaps are surfaced as\nvalidation errors (e.g. an image must ultimately be resolved).",
         "properties": {
           "image_id": {
             "anyOf": [
@@ -52361,7 +52362,7 @@
         "description": "Retrieve a single user by UUID.\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "patch": {
-        "operationId": "v2/users.modify_user",
+        "operationId": "v2/users.update_user",
         "tags": [
           "v2/users"
         ],
@@ -60992,8 +60993,13 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "parameters": [],
-        "description": ""
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "put": {
         "operationId": "manager.update_manager_status",
@@ -61034,8 +61040,13 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "parameters": [],
-        "description": ""
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "post": {
         "operationId": "manager.update_announcement",
@@ -61076,8 +61087,13 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "parameters": [],
-        "description": ""
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/manager/scheduler/operation": {
@@ -62207,7 +62223,7 @@
           }
         },
         "parameters": [],
-        "description": "Generate a presigned URL for uploading artifact files.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Generate a presigned URL for uploading artifact files.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/object-storages/presigned/download": {
@@ -62236,7 +62252,7 @@
           }
         },
         "parameters": [],
-        "description": "Generate a presigned URL for safely downloading artifact files.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Generate a presigned URL for safely downloading artifact files.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/object-storages/buckets": {
@@ -62256,7 +62272,7 @@
           }
         ],
         "parameters": [],
-        "description": "Retrieve all storage namespaces (buckets) across all storage systems.\n\nNote: This API is deprecated. Use /storage-namespaces instead.\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Retrieve all storage namespaces (buckets) across all storage systems.\n\nNote: This API is deprecated. Use /storage-namespaces instead.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/object-storages/{storage_id}/buckets": {
@@ -62285,7 +62301,7 @@
             }
           }
         ],
-        "description": "Retrieve storage namespaces (buckets) for a specific storage system.\n\nNote: This API is deprecated. Use /storage-namespaces instead.\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Retrieve storage namespaces (buckets) for a specific storage system.\n\nNote: This API is deprecated. Use /storage-namespaces instead.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/object-storages/": {
@@ -62305,7 +62321,7 @@
           }
         ],
         "parameters": [],
-        "description": "List all configured object storage systems.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "List all configured object storage systems.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/vfs-storages/{storage_name}/download": {
@@ -62343,7 +62359,7 @@
             }
           }
         ],
-        "description": "Download artifact directory from VFS storage via storage proxy streaming.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Download artifact directory from VFS storage via storage proxy streaming.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/vfs-storages/{storage_name}/files": {
@@ -62381,7 +62397,7 @@
             }
           }
         ],
-        "description": "List files recursively in a VFS storage directory via storage proxy.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "List files recursively in a VFS storage directory via storage proxy.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/vfs-storages/{storage_name}": {
@@ -62410,7 +62426,7 @@
             }
           }
         ],
-        "description": "Get VFS storage information by storage name.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Get VFS storage information by storage name.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/vfs-storages/": {
@@ -62430,7 +62446,7 @@
           }
         ],
         "parameters": [],
-        "description": "List all VFS storages.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "List all VFS storages.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/notifications/channels": {
@@ -64818,7 +64834,7 @@
           }
         },
         "parameters": [],
-        "description": "Search presets with filters, orders, and pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Search presets with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/resource/prometheus-query-definitions/{id}": {
@@ -64850,7 +64866,7 @@
         "description": "Get a preset by ID.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "patch": {
-        "operationId": "resource/prometheus-query-definitions.modify_preset",
+        "operationId": "resource/prometheus-query-definitions.update_preset",
         "tags": [
           "resource/prometheus-query-definitions"
         ],

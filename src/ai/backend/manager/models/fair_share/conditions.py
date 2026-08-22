@@ -8,7 +8,7 @@ from collections.abc import Collection
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
-from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
@@ -18,7 +18,7 @@ from ai.backend.manager.models.fair_share.row import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.user import UserRow
 
 
@@ -374,9 +374,9 @@ class ProjectFairShareConditions:
     def by_project_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = GroupRow.name.ilike(f"%{spec.value}%")
+                condition = ProjectRow.name.ilike(f"%{spec.value}%")
             else:
-                condition = GroupRow.name.like(f"%{spec.value}%")
+                condition = ProjectRow.name.like(f"%{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -387,9 +387,9 @@ class ProjectFairShareConditions:
     def by_project_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = sa.func.lower(GroupRow.name) == spec.value.lower()
+                condition = sa.func.lower(ProjectRow.name) == spec.value.lower()
             else:
-                condition = GroupRow.name == spec.value
+                condition = ProjectRow.name == spec.value
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -400,9 +400,9 @@ class ProjectFairShareConditions:
     def by_project_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = GroupRow.name.ilike(f"{spec.value}%")
+                condition = ProjectRow.name.ilike(f"{spec.value}%")
             else:
-                condition = GroupRow.name.like(f"{spec.value}%")
+                condition = ProjectRow.name.like(f"{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -413,9 +413,9 @@ class ProjectFairShareConditions:
     def by_project_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = GroupRow.name.ilike(f"%{spec.value}")
+                condition = ProjectRow.name.ilike(f"%{spec.value}")
             else:
-                condition = GroupRow.name.like(f"%{spec.value}")
+                condition = ProjectRow.name.like(f"%{spec.value}")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -425,21 +425,21 @@ class ProjectFairShareConditions:
     @staticmethod
     def by_project_is_active(is_active: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.is_active == is_active
+            return ProjectRow.is_active == is_active
 
         return inner
 
     @staticmethod
     def by_project_type_equals(project_type: ProjectType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.type == project_type
+            return ProjectRow.type == project_type
 
         return inner
 
     @staticmethod
     def by_project_type_in(project_types: Collection[ProjectType]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.type.in_(project_types)
+            return ProjectRow.type.in_(project_types)
 
         return inner
 
@@ -897,14 +897,14 @@ class RGDomainFairShareConditions:
 class RGProjectFairShareConditions:
     """Query conditions for rg-scoped project fair share queries.
 
-    References GroupRow (base table) for project conditions, DomainRow (INNER JOIN'd)
+    References ProjectRow (base table) for project conditions, DomainRow (INNER JOIN'd)
     for domain conditions, and ProjectFairShareRow (LEFT JOIN'd) for resource_group conditions.
     """
 
     @staticmethod
     def by_project_id(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            condition = GroupRow.id == spec.value
+            condition = ProjectRow.id == spec.value
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -914,7 +914,7 @@ class RGProjectFairShareConditions:
     @staticmethod
     def by_project_ids(spec: UUIDInMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            condition = GroupRow.id.in_(spec.values)
+            condition = ProjectRow.id.in_(spec.values)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -1046,7 +1046,7 @@ class RGProjectFairShareConditions:
 class RGUserFairShareConditions:
     """Query conditions for rg-scoped user fair share queries.
 
-    References AssocGroupUserRow (base table), GroupRow/DomainRow/UserRow (INNER JOIN'd),
+    References AssocGroupUserRow (base table), ProjectRow/DomainRow/UserRow (INNER JOIN'd),
     and UserFairShareRow (LEFT JOIN'd) for resource_group conditions.
     """
 

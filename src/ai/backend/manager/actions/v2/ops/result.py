@@ -12,21 +12,31 @@ so by implementing :class:`EntityData`. The bulk shape is different again — th
 named the entities, so it answers for each one against that list.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityData
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.types import (
+    EntityData,
+    EntityIdentifier,
+    FieldData,
+    FieldIdentifier,
+)
 from ai.backend.manager.actions.run_status import ActionRunStatus
-from ai.backend.manager.actions.v2.bulk.result import BaseBulkActionResult, BulkEntityResult
+from ai.backend.manager.actions.v2.bulk.result import BasePartialBulkActionResult, BulkEntityResult
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupActionResult
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 
 __all__ = (
     "EntityOpsResult",
     "CreatedEntityOpsResult",
+    "CreatedEntityWithFieldsOpsResult",
     "LookupOpsResult",
+    "OwnedFieldsOpsResult",
+    "CreatedFieldOpsResult",
+    "FieldsOpsResult",
+    "BulkFieldOpsResult",
+    "FieldOwnerLookupOpsResult",
     "EntitiesOpsResult",
     "BulkOpsResult",
     "BatchOpsResult",
@@ -56,25 +66,58 @@ class CreatedEntityOpsResult[TData: EntityData](EntityOpsResult[TData], BaseScop
     """
 
     @override
-    def entity_ids(self) -> Sequence[EntityID]:
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
         return (self.data.entity_id(),)
 
 
 @dataclass
-class LookupOpsResult[TData: EntityData](EntityOpsResult[TData], BaseLookupActionResult):
-    """The entity a lookup resolved its key to.
+class CreatedEntityWithFieldsOpsResult[TData: EntityData, TFieldData](
+    CreatedEntityOpsResult[TData]
+):
+    """The entity a create produced, and the field rows created under it.
 
-    A lookup declares no target — producing one is the point of the run — so the id
-    reaches the audit trail through the result, the same way a create's does.
+    Reports the entity alone as what was touched: the field rows are owned by it
+    and carry no independent identity for the audit trail to name.
     """
 
-    @override
-    def resolved_entity_id(self) -> EntityID:
-        return self.data.entity_id()
+    fields: list[TFieldData]
 
 
 @dataclass
-class BulkOpsResult[TData](BaseBulkActionResult):
+class LookupOpsResult[TEntityID: EntityIdentifier](BaseLookupActionResult):
+    """The id of the entity a lookup's key names.
+
+    A lookup declares no target — producing one is the point of the run — so the id
+    reaches the audit trail through the result, the same way a create's does.
+
+    Carries the id alone: what the caller does next is an operation on that entity, and
+    the value behind the id is read by a get, which says for itself what to load.
+    """
+
+    resolved_entity_id: TEntityID
+
+    @override
+    def entity_id(self) -> TEntityID:
+        return self.resolved_entity_id
+
+
+@dataclass
+class FieldOwnerLookupOpsResult(BaseLookupActionResult):
+    """The id of the entity a field row belongs to.
+
+    Carries the id alone: the owner's data is never read, because this value exists to
+    name the RBAC target and the audit row of the operation that follows.
+    """
+
+    owner_entity_id: EntityIdentifier
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.owner_entity_id
+
+
+@dataclass
+class BulkOpsResult[TData](BasePartialBulkActionResult):
     """How each entity a bulk write named fared.
 
     The bulk shape is the one that reports per entity: the caller named them, so each
@@ -86,8 +129,8 @@ class BulkOpsResult[TData](BaseBulkActionResult):
     ones the caller passed in, not something to recover from what came back.
     """
 
-    successes: dict[EntityID, TData]
-    errors: dict[EntityID, Exception]
+    successes: dict[EntityIdentifier, TData]
+    errors: dict[EntityIdentifier, Exception]
 
     @override
     def entity_results(self) -> Sequence[BulkEntityResult]:
@@ -132,8 +175,49 @@ class EntitiesOpsResult[TData: EntityData](BaseScopeActionResult):
     items: list[TData]
 
     @override
-    def entity_ids(self) -> Sequence[EntityID]:
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
         return tuple(item.entity_id() for item in self.items)
+
+
+@dataclass
+class BulkFieldOpsResult[TData]:
+    """How each field row a bulk write named fared.
+
+    Keyed by the field rows the caller named, unlike :class:`BulkOpsResult`: the answer
+    the caller expects is per row. What the run is recorded against is the entity owning
+    each row, which the processor resolves.
+    """
+
+    successes: dict[FieldIdentifier, TData]
+    errors: dict[FieldIdentifier, Exception]
+
+
+@dataclass
+class OwnedFieldsOpsResult[TOwnerID: EntityIdentifier, TData: FieldData]:
+    """The field row each named entity designates.
+
+    Keyed by the owner rather than the row, unlike :class:`BulkFieldOpsResult`: the
+    owner is what the caller named and what the run is authorized against. An owner
+    designating nothing is absent.
+    """
+
+    designated: Mapping[TOwnerID, TData]
+
+
+@dataclass
+class CreatedFieldOpsResult[TData: FieldData](EntityOpsResult[TData]):
+    """The field row a write created."""
+
+
+@dataclass
+class FieldsOpsResult[TData: FieldData]:
+    """Every field row a write created.
+
+    Names nothing on its own: the operation is answered for by the owner the action
+    already declares, so there is no id for this result to report.
+    """
+
+    items: list[TData]
 
 
 @dataclass
@@ -152,6 +236,20 @@ class BatchOpsResult[TData]:
 
 
 @dataclass
+class ScopedFieldsOpsResult[TData](BatchOpsResult[TData], BaseScopeActionResult):
+    """A page of the field rows read within one owner's scope.
+
+    Names no entity: a field row is not one, so there is no id to report. Which owner
+    the read stayed inside is on the action's scope targets, which the audit row is
+    tied to. Unlike the entity page, the data type is therefore unconstrained.
+    """
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return ()
+
+
+@dataclass
 class ScopedBatchOpsResult[TData: EntityData](BatchOpsResult[TData], BaseScopeActionResult):
     """A page of entities read within a scope.
 
@@ -160,7 +258,7 @@ class ScopedBatchOpsResult[TData: EntityData](BatchOpsResult[TData], BaseScopeAc
     """
 
     @override
-    def entity_ids(self) -> Sequence[EntityID]:
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
         """Every entity on the page.
 
         A read still names what it reached. How much of that is worth recording is the

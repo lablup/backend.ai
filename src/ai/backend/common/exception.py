@@ -184,6 +184,7 @@ class ErrorDomain(enum.StrEnum):
     STORAGE_PROXY = "storage-proxy"
     APPPROXY = "appproxy"
     MESSAGE_QUEUE = "message-queue"
+    EVENT = "event"
     NOTIFICATION = "notification"
     HEALTH_CHECK = "health-check"
     KEYPAIR_RESOURCE_POLICY = "keypair-resource-policy"
@@ -821,7 +822,7 @@ class ScalingGroupNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class ScalingGroupConflict(BackendAIError, web.HTTPConflict):
+class ResourceGroupConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-scaling-group"
     error_title = "Duplicate Scaling Group"
 

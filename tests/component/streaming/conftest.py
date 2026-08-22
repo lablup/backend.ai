@@ -13,10 +13,13 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.plugin.monitor import ErrorPluginContext
-from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import ResourceSlot, SessionTypes
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.stream.handler import StreamHandler
@@ -29,7 +32,13 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.stream.repository import StreamRepository
+from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
+from ai.backend.manager.services.session.actions.resolve_session_name import (
+    ResolveSessionNameAction,
+)
+from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.stream.processors import StreamProcessors
 from ai.backend.manager.services.stream.service import StreamService
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -51,7 +60,7 @@ class UserFixtureData:
 
 @dataclass
 class SessionSeedData:
-    session_id: SessionId
+    session_id: SessionID
     session_name: str
     kernel_id: uuid.UUID
     access_key: str
@@ -63,6 +72,7 @@ def stream_processors(
     database_engine: ExtendedAsyncSAEngine,
     valkey_clients: ValkeyClients,
     async_etcd: AsyncEtcd,
+    processor_registry: ProcessorRegistry[Any],
 ) -> StreamProcessors:
     """Real StreamProcessors with real StreamService and StreamRepository."""
     repo = StreamRepository(database_engine)
@@ -72,13 +82,48 @@ def stream_processors(
         valkey_live=valkey_clients.live,
         etcd=async_etcd,
     )
-    return StreamProcessors(service=service, action_monitors=[])
+    return StreamProcessors(processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)), service)
+
+
+@pytest.fixture()
+async def session_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> Any:
+    """The session processors the stream handler reaches for.
+
+    The handler resolves the session a request names, so the lookup and the name
+    normalization run against the real repository; the rest of the service is unused.
+    """
+    service = SessionService(
+        SessionServiceArgs(
+            agent_registry=AsyncMock(),
+            event_fetcher=AsyncMock(),
+            background_task_manager=AsyncMock(),
+            event_hub=AsyncMock(),
+            error_monitor=AsyncMock(),
+            idle_checker_host=AsyncMock(),
+            session_repository=SessionRepository(database_engine),
+            scheduler_repository=AsyncMock(),
+            scheduling_controller=AsyncMock(),
+            appproxy_client_pool=AsyncMock(),
+            user_repository=AsyncMock(),
+        )
+    )
+    processors = MagicMock()
+    group = processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE))
+    processors.resolve_session_name = group.single_entity(
+        ResolveSessionNameAction, service.resolve_session_name
+    )
+    processors.lookup = group.public_lookup_ops(LookupSessionAction)
+    return processors
 
 
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     stream_processors: StreamProcessors,
+    session_processors: Any,
     config_provider: ManagerConfigProvider,
     error_monitor: ErrorPluginContext,
 ) -> list[RouteRegistry]:
@@ -88,7 +133,7 @@ def server_module_registries(
             StreamHandler(
                 private_ctx=MagicMock(),
                 stream_processors=stream_processors,
-                session_processors=MagicMock(),
+                session_processors=session_processors,
                 config_provider=config_provider,
                 error_monitor=error_monitor,
             ),
@@ -105,7 +150,7 @@ async def session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session + kernel with service_ports in the database.
@@ -114,7 +159,7 @@ async def session_seed(
     ``get_stream_apps()`` returns a non-empty list.
     """
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-stream-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -138,7 +183,7 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
+                scaling_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
@@ -164,7 +209,7 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_name,
+                scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
@@ -213,7 +258,7 @@ async def session_seed_no_ports(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session + kernel with ``service_ports=None``.
@@ -222,7 +267,7 @@ async def session_seed_no_ports(
     the kernel has no service ports configured.
     """
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-stream-noports-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -246,7 +291,7 @@ async def session_seed_no_ports(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
+                scaling_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
@@ -272,7 +317,7 @@ async def session_seed_no_ports(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_name,
+                scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",

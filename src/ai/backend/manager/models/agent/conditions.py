@@ -111,10 +111,10 @@ class AgentConditions:
 
         return inner
 
-    # --- scaling_group string conditions ---
+    # --- resource_group string conditions ---
 
     @staticmethod
-    def by_scaling_group_contains(spec: StringMatchSpec) -> QueryCondition:
+    def by_resource_group_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = AgentRow.scaling_group.ilike(f"%{spec.value}%")
@@ -125,7 +125,7 @@ class AgentConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group_equals(spec: StringMatchSpec) -> QueryCondition:
+    def by_resource_group_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = sa.func.lower(AgentRow.scaling_group) == spec.value.lower()
@@ -136,7 +136,7 @@ class AgentConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
+    def by_resource_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = AgentRow.scaling_group.ilike(f"{spec.value}%")
@@ -147,7 +147,7 @@ class AgentConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
+    def by_resource_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = AgentRow.scaling_group.ilike(f"%{spec.value}")
@@ -157,7 +157,7 @@ class AgentConditions:
 
         return inner
 
-    by_scaling_group_in = staticmethod(make_string_in_factory(AgentRow.scaling_group))
+    by_resource_group_in = staticmethod(make_string_in_factory(AgentRow.scaling_group))
 
     # --- cursor pagination conditions ---
 

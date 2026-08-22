@@ -83,6 +83,26 @@ class TestUserSlotQuota:
         with pytest.raises(UserResourceQuotaExceeded):
             validator.validate(snapshot, workload)
 
+    def test_message_reports_only_the_exceeded_slot(
+        self,
+        validator: ResourcePolicyValidator,
+        workload_factory: WorkloadFactory,
+        snapshot_factory: SnapshotFactory,
+        occupancy_factory: OccupancyFactory,
+    ) -> None:
+        """The recorded detail names the slot, its occupancy, and the amount over."""
+        workload = workload_factory(slots={"cpu": "4", "mem": "8192"})
+        snapshot = snapshot_factory(
+            user_limit=_user_limit({"cpu": "10", "mem": "20480"}),
+            occupancy=occupancy_factory(user_slots={"cpu": ("4", "3"), "mem": ("8192", "0")}),
+        )
+
+        with pytest.raises(UserResourceQuotaExceeded) as exc_info:
+            validator.validate(snapshot, workload)
+        summary = exc_info.value.summary()
+        assert "\n  - cpu: used 7 + requested 4 > limit 10 (over by 1)" in summary
+        assert "mem" not in summary
+
     def test_passes_when_no_policy(
         self,
         validator: ResourcePolicyValidator,

@@ -92,10 +92,10 @@ def create(
 )
 def get(role_preset_id: uuid.UUID, detail: bool) -> None:
     """Get a single role preset by ID."""
+    from ai.backend.common.data.entity.role_preset import RolePresetID
     from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
         SearchRolePermissionPresetsInput,
     )
-    from ai.backend.common.identifier.role_preset import RolePresetID
 
     preset_id = RolePresetID(role_preset_id)
 
@@ -208,8 +208,8 @@ def update(
     auto_assign: bool | None,
 ) -> None:
     """Update a role preset's mutable metadata."""
+    from ai.backend.common.data.entity.role_preset import RolePresetID
     from ai.backend.common.dto.manager.v2.role_preset.request import UpdateRolePresetBody
-    from ai.backend.common.identifier.role_preset import RolePresetID
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -229,8 +229,8 @@ def update(
 @click.argument("role_preset_ids", type=click.UUID, nargs=-1, required=True)
 def delete(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
     """Soft-delete one or more role presets (sets ``deleted = true``)."""
+    from ai.backend.common.data.entity.role_preset import RolePresetID
     from ai.backend.common.dto.manager.v2.role_preset.request import BulkDeleteRolePresetsInput
-    from ai.backend.common.identifier.role_preset import RolePresetID
 
     ids = [RolePresetID(rid) for rid in role_preset_ids]
 
@@ -251,8 +251,8 @@ def delete(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
 @click.argument("role_preset_ids", type=click.UUID, nargs=-1, required=True)
 def restore(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
     """Restore one or more soft-deleted role presets (sets ``deleted = false``)."""
+    from ai.backend.common.data.entity.role_preset import RolePresetID
     from ai.backend.common.dto.manager.v2.role_preset.request import BulkRestoreRolePresetsInput
-    from ai.backend.common.identifier.role_preset import RolePresetID
 
     ids = [RolePresetID(rid) for rid in role_preset_ids]
 
@@ -273,8 +273,8 @@ def restore(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
 @click.argument("role_preset_ids", type=click.UUID, nargs=-1, required=True)
 def purge(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
     """Hard-delete one or more role presets, cascading to their permission entries."""
+    from ai.backend.common.data.entity.role_preset import RolePresetID
     from ai.backend.common.dto.manager.v2.role_preset.request import BulkPurgeRolePresetsInput
-    from ai.backend.common.identifier.role_preset import RolePresetID
 
     ids = [RolePresetID(rid) for rid in role_preset_ids]
 
@@ -311,6 +311,7 @@ def permission_search(
     order_by: tuple[str, ...],
 ) -> None:
     """Search the permission entries belonging to a single role preset."""
+    from ai.backend.common.data.entity.role_preset import RolePresetID
     from ai.backend.common.dto.manager.v2.rbac.types import (
         OperationTypeDTO,
         OperationTypeFilter,
@@ -325,7 +326,6 @@ def permission_search(
     from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
         RolePermissionPresetOrderField,
     )
-    from ai.backend.common.identifier.role_preset import RolePresetID
 
     filter_dto: RolePermissionPresetFilter | None = None
     if entity_type is not None or operation is not None:
@@ -376,13 +376,13 @@ def permission_search(
 )
 def permission_add(role_preset_id: uuid.UUID, permissions: str) -> None:
     """Bulk-add permission entries to an existing role preset."""
+    from ai.backend.common.data.entity.role_preset import RolePresetID
     from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
         BulkAddRolePermissionPresetsInput,
     )
     from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
         RolePermissionPresetEntry,
     )
-    from ai.backend.common.identifier.role_preset import RolePresetID
 
     entries = load_model(permissions, list[RolePermissionPresetEntry])
 
@@ -404,10 +404,10 @@ def permission_add(role_preset_id: uuid.UUID, permissions: str) -> None:
 @click.argument("permission_preset_ids", type=click.UUID, nargs=-1, required=True)
 def permission_remove(permission_preset_ids: tuple[uuid.UUID, ...]) -> None:
     """Bulk-remove permission entries by their row IDs."""
+    from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
     from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
         BulkRemoveRolePermissionPresetsInput,
     )
-    from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
 
     ids = [RolePermissionPresetID(pid) for pid in permission_preset_ids]
 

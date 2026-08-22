@@ -71,7 +71,7 @@ class ArtifactRegistryEventHandler:
                 continue
 
             try:
-                await processors.artifact.scan.wait_for_complete(
+                await processors.artifact.scan.run(
                     ScanArtifactsAction(
                         registry_id=registry.registry_id,
                         # TODO: Support other artifact types in the future

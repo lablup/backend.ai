@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
@@ -14,6 +13,7 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.manager.data.permission.role import (
     RoleData,
     RoleDetailData,
@@ -43,8 +43,8 @@ class RoleRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "roles"
     __table_args__ = (sa.Index("ix_id_status", "id", "status"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[RoleID] = mapped_column(
+        "id", GUID(RoleID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(64), nullable=False)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)

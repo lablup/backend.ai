@@ -43,7 +43,7 @@ class AgentOrders:
         return AgentRow.status.desc()
 
     @staticmethod
-    def scaling_group(ascending: bool = True) -> QueryOrder:
+    def resource_group(ascending: bool = True) -> QueryOrder:
         if ascending:
             return AgentRow.scaling_group.asc()
         return AgentRow.scaling_group.desc()

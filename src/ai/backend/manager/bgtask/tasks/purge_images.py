@@ -94,7 +94,7 @@ class PurgeImagesHandler(BaseBackgroundTaskHandler[PurgeImagesManifest, PurgeIma
 
         for key in manifest.keys:
             for img in key.images:
-                result = await self._processors.image.purge_image.wait_for_complete(
+                result = await self._processors.image.purge_image.run(
                     PurgeImageAction(
                         ImageRefData(
                             name=img.name,

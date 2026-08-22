@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.common.dto.manager.query import (
     DateTimeFilter,
     UUIDFilter,
@@ -16,7 +17,6 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import (
     IdleCheckerScopeTypeDTO,
     ScopeTypeFilter,
 )
-from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 
 
 class IdleCheckerScopeRefDTO(BaseRequestModel):

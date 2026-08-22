@@ -8,7 +8,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.user import UserRow
 
 __all__ = ("UserOrders",)
@@ -101,8 +101,8 @@ class UserOrders:
             .select_from(
                 sa.join(
                     AssocGroupUserRow.__table__,
-                    GroupRow.__table__,
-                    AssocGroupUserRow.group_id == GroupRow.id,
+                    ProjectRow.__table__,
+                    AssocGroupUserRow.group_id == ProjectRow.id,
                 )
             )
             .where(AssocGroupUserRow.user_id == UserRow.uuid)
@@ -112,5 +112,5 @@ class UserOrders:
 
     @staticmethod
     def by_project_name(ascending: bool = True) -> QueryOrder:
-        subq = UserOrders._scalar_project_min(GroupRow.name)
+        subq = UserOrders._scalar_project_min(ProjectRow.name)
         return subq.asc() if ascending else subq.desc()

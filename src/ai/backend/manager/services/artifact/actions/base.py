@@ -1,47 +1,33 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseAction
-from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
-from ai.backend.manager.actions.action.single_entity import (
-    BaseSingleEntityAction,
-    BaseSingleEntityActionResult,
-)
-from ai.backend.manager.actions.action.types import FieldData
+from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE, ArtifactID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 
 
 @dataclass
-class ArtifactAction(BaseAction):
+class ArtifactAction(BaseGlobalAction):
+    """Base for an operation that names no single artifact."""
+
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.ARTIFACT
+        return ARTIFACT_ENTITY_TYPE
 
 
 @dataclass
-class ArtifactScopeAction(BaseScopeAction):
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.ARTIFACT
-
-
-class ArtifactScopeActionResult(BaseScopeActionResult):
-    pass
+class ArtifactScopeAction(ArtifactAction):
+    """Base for a read that spans the installation."""
 
 
 @dataclass
 class ArtifactSingleEntityAction(BaseSingleEntityAction):
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.ARTIFACT
+    """Base for an operation on one artifact."""
+
+    artifact_id: ArtifactID
 
     @override
-    def field_data(self) -> FieldData | None:
-        return None
-
-
-class ArtifactSingleEntityActionResult(BaseSingleEntityActionResult):
-    pass
+    def entity_id(self) -> EntityIdentifier:
+        return self.artifact_id

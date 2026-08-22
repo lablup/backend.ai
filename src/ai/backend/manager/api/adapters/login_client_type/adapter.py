@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     CreateLoginClientTypeInput,
     LoginClientTypeFilter,
@@ -27,30 +28,23 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.login_client_type.conditions import LoginClientTypeConditions
+from ai.backend.manager.models.login_client_type.creators import LoginClientTypeCreator
 from ai.backend.manager.models.login_client_type.orders import LoginClientTypeOrders
-from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
+from ai.backend.manager.models.login_client_type.searchers import LoginClientTypeSearcher
+from ai.backend.manager.models.login_client_type.updaters import LoginClientTypeUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.login_client_type.creators import (
-    LoginClientTypeCreatorSpec,
-)
-from ai.backend.manager.repositories.login_client_type.updaters import (
-    LoginClientTypeUpdaterSpec,
 )
 from ai.backend.manager.services.login_client_type.actions.create import (
     CreateLoginClientTypeAction,
 )
-from ai.backend.manager.services.login_client_type.actions.delete import (
-    DeleteLoginClientTypeAction,
-)
 from ai.backend.manager.services.login_client_type.actions.get import (
     GetLoginClientTypeAction,
+)
+from ai.backend.manager.services.login_client_type.actions.purge import (
+    PurgeLoginClientTypeAction,
 )
 from ai.backend.manager.services.login_client_type.actions.search import (
     SearchLoginClientTypesAction,
@@ -95,17 +89,17 @@ class LoginClientTypeAdapter(BaseAdapter):
     # --- Non-admin methods ---
 
     async def get(self, type_id: UUID) -> LoginClientTypeNode:
-        action_result = await self._processors.login_client_type.get.wait_for_complete(
-            GetLoginClientTypeAction(id=type_id)
+        action_result = await self._processors.login_client_type.public_get.run(
+            GetLoginClientTypeAction(id=LoginClientTypeID(type_id))
         )
-        return self._data_to_node(action_result.login_client_type)
+        return self._data_to_node(action_result.data)
 
     async def search(self, input: SearchLoginClientTypesInput) -> SearchLoginClientTypesPayload:
         """Search login client types with filter/order/pagination."""
-        querier = self._build_search_querier(input)
+        searcher = self._build_search_searcher(input)
 
-        action_result = await self._processors.login_client_type.search.wait_for_complete(
-            SearchLoginClientTypesAction(querier=querier)
+        action_result = await self._processors.login_client_type.public_search.run(
+            SearchLoginClientTypesAction(searcher=searcher)
         )
 
         return SearchLoginClientTypesPayload(
@@ -118,62 +112,56 @@ class LoginClientTypeAdapter(BaseAdapter):
     # --- Admin methods ---
 
     async def admin_create(self, input: CreateLoginClientTypeInput) -> CreateLoginClientTypePayload:
-        creator = Creator[LoginClientTypeRow](
-            spec=LoginClientTypeCreatorSpec(
-                name=input.name,
-                description=input.description,
-            ),
+        creator = LoginClientTypeCreator(
+            name=input.name,
+            description=input.description,
         )
-        action_result = await self._processors.login_client_type_admin.create.wait_for_complete(
+        action_result = await self._processors.login_client_type.global_create.run(
             CreateLoginClientTypeAction(creator=creator)
         )
         return CreateLoginClientTypePayload(
-            login_client_type=self._data_to_node(action_result.login_client_type),
+            login_client_type=self._data_to_node(action_result.data),
         )
 
     async def admin_update(
         self, type_id: UUID, input: UpdateLoginClientTypeInput
     ) -> UpdateLoginClientTypePayload:
-        updater = Updater[LoginClientTypeRow](
-            spec=LoginClientTypeUpdaterSpec(
-                name=(
-                    OptionalState.update(input.name)
-                    if input.name is not None
-                    else OptionalState.nop()
-                ),
-                description=(
-                    TriState.nop()
-                    if isinstance(input.description, Sentinel)
-                    else TriState.nullify()
-                    if input.description is None
-                    else TriState.update(input.description)
-                ),
+        updater = LoginClientTypeUpdater(
+            login_client_type_id=LoginClientTypeID(type_id),
+            name=(
+                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
-            pk_value=type_id,
+            description=(
+                TriState.nop()
+                if isinstance(input.description, Sentinel)
+                else TriState.nullify()
+                if input.description is None
+                else TriState.update(input.description)
+            ),
         )
-        action_result = await self._processors.login_client_type_admin.update.wait_for_complete(
+        action_result = await self._processors.login_client_type.update.run(
             UpdateLoginClientTypeAction(updater=updater)
         )
         return UpdateLoginClientTypePayload(
-            login_client_type=self._data_to_node(action_result.login_client_type),
+            login_client_type=self._data_to_node(action_result.data),
         )
 
     async def admin_delete(self, type_id: UUID) -> DeleteLoginClientTypePayload:
-        action_result = await self._processors.login_client_type_admin.delete.wait_for_complete(
-            DeleteLoginClientTypeAction(id=type_id)
+        action_result = await self._processors.login_client_type.purge.run(
+            PurgeLoginClientTypeAction(id=type_id)
         )
-        return DeleteLoginClientTypePayload(id=action_result.login_client_type.id)
+        return DeleteLoginClientTypePayload(id=action_result.data.id)
 
     # --- Private helpers ---
 
-    def _build_search_querier(self, input: SearchLoginClientTypesInput) -> BatchQuerier:
+    def _build_search_searcher(self, input: SearchLoginClientTypesInput) -> LoginClientTypeSearcher:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         pagination = OffsetPagination(
             limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
             offset=input.offset if input.offset is not None else 0,
         )
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return LoginClientTypeSearcher(pagination=pagination, conditions=conditions, orders=orders)
 
     def _convert_filter(self, filter: LoginClientTypeFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

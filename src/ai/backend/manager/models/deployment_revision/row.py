@@ -9,12 +9,12 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.config import ModelDefinition
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     ClusterMode,
     MountInfoEntry,
@@ -91,7 +91,7 @@ class DeploymentRevisionRow(CreatedAtMixin, Base):
         primary_key=True,
         server_default=sa.text("uuid_generate_v4()"),
     )
-    endpoint: Mapped[DeploymentID] = mapped_column("endpoint", GUID, nullable=False)
+    endpoint: Mapped[DeploymentID] = mapped_column("endpoint", GUID(DeploymentID), nullable=False)
     revision_number: Mapped[int] = mapped_column("revision_number", sa.Integer, nullable=False)
 
     # Image configuration.

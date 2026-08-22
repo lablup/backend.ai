@@ -22,8 +22,8 @@ from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatHistory,
 )
 from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.dto.clients.openai_compat import ChatCompletionRequest
-from ai.backend.common.identifier.deployment import DeploymentID
 
 
 def _run_async(coro_fn: Callable[[], Coroutine[Any, Any, None]]) -> None:

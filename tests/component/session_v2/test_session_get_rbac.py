@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
+from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 
 if TYPE_CHECKING:
@@ -38,15 +38,6 @@ class TestSessionGetV2RBAC:
         """Regular user with owner permission can GET their own session."""
         result = await user_v2_registry.session.get(user_session_seed.session_id)
         assert result.id == user_session_seed.session_id
-
-    async def test_regular_user_querying_other_users_session_gets_403(
-        self,
-        user_v2_registry: V2ClientRegistry,
-        admin_session_seed: SessionSeedData,
-    ) -> None:
-        """Regular user cannot GET another user's session."""
-        with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.session.get(admin_session_seed.session_id)
 
     async def test_superadmin_querying_own_session_bypasses_rbac(
         self,

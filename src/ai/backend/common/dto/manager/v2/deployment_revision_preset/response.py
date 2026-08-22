@@ -7,12 +7,12 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     PresetModelDefinitionInfoDTO,
 )
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 
 
 class EnvironEntryInfo(BaseResponseModel):

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.model_deployment.types import (
     RouteStatus as CommonRouteStatus,
@@ -46,7 +47,6 @@ from ai.backend.common.dto.manager.deployment.types import (
     RevisionOrderField,
     RouteOrderField,
 )
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.schema.deployment import BlueGreenSpec, IntOrPercent, RollingUpdateSpec
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.data.deployment.creator import (

@@ -1,19 +1,10 @@
-from typing import Any, Self, override
+from typing import override
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 
 
 class BaseIdleCheckEvent(AbstractAnycastEvent):
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return tuple()
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls()
-
     @classmethod
     @override
     def event_domain(cls) -> EventDomain:

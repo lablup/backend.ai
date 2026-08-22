@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.agent.request import (
     AdminSearchAgentsInput,
@@ -28,7 +29,6 @@ from ai.backend.common.dto.manager.v2.agent.types import (
     AgentStatusFilter,
     ConflictingSessionCleanupPolicyEnum,
 )
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -146,7 +146,7 @@ class AgentAdapter(BaseAdapter):
         if f.schedulable is not None:
             conditions.append(AgentConditions.by_schedulable(f.schedulable))
         if f.scaling_group is not None:
-            condition = self._convert_scaling_group_filter(f.scaling_group)
+            condition = self._convert_resource_group_filter(f.scaling_group)
             if condition is not None:
                 conditions.append(condition)
         if f.AND:
@@ -176,14 +176,14 @@ class AgentAdapter(BaseAdapter):
             in_factory=AgentConditions.by_id_in,
         )
 
-    def _convert_scaling_group_filter(self, sf: StringFilter) -> QueryCondition | None:
+    def _convert_resource_group_filter(self, sf: StringFilter) -> QueryCondition | None:
         return self.convert_string_filter(
             sf,
-            contains_factory=AgentConditions.by_scaling_group_contains,
-            equals_factory=AgentConditions.by_scaling_group_equals,
-            starts_with_factory=AgentConditions.by_scaling_group_starts_with,
-            ends_with_factory=AgentConditions.by_scaling_group_ends_with,
-            in_factory=AgentConditions.by_scaling_group_in,
+            contains_factory=AgentConditions.by_resource_group_contains,
+            equals_factory=AgentConditions.by_resource_group_equals,
+            starts_with_factory=AgentConditions.by_resource_group_starts_with,
+            ends_with_factory=AgentConditions.by_resource_group_ends_with,
+            in_factory=AgentConditions.by_resource_group_in,
         )
 
     @staticmethod
@@ -305,6 +305,6 @@ class AgentAdapter(BaseAdapter):
                 region=data.region,
                 addr=data.addr,
             ),
-            scaling_group=data.scaling_group,
+            scaling_group=data.resource_group,
             permissions=[p.value for p in detail.permissions],
         )

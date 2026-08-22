@@ -2,19 +2,24 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.manager.errors.repository import (
     AmbiguousEntityKeyError,
     EmptyOperationScopeError,
-    UnsupportedCompositePrimaryKeyError,
 )
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.models.specs.lookup import DataLookup
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.lookup import (
+    DataLookup,
+    FieldOwnerKeyLookup,
+    FieldOwnerLookup,
+)
+from ai.backend.manager.models.specs.querier import DataQuerier, OwnedFieldQuerier
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
 from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
 
@@ -27,22 +32,18 @@ class V2ReadOps(V2OpsBase):
     ) -> TData | None:
         """Fetch a single row by primary key and return it as its ``data/`` type."""
         row_class = querier.row_class()
-        pk_columns = list(row_class.__table__.primary_key.columns)
-        if len(pk_columns) != 1:
-            raise UnsupportedCompositePrimaryKeyError(
-                f"Querier only supports single-column primary keys "
-                f"(table: {row_class.__table__.name})",
-            )
         result = await self._sess.execute(
-            sa.select(row_class).where(pk_columns[0] == querier.pk_value())
+            sa.select(row_class).where(querier.entity_id_column() == querier.entity_id_value())
         )
         row = result.scalar_one_or_none()
         if row is None:
             return None
         return querier.to_data(row)
 
-    async def lookup_data[TRow: Base, TData](self, lookup: DataLookup[TRow, TData]) -> TData | None:
-        """Fetch one row by a key that is not its primary key, as its ``data/`` type.
+    async def lookup_entity_id[TRow: Base, TEntityID: EntityIdentifier](
+        self, lookup: DataLookup[TRow, TEntityID]
+    ) -> TEntityID | None:
+        """Resolve a key that is not a primary key into the id of the entity it names.
 
         Reads at most two rows and rejects the second: a lookup key is expected to
         be unique, so more than one match means the conditions are wrong or the
@@ -60,7 +61,61 @@ class V2ReadOps(V2OpsBase):
             raise AmbiguousEntityKeyError(
                 f"The given key matches more than one {row_class.__name__}"
             )
-        return lookup.to_data(rows[0])
+        return lookup.to_entity_id(rows[0])
+
+    async def lookup_field_owners(
+        self, lookup: FieldOwnerLookup[Any, Any], field_ids: Sequence[FieldIdentifier]
+    ) -> Mapping[FieldIdentifier, EntityIdentifier]:
+        """Read the owning entity of each named field row.
+
+        A row that is gone is absent from the mapping rather than an error: the caller
+        decides whether that is a miss or one failed item among many.
+        """
+        if not field_ids:
+            return {}
+        rows = (await self._sess.execute(lookup.build_query(field_ids))).all()
+        owners = {row[0]: lookup.to_entity_id(row[1]) for row in rows}
+        return {field_id: owners[field_id] for field_id in field_ids if field_id in owners}
+
+    async def lookup_field_owner_by_key[TOwnerID: EntityIdentifier](
+        self, lookup: FieldOwnerKeyLookup[TOwnerID]
+    ) -> TOwnerID | None:
+        """Read the entity owning the field row the key names; ``None`` if nothing matches."""
+        rows = (await self._sess.execute(lookup.build_query().limit(2))).all()
+        if not rows:
+            return None
+        if len(rows) > 1:
+            raise AmbiguousEntityKeyError(
+                "A field owner key matched more than one row, so it is not a key."
+            )
+        return lookup.to_entity_id(rows[0][0])
+
+    async def query_owned_fields[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
+        self,
+        querier: OwnedFieldQuerier[TOwnerID, TRow, TData],
+        owner_ids: Sequence[TOwnerID],
+    ) -> Mapping[TOwnerID, TData]:
+        """Read the row each named entity designates, keyed by that entity.
+
+        An owner designating nothing is absent from the mapping. A second row for the
+        same owner is a fault rather than a pick: the querier's SELECT names one row,
+        so two mean the narrowing is wrong or the constraint enforcing it is missing.
+        """
+        if not owner_ids:
+            return {}
+        owner_column = querier.owner_id_column()
+        rows = (
+            await self._sess.scalars(querier.build_select().where(owner_column.in_(owner_ids)))
+        ).all()
+        designated: dict[TOwnerID, TData] = {}
+        for row in rows:
+            owner_id = getattr(row, owner_column.key)
+            if owner_id in designated:
+                raise AmbiguousEntityKeyError(
+                    f"{querier.__class__.__name__} matched more than one row for one owner."
+                )
+            designated[owner_id] = querier.to_data(row)
+        return designated
 
     async def search_with_scopes[TRow: Base, TData](
         self,

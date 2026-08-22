@@ -7,9 +7,9 @@ from typing import Any
 
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -184,11 +184,11 @@ class SessionRepository:
         return await self._db_source.get_group_name_by_domain_and_id(domain_name, group_id)
 
     @session_repository_resilience.apply()
-    async def get_scaling_group_wsproxy_addr(
+    async def get_resource_group_wsproxy_addr(
         self,
-        scaling_group_name: str,
+        resource_group_name: str,
     ) -> str | None:
-        return await self._db_source.get_scaling_group_wsproxy_addr(scaling_group_name)
+        return await self._db_source.get_resource_group_wsproxy_addr(resource_group_name)
 
     @session_repository_resilience.apply()
     async def get_session_by_id(
@@ -198,12 +198,12 @@ class SessionRepository:
         return await self._db_source.get_session_by_id(session_id)
 
     @session_repository_resilience.apply()
-    async def modify_session(
+    async def update_session(
         self,
         updater: Updater[SessionRow],
         session_name: str | None = None,
     ) -> SessionRow | None:
-        return await self._db_source.modify_session(updater, session_name)
+        return await self._db_source.update_session(updater, session_name)
 
     @session_repository_resilience.apply()
     async def query_userinfo(

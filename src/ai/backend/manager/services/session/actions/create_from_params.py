@@ -1,19 +1,21 @@
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, override
 
 import yarl
 
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT
 from ai.backend.common.types import AccessKey, ClusterMode, SessionTypes
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.services.session.base import SessionScopeAction
+from ai.backend.manager.services.session.base import (
+    SessionScopeAction,
+    SessionScopeActionResult,
+)
 
 
 # TODO: Idea: Refactor this type using pydantic and utilize as API model
@@ -49,9 +51,10 @@ class CreateFromParamsActionParams:
 class CreateFromParamsAction(SessionScopeAction):
     """Create a new session from parameters.
 
-    RBAC validation checks if the user has CREATE permission in USER scope.
-    Scope is always USER scope with user_id.
+    Answered for by the project the session is created in.
     """
+
+    project_id: ProjectID
 
     params: CreateFromParamsActionParams
     user_id: uuid.UUID
@@ -61,38 +64,24 @@ class CreateFromParamsAction(SessionScopeAction):
     keypair_resource_policy: dict[str, Any] | None
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id),)
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_from_params"
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
-    @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.USER
-
-    @override
-    def scope_id(self) -> str:
-        return str(self.user_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.USER,
-            element_id=str(self.user_id),
-        )
-
 
 @dataclass
-class CreateFromParamsActionResult(BaseActionResult):
+class CreateFromParamsActionResult(SessionScopeActionResult):
     # TODO: Change this to SessionData
     session_id: uuid.UUID
 
     # TODO: Add proper type
     result: Mapping[str, Any]
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.session_id)

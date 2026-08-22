@@ -320,10 +320,10 @@ def unquote(_cli_ctx: CLIContext, value: str) -> None:
     help="The configuration scope to put the value.",
 )
 @click.pass_obj
-def set_storage_sftp_scaling_group(
+def set_storage_sftp_resource_group(
     cli_ctx: CLIContext,
     proxy: str,
-    scaling_groups: str,
+    resource_groups: str,
     scope: ConfigScopes,
 ) -> None:
     """
@@ -339,7 +339,7 @@ def set_storage_sftp_scaling_group(
                 sys.exit(ExitCode.FAILURE)
             await etcd.put(
                 f"volumes/proxies/{proxy}/sftp_scaling_groups",
-                ",".join([x.strip() for x in scaling_groups.split(",")]),
+                ",".join([x.strip() for x in resource_groups.split(",")]),
             )
 
     asyncio.run(_impl())
@@ -355,7 +355,7 @@ def set_storage_sftp_scaling_group(
     help="The configuration scope to put the value.",
 )
 @click.pass_obj
-def remove_storage_sftp_scaling_group(
+def remove_storage_sftp_resource_group(
     cli_ctx: CLIContext,
     proxy: str,
     scope: ConfigScopes,

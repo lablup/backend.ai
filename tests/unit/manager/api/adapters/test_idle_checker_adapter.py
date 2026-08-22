@@ -7,6 +7,8 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -22,8 +24,6 @@ from ai.backend.common.dto.manager.v2.idle_checker.request import (
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import MetricLabelEntry
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import MetricLabelEntryInfo
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.api.adapters.idle_checker.adapter import IdleCheckerAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData

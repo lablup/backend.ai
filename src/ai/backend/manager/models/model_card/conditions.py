@@ -8,12 +8,12 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
     make_nested_string_in_factory,

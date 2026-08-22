@@ -8,8 +8,8 @@ import pytest
 from aiohttp.test_utils import make_mocked_request
 
 from ai.backend.common.contexts.user import current_user, triggered_user
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.api.rest.middleware import auth as auth_mw
 from ai.backend.manager.api.rest.middleware.auth import (
     _resolve_effective_user,

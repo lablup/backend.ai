@@ -26,13 +26,13 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
     ReplicaHealthStatus as ValkeyReplicaHealthStatus,
 )
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     BulkUpdateRoutesResponse,
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import UpdatedRoutesItem
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
@@ -40,7 +40,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
-from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
+from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
@@ -544,7 +544,7 @@ class TestCleanupRoutesByConfig:
         deployment.current_revision = current_revision_mock
         deployment.deploying_revision = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
-        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+        mock_deployment_repo.get_resource_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
         }
 
@@ -580,7 +580,7 @@ class TestCleanupRoutesByConfig:
         deployment.current_revision = current_revision_mock
         deployment.deploying_revision = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
-        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+        mock_deployment_repo.get_resource_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
         }
 
@@ -653,7 +653,7 @@ class TestCleanupRoutesByConfig:
         deployment.current_revision = current_revision_mock
         deployment.deploying_revision = deploying_revision_mock
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
-        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+        mock_deployment_repo.get_resource_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
         }
 
@@ -702,7 +702,7 @@ class TestCleanupRoutesByConfig:
         deployment.current_revision = None
         deployment.deploying_revision = deploying_revision_mock
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
-        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+        mock_deployment_repo.get_resource_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
         }
 
@@ -748,7 +748,7 @@ class TestCleanupRoutesByConfig:
         deployment.current_revision = None
         deployment.deploying_revision = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
-        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+        mock_deployment_repo.get_resource_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
         }
 
@@ -1021,8 +1021,8 @@ def _wire_proxy_target(
     """
     deployments = [_make_deployment_mock(UUID(str(eid)), resource_group) for eid in endpoint_ids]
     mock_deployment_repo.get_deployments_by_ids.return_value = deployments
-    mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = {
-        resource_group: ScalingGroupProxyTarget(addr=addr, api_token=token),
+    mock_deployment_repo.fetch_resource_group_proxy_targets.return_value = {
+        resource_group: ResourceGroupProxyTarget(addr=addr, api_token=token),
     }
     mock_deployment_repo.fetch_route_connection_infos.return_value = {
         UUID(str(eid)): [

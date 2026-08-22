@@ -87,6 +87,7 @@ from ai.backend.agent.tasks import (
 )
 from ai.backend.common.asyncio import cancel_tasks, current_loop
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
+from ai.backend.common.cgroup import CgroupController
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
@@ -98,6 +99,7 @@ from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyS
 from ai.backend.common.config import ModelConfig, ModelDefinition
 from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.common.data.agent.types import AgentInfo
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.image.types import InstalledImageInfo, ScannedImage
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
@@ -146,7 +148,12 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelStartedBroadcastEvent,
     KernelTerminatedBroadcastEvent,
 )
-from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.events.event_types.kernel.types import (
+    KernelCreationInfo,
+    KernelLifecycleEventReason,
+    ServicePortInfo,
+    UsedDevices,
+)
 from ai.backend.common.events.event_types.session.anycast import (
     ExecutionFinishedAnycastEvent,
     ExecutionStartedAnycastEvent,
@@ -173,7 +180,6 @@ from ai.backend.common.exception import (
     ConfigurationError,
     VolumeMountFailed,
 )
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.json import (
     dump_json,
     dump_json_str,
@@ -1944,7 +1950,9 @@ class AbstractAgent[
         )
 
     @abstractmethod
-    def get_cgroup_path(self, controller: str, container_id: str) -> Path:
+    async def get_cgroup_path(
+        self, controller: CgroupController, container_id: ContainerId
+    ) -> Path:
         """
         Get the cgroup path for the given controller and container ID.
         This is used to read/write cgroup files for resource management.
@@ -3301,24 +3309,29 @@ class AbstractAgent[
                             )
 
                     # Finally we are done.
+                    creation_info = KernelCreationInfo(
+                        container_id=ContainerId(str(kernel_obj["container_id"])),
+                        kernel_host=str(kernel_obj["kernel_host"]),
+                        repl_in_port=kernel_obj["repl_in_port"],
+                        repl_out_port=kernel_obj["repl_out_port"],
+                        service_ports=[
+                            ServicePortInfo.model_validate(service_port)
+                            for service_port in public_service_ports
+                        ],
+                        used_devices=UsedDevices.from_allocations(
+                            resource_spec.allocations, attached_devices
+                        ),
+                    )
                     await self.anycast_and_broadcast_event(
                         KernelStartedAnycastEvent(
                             kernel_id=kernel_id,
                             session_id=session_id,
-                            creation_info={
-                                **kernel_creation_info,
-                                "id": str(KernelId(kernel_id)),
-                                "container_id": str(kernel_obj["container_id"]),
-                            },
+                            creation_info=creation_info,
                         ),
                         KernelStartedBroadcastEvent(
                             kernel_id=kernel_id,
                             session_id=session_id,
-                            creation_info={
-                                **kernel_creation_info,
-                                "id": str(KernelId(kernel_id)),
-                                "container_id": str(kernel_obj["container_id"]),
-                            },
+                            creation_info=creation_info,
                         ),
                     )
                     async with self.registry_lock:

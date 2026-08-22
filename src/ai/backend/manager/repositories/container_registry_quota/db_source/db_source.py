@@ -12,7 +12,7 @@ from sqlalchemy.orm import load_only
 from ai.backend.manager.data.container_registry.types import PerProjectContainerRegistryInfo
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -72,11 +72,11 @@ class PerProjectRegistryQuotaDBSource:
         self,
         db_sess: SASession,
         project_id: UUID,
-    ) -> GroupRow | None:
+    ) -> ProjectRow | None:
         project_query = (
-            sa.select(GroupRow)
-            .where(GroupRow.id == project_id)
-            .options(load_only(GroupRow.container_registry))
+            sa.select(ProjectRow)
+            .where(ProjectRow.id == project_id)
+            .options(load_only(ProjectRow.container_registry))
         )
         result = await db_sess.execute(project_query)
         return result.scalar_one_or_none()

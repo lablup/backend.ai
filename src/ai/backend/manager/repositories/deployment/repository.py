@@ -16,16 +16,16 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import Valke
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.replica import ReplicaID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.session_group import SessionGroupID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -74,22 +74,23 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
+    ResourceGroupCleanupConfig,
     RevisionSearchResult,
     RouteHandlerCategory,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
-    ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
-from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
+from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import DeploymentContext
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scheduling_history import (
     RouteHistoryRow,
@@ -105,6 +106,7 @@ from ai.backend.manager.repositories.base.updater import (
     Updater,
 )
 from ai.backend.manager.repositories.base.upserter import Upserter
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.scheduling_history.creators import DeploymentHistoryCreatorSpec
 
 from .db_source import DeploymentDBSource
@@ -165,12 +167,14 @@ class DeploymentRepository:
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
         storage_manager: StorageSessionManager,
         valkey_stat: ValkeyStatClient,
         valkey_live: ValkeyLiveClient,
         valkey_schedule: ValkeyScheduleClient,
     ) -> None:
         self._db_source = DeploymentDBSource(db, storage_manager)
+        self._v2_ops = v2_ops_provider
         self._storage_source = DeploymentStorageSource(storage_manager)
         self._valkey_stat = valkey_stat
         self._valkey_live = valkey_live
@@ -201,8 +205,8 @@ class DeploymentRepository:
         return await self._db_source.get_image_id(image)
 
     @deployment_repository_resilience.apply()
-    async def get_default_architecture_from_scaling_group(
-        self, scaling_group_name: str
+    async def get_default_architecture_from_resource_group(
+        self, resource_group_name: str
     ) -> str | None:
         """Most common architecture among live agents in a scaling group.
 
@@ -210,7 +214,9 @@ class DeploymentRepository:
         only the image canonical without an explicit architecture. Returns
         ``None`` when no live agents are attached to the scaling group.
         """
-        return await self._db_source.get_default_architecture_from_scaling_group(scaling_group_name)
+        return await self._db_source.get_default_architecture_from_resource_group(
+            resource_group_name
+        )
 
     @deployment_repository_resilience.apply()
     async def get_modified_endpoint(
@@ -296,9 +302,9 @@ class DeploymentRepository:
         return await self._db_source.get_deployments_by_ids(deployment_ids)
 
     @deployment_repository_resilience.apply()
-    async def get_scaling_group_cleanup_configs(
-        self, scaling_group_names: Sequence[str]
-    ) -> Mapping[str, ScalingGroupCleanupConfig]:
+    async def get_resource_group_cleanup_configs(
+        self, resource_group_names: Sequence[str]
+    ) -> Mapping[str, ResourceGroupCleanupConfig]:
         """
         Get route cleanup target statuses configuration for scaling groups.
 
@@ -308,7 +314,7 @@ class DeploymentRepository:
         Returns:
             Mapping of scaling group name to ScalingGroupCleanupConfig
         """
-        return await self._db_source.get_scaling_group_cleanup_configs(scaling_group_names)
+        return await self._db_source.get_resource_group_cleanup_configs(resource_group_names)
 
     @deployment_repository_resilience.apply()
     async def get_resource_group_default_deployment_options(
@@ -636,12 +642,12 @@ class DeploymentRepository:
         return await self._db_source.batch_update_desired_replicas(updates)
 
     @deployment_repository_resilience.apply()
-    async def fetch_scaling_group_proxy_targets(
+    async def fetch_resource_group_proxy_targets(
         self,
-        scaling_group: set[str],
-    ) -> Mapping[str, ScalingGroupProxyTarget | None]:
+        resource_group: set[str],
+    ) -> Mapping[str, ResourceGroupProxyTarget | None]:
         """Fetch the proxy target URL for a scaling group endpoint."""
-        return await self._db_source.fetch_scaling_group_proxy_targets(scaling_group)
+        return await self._db_source.fetch_resource_group_proxy_targets(resource_group)
 
     @deployment_repository_resilience.apply()
     async def fetch_auto_scaling_rules_by_deployment_ids(
@@ -1230,7 +1236,7 @@ class DeploymentRepository:
         """Batched read for the legacy model-serving create path.
 
         Now takes a ``RuntimeVariantID`` — the legacy service layer is
-        responsible for resolving name→id via the ResolveRuntimeVariantByName
+        responsible for resolving name→id via the LookupRuntimeVariantLookup
         action before invoking this flow.
         """
         return await self._db_source.load_legacy_model_service_deployment_read_bundle(
@@ -1542,18 +1548,11 @@ class DeploymentRepository:
 
     @deployment_repository_resilience.apply()
     async def create_access_token(
-        self,
-        creator: RBACEntityCreator[EndpointTokenRow],
-    ) -> EndpointTokenRow:
-        """Create a new access token for a model deployment.
-
-        Args:
-            creator: RBACEntityCreator containing the EndpointTokenCreatorSpec.
-
-        Returns:
-            Created EndpointTokenRow.
-        """
-        return await self._db_source.create_access_token(creator)
+        self, deployment_id: DeploymentID, creator: EndpointTokenCreator
+    ) -> ModelDeploymentAccessTokenData:
+        """Register an access token under the deployment it grants access to."""
+        async with self._v2_ops.write_ops() as w:
+            return await w.create_field(deployment_id, creator)
 
     @deployment_repository_resilience.apply()
     async def get_access_token(

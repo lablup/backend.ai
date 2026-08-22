@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import msgpack
 import pytest
 
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
@@ -26,14 +27,14 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ChangeVFolderOwnershipActionResult,
     GetQuotaAction,
     GetQuotaActionResult,
-    ListAllHostsAction,
-    ListAllHostsActionResult,
-    ListHostsAction,
-    ListHostsActionResult,
-    MountHostAction,
-    MountHostActionResult,
-    UmountHostAction,
-    UmountHostActionResult,
+    GlobalListAllHostsAction,
+    GlobalListAllHostsActionResult,
+    GlobalMountHostAction,
+    GlobalMountHostActionResult,
+    GlobalUmountHostAction,
+    GlobalUmountHostActionResult,
+    SearchHostsAction,
+    SearchHostsActionResult,
     UpdateQuotaAction,
     UpdateQuotaActionResult,
 )
@@ -99,7 +100,7 @@ def mock_storage_manager() -> MagicMock:
             ),
         ]
     )
-    manager.get_sftp_scaling_groups = AsyncMock(return_value=[])
+    manager.get_sftp_resource_groups = AsyncMock(return_value=[])
     return manager
 
 
@@ -142,10 +143,10 @@ class TestListAllHostsAction:
         vfolder_service: VFolderService,
         mock_storage_manager: MagicMock,
     ) -> None:
-        action = ListAllHostsAction()
+        action = GlobalListAllHostsAction()
         result = await vfolder_service.list_all_hosts(action)
 
-        assert isinstance(result, ListAllHostsActionResult)
+        assert isinstance(result, GlobalListAllHostsActionResult)
         assert "proxy1:volume1" in result.allowed
         assert "proxy2:volume2" in result.allowed
         assert len(result.allowed) == 2
@@ -157,7 +158,7 @@ class TestListAllHostsAction:
         mock_config_provider: MagicMock,
     ) -> None:
         mock_config_provider.config.volumes.default_host = "proxy1:volume1"
-        action = ListAllHostsAction()
+        action = GlobalListAllHostsAction()
         result = await vfolder_service.list_all_hosts(action)
 
         assert result.default == "proxy1:volume1"
@@ -168,7 +169,7 @@ class TestListAllHostsAction:
         mock_config_provider: MagicMock,
     ) -> None:
         mock_config_provider.config.volumes.default_host = "nonexistent:host"
-        action = ListAllHostsAction()
+        action = GlobalListAllHostsAction()
         result = await vfolder_service.list_all_hosts(action)
 
         assert result.default is None
@@ -186,7 +187,7 @@ class TestListHostsAction:
                 "proxy1:volume1": {VFolderHostPermission.CREATE, VFolderHostPermission.MODIFY},
             })
         )
-        action = ListHostsAction(
+        action = SearchHostsAction(
             user_uuid=user_uuid,
             domain_name="default",
             group_id=None,
@@ -194,7 +195,7 @@ class TestListHostsAction:
         )
         result = await vfolder_service.list_hosts(action)
 
-        assert isinstance(result, ListHostsActionResult)
+        assert isinstance(result, SearchHostsActionResult)
         assert "proxy1:volume1" in result.allowed
         assert "proxy2:volume2" not in result.allowed
         mock_vfolder_repository.get_allowed_hosts_for_listing.assert_awaited_once()
@@ -210,7 +211,7 @@ class TestListHostsAction:
                 "proxy1:volume1": {VFolderHostPermission.CREATE},
             })
         )
-        action = ListHostsAction(
+        action = SearchHostsAction(
             user_uuid=user_uuid,
             domain_name="default",
             group_id=None,
@@ -239,7 +240,7 @@ class TestListHostsAction:
                 "proxy1:volume1": {VFolderHostPermission.CREATE},
             })
         )
-        action = ListHostsAction(
+        action = SearchHostsAction(
             user_uuid=user_uuid,
             domain_name="default",
             group_id=None,
@@ -267,7 +268,7 @@ class TestListHostsAction:
                 "proxy1:volume1": {VFolderHostPermission.CREATE},
             })
         )
-        action = ListHostsAction(
+        action = SearchHostsAction(
             user_uuid=user_uuid,
             domain_name="default",
             group_id=None,
@@ -297,7 +298,7 @@ class TestListHostsAction:
                 "proxy1:volume1": {VFolderHostPermission.CREATE},
             })
         )
-        action = ListHostsAction(
+        action = SearchHostsAction(
             user_uuid=user_uuid,
             domain_name="default",
             group_id=None,
@@ -321,7 +322,7 @@ class TestGetQuotaAction:
         action = GetQuotaAction(
             folder_host="proxy1:volume1",
             vfid="vfid-123",
-            vfolder_id=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             unmanaged_path=None,
             user_role=UserRole.SUPERADMIN,
             user_uuid=user_uuid,
@@ -343,7 +344,7 @@ class TestGetQuotaAction:
         action = GetQuotaAction(
             folder_host="proxy1:volume1",
             vfid="vfid-123",
-            vfolder_id=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             unmanaged_path=None,
             user_role=UserRole.USER,
             user_uuid=user_uuid,
@@ -370,7 +371,7 @@ class TestGetQuotaAction:
         action = GetQuotaAction(
             folder_host="proxy1:volume1",
             vfid="vfid-123",
-            vfolder_id=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             unmanaged_path=None,
             user_role=UserRole.SUPERADMIN,
             user_uuid=user_uuid,
@@ -393,7 +394,7 @@ class TestUpdateQuotaAction:
         action = UpdateQuotaAction(
             folder_host="proxy1:volume1",
             vfid="vfid-123",
-            vfolder_id=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             unmanaged_path=None,
             user_role=UserRole.SUPERADMIN,
             user_uuid=user_uuid,
@@ -419,7 +420,7 @@ class TestUpdateQuotaAction:
         action = UpdateQuotaAction(
             folder_host="proxy1:volume1",
             vfid="vfid-123",
-            vfolder_id=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             unmanaged_path=None,
             user_role=UserRole.SUPERADMIN,
             user_uuid=user_uuid,
@@ -445,7 +446,7 @@ class TestUpdateQuotaAction:
         action = UpdateQuotaAction(
             folder_host="proxy1:volume1",
             vfid="vfid-123",
-            vfolder_id=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             unmanaged_path=None,
             user_role=UserRole.SUPERADMIN,
             user_uuid=user_uuid,
@@ -473,7 +474,7 @@ class TestChangeVFolderOwnershipAction:
     ) -> None:
         mock_vfolder_repository.change_vfolder_ownership = AsyncMock()
         action = ChangeVFolderOwnershipAction(
-            vfolder_id=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             user_email="new-owner@example.com",
         )
         result = await vfolder_service.change_vfolder_ownership(action)
@@ -493,7 +494,7 @@ class TestChangeVFolderOwnershipAction:
             side_effect=UserNotFound("User not found")
         )
         action = ChangeVFolderOwnershipAction(
-            vfolder_id=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             user_email="nonexistent@example.com",
         )
         with pytest.raises(UserNotFound):
@@ -508,18 +509,18 @@ class TestMountHostAction:
         mock_etcd: MagicMock,
     ) -> None:
         mock_vfolder_repository.get_alive_agent_ids = AsyncMock(return_value=[])
-        action = MountHostAction(
+        action = GlobalMountHostAction(
             name="test-volume",
             fs_location="/dev/sda1",
             fs_type="ext4",
             options=None,
-            scaling_group=None,
+            resource_group=None,
             fstab_path=None,
             edit_fstab=False,
         )
         result = await vfolder_service.mount_host(action)
 
-        assert isinstance(result, MountHostActionResult)
+        assert isinstance(result, GlobalMountHostActionResult)
         assert result.manager.success is True
         mock_vfolder_repository.get_alive_agent_ids.assert_awaited_once_with(None)
 
@@ -529,10 +530,10 @@ class TestMountHostAction:
         mock_vfolder_repository: MagicMock,
     ) -> None:
         mock_vfolder_repository.get_alive_agent_ids = AsyncMock(return_value=[])
-        action = MountHostAction(
+        action = GlobalMountHostAction(
             name="test-volume",
             fs_location="/dev/sda1",
-            scaling_group="sg-01",
+            resource_group="sg-01",
         )
         await vfolder_service.mount_host(action)
 
@@ -549,7 +550,7 @@ class TestUmountHostAction:
         mock_vfolder_repository.get_active_kernel_mount_names = AsyncMock(
             return_value=["test-volume"]
         )
-        action = UmountHostAction(
+        action = GlobalUmountHostAction(
             name="test-volume",
         )
         with pytest.raises(VFolderOperationFailed, match="Target host is used in sessions"):
@@ -562,7 +563,7 @@ class TestUmountHostAction:
         mock_config_provider: MagicMock,
     ) -> None:
         mock_config_provider.legacy_etcd_config_loader.get_raw = AsyncMock(return_value="/mnt")
-        action = UmountHostAction(
+        action = GlobalUmountHostAction(
             name=".",
         )
         with pytest.raises(
@@ -577,10 +578,10 @@ class TestUmountHostAction:
     ) -> None:
         mock_vfolder_repository.get_active_kernel_mount_names = AsyncMock(return_value=[])
         mock_vfolder_repository.get_alive_agent_ids = AsyncMock(return_value=[])
-        action = UmountHostAction(
+        action = GlobalUmountHostAction(
             name="test-volume",
         )
         result = await vfolder_service.umount_host(action)
 
-        assert isinstance(result, UmountHostActionResult)
+        assert isinstance(result, GlobalUmountHostActionResult)
         assert result.manager.success is True

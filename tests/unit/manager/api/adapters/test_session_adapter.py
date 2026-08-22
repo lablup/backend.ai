@@ -53,7 +53,7 @@ def _create_session_data(
         creation_id="test-creation-id",
         name=name,
         access_key=None,
-        scaling_group_name="default",
+        resource_group_name="default",
         target_sgroup_names=None,
         agent_ids=None,
         images=None,
@@ -151,7 +151,7 @@ class TestEnqueueActionBuilding:
         processors = MagicMock()
         result = MagicMock()
         result.session_data = _create_session_data()
-        processors.session.enqueue_session.wait_for_complete = AsyncMock(return_value=result)
+        processors.session.enqueue_session.run = AsyncMock(return_value=result)
         return processors
 
     @pytest.fixture
@@ -185,8 +185,8 @@ class TestEnqueueActionBuilding:
             group_id=project_id,
         )
         assert result.session is not None
-        mock_processors.session.enqueue_session.wait_for_complete.assert_called_once()
-        action = mock_processors.session.enqueue_session.wait_for_complete.call_args[0][0]
+        mock_processors.session.enqueue_session.run.assert_called_once()
+        action = mock_processors.session.enqueue_session.run.call_args[0][0]
         assert action.session_type == SessionTypes.INTERACTIVE
         assert action.resource.cluster_mode == ClusterMode.SINGLE_NODE
 
@@ -212,7 +212,7 @@ class TestEnqueueActionBuilding:
             domain_name="default",
             group_id=dto.project_id,
         )
-        action = mock_processors.session.enqueue_session.wait_for_complete.call_args[0][0]
+        action = mock_processors.session.enqueue_session.run.call_args[0][0]
         assert action.session_type == SessionTypes.BATCH
         assert action.batch is not None
         assert action.batch.startup_command == "python train.py"
@@ -240,7 +240,7 @@ class TestEnqueueActionBuilding:
             domain_name="default",
             group_id=dto.project_id,
         )
-        action = mock_processors.session.enqueue_session.wait_for_complete.call_args[0][0]
+        action = mock_processors.session.enqueue_session.run.call_args[0][0]
         assert action.resource.cluster_mode == ClusterMode.MULTI_NODE
         assert action.resource.cluster_size == 4
 
@@ -267,7 +267,7 @@ class TestEnqueueActionBuilding:
             domain_name="default",
             group_id=dto.project_id,
         )
-        action = mock_processors.session.enqueue_session.wait_for_complete.call_args[0][0]
+        action = mock_processors.session.enqueue_session.run.call_args[0][0]
         assert action.scheduling.agent_list == ["agent-1"]
         assert action.scheduling.agent_selection_policy == AgentSelectionPolicy.STRICT
 
@@ -292,7 +292,7 @@ class TestEnqueueActionBuilding:
             domain_name="default",
             group_id=dto.project_id,
         )
-        action = mock_processors.session.enqueue_session.wait_for_complete.call_args[0][0]
+        action = mock_processors.session.enqueue_session.run.call_args[0][0]
         assert action.scheduling.agent_selection_policy is None
 
 
@@ -307,7 +307,7 @@ class TestTerminateActionBuilding:
         result.terminating = [uuid4()]
         result.force_terminated = []
         result.skipped = []
-        processors.session.terminate_sessions.wait_for_complete = AsyncMock(return_value=result)
+        processors.session.terminate_sessions.run = AsyncMock(return_value=result)
         return processors
 
     @pytest.fixture
@@ -324,7 +324,7 @@ class TestTerminateActionBuilding:
         dto = TerminateSessionsInput(session_ids=[sid])
         result = await adapter.terminate(dto)
         assert len(result.terminating) == 1
-        mock_processors.session.terminate_sessions.wait_for_complete.assert_called_once()
+        mock_processors.session.terminate_sessions.run.assert_called_once()
 
     async def test_terminate_forced(
         self,
@@ -334,7 +334,7 @@ class TestTerminateActionBuilding:
         """Force terminate should pass forced=True to action."""
         dto = TerminateSessionsInput(session_ids=[uuid4()], forced=True)
         await adapter.terminate(dto)
-        action = mock_processors.session.terminate_sessions.wait_for_complete.call_args[0][0]
+        action = mock_processors.session.terminate_sessions.run.call_args[0][0]
         assert action.forced is True
 
     async def test_terminate_multiple(
@@ -346,5 +346,5 @@ class TestTerminateActionBuilding:
         ids = [uuid4(), uuid4(), uuid4()]
         dto = TerminateSessionsInput(session_ids=ids)
         await adapter.terminate(dto)
-        action = mock_processors.session.terminate_sessions.wait_for_complete.call_args[0][0]
+        action = mock_processors.session.terminate_sessions.run.call_args[0][0]
         assert len(action.session_ids) == 3

@@ -23,7 +23,7 @@ class TestUnknownFieldWarning:
         "unknown_key",
         ["use-experimental-redis-event-dispatcher", "totally-made-up-key"],
     )
-    def test_unknown_field_is_warned_and_dropped(
+    def test_unknown_field_is_warned_and_kept(
         self,
         unknown_key: str,
         caplog: pytest.LogCaptureFixture,
@@ -33,9 +33,8 @@ class TestUnknownFieldWarning:
 
         warnings = _unknown_field_warnings(caplog)
         assert any(unknown_key in m and "ManagerConfig" in m for m in warnings)
-        assert not hasattr(config, unknown_key.replace("-", "_"))
-        assert unknown_key not in config.model_dump()
-        assert unknown_key not in config.model_fields_set
+        assert config.model_dump()[unknown_key] is True
+        assert unknown_key in config.model_fields_set
 
     def test_known_field_emits_no_warning(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level("WARNING", logger=CONFIG_LOGGER):

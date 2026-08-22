@@ -4,15 +4,12 @@ import logging
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, override
+from typing import Any, override
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider, ResourceT
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
-
-if TYPE_CHECKING:
-    from ai.backend.manager.repositories.error_log import ErrorLogRepository
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -21,15 +18,14 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class MonitoringInput:
     """Input required for monitoring plugin setup.
 
-    Separated from PluginsInput because monitoring plugins require
-    error_log_repository which is only available after DomainComposer (Stage 6).
+    Separated from PluginsInput because the monitoring plugins are initialized after
+    the domain stage.
     """
 
     etcd: AsyncEtcd
     local_config: Mapping[str, Any]
     allowed_plugins: set[str] | None
     disabled_plugins: set[str] | None
-    error_log_repository: ErrorLogRepository
 
 
 class MonitoringDependency(NonMonitorableDependencyProvider[MonitoringInput, ResourceT]):
@@ -39,10 +35,7 @@ class MonitoringDependency(NonMonitorableDependencyProvider[MonitoringInput, Res
 
 
 class ErrorMonitorDependency(MonitoringDependency[ManagerErrorPluginContext]):
-    """Provides ManagerErrorPluginContext lifecycle management.
-
-    Injects error_log_repository directly.
-    """
+    """Provides ManagerErrorPluginContext lifecycle management."""
 
     @property
     @override
@@ -56,7 +49,6 @@ class ErrorMonitorDependency(MonitoringDependency[ManagerErrorPluginContext]):
     ) -> AsyncIterator[ManagerErrorPluginContext]:
         ctx = ManagerErrorPluginContext(setup_input.etcd, setup_input.local_config)
         await ctx.init(
-            context={"error_log_repository": setup_input.error_log_repository},
             allowlist=setup_input.allowed_plugins,
         )
         log.info(

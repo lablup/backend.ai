@@ -7,6 +7,7 @@ from functools import lru_cache
 from typing import cast
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -44,7 +45,6 @@ from ai.backend.common.dto.manager.v2.idle_checker.types import (
     IdleCheckerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import MetricLabelEntryInfo
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData

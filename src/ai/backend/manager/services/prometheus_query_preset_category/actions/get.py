@@ -1,35 +1,41 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.prometheus_query_preset_category import (
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
+)
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
+from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,
 )
-from ai.backend.manager.services.prometheus_query_preset_category.actions.base import (
-    PrometheusQueryPresetCategoryAction,
+from ai.backend.manager.models.prometheus_query_preset_category.queriers import (
+    PrometheusQueryPresetCategoryQuerier,
+)
+from ai.backend.manager.models.prometheus_query_preset_category.row import (
+    PrometheusQueryPresetCategoryRow,
 )
 
 
 @dataclass
-class GetCategoryAction(PrometheusQueryPresetCategoryAction):
-    category_id: UUID
+class GetCategoryAction(
+    GetSingleEntityOpsAction[PrometheusQueryPresetCategoryRow, PrometheusQueryPresetCategoryData]
+):
+    """Read one category from the catalog."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.category_id)
+    category_id: PrometheusQueryPresetCategoryID
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
-
-
-@dataclass
-class GetCategoryActionResult(BaseActionResult):
-    category: PrometheusQueryPresetCategoryData
+    def action_name(cls) -> str:
+        return "get_prometheus_query_preset_category"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.category.id)
+    def entity_id(self) -> EntityIdentifier:
+        return self.category_id
+
+    @override
+    def to_querier(self) -> PrometheusQueryPresetCategoryQuerier:
+        return PrometheusQueryPresetCategoryQuerier(category_id=self.category_id)

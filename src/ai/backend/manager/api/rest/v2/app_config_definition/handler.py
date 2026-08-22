@@ -7,12 +7,12 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     CreateAppConfigDefinitionInput,
     PurgeAppConfigDefinitionInput,
     SearchAppConfigDefinitionsInput,
 )
-from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import AppConfigDefinitionIdPathParam
 

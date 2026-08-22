@@ -12,7 +12,7 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     ProjectFairShareData,
@@ -21,12 +21,12 @@ from ai.backend.manager.data.fair_share import (
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
     ProjectNotFound,
-    ScalingGroupNotFound,
+    ResourceGroupNotFound,
 )
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 __all__ = (
@@ -74,9 +74,9 @@ class DomainFairShareOperationScope(OperationScope):
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
-                column=ScalingGroupRow.id,
+                column=ResourceGroupRow.id,
                 value=self.resource_group_id,
-                error=ScalingGroupNotFound(str(self.resource_group_id)),
+                error=ResourceGroupNotFound(str(self.resource_group_id)),
             ),
         ]
 
@@ -97,7 +97,7 @@ class ProjectFairShareOperationScope(OperationScope):
 
     @override
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for GroupRow filtered by domain.
+        """Convert scope to a query condition for ProjectRow filtered by domain.
 
         The resource_group filter is applied in the LEFT JOIN condition,
         so only the domain filter is needed here.
@@ -105,7 +105,7 @@ class ProjectFairShareOperationScope(OperationScope):
         domain_name = self.domain_name
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.domain_name == domain_name
+            return ProjectRow.domain_name == domain_name
 
         return inner
 
@@ -115,9 +115,9 @@ class ProjectFairShareOperationScope(OperationScope):
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
-                column=ScalingGroupRow.id,
+                column=ResourceGroupRow.id,
                 value=self.resource_group_id,
-                error=ScalingGroupNotFound(str(self.resource_group_id)),
+                error=ResourceGroupNotFound(str(self.resource_group_id)),
             ),
             ExistenceCheck(
                 column=DomainRow.name,
@@ -146,7 +146,7 @@ class UserFairShareOperationScope(OperationScope):
 
     @override
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for GroupRow filtered by domain and project.
+        """Convert scope to a query condition for ProjectRow filtered by domain and project.
 
         The resource_group filter is applied in the LEFT JOIN condition,
         so only domain and project filters are needed here.
@@ -156,8 +156,8 @@ class UserFairShareOperationScope(OperationScope):
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
-                GroupRow.domain_name == domain_name,
-                GroupRow.id == project_id,
+                ProjectRow.domain_name == domain_name,
+                ProjectRow.id == project_id,
             )
 
         return inner
@@ -172,9 +172,9 @@ class UserFairShareOperationScope(OperationScope):
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
-                column=ScalingGroupRow.id,
+                column=ResourceGroupRow.id,
                 value=self.resource_group_id,
-                error=ScalingGroupNotFound(str(self.resource_group_id)),
+                error=ResourceGroupNotFound(str(self.resource_group_id)),
             ),
             ExistenceCheck(
                 column=DomainRow.name,
@@ -182,7 +182,7 @@ class UserFairShareOperationScope(OperationScope):
                 error=DomainNotFound(self.domain_name),
             ),
             ExistenceCheck(
-                column=GroupRow.id,
+                column=ProjectRow.id,
                 value=self.project_id,
                 error=ProjectNotFound(str(self.project_id)),
             ),

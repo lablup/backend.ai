@@ -4,7 +4,7 @@ Utility functions for agent selectors.
 
 from decimal import Decimal
 
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.manager.views.sokovan.agent import AgentInfo
 from ai.backend.manager.views.sokovan.workload import ResourceRequest
 

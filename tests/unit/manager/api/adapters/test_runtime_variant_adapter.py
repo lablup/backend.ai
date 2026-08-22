@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from ai.backend.common.config import DefaultModelDefinition
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 

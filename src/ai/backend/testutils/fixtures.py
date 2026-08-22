@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
-from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 
 __all__ = (
     "DomainFactory",

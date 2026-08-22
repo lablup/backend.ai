@@ -192,11 +192,11 @@ def update(
 ) -> None:
     """Update an idle checker."""
     from ai.backend.common.api_handlers import SENTINEL
+    from ai.backend.common.data.entity.idle_checker import IdleCheckerID
     from ai.backend.common.dto.manager.v2.idle_checker.request import (
         IdleCheckerSpecInputDTO,
         UpdateIdleCheckerInput,
     )
-    from ai.backend.common.identifier.idle_checker import IdleCheckerID
 
     if description is not None and clear_description:
         raise click.UsageError("--description and --clear-description cannot be used together")
@@ -233,7 +233,7 @@ def update(
 @click.argument("idle_checker_id", type=click.UUID)
 def purge(idle_checker_id: uuid.UUID) -> None:
     """Permanently remove an idle checker."""
-    from ai.backend.common.identifier.idle_checker import IdleCheckerID
+    from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())

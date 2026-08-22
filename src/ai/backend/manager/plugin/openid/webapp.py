@@ -24,14 +24,13 @@ from authlib.jose import jwt as joseJWT  # pants: no-infer-dep
 from authlib.oidc.core import CodeIDToken  # pants: no-infer-dep
 
 from ai.backend.common.cron import LocalCron, PeriodicTask
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
-from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -153,9 +152,9 @@ async def create_user_if_not_exists(
         domain_id = DomainID(domain_result.rows[0].id)
 
         project_result = await w.batch_query_in_global(
-            sa.select(GroupRow.id).where(
-                GroupRow.domain_name == user_data["domain_name"],
-                GroupRow.name == user_info["project"],
+            sa.select(ProjectRow.id).where(
+                ProjectRow.domain_name == user_data["domain_name"],
+                ProjectRow.name == user_info["project"],
             ),
             BatchQuerier(pagination=NoPagination()),
         )
@@ -181,7 +180,6 @@ async def create_user_if_not_exists(
                 domain_id=domain_id,
                 project_ids=project_ids,
                 keypair_resource_policy=user_info["keypair_resource_policy"],
-                keypair_rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
             )
         )
         log.info("OPENID.WEBAPP: new user created ({})", result.user_row.email)

@@ -12,7 +12,6 @@ from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantP
 from ai.backend.manager.errors.resource import RuntimeVariantPresetNotFound
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
@@ -66,23 +65,3 @@ class RuntimeVariantPresetDBSource:
                     f"Runtime variant preset with ID {updater.pk_value} not found."
                 )
             return result.row.to_data()
-
-    async def delete(self, preset_id: UUID) -> RuntimeVariantPresetData:
-        async with self._db.begin_session() as session:
-            stmt = sa.select(RuntimeVariantPresetRow).where(RuntimeVariantPresetRow.id == preset_id)
-            row = (await session.execute(stmt)).scalar_one_or_none()
-            if row is None:
-                raise RuntimeVariantPresetNotFound()
-            data = row.to_data()
-            await session.delete(row)
-        return data
-
-    async def search(
-        self,
-        querier: BatchQuerier,
-    ) -> tuple[list[RuntimeVariantPresetData], int, bool, bool]:
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(RuntimeVariantPresetRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.RuntimeVariantPresetRow.to_data() for row in result.rows]
-            return items, result.total_count, result.has_next_page, result.has_previous_page

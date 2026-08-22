@@ -6,6 +6,11 @@ from typing import Self
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.resource_policy import (
+    KeyPairResourcePolicyUUID,
+    ProjectResourcePolicyUUID,
+    UserResourcePolicyUUID,
+)
 from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.types import (
     DefaultForUnspecified,
@@ -18,6 +23,7 @@ from ai.backend.manager.data.resource.types import (
     UserResourcePolicyData,
 )
 from ai.backend.manager.models.base import (
+    GUID,
     Base,
     EnumType,
     ResourceSlotColumn,
@@ -45,9 +51,26 @@ class KeyPairResourcePolicyRow(CreatedAtMixin, Base):
             f"max_priority >= {SESSION_PRIORITY_MIN} AND max_priority <= {SESSION_PRIORITY_MAX}",
             name="max_priority_within_session_priority_range",
         ),
+        # Partial unique index: at most one policy may be the default.
+        sa.Index(
+            "uq_keypair_resource_policies_is_default",
+            "is_default",
+            unique=True,
+            postgresql_where=sa.text("is_default"),
+        ),
     )
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
+    uuid: Mapped[KeyPairResourcePolicyUUID] = mapped_column(
+        "uuid",
+        GUID(KeyPairResourcePolicyUUID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
+    is_default: Mapped[bool] = mapped_column(
+        "is_default", sa.Boolean, nullable=False, server_default=sa.false()
+    )
     default_for_unspecified: Mapped[DefaultForUnspecified] = mapped_column(
         "default_for_unspecified",
         EnumType(DefaultForUnspecified),
@@ -91,6 +114,7 @@ class KeyPairResourcePolicyRow(CreatedAtMixin, Base):
         self,
     ) -> KeyPairResourcePolicyData:
         return KeyPairResourcePolicyData(
+            uuid=self.uuid,
             name=self.name,
             created_at=self.created_at,
             default_for_unspecified=self.default_for_unspecified,
@@ -116,6 +140,13 @@ class UserResourcePolicyRow(CreatedAtMixin, Base):
     __tablename__ = "user_resource_policies"
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
+    uuid: Mapped[UserResourcePolicyUUID] = mapped_column(
+        "uuid",
+        GUID(UserResourcePolicyUUID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
     max_vfolder_count: Mapped[int] = mapped_column(
         "max_vfolder_count", sa.Integer(), nullable=False
     )
@@ -161,6 +192,7 @@ class UserResourcePolicyRow(CreatedAtMixin, Base):
 
     def to_dataclass(self) -> UserResourcePolicyData:
         return UserResourcePolicyData(
+            uuid=self.uuid,
             name=self.name,
             created_at=self.created_at,
             max_vfolder_count=self.max_vfolder_count,
@@ -180,6 +212,13 @@ class ProjectResourcePolicyRow(CreatedAtMixin, Base):
     __tablename__ = "project_resource_policies"
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
+    uuid: Mapped[ProjectResourcePolicyUUID] = mapped_column(
+        "uuid",
+        GUID(ProjectResourcePolicyUUID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
     max_vfolder_count: Mapped[int] = mapped_column(
         "max_vfolder_count", sa.Integer(), nullable=False
     )
@@ -213,6 +252,7 @@ class ProjectResourcePolicyRow(CreatedAtMixin, Base):
 
     def to_dataclass(self) -> ProjectResourcePolicyData:
         return ProjectResourcePolicyData(
+            uuid=self.uuid,
             name=self.name,
             created_at=self.created_at,
             max_vfolder_count=self.max_vfolder_count,

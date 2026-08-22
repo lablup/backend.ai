@@ -6,7 +6,11 @@
 
 - `repository.py` (single-entity CRUD), `repositories.py` (multi-entity container / `RepositoryArgs`),
   `types.py` (OperationScope + SearchResult), `options.py` (QueryCondition/QueryOrder),
-  `db_source/db_source.py` (queries). Optional: `creators.py` / `updaters.py` / `purgers.py` / `upserters.py`.
+  `db_source/db_source.py` (queries). Optional: `updaters.py`, for the legacy
+  `UpdaterSpec` only.
+- Every v2 spec — read as well as write — is declared next to its row under `models/`:
+  `queriers.py`, `searchers.py`, `lookups.py`, `updaters.py`, `creators.py`, `purgers.py`,
+  `upserters.py`. What stays here is the repositories and the queries they run.
 - Separate out db_source so it is clear which source a Repository uses.
 - Do NOT write a `repository.py` / `db_source.py` for an operation that only hands a spec to
   ops and converts the row: `repositories/ops/repository.py` already does that for
@@ -22,14 +26,18 @@
 ## Data access
 
 - New write specs use the `models/specs/` lineage only:
-  - write families: `GlobalEntity*` / `Entity*` / `RoleManagedEntity*` / `FieldEntity*` (Creator/Purger/Upserter)
+  - write specs: `GlobalEntity*` / `Entity*` / `RoleManagedEntity*` / `FieldEntity*` (Creator/Purger/Upserter)
   - read/update: `DataQuerier`, `DataLookup`, `Searcher`, `DataUpdater`
 - No new use of the legacy specs — transition-only maintenance of existing code:
   - `repositories/base/`: `CreatorSpec`, `DataCreator`, `UpserterSpec`, `PurgerSpec`
-  - `repositories/base/rbac/`: the `RBACEntityCreator` / `RBACEntityUpserter` / `RBACEntityPurger` family
+  - `repositories/base/rbac/`: the `RBACEntityCreator` / `RBACEntityUpserter` / `RBACEntityPurger` set
   - Judge by import path (`models.specs.*` is v2) — `repositories.base` re-exports some
     v2 types and bridge classes like `DataBatchPurger` share names, so never judge by
     the class name alone.
+- A v2 ops method that writes several rows names its failure mode: `atomic_*` raises and
+  writes nothing on the first failure, `partial_*` isolates each item in a savepoint and
+  answers per item. There is no unmarked default, and the two are never selected by an
+  argument — the return type differs (`list` vs `BulkResultWithFailures`).
 - The new path for the standard six operations is `OpsRepository` (`V2DBOpsProvider`).
   The legacy `DBOpsProvider` path (including `create_dependent` and
   `create_with_next_value`) is for existing code only — when a new domain needs those

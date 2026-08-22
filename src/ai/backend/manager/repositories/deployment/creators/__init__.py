@@ -14,7 +14,6 @@ from .deployment import (
 from .policy import DeploymentPolicyCreatorSpec
 from .revision import DeploymentRevisionCreatorSpec
 from .route import RouteBatchUpdaterSpec, RouteCreatorSpec
-from .token import EndpointTokenCreatorSpec
 
 __all__ = [
     # Deployment (endpoint) - CreatorSpec
@@ -37,5 +36,4 @@ __all__ = [
     "RouteCreatorSpec",
     "RouteBatchUpdaterSpec",
     # Token
-    "EndpointTokenCreatorSpec",
 ]

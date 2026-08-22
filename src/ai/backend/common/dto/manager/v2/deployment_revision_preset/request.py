@@ -7,6 +7,8 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.config import DEFAULT_SHELL, PresetModelDefinition, PreStartAction
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import (
     EnvironmentVariableEntryInput,
@@ -21,8 +23,6 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsEntryDTO
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 
 
 class PresetModelHealthCheckInput(BaseRequestModel):

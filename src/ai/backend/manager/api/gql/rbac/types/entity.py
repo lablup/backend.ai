@@ -11,6 +11,8 @@ from typing import Any, Self, cast, override
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import (
     EntityFilter as EntityFilterDTO,
@@ -21,8 +23,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.response import (
     AssociationScopesEntitiesNode,
 )
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,

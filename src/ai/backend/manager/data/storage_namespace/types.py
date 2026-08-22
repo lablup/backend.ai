@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from typing import override
+
+from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
 
 
 @dataclass
@@ -15,7 +19,11 @@ class StorageNamespaceListResult:
 
 
 @dataclass
-class StorageNamespaceData:
-    id: uuid.UUID
+class StorageNamespaceData(EntityData):
+    id: StorageNamespaceID
     storage_id: uuid.UUID
     namespace: str
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.id

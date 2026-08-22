@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 
 from ai.backend.manager.api.rest.export.adapter import ExportAdapter
-from ai.backend.manager.models.group.row import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.export import ExportFieldDef
@@ -117,8 +117,8 @@ class TestJoinDefinitions:
         assert ASSOC_GROUP_USER_JOIN.table is AssocGroupUserRow.__table__
 
     def test_project_join_table(self) -> None:
-        """Project JOIN should use GroupRow table."""
-        assert PROJECT_JOIN.table is GroupRow.__table__
+        """Project JOIN should use ProjectRow table."""
+        assert PROJECT_JOIN.table is ProjectRow.__table__
 
     def test_default_keypair_join_table(self) -> None:
         """Default keypair JOIN should use KeyPairRow table."""

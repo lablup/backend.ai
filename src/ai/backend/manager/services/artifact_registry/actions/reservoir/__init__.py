@@ -3,7 +3,10 @@ from .delete import DeleteReservoirActionResult, DeleteReservoirRegistryAction
 from .get import GetReservoirRegistryAction, GetReservoirRegistryActionResult
 from .get_multi import GetReservoirRegistriesAction, GetReservoirRegistriesActionResult
 from .list import ListReservoirRegistriesAction, ListReservoirRegistriesActionResult
-from .search import SearchReservoirRegistriesAction, SearchReservoirRegistriesActionResult
+from .search import (
+    SearchReservoirRegistriesAction,
+    SearchReservoirRegistriesActionResult,
+)
 from .update import UpdateReservoirRegistryAction, UpdateReservoirRegistryActionResult
 
 __all__ = [

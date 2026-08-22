@@ -7,6 +7,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
+from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.base import GUID, Base
 
@@ -29,14 +31,14 @@ class AssociationArtifactsStorageRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    artifact_revision_id: Mapped[uuid.UUID] = mapped_column(
+    artifact_revision_id: Mapped[ArtifactRevisionID] = mapped_column(
         "artifact_revision_id",
-        GUID,
+        GUID(ArtifactRevisionID),
         nullable=False,
     )
-    storage_namespace_id: Mapped[uuid.UUID] = mapped_column(
+    storage_namespace_id: Mapped[StorageNamespaceID] = mapped_column(
         "storage_namespace_id",
-        GUID,
+        GUID(StorageNamespaceID),
         nullable=False,
     )
     storage_type: Mapped[str] = mapped_column("storage_type", sa.String, nullable=False)

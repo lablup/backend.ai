@@ -10,9 +10,9 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -22,10 +22,10 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.conditions import (
     DomainScopeConditions,
@@ -38,6 +38,7 @@ from ai.backend.manager.models.rbac_models.orders import (
     UserScopeOrders,
 )
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -46,7 +47,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import PasswordHashAlgorithm, PasswordInfo, UserRow, UserStatus
@@ -83,7 +83,7 @@ class TestSearchDomainScopes:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -91,7 +91,7 @@ class TestSearchDomainScopes:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -345,7 +345,7 @@ class TestSearchProjectScopes:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -353,7 +353,7 @@ class TestSearchProjectScopes:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -426,7 +426,7 @@ class TestSearchProjectScopes:
 
             for name in project_names:
                 project_id = uuid.uuid4()
-                project = GroupRow(
+                project = ProjectRow(
                     id=project_id,
                     name=name,
                     description=f"Test project: {name}",
@@ -454,7 +454,7 @@ class TestSearchProjectScopes:
         async with db_with_scope_tables.begin_session() as db_sess:
             for i in range(15):
                 project_id = uuid.uuid4()
-                project = GroupRow(
+                project = ProjectRow(
                     id=project_id,
                     name=f"project-{i:02d}",
                     description=f"Test project {i}",
@@ -563,7 +563,7 @@ class TestSearchUserScopes:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -571,7 +571,7 @@ class TestSearchUserScopes:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -783,7 +783,7 @@ class TestSearchGlobalScope:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -791,7 +791,7 @@ class TestSearchGlobalScope:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -834,7 +834,7 @@ class TestSearchScopesEmptyResult:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -842,7 +842,7 @@ class TestSearchScopesEmptyResult:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,

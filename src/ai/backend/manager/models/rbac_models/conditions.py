@@ -26,7 +26,7 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -605,15 +605,15 @@ class DomainScopeConditions:
 class ProjectScopeConditions:
     """Query conditions for project (group) scope IDs."""
 
-    by_name_in = staticmethod(make_string_in_factory(GroupRow.name))
+    by_name_in = staticmethod(make_string_in_factory(ProjectRow.name))
 
     @staticmethod
     def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = GroupRow.name.ilike(f"%{spec.value}%")
+                condition = ProjectRow.name.ilike(f"%{spec.value}%")
             else:
-                condition = GroupRow.name.like(f"%{spec.value}%")
+                condition = ProjectRow.name.like(f"%{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -624,9 +624,9 @@ class ProjectScopeConditions:
     def by_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = sa.func.lower(GroupRow.name) == spec.value.lower()
+                condition = sa.func.lower(ProjectRow.name) == spec.value.lower()
             else:
-                condition = GroupRow.name == spec.value
+                condition = ProjectRow.name == spec.value
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -637,9 +637,9 @@ class ProjectScopeConditions:
     def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = GroupRow.name.ilike(f"{spec.value}%")
+                condition = ProjectRow.name.ilike(f"{spec.value}%")
             else:
-                condition = GroupRow.name.like(f"{spec.value}%")
+                condition = ProjectRow.name.like(f"{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -650,9 +650,9 @@ class ProjectScopeConditions:
     def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = GroupRow.name.ilike(f"%{spec.value}")
+                condition = ProjectRow.name.ilike(f"%{spec.value}")
             else:
-                condition = GroupRow.name.like(f"%{spec.value}")
+                condition = ProjectRow.name.like(f"%{spec.value}")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition

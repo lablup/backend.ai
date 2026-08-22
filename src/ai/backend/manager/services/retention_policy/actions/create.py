@@ -1,32 +1,32 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.retention_policy import RETENTION_POLICY_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
 from ai.backend.manager.data.retention.types import RetentionPolicyData
+from ai.backend.manager.models.retention.creators import RetentionPolicyCreator
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.retention_policy.actions.base import RetentionPolicyAction
 
 
 @dataclass
-class CreateRetentionPolicyAction(RetentionPolicyAction):
-    creator: Creator[RetentionPolicyRow]
+class CreateRetentionPolicyAction(CreateGlobalOpsAction[RetentionPolicyRow, RetentionPolicyData]):
+    """Register the cleanup settings for one retention category."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    creator: RetentionPolicyCreator
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-
-@dataclass
-class CreateRetentionPolicyActionResult(BaseActionResult):
-    policy: RetentionPolicyData
+    def entity_type(cls) -> EntityType:
+        return RETENTION_POLICY_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.policy.id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_retention_policy"
+
+    @override
+    def to_creator(self) -> RetentionPolicyCreator:
+        return self.creator

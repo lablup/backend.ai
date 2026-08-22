@@ -17,9 +17,9 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -38,16 +38,17 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import (
     AssociationScopesEntitiesRow,
     EntityFieldRow,
     RoleRow,
     UserRoleRow,
 )
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -55,7 +56,6 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
@@ -78,7 +78,7 @@ class TestForceTerminateResourceDeallocation:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -86,7 +86,7 @@ class TestForceTerminateResourceDeallocation:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
@@ -141,12 +141,12 @@ class TestForceTerminateResourceDeallocation:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=test_scaling_group_id,
                     name=sg_name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(
+                    scheduler_opts=ResourceGroupOpts(
                         allowed_session_types=[],
                         pending_timeout=timedelta(hours=1),
                         config={},
@@ -255,7 +255,6 @@ class TestForceTerminateResourceDeallocation:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 KeyPairRow(
-                    user_id=f"test-user-{uuid.uuid4().hex[:8]}@test.com",
                     access_key=access_key,
                     secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
                     is_active=True,
@@ -279,7 +278,7 @@ class TestForceTerminateResourceDeallocation:
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     description="Test group",
@@ -340,7 +339,7 @@ class TestForceTerminateResourceDeallocation:
         domain_id: DomainID,
         domain_name: str,
         resource_group_id: ResourceGroupID,
-        scaling_group_name: str,
+        resource_group_name: str,
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
         access_key: AccessKey,
@@ -362,7 +361,7 @@ class TestForceTerminateResourceDeallocation:
                     domain_name=domain_name,
                     group_id=group_id,
                     resource_group_id=resource_group_id,
-                    scaling_group_name=scaling_group_name,
+                    scaling_group_name=resource_group_name,
                     status=session_status,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
@@ -382,7 +381,7 @@ class TestForceTerminateResourceDeallocation:
                     session_id=session_id,
                     agent=agent_id,
                     agent_addr="127.0.0.1:6001" if agent_id else None,
-                    scaling_group=scaling_group_name,
+                    scaling_group=resource_group_name,
                     resource_group_id=resource_group_id,
                     cluster_idx=0,
                     cluster_role="main",
@@ -490,7 +489,7 @@ class TestForceTerminateResourceDeallocation:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -561,7 +560,7 @@ class TestForceTerminateResourceDeallocation:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -612,7 +611,7 @@ class TestForceTerminateResourceDeallocation:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -659,7 +658,7 @@ class TestBulkTerminateResourceDeallocation:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -667,7 +666,7 @@ class TestBulkTerminateResourceDeallocation:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
@@ -722,12 +721,12 @@ class TestBulkTerminateResourceDeallocation:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=test_scaling_group_id,
                     name=sg_name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(
+                    scheduler_opts=ResourceGroupOpts(
                         allowed_session_types=[],
                         pending_timeout=timedelta(hours=1),
                         config={},
@@ -836,7 +835,6 @@ class TestBulkTerminateResourceDeallocation:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 KeyPairRow(
-                    user_id=f"test-user-{uuid.uuid4().hex[:8]}@test.com",
                     access_key=access_key,
                     secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
                     is_active=True,
@@ -860,7 +858,7 @@ class TestBulkTerminateResourceDeallocation:
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     description="Test group",
@@ -919,7 +917,7 @@ class TestBulkTerminateResourceDeallocation:
         domain_id: DomainID,
         domain_name: str,
         resource_group_id: ResourceGroupID,
-        scaling_group_name: str,
+        resource_group_name: str,
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
         access_key: AccessKey,
@@ -941,7 +939,7 @@ class TestBulkTerminateResourceDeallocation:
                     domain_name=domain_name,
                     group_id=group_id,
                     resource_group_id=resource_group_id,
-                    scaling_group_name=scaling_group_name,
+                    scaling_group_name=resource_group_name,
                     status=SessionStatus.RUNNING,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
@@ -961,7 +959,7 @@ class TestBulkTerminateResourceDeallocation:
                     session_id=session_id,
                     agent=agent_id,
                     agent_addr="127.0.0.1:6001",
-                    scaling_group=scaling_group_name,
+                    scaling_group=resource_group_name,
                     resource_group_id=resource_group_id,
                     cluster_idx=0,
                     cluster_role="main",
@@ -1064,7 +1062,7 @@ class TestBulkTerminateResourceDeallocation:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -1117,7 +1115,7 @@ class TestNegativeValueGuard:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -1125,7 +1123,7 @@ class TestNegativeValueGuard:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
@@ -1180,12 +1178,12 @@ class TestNegativeValueGuard:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=test_scaling_group_id,
                     name=sg_name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(
+                    scheduler_opts=ResourceGroupOpts(
                         allowed_session_types=[],
                         pending_timeout=timedelta(hours=1),
                         config={},
@@ -1294,7 +1292,6 @@ class TestNegativeValueGuard:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 KeyPairRow(
-                    user_id=f"test-user-{uuid.uuid4().hex[:8]}@test.com",
                     access_key=access_key,
                     secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
                     is_active=True,
@@ -1318,7 +1315,7 @@ class TestNegativeValueGuard:
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     description="Test group",

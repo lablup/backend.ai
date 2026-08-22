@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
 
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.data.model_card.types import ResourceRequirementEntry
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.repositories.base.upserter import UpserterSpec

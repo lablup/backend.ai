@@ -11,7 +11,7 @@ class DomainRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = DomainRepository(args.db)
+        repository = DomainRepository(args.db, args.v2_ops_provider)
 
         return cls(
             repository=repository,

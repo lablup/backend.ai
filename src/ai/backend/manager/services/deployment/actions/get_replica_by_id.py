@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import ModelReplicaData
 from ai.backend.manager.services.deployment.actions.replica.base import DeploymentReplicaBaseAction
@@ -13,8 +12,9 @@ class GetReplicaByIdAction(DeploymentReplicaBaseAction):
     replica_id: UUID
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.replica_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_replica_by_id"
 
     @override
     @classmethod
@@ -23,9 +23,5 @@ class GetReplicaByIdAction(DeploymentReplicaBaseAction):
 
 
 @dataclass
-class GetReplicaByIdActionResult(BaseActionResult):
+class GetReplicaByIdActionResult:
     data: ModelReplicaData | None
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id) if self.data else None

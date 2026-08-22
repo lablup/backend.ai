@@ -15,8 +15,9 @@ import sqlalchemy as sa
 from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     BinarySize,
     ClusterMode,
@@ -31,9 +32,9 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
     VFolderCreateParams,
     VFolderMountPermission,
@@ -56,12 +57,12 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -71,6 +72,7 @@ from ai.backend.manager.models.rbac_models.permission.object_permission import O
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -83,7 +85,6 @@ from ai.backend.manager.models.resource_slot.row import (
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow, SessionStatus
 from ai.backend.manager.models.user import (
     UserRole,
@@ -147,7 +148,7 @@ class TestVfolderRepository:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -155,7 +156,7 @@ class TestVfolderRepository:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -309,7 +310,7 @@ class TestVfolderRepository:
         group_uuid = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_uuid,
                 name=f"test-model-store-{group_uuid.hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -389,7 +390,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
             ],
         ):
             yield database_connection
@@ -506,7 +507,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
         group_uuid = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_uuid,
                 name=f"test-group-{group_uuid.hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -587,7 +588,6 @@ class TestVfolderRepositoryAllowedVfolderHosts:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 KeyPairRow(
-                    user_id=f"test-{test_user.hex[:8]}@example.com",
                     user=test_user,
                     access_key=f"AK{test_user.hex[:14]}",
                     secret_key="test-secret",
@@ -639,7 +639,7 @@ class TestVfolderRepositoryPurge:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -647,7 +647,7 @@ class TestVfolderRepositoryPurge:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -927,7 +927,7 @@ class TestVfolderRepositoryPurge:
         project_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=f"test-project-{project_id.hex[:8]}",
                     domain_name=test_domain.domain_name,
@@ -1020,7 +1020,7 @@ class TestVfolderRepositoryDeleteForever:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -1028,7 +1028,7 @@ class TestVfolderRepositoryDeleteForever:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -1157,7 +1157,7 @@ class TestVfolderRepositoryDeleteForever:
         project_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=f"test-project-{project_id.hex[:8]}",
                     domain_name=test_domain.domain_name,
@@ -1394,14 +1394,14 @@ class TestVfolderRepositoryDeleteForever:
     ) -> tuple[uuid.UUID, str]:
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             db_sess.add(sgroup)
             await db_sess.flush()
@@ -1417,7 +1417,7 @@ class TestVfolderRepositoryDeleteForever:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 ContainerRegistryRow(
-                    id=registry_id,
+                    id=ContainerRegistryID(registry_id),
                     url="https://docker.io",
                     registry_name=f"reg-{uuid.uuid4().hex[:8]}",
                     type=ContainerRegistryType.DOCKER,
@@ -1924,13 +1924,13 @@ class TestVFolderRepositoryTrashAndRestore:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 ContainerRegistryRow,
                 ImageRow,

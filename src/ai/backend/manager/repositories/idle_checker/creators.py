@@ -5,9 +5,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.idle_checker.types import IdleCheckerSpec, IdleCheckPhase
 from ai.backend.common.data.permission.types import ScopeType
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.errors.idle_checker import (
     IdleCheckerAssignmentAlreadyExists,

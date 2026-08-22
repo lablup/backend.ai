@@ -76,11 +76,6 @@ class ResourceSlotRepository:
     # ==================== agent_resources ====================
 
     @resource_slot_repository_resilience.apply()
-    async def get_agent_resources(self, agent_id: str) -> list[AgentResourceRow]:
-        """Get all slot capacity/usage rows for a given agent."""
-        return await self._db_source.get_agent_resources(agent_id)
-
-    @resource_slot_repository_resilience.apply()
     async def get_agent_resource_by_slot(self, agent_id: str, slot_name: str) -> AgentResourceRow:
         """Get a single slot row for one agent+slot combination."""
         return await self._db_source.get_agent_resource_by_slot(agent_id, slot_name)
@@ -90,11 +85,6 @@ class ResourceSlotRepository:
         return await self._db_source.search_agent_resources(querier)
 
     # ==================== resource_allocations ====================
-
-    @resource_slot_repository_resilience.apply()
-    async def get_kernel_allocations(self, kernel_id: uuid.UUID) -> list[ResourceAllocationRow]:
-        """Get all per-slot allocation rows for a given kernel."""
-        return await self._db_source.get_kernel_allocations(kernel_id)
 
     @resource_slot_repository_resilience.apply()
     async def get_kernel_allocation_by_slot(

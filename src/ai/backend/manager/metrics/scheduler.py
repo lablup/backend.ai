@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Self
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.metrics.safe import (
     SafeCounter as Counter,
 )

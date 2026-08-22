@@ -134,13 +134,13 @@ def update_resource_group(
     force: bool,
 ) -> None:
     """Change an agent's resource group (superadmin only)."""
+    from ai.backend.common.data.entity.resource_group import ResourceGroupID
     from ai.backend.common.dto.manager.v2.agent.request import (
         UpdateAgentResourceGroupBody,
     )
     from ai.backend.common.dto.manager.v2.agent.types import (
         ConflictingSessionCleanupPolicyEnum,
     )
-    from ai.backend.common.identifier.resource_group import ResourceGroupID
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())

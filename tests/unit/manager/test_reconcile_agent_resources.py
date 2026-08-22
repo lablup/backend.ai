@@ -16,8 +16,8 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.auth import PublicKey, SecretKey
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import ResourceSlot, SlotName
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -26,16 +26,16 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
@@ -84,8 +84,8 @@ class TestReconcileAgentResources:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                ScalingGroupRow,
-                GroupRow,
+                ResourceGroupRow,
+                ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -157,18 +157,18 @@ class TestReconcileAgentResources:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=resource_group_id,
                     name=sg_name,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
@@ -483,8 +483,8 @@ class TestOrphanedAllocationCleanup:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                ScalingGroupRow,
-                GroupRow,
+                ResourceGroupRow,
+                ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -559,18 +559,18 @@ class TestOrphanedAllocationCleanup:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=resource_group_id,
                     name=sg_name,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
@@ -957,8 +957,8 @@ class TestTerminalSessionKernelReconciliation:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                ScalingGroupRow,
-                GroupRow,
+                ResourceGroupRow,
+                ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -1031,18 +1031,18 @@ class TestTerminalSessionKernelReconciliation:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=resource_group_id,
                     name=sg_name,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,

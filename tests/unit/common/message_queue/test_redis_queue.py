@@ -90,7 +90,7 @@ async def redis_queue(
 async def test_send_and_consume(redis_queue: RedisQueue) -> None:
     # Test message sending and consuming
     test_payload = AnycastMessagePayload(
-        name=MessageName("test-event"), source="i-test", body=b"body"
+        name=MessageName("test-event"), source="i-test", payload="{}"
     )
 
     # Send message
@@ -107,7 +107,7 @@ async def test_send_and_consume(redis_queue: RedisQueue) -> None:
 async def test_subscribe(redis_queue: RedisQueue) -> None:
     # Test message subscription
     test_payload = BroadcastMessagePayload(
-        name=MessageName("test-event"), source="i-test", body=b"body"
+        name=MessageName("test-event"), source="i-test", payload="{}"
     )
 
     # Create task to subscribe
@@ -135,7 +135,7 @@ async def test_subscribe(redis_queue: RedisQueue) -> None:
 async def test_broadcast_with_cache(redis_queue: RedisQueue) -> None:
     # Test broadcasting with cache
     test_payload = BroadcastMessagePayload(
-        name=MessageName("test-event"), source="i-test", body=b"body"
+        name=MessageName("test-event"), source="i-test", payload="{}"
     )
     cache_id = f"test-cache-id-{random.randint(1000, 9999)}"
 
@@ -168,7 +168,7 @@ async def test_broadcast_with_cache(redis_queue: RedisQueue) -> None:
 async def test_done(redis_queue: RedisQueue) -> None:
     # Test message acknowledgment
     test_payload = AnycastMessagePayload(
-        name=MessageName("test-event"), source="i-test", body=b"body"
+        name=MessageName("test-event"), source="i-test", payload="{}"
     )
 
     # Send message

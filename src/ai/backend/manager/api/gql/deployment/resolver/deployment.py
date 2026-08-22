@@ -9,11 +9,11 @@ from strawberry import ID, Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AdminSearchDeploymentsInput,
     ReplaceDeploymentOptionsInput,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,

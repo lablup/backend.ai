@@ -16,8 +16,8 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -82,7 +82,7 @@ class TestTerminatedStatusGuard:
         domain_id: DomainID,
         domain_name: str,
         resource_group_id: ResourceGroupID,
-        scaling_group_name: str,
+        resource_group_name: str,
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
         access_key: AccessKey,
@@ -95,7 +95,7 @@ class TestTerminatedStatusGuard:
             domain_id=domain_id,
             domain_name=domain_name,
             resource_group_id=resource_group_id,
-            scaling_group_name=scaling_group_name,
+            resource_group_name=resource_group_name,
             group_id=group_id,
             user_uuid=user_uuid,
             access_key=access_key,
@@ -124,7 +124,7 @@ class TestTerminatedStatusGuard:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -173,7 +173,7 @@ class TestTerminatedStatusGuard:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -213,7 +213,7 @@ class TestTerminatedStatusGuard:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -248,7 +248,7 @@ class TestTerminatedStatusGuard:
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,

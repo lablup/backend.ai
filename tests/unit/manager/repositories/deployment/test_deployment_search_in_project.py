@@ -11,9 +11,10 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import DeploymentSummarySearchResult
@@ -28,13 +29,14 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -43,7 +45,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -52,6 +53,7 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import ProjectDeploymentOperationScope
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
@@ -75,7 +77,7 @@ class TestEndpointSearchInProject:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -83,7 +85,7 @@ class TestEndpointSearchInProject:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -133,11 +135,11 @@ class TestEndpointSearchInProject:
 
             # Scaling group
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=sgroup_name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             await db_sess.flush()
@@ -185,7 +187,7 @@ class TestEndpointSearchInProject:
 
             # Two projects
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_a_id,
                     name=f"project-a-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
@@ -194,7 +196,7 @@ class TestEndpointSearchInProject:
                 )
             )
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_b_id,
                     name=f"project-b-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
@@ -207,7 +209,7 @@ class TestEndpointSearchInProject:
             # Container registry + image
             db_sess.add(
                 ContainerRegistryRow(
-                    id=registry_id,
+                    id=ContainerRegistryID(registry_id),
                     url="http://test-registry.local",
                     registry_name=f"test-registry-{uuid.uuid4().hex[:8]}",
                     type=ContainerRegistryType.DOCKER,
@@ -288,6 +290,7 @@ class TestEndpointSearchInProject:
         mock_valkey_schedule = AsyncMock()
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=mock_storage_manager,
             valkey_stat=mock_valkey_stat,
             valkey_live=mock_valkey_live,

@@ -6,8 +6,8 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import IdleCheckerScopeTypeDTO
-from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 
 
 class IdleCheckerAssignmentNode(BaseResponseModel):

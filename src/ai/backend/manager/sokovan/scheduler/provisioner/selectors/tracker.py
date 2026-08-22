@@ -10,8 +10,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.identifier.session_group import SessionGroupID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.views.sokovan.agent import AgentInfo, ResourceGroupResource
 from ai.backend.manager.views.sokovan.workload import ResourceRequest

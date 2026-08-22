@@ -1,64 +1,65 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
+from __future__ import annotations
+
+from ai.backend.common.data.entity.resource_policy import ProjectResourcePolicyUUID
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+    LookupOpsResult,
+)
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    SingleEntityActionProcessor,
+)
+from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
     CreateProjectResourcePolicyAction,
-    CreateProjectResourcePolicyActionResult,
 )
-from ai.backend.manager.services.project_resource_policy.actions.delete_project_resource_policy import (
-    DeleteProjectResourcePolicyAction,
-    DeleteProjectResourcePolicyActionResult,
-)
-from ai.backend.manager.services.project_resource_policy.actions.get_project_resource_policy import (
+from ai.backend.manager.services.project_resource_policy.actions.get import (
     GetProjectResourcePolicyAction,
-    GetProjectResourcePolicyActionResult,
 )
-from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
-    ModifyProjectResourcePolicyAction,
-    ModifyProjectResourcePolicyActionResult,
+from ai.backend.manager.services.project_resource_policy.actions.lookup import (
+    LookupProjectResourcePolicyAction,
+)
+from ai.backend.manager.services.project_resource_policy.actions.purge_project_resource_policy import (
+    PurgeProjectResourcePolicyAction,
 )
 from ai.backend.manager.services.project_resource_policy.actions.search_project_resource_policies import (
     SearchProjectResourcePoliciesAction,
-    SearchProjectResourcePoliciesActionResult,
 )
-from ai.backend.manager.services.project_resource_policy.service import ProjectResourcePolicyService
+from ai.backend.manager.services.project_resource_policy.actions.update_project_resource_policy import (
+    UpdateProjectResourcePolicyAction,
+)
 
 
 class ProjectResourcePolicyProcessors:
-    get_project_resource_policy: ActionProcessor[
-        GetProjectResourcePolicyAction, GetProjectResourcePolicyActionResult
+    """Every operation runs straight against ops, so this domain has no service."""
+
+    get: SingleEntityActionProcessor[
+        GetProjectResourcePolicyAction, EntityOpsResult[ProjectResourcePolicyData]
     ]
-    search_project_resource_policies: ActionProcessor[
-        SearchProjectResourcePoliciesAction, SearchProjectResourcePoliciesActionResult
+    lookup: LookupActionProcessor[
+        LookupProjectResourcePolicyAction, LookupOpsResult[ProjectResourcePolicyUUID]
     ]
-    create_project_resource_policy: ActionProcessor[
-        CreateProjectResourcePolicyAction, CreateProjectResourcePolicyActionResult
+    global_search: GlobalActionProcessor[
+        SearchProjectResourcePoliciesAction, BatchOpsResult[ProjectResourcePolicyData]
     ]
-    modify_project_resource_policy: ActionProcessor[
-        ModifyProjectResourcePolicyAction, ModifyProjectResourcePolicyActionResult
+    global_create: GlobalActionProcessor[
+        CreateProjectResourcePolicyAction, CreatedEntityOpsResult[ProjectResourcePolicyData]
     ]
-    delete_project_resource_policy: ActionProcessor[
-        DeleteProjectResourcePolicyAction, DeleteProjectResourcePolicyActionResult
+    update: SingleEntityActionProcessor[
+        UpdateProjectResourcePolicyAction, EntityOpsResult[ProjectResourcePolicyData]
+    ]
+    purge: SingleEntityActionProcessor[
+        PurgeProjectResourcePolicyAction, EntityOpsResult[ProjectResourcePolicyData]
     ]
 
-    def __init__(
-        self,
-        service: ProjectResourcePolicyService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.get_project_resource_policy = ActionProcessor(
-            service.get_project_resource_policy, action_monitors
-        )
-        self.search_project_resource_policies = ActionProcessor(
-            service.search_project_resource_policies, action_monitors
-        )
-        self.create_project_resource_policy = ActionProcessor(
-            service.create_project_resource_policy, action_monitors
-        )
-        self.modify_project_resource_policy = ActionProcessor(
-            service.modify_project_resource_policy, action_monitors
-        )
-        self.delete_project_resource_policy = ActionProcessor(
-            service.delete_project_resource_policy, action_monitors
-        )
+    def __init__(self, group: ProcessorGroup[ProjectResourcePolicyData]) -> None:
+        self.get = group.single_get_ops(GetProjectResourcePolicyAction)
+        self.lookup = group.lookup_ops(LookupProjectResourcePolicyAction)
+        self.global_search = group.global_search_ops(SearchProjectResourcePoliciesAction)
+        self.global_create = group.global_create_ops(CreateProjectResourcePolicyAction)
+        self.update = group.single_update_ops(UpdateProjectResourcePolicyAction)
+        self.purge = group.entity_purge_ops(PurgeProjectResourcePolicyAction)

@@ -3,10 +3,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.action import ActionID
+from ai.backend.common.data.entity.types import EntityIdentifier, ScopeRef
 from ai.backend.common.exception import ErrorCode
-from ai.backend.common.identifier.action import ActionID
-from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.types import OperationStatus
 
 __all__ = (
@@ -18,7 +17,7 @@ __all__ = (
 
 class BaseScopeActionResult(ABC):
     @abstractmethod
-    def entity_ids(self) -> Sequence[EntityID]:
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
         """Return the entities the run affected, empty if it affected none.
 
         No per-entity status: the caller named a scope, not entities, so there is no
@@ -38,7 +37,7 @@ class ScopeActionResultMeta:
 
     action_id: ActionID
     scope_targets: Sequence[ScopeRef]
-    entity_ids: Sequence[EntityID]
+    entity_ids: Sequence[EntityIdentifier]
     status: OperationStatus
     description: str
     started_at: datetime

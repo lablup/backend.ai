@@ -4,7 +4,7 @@ from .base import (
 from .monitor import BulkActionMonitor
 from .processor import BulkActionProcessor
 from .result import (
-    BaseBulkActionResult,
+    BasePartialBulkActionResult,
     BulkActionProcessResult,
     BulkActionResultMeta,
     BulkEntityResult,
@@ -13,7 +13,7 @@ from .validator import BulkActionValidator
 
 __all__ = (
     "BaseBulkAction",
-    "BaseBulkActionResult",
+    "BasePartialBulkActionResult",
     "BulkEntityResult",
     "BulkActionMonitor",
     "BulkActionProcessor",

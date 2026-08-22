@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeID, ScopeType
+from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.scope import ScopeID
-from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 
 __all__ = (
     "VirtualScopeData",

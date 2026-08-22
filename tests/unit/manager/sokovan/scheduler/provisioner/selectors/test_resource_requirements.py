@@ -8,9 +8,8 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.identifier.architecture import ArchName
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.types import ClusterMode, KernelId
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.types import ArchName, ClusterMode, KernelId
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import PlacementPlan
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import ResourceRequirements

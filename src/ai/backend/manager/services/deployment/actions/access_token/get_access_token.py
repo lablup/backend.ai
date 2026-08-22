@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import ModelDeploymentAccessTokenData
 from ai.backend.manager.services.deployment.actions.access_token.base import (
@@ -15,8 +14,9 @@ class GetAccessTokenAction(DeploymentAccessTokenBaseAction):
     access_token_id: UUID
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.access_token_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_access_token"
 
     @override
     @classmethod
@@ -25,9 +25,5 @@ class GetAccessTokenAction(DeploymentAccessTokenBaseAction):
 
 
 @dataclass
-class GetAccessTokenActionResult(BaseActionResult):
+class GetAccessTokenActionResult:
     data: ModelDeploymentAccessTokenData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)

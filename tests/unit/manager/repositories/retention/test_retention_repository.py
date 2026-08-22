@@ -32,12 +32,15 @@ from unittest.mock import MagicMock
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.events.types import EventDomain
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.types import OperationStatus
@@ -59,16 +62,17 @@ from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
-from ai.backend.manager.models.error_logs import ErrorLogRow
+from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.event_log.row import EventLogRow
-from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -83,7 +87,6 @@ from ai.backend.manager.models.resource_usage_history.row import (
 )
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.routing.row import RouteStatus, RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import (
     DeploymentHistoryRow,
     KernelSchedulingHistoryRow,
@@ -189,13 +192,13 @@ async def _seed_scope(engine: ExtendedAsyncSAEngine) -> _Scope:
             DomainRow(id=scope.domain_id, name=scope.domain_name, description=None, is_active=True)
         )
         sess.add(
-            ScalingGroupRow(
+            ResourceGroupRow(
                 name=scope.sgroup_name,
                 id=scope.sgroup_id,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
         )
         sess.add(
@@ -221,7 +224,7 @@ async def _seed_scope(engine: ExtendedAsyncSAEngine) -> _Scope:
             )
         )
         sess.add(
-            GroupRow(
+            ProjectRow(
                 id=scope.group_id,
                 name="retention-group",
                 description=None,
@@ -535,10 +538,10 @@ class TestSessionsRetention:
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 SessionRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -584,13 +587,13 @@ class TestSessionsRetention:
                 )
             )
             sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=scope.sgroup_name,
                     id=scope.sgroup_id,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             sess.add(
@@ -616,7 +619,7 @@ class TestSessionsRetention:
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=scope.group_id,
                     name="retention-group",
                     description=None,
@@ -917,8 +920,8 @@ class TestDeploymentsRetention:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                ScalingGroupRow,
-                GroupRow,
+                ResourceGroupRow,
+                ProjectRow,
                 EndpointRow,
                 DeploymentPolicyRow,
                 EndpointTokenRow,
@@ -944,17 +947,17 @@ class TestDeploymentsRetention:
                 )
             )
             sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=scope.sgroup_name,
                     id=scope.sgroup_id,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=scope.group_id,
                     name="retention-group",
                     description=None,
@@ -1012,12 +1015,12 @@ class TestDeploymentsRetention:
         async with db.begin_session() as sess:
             sess.add(
                 EndpointTokenRow(
-                    id=uuid.uuid4(),
+                    id=DeploymentTokenID(uuid.uuid4()),
                     token=f"tok-{uuid.uuid4()}",
                     endpoint=endpoint_id,
-                    session_owner=scope.user_uuid,
+                    session_owner=UserID(scope.user_uuid),
                     domain=scope.domain_name,
-                    project=scope.group_id,
+                    project=ProjectID(scope.group_id),
                     expires_at=expires_at,
                 )
             )
@@ -1123,10 +1126,10 @@ class TestDeploymentsTerminalChildCleanup:
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 SessionRow,
                 EndpointRow,
                 ReplicaGroupRow,
@@ -1162,13 +1165,13 @@ class TestDeploymentsTerminalChildCleanup:
                 )
             )
             sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=scope.sgroup_name,
                     id=scope.sgroup_id,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             sess.add(
@@ -1194,7 +1197,7 @@ class TestDeploymentsTerminalChildCleanup:
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=scope.group_id,
                     name="retention-group",
                     description=None,
@@ -1361,10 +1364,10 @@ class TestDeploymentsSessionGroupCleanup:
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 SessionGroupRow,
                 SessionRow,
                 EndpointRow,

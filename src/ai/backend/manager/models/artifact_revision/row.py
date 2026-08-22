@@ -9,6 +9,8 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.artifact.types import VerificationStepResult
+from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import (
@@ -33,12 +35,15 @@ class ArtifactRevisionRow(Base):
         sa.UniqueConstraint("artifact_id", "version", name="uq_artifact_id_version"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ArtifactRevisionID] = mapped_column(
+        "id",
+        GUID(ArtifactRevisionID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
-    artifact_id: Mapped[uuid.UUID] = mapped_column(
+    artifact_id: Mapped[ArtifactID] = mapped_column(
         "artifact_id",
-        GUID,
+        GUID(ArtifactID),
         nullable=False,
         index=True,
     )

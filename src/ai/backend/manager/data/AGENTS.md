@@ -22,6 +22,15 @@ dataclasses (established pattern); for new code, do not add re-exports — impor
 - Do NOT import from `manager/models/`, `manager/repositories/`, `manager/services/`, or external frameworks (`pydantic`,
   `sqlalchemy`, `aiohttp`).
 
+## `EntityData` / `FieldData` carries what its own domain's row holds
+
+- Its own row's columns only. Reading a relationship or carrying a joined value is not
+  allowed; another entity is named by its foreign-key value (`channel_id`).
+- A composite type that inherits neither is the exception.
+- A value spanning several rows is served by a repository in the service layer, not
+  folded into ops. Where a calculation is involved or many rows are, it becomes a
+  repository method of that domain.
+
 ## Legacy distinction
 
 - For types that support legacy paths rather than the v2 / GraphQL path, it is recommended to add `Legacy` to the name —

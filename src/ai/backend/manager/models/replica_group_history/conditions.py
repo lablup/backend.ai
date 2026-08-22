@@ -8,8 +8,8 @@ from datetime import datetime
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import ReplicaGroupHandlerCategory
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.clauses import QueryCondition

@@ -11,8 +11,8 @@ import msgpack
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -30,17 +30,20 @@ from ai.backend.manager.data.user.types import (
     UserData,
     UserSearchResult,
 )
+from ai.backend.manager.errors.user import KeyPairNotFound
+from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicyKeypairOperationScope,
     UserKeypairOperationScope,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.manager.repositories.user.types import (
@@ -71,8 +74,17 @@ user_repository_resilience = Resilience(
 class UserRepository:
     _db_source: UserDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
         self._db_source = UserDBSource(db)
+        self._v2_ops = v2_ops_provider
+
+    @user_repository_resilience.apply()
+    async def default_access_key(self, user_id: UserID) -> AccessKey | None:
+        """The key a user authorizes with, or ``None`` if they marked no active one."""
+        async with self._v2_ops.read_ops() as r:
+            designated = await r.query_owned_fields(DefaultKeypairQuerier(), [user_id])
+        keypair = designated.get(user_id)
+        return AccessKey(keypair.access_key) if keypair is not None else None
 
     @user_repository_resilience.apply()
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
@@ -328,25 +340,6 @@ class UserRepository:
         return await self._db_source.search_my_keypairs(scope, querier)
 
     @user_repository_resilience.apply()
-    async def search_keypairs_by_resource_policy(
-        self,
-        scope: KeypairResourcePolicyKeypairOperationScope,
-        querier: BatchQuerier,
-    ) -> SearchResult[KeyPairData]:
-        """Search keypairs assigned to a keypair resource policy.
-
-        Args:
-            scope: Search scope containing the resource policy name to filter by.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            SearchResult with matching keypairs and pagination info.
-        """
-        return await self._db_source.search_keypairs_by_resource_policy(scope, querier)
-
-    # ------------------------------------------------------------------ admin keypair operations
-
-    @user_repository_resilience.apply()
     async def admin_create_keypair(
         self, user_id: UUID, creator: KeyPairCreator
     ) -> GeneratedKeyPairData:
@@ -370,6 +363,15 @@ class UserRepository:
     ) -> SearchResult[KeyPairData]:
         """Admin search all keypairs without scope restriction."""
         return await self._db_source.admin_search_keypairs(querier)
+
+    @user_repository_resilience.apply()
+    async def update_keypair_column(self, updater: DataUpdater[Any, KeyPairData]) -> KeyPairData:
+        """Write one column of a keypair row."""
+        async with self._v2_ops.write_ops() as w:
+            data = await w.update_data(updater)
+            if data is None:
+                raise KeyPairNotFound(f"Keypair not found: {updater.target_id_value()}")
+            return data
 
     @user_repository_resilience.apply()
     async def admin_get_keypair(self, access_key: str) -> KeyPairData:

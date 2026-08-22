@@ -2970,7 +2970,7 @@ class VolumeProxyConfig(BaseConfigSchema):
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
-    sftp_scaling_groups: Annotated[
+    sftp_resource_groups: Annotated[
         CommaSeparatedStrList | None,
         Field(
             default=None,

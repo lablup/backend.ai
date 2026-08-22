@@ -13,7 +13,6 @@ from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.role import (
     UserRoleRevocationData,
 )
-from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     CreateRoleInput,
@@ -21,6 +20,7 @@ from ai.backend.manager.repositories.permission_controller.db_source.db_source i
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
+from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.services.permission_contoller.actions.assign_role import (
     AssignRoleAction,
     AssignRoleActionResult,
@@ -169,13 +169,13 @@ _GRANT_OPERATIONS: frozenset[OperationType] = frozenset({
 
 class PermissionControllerService:
     _repository: PermissionControllerRepository
-    _group_repository: GroupRepository
+    _group_repository: ProjectRepository
     _rbac_action_registry: Sequence[type[BaseRBACAction]]
 
     def __init__(
         self,
         repository: PermissionControllerRepository,
-        group_repository: GroupRepository,
+        group_repository: ProjectRepository,
         rbac_action_registry: Sequence[type[BaseRBACAction]],
     ) -> None:
         self._repository = repository

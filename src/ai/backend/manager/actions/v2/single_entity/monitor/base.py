@@ -1,24 +1,25 @@
 from abc import ABC
 
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
-from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.single_entity.result import SingleEntityActionProcessResult
+from ai.backend.manager.actions.v2.single_entity.trigger import (
+    SingleEntityActionTriggerMeta,
+)
 
 __all__ = ("SingleEntityActionMonitor",)
 
 
 class SingleEntityActionMonitor(ABC):
-    """Observes the lifecycle of a single-entity action.
+    """Observes the lifecycle of an operation on one entity.
 
-    Bound to the self-contained :class:`BaseSingleEntityAction` (pure ABC). ``prepare``
-    runs before the action function; ``done`` runs after it completes (or fails), with
-    the outcome carried in :class:`SingleEntityActionProcessResult`.
+    ``prepare`` runs before the action function; ``done`` runs after it completes (or
+    fails), with the outcome carried in :class:`SingleEntityActionProcessResult`. Reads
+    the entity from the meta, so the field shape reuses these unchanged.
     """
 
-    async def prepare(self, action: BaseSingleEntityAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, meta: SingleEntityActionTriggerMeta) -> None:
         raise NotImplementedError("Subclasses must implement the prepare method")
 
     async def done(
-        self, action: BaseSingleEntityAction, result: SingleEntityActionProcessResult
+        self, meta: SingleEntityActionTriggerMeta, result: SingleEntityActionProcessResult
     ) -> None:
         raise NotImplementedError("Subclasses must implement the done method")

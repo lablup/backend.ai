@@ -11,7 +11,7 @@ from ai.backend.common.config import (
     ModelDefinition,
     ModelServiceConfig,
 )
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import MountPermission
 from ai.backend.manager.data.deployment.types import ModelRevisionData
 from ai.backend.manager.data.session.creation import (

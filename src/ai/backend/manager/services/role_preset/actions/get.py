@@ -1,31 +1,31 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.identifier.role_preset import RolePresetID
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.role_preset.types import RolePresetData
-from ai.backend.manager.services.role_preset.actions.base import RolePresetAction
+from ai.backend.manager.models.rbac_models.role_preset.queriers import RolePresetQuerier
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 
 
 @dataclass
-class GetRolePresetAction(RolePresetAction):
+class GetRolePresetAction(GetSingleEntityOpsAction[RolePresetRow, RolePresetData]):
+    """Read one role preset."""
+
     preset_id: RolePresetID
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.preset_id)
-
-    @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
-
-
-@dataclass
-class GetRolePresetActionResult(BaseActionResult):
-    preset: RolePresetData
+    def action_name(cls) -> str:
+        return "get_role_preset"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.preset.id)
+    def entity_id(self) -> EntityIdentifier:
+        return self.preset_id
+
+    @override
+    def to_querier(self) -> RolePresetQuerier:
+        return RolePresetQuerier(preset_id=self.preset_id)

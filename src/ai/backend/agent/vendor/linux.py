@@ -8,7 +8,11 @@ from collections.abc import Iterator
 import aiohttp
 import aiotools
 
-from ai.backend.common.cgroup import get_cgroup_mount_point
+from ai.backend.common.cgroup import (
+    CgroupController,
+    CgroupResolutionFailed,
+    get_cgroup_mount_point,
+)
 from ai.backend.common.docker import get_docker_connector
 from ai.backend.logging import BraceStyleAdapter
 
@@ -77,8 +81,8 @@ class libnuma:
             driver = data["CgroupDriver"]
             version = data["CgroupVersion"]
             try:
-                mount_point = get_cgroup_mount_point(version, "cpuset")
-            except RuntimeError:
+                mount_point = get_cgroup_mount_point(version, CgroupController.CPUSET)
+            except CgroupResolutionFailed:
                 return None
             match driver:
                 case "cgroupfs":

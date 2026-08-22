@@ -2,6 +2,7 @@ import uuid
 
 from pydantic import HttpUrl
 
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.model_serving.response import (
     CompactServeInfoModel,
     ErrorInfoModel,
@@ -18,7 +19,6 @@ from ai.backend.common.dto.manager.model_serving.response import (
     TokenResponseModel,
     TryStartResponseModel,
 )
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import RuntimeVariant
 
 

@@ -1,7 +1,12 @@
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -18,6 +23,7 @@ from ai.backend.manager.services.agent.actions.load_container_counts import (
     LoadContainerCountsAction,
     LoadContainerCountsActionResult,
 )
+from ai.backend.manager.services.agent.actions.lookup import LookupAgentAction
 from ai.backend.manager.services.agent.actions.mark_agent_exit import (
     MarkAgentExitAction,
     MarkAgentExitActionResult,
@@ -91,9 +97,11 @@ class AgentProcessors:
     update_resource_group: ActionProcessor[
         UpdateAgentResourceGroupAction, UpdateAgentResourceGroupActionResult
     ]
+    lookup: LookupActionProcessor[LookupAgentAction, LookupOpsResult[AgentUUID]]
 
     def __init__(
         self,
+        group: ProcessorGroup[AgentData],
         service: AgentService,
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
@@ -102,6 +110,7 @@ class AgentProcessors:
             monitor for monitor in action_monitors if not isinstance(monitor, AuditLogMonitor)
         ]
 
+        self.lookup = group.public_lookup_ops(LookupAgentAction)
         self.sync_agent_registry = ActionProcessor(service.sync_agent_registry, action_monitors)
         self.get_watcher_status = ActionProcessor(service.get_watcher_status, action_monitors)
         self.watcher_agent_start = ActionProcessor(service.watcher_agent_start, action_monitors)

@@ -7,6 +7,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.keypair.request import (
     AdminCreateKeypairInput,
@@ -19,7 +20,6 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
     UpdateMyKeypairInput,
 )
 from ai.backend.common.dto.manager.v2.keypair.response import SearchMyKeypairsPayload
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import AccessKeyPathParam

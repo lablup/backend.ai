@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from decimal import Decimal
 from typing import Any, cast, override
 
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     BinarySize,
     ResourceSlot,

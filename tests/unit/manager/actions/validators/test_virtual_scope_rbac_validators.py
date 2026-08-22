@@ -20,7 +20,16 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.types import (
+    EntityID,
+    EntityIdentifier,
+    EntityType,
+    ScopeID,
+    ScopeRef,
+    ScopeType,
+)
+from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
 from ai.backend.common.data.permission.types import (
     EntityType as PermEntityType,
 )
@@ -33,14 +42,11 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.scope import ScopeID
-from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualScopeBulkActionRBACValidator,
 )
@@ -49,6 +55,9 @@ from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualScopeScopeActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
+from ai.backend.manager.actions.v2.single_entity.trigger import (
+    SingleEntityActionTriggerMeta,
+)
 from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualScopeSingleEntityActionRBACValidator,
 )
@@ -70,11 +79,11 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
@@ -88,7 +97,7 @@ from ai.backend.testutils.db import with_tables
 _ORM_CLUSTER = (
     AgentRow,
     ImageRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
 )
 
 _DOMAIN_ID: ScopeID = uuid.uuid4()
@@ -99,6 +108,13 @@ _BULK_VF_GRANTED: EntityID = uuid.uuid4()
 _BULK_VF_DENIED: EntityID = uuid.uuid4()
 
 
+class _StubEntityID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType("vfolder")
+
+
 class _ProjectCreateScopeAction(BaseScopeAction):
     """PROJECT:CREATE at domain scopes — subject type differs from the scope type."""
 
@@ -107,14 +123,14 @@ class _ProjectCreateScopeAction(BaseScopeAction):
     def __init__(self, scopes: Sequence[ScopeRef]) -> None:
         self._scopes = scopes
 
-    @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return self._scopes
-
     @classmethod
     @override
     def entity_type(cls) -> EntityType:
         return EntityType("project")
+
+    @override
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return self._scopes
 
     @classmethod
     @override
@@ -135,11 +151,6 @@ class _VfolderUpdateAction(BaseSingleEntityAction):
 
     @classmethod
     @override
-    def entity_type(cls) -> EntityType:
-        return EntityType("vfolder")
-
-    @classmethod
-    @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
@@ -149,8 +160,8 @@ class _VfolderUpdateAction(BaseSingleEntityAction):
         return "update_vfolder"
 
     @override
-    def entity_id(self) -> EntityID:
-        return self.vfolder_id
+    def entity_id(self) -> EntityIdentifier:
+        return _StubEntityID(self.vfolder_id)
 
 
 @dataclass
@@ -158,11 +169,6 @@ class _VfolderUpsertAction(BaseSingleEntityAction):
     """VFOLDER:UPSERT on a single vfolder — requires the ``CREATE | UPDATE`` mask."""
 
     vfolder_id: EntityID = field(default_factory=lambda: _VFOLDER_ID)
-
-    @classmethod
-    @override
-    def entity_type(cls) -> EntityType:
-        return EntityType("vfolder")
 
     @classmethod
     @override
@@ -175,8 +181,8 @@ class _VfolderUpsertAction(BaseSingleEntityAction):
         return "upsert_vfolder"
 
     @override
-    def entity_id(self) -> EntityID:
-        return self.vfolder_id
+    def entity_id(self) -> EntityIdentifier:
+        return _StubEntityID(self.vfolder_id)
 
 
 @dataclass
@@ -184,11 +190,6 @@ class _BulkVfolderUpdateAction(BaseBulkAction):
     """VFOLDER:UPDATE on multiple vfolders — exercises the bulk validator path."""
 
     ids: list[EntityID]
-
-    @classmethod
-    @override
-    def entity_type(cls) -> EntityType:
-        return EntityType("vfolder")
 
     @classmethod
     @override
@@ -201,8 +202,27 @@ class _BulkVfolderUpdateAction(BaseBulkAction):
         return "update_vfolders"
 
     @override
-    def entity_ids(self) -> Sequence[EntityID]:
-        return self.ids
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(_VfolderID(i) for i in self.ids)
+
+
+def _bulk_meta(
+    action: _BulkVfolderUpdateAction, trigger_meta: BaseActionTriggerMeta
+) -> BulkActionTriggerMeta:
+    return BulkActionTriggerMeta(
+        action_id=trigger_meta.action_id,
+        started_at=trigger_meta.started_at,
+        entity_ids=action.entity_ids(),
+        operation_type=action.operation_type(),
+        action_name=action.action_name(),
+    )
+
+
+class _VfolderID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType("vfolder")
 
 
 def _domain_scope(scope_id: ScopeID) -> ScopeRef:
@@ -727,7 +747,15 @@ class TestVirtualScopeSingleEntityActionRBACValidator:
         user_with_vfolder_update_at_project: UserData,
     ) -> None:
         with with_user(user_with_vfolder_update_at_project):
-            await single_entity_validator.validate(single_entity_action, trigger_meta)
+            await single_entity_validator.validate(
+                SingleEntityActionTriggerMeta(
+                    action_id=trigger_meta.action_id,
+                    started_at=trigger_meta.started_at,
+                    entity=single_entity_action.entity_id(),
+                    operation_type=single_entity_action.operation_type(),
+                    action_name=single_entity_action.action_name(),
+                )
+            )
 
     async def test_without_permission_raises(
         self,
@@ -738,7 +766,15 @@ class TestVirtualScopeSingleEntityActionRBACValidator:
     ) -> None:
         with with_user(regular_user_without_permission):
             with pytest.raises(NotEnoughPermission):
-                await single_entity_validator.validate(single_entity_action, trigger_meta)
+                await single_entity_validator.validate(
+                    SingleEntityActionTriggerMeta(
+                        action_id=trigger_meta.action_id,
+                        started_at=trigger_meta.started_at,
+                        entity=single_entity_action.entity_id(),
+                        operation_type=single_entity_action.operation_type(),
+                        action_name=single_entity_action.action_name(),
+                    )
+                )
 
     async def test_entity_cap_clips_granted_permission(
         self,
@@ -749,7 +785,15 @@ class TestVirtualScopeSingleEntityActionRBACValidator:
     ) -> None:
         with with_user(user_with_read_capped_vfolder):
             with pytest.raises(NotEnoughPermission):
-                await single_entity_validator.validate(single_entity_action, trigger_meta)
+                await single_entity_validator.validate(
+                    SingleEntityActionTriggerMeta(
+                        action_id=trigger_meta.action_id,
+                        started_at=trigger_meta.started_at,
+                        entity=single_entity_action.entity_id(),
+                        operation_type=single_entity_action.operation_type(),
+                        action_name=single_entity_action.action_name(),
+                    )
+                )
 
 
 class TestUpsertRequiresBothCreateAndUpdate:
@@ -769,7 +813,15 @@ class TestUpsertRequiresBothCreateAndUpdate:
     ) -> None:
         with with_user(user_with_vfolder_create_only):
             with pytest.raises(NotEnoughPermission):
-                await single_entity_validator.validate(upsert_action, trigger_meta)
+                await single_entity_validator.validate(
+                    SingleEntityActionTriggerMeta(
+                        action_id=trigger_meta.action_id,
+                        started_at=trigger_meta.started_at,
+                        entity=upsert_action.entity_id(),
+                        operation_type=upsert_action.operation_type(),
+                        action_name=upsert_action.action_name(),
+                    )
+                )
 
     async def test_update_only_is_rejected(
         self,
@@ -780,7 +832,15 @@ class TestUpsertRequiresBothCreateAndUpdate:
     ) -> None:
         with with_user(user_with_vfolder_update_only):
             with pytest.raises(NotEnoughPermission):
-                await single_entity_validator.validate(upsert_action, trigger_meta)
+                await single_entity_validator.validate(
+                    SingleEntityActionTriggerMeta(
+                        action_id=trigger_meta.action_id,
+                        started_at=trigger_meta.started_at,
+                        entity=upsert_action.entity_id(),
+                        operation_type=upsert_action.operation_type(),
+                        action_name=upsert_action.action_name(),
+                    )
+                )
 
     async def test_both_bits_pass(
         self,
@@ -790,7 +850,15 @@ class TestUpsertRequiresBothCreateAndUpdate:
         user_with_vfolder_create_and_update: UserData,
     ) -> None:
         with with_user(user_with_vfolder_create_and_update):
-            await single_entity_validator.validate(upsert_action, trigger_meta)
+            await single_entity_validator.validate(
+                SingleEntityActionTriggerMeta(
+                    action_id=trigger_meta.action_id,
+                    started_at=trigger_meta.started_at,
+                    entity=upsert_action.entity_id(),
+                    operation_type=upsert_action.operation_type(),
+                    action_name=upsert_action.action_name(),
+                )
+            )
 
     async def test_single_bit_operation_still_passes_with_one_bit(
         self,
@@ -801,7 +869,15 @@ class TestUpsertRequiresBothCreateAndUpdate:
     ) -> None:
         # Regression: the subset semantics must not tighten single-bit operations.
         with with_user(user_with_vfolder_update_only):
-            await single_entity_validator.validate(single_entity_action, trigger_meta)
+            await single_entity_validator.validate(
+                SingleEntityActionTriggerMeta(
+                    action_id=trigger_meta.action_id,
+                    started_at=trigger_meta.started_at,
+                    entity=single_entity_action.entity_id(),
+                    operation_type=single_entity_action.operation_type(),
+                    action_name=single_entity_action.action_name(),
+                )
+            )
 
 
 class TestVirtualScopeBulkActionRBACValidator:
@@ -814,7 +890,15 @@ class TestVirtualScopeBulkActionRBACValidator:
     ) -> None:
         # No permission rows seeded; bypass must succeed regardless.
         with with_user(superadmin_user):
-            await bulk_validator.validate(bulk_vfolder_action, trigger_meta)
+            await bulk_validator.validate(
+                BulkActionTriggerMeta(
+                    action_id=trigger_meta.action_id,
+                    started_at=trigger_meta.started_at,
+                    entity_ids=bulk_vfolder_action.entity_ids(),
+                    operation_type=bulk_vfolder_action.operation_type(),
+                    action_name=bulk_vfolder_action.action_name(),
+                )
+            )
 
     async def test_all_targets_granted_passes(
         self,
@@ -824,7 +908,15 @@ class TestVirtualScopeBulkActionRBACValidator:
         user_with_all_bulk_vfolders_granted: UserData,
     ) -> None:
         with with_user(user_with_all_bulk_vfolders_granted):
-            await bulk_validator.validate(bulk_vfolder_action, trigger_meta)
+            await bulk_validator.validate(
+                BulkActionTriggerMeta(
+                    action_id=trigger_meta.action_id,
+                    started_at=trigger_meta.started_at,
+                    entity_ids=bulk_vfolder_action.entity_ids(),
+                    operation_type=bulk_vfolder_action.operation_type(),
+                    action_name=bulk_vfolder_action.action_name(),
+                )
+            )
 
     async def test_any_denied_target_rejects_whole_action(
         self,
@@ -836,7 +928,15 @@ class TestVirtualScopeBulkActionRBACValidator:
         # _BULK_VF_DENIED has no membership, so the whole bulk action must be rejected.
         with with_user(user_with_partial_bulk_membership):
             with pytest.raises(NotEnoughPermission):
-                await bulk_validator.validate(bulk_vfolder_action, trigger_meta)
+                await bulk_validator.validate(
+                    BulkActionTriggerMeta(
+                        action_id=trigger_meta.action_id,
+                        started_at=trigger_meta.started_at,
+                        entity_ids=bulk_vfolder_action.entity_ids(),
+                        operation_type=bulk_vfolder_action.operation_type(),
+                        action_name=bulk_vfolder_action.action_name(),
+                    )
+                )
 
     async def test_entity_cap_clips_granted_permission(
         self,
@@ -847,8 +947,7 @@ class TestVirtualScopeBulkActionRBACValidator:
         with with_user(user_with_read_capped_bulk_vfolder):
             with pytest.raises(NotEnoughPermission):
                 await bulk_validator.validate(
-                    _BulkVfolderUpdateAction(ids=[_BULK_VF_GRANTED]),
-                    trigger_meta,
+                    _bulk_meta(_BulkVfolderUpdateAction(ids=[_BULK_VF_GRANTED]), trigger_meta)
                 )
 
     async def test_empty_targets_passes(
@@ -858,4 +957,6 @@ class TestVirtualScopeBulkActionRBACValidator:
         regular_user_without_permission: UserData,
     ) -> None:
         with with_user(regular_user_without_permission):
-            await bulk_validator.validate(_BulkVfolderUpdateAction(ids=[]), trigger_meta)
+            await bulk_validator.validate(
+                _bulk_meta(_BulkVfolderUpdateAction(ids=[]), trigger_meta)
+            )

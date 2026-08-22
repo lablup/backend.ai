@@ -6,9 +6,9 @@ from dataclasses import dataclass, field
 from typing import override
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.replica import ReplicaID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,

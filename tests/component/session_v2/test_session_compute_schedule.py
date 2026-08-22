@@ -16,6 +16,8 @@ import sqlalchemy as sa
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.scheduler.request import (
     ComputeScheduleInput,
@@ -23,13 +25,11 @@ from ai.backend.common.dto.manager.v2.scheduler.request import (
 )
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
 from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.data.session.options import AgentSelectionPolicy, DefaultSessionOptions
-from ai.backend.manager.models.scaling_group import scaling_groups
+from ai.backend.manager.models.resource_group import resource_groups
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.services.session.processors import SessionProcessors
 
@@ -83,8 +83,8 @@ async def strict_agent_selection(
     """Make the test resource group enforce designated agents strictly."""
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.update(scaling_groups)
-            .where(scaling_groups.c.id == resource_group_id)
+            sa.update(resource_groups)
+            .where(resource_groups.c.id == resource_group_id)
             .values(
                 default_session_options=DefaultSessionOptions(
                     agent_selection_policy=AgentSelectionPolicy.STRICT,

@@ -1,44 +1,61 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
+from __future__ import annotations
+
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+)
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.services.retention_policy.actions.create import (
     CreateRetentionPolicyAction,
-    CreateRetentionPolicyActionResult,
 )
 from ai.backend.manager.services.retention_policy.actions.delete import (
     DeleteRetentionPolicyAction,
-    DeleteRetentionPolicyActionResult,
 )
+from ai.backend.manager.services.retention_policy.actions.get import GetRetentionPolicyAction
 from ai.backend.manager.services.retention_policy.actions.purge import (
     PurgeRetentionPolicyAction,
-    PurgeRetentionPolicyActionResult,
 )
 from ai.backend.manager.services.retention_policy.actions.search import (
     SearchRetentionPoliciesAction,
-    SearchRetentionPoliciesActionResult,
 )
 from ai.backend.manager.services.retention_policy.actions.update import (
     UpdateRetentionPolicyAction,
-    UpdateRetentionPolicyActionResult,
 )
-from ai.backend.manager.services.retention_policy.service import RetentionPolicyService
 
 
 class RetentionPolicyProcessors:
-    create: GlobalActionProcessor[CreateRetentionPolicyAction, CreateRetentionPolicyActionResult]
-    update: GlobalActionProcessor[UpdateRetentionPolicyAction, UpdateRetentionPolicyActionResult]
-    delete: GlobalActionProcessor[DeleteRetentionPolicyAction, DeleteRetentionPolicyActionResult]
-    purge: GlobalActionProcessor[PurgeRetentionPolicyAction, PurgeRetentionPolicyActionResult]
-    search: GlobalActionProcessor[
-        SearchRetentionPoliciesAction, SearchRetentionPoliciesActionResult
+    """Every operation runs straight against ops, so this domain has no service."""
+
+    get: SingleEntityActionProcessor[GetRetentionPolicyAction, EntityOpsResult[RetentionPolicyData]]
+    global_create: GlobalActionProcessor[
+        CreateRetentionPolicyAction,
+        CreatedEntityOpsResult[RetentionPolicyData],
+    ]
+    update: SingleEntityActionProcessor[
+        UpdateRetentionPolicyAction,
+        EntityOpsResult[RetentionPolicyData],
+    ]
+    delete: SingleEntityActionProcessor[
+        DeleteRetentionPolicyAction,
+        EntityOpsResult[RetentionPolicyData],
+    ]
+    purge: SingleEntityActionProcessor[
+        PurgeRetentionPolicyAction,
+        EntityOpsResult[RetentionPolicyData],
+    ]
+    global_search: GlobalActionProcessor[
+        SearchRetentionPoliciesAction,
+        BatchOpsResult[RetentionPolicyData],
     ]
 
-    def __init__(
-        self,
-        service: RetentionPolicyService,
-        action_monitors: list[ActionMonitor],
-    ) -> None:
-        self.create = GlobalActionProcessor(service.create, action_monitors)
-        self.update = GlobalActionProcessor(service.update, action_monitors)
-        self.delete = GlobalActionProcessor(service.delete, action_monitors)
-        self.purge = GlobalActionProcessor(service.purge, action_monitors)
-        self.search = GlobalActionProcessor(service.search, action_monitors)
+    def __init__(self, group: ProcessorGroup[RetentionPolicyData]) -> None:
+        self.get = group.single_get_ops(GetRetentionPolicyAction)
+        self.global_create = group.global_create_ops(CreateRetentionPolicyAction)
+        self.update = group.single_update_ops(UpdateRetentionPolicyAction)
+        self.delete = group.entity_purge_ops(DeleteRetentionPolicyAction)
+        self.purge = group.entity_purge_ops(PurgeRetentionPolicyAction)
+        self.global_search = group.global_search_ops(SearchRetentionPoliciesAction)

@@ -3,38 +3,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.service_catalog import SERVICE_CATALOG_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.service_catalog.types import ServiceCatalogData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.service_catalog.actions.base import ServiceCatalogAction
+from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
+from ai.backend.manager.models.service_catalog.searchers import ServiceCatalogSearcher
 
 
 @dataclass
-class SearchServiceCatalogsAction(ServiceCatalogAction):
-    """Action to search service catalog entries."""
+class SearchServiceCatalogsAction(SearchGlobalOpsAction[ServiceCatalogRow, ServiceCatalogData]):
+    """Page through the registered services."""
 
-    querier: BatchQuerier
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    searcher: ServiceCatalogSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchServiceCatalogsActionResult(BaseActionResult):
-    """Result of searching service catalog entries."""
-
-    data: list[ServiceCatalogData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return SERVICE_CATALOG_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_service_catalogs"
+
+    @override
+    def to_searcher(self) -> ServiceCatalogSearcher:
+        return self.searcher

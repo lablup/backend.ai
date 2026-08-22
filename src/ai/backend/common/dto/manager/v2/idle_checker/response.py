@@ -6,10 +6,10 @@ from decimal import Decimal
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.dto.manager.v2.idle_checker.types import IdleCheckerTypeDTO
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import MetricLabelEntryInfo
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionTypes
 

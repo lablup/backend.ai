@@ -19,4 +19,4 @@ class EventFetcher:
         payload = await self._msg_queue.fetch_cached_broadcast_message(cache_id)
         if payload is None:
             return None
-        return AbstractBroadcastEvent.deserialize_from_wrapper(payload)
+        return AbstractBroadcastEvent.from_broadcast_payload(payload)

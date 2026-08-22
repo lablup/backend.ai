@@ -17,7 +17,7 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.sokovan.scheduler.fair_share.aggregator import (
     SLICE_DURATION_SECONDS,

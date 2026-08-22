@@ -7,7 +7,7 @@ from collections.abc import Callable
 
 import pytest
 
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.drf import DRFSequencer
 from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
 from ai.backend.manager.views.sokovan.workload import SessionWorkload

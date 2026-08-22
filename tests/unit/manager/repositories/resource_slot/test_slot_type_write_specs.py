@@ -5,14 +5,17 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.common.types import ResourceSlot, SlotTypes
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.errors.resource_slot import (
     ResourceSlotTypeAlreadyExists,
     ResourceSlotTypeInUse,
@@ -23,16 +26,18 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -49,15 +54,17 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.resource_slot.types import NumberFormat
+from ai.backend.manager.models.resource_slot.updaters import ResourceSlotTypeUpdater
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.resource_slot.updaters import ResourceSlotTypeUpdater
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
@@ -74,16 +81,20 @@ async def db_with_referencing_tables(
     async with with_tables(
         database_connection,
         [
+            VirtualScopeRow,
+            EntityMembershipRow,
+            ScopeBindingRow,
             DomainRow,
-            ScalingGroupRow,
+            ResourceGroupRow,
             UserResourcePolicyRow,
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
             RoleRow,
+            PermissionRow,
             UserRoleRow,
             UserRow,
             KeyPairRow,
-            GroupRow,
+            ProjectRow,
             AgentRow,
             ContainerRegistryRow,
             ImageRow,
@@ -112,18 +123,18 @@ async def db_with_referencing_tables(
 @pytest.fixture
 async def existing_slot_type(
     db_with_referencing_tables: ExtendedAsyncSAEngine,
-) -> str:
-    slot_name = "cuda.device"
+) -> ResourceSlotTypeData:
+    """Seed a slot type and answer with it: a write names it by uuid, a check by name."""
     async with db_with_referencing_tables.begin_session() as db_sess:
-        db_sess.add(
-            ResourceSlotTypeRow(
-                slot_name=slot_name,
-                slot_type="unique",
-                display_name="GPU",
-                rank=3,
-            )
+        row = ResourceSlotTypeRow(
+            slot_name="cuda.device",
+            slot_type="unique",
+            display_name="GPU",
+            rank=3,
         )
-    return slot_name
+        db_sess.add(row)
+        await db_sess.flush()
+        return row.to_data()
 
 
 def _creator(
@@ -188,10 +199,10 @@ class TestResourceSlotTypeCreator:
     async def test_existing_name_conflicts_and_leaves_the_row_alone(
         self,
         db_with_referencing_tables: ExtendedAsyncSAEngine,
-        existing_slot_type: str,
+        existing_slot_type: ResourceSlotTypeData,
     ) -> None:
         creator = _creator(
-            existing_slot_type,
+            existing_slot_type.slot_name,
             SlotTypes.COUNT,
             display_name="Overwritten",
         )
@@ -202,7 +213,7 @@ class TestResourceSlotTypeCreator:
         async with db_with_referencing_tables.begin_readonly_session() as db_sess:
             row = await db_sess.scalar(
                 sa.select(ResourceSlotTypeRow).where(
-                    ResourceSlotTypeRow.slot_name == existing_slot_type
+                    ResourceSlotTypeRow.slot_name == existing_slot_type.slot_name
                 )
             )
             assert row is not None
@@ -214,10 +225,10 @@ class TestResourceSlotTypeUpdater:
     async def test_updates_only_the_named_fields(
         self,
         db_with_referencing_tables: ExtendedAsyncSAEngine,
-        existing_slot_type: str,
+        existing_slot_type: ResourceSlotTypeData,
     ) -> None:
         updater = ResourceSlotTypeUpdater(
-            slot_name=existing_slot_type,
+            slot_type_id=existing_slot_type.uuid,
             enabled=OptionalState.update(False),
             required=OptionalState.update(True),
         )
@@ -237,7 +248,7 @@ class TestResourceSlotTypeUpdater:
         db_with_referencing_tables: ExtendedAsyncSAEngine,
     ) -> None:
         updater = ResourceSlotTypeUpdater(
-            slot_name="no.such.slot",
+            slot_type_id=ResourceSlotTypeUUID(uuid4()),
             enabled=OptionalState.update(False),
         )
         provider = V2DBOpsProvider(db_with_referencing_tables)
@@ -249,26 +260,28 @@ class TestResourceSlotTypePurger:
     async def test_removes_an_unreferenced_slot_type(
         self,
         db_with_referencing_tables: ExtendedAsyncSAEngine,
-        existing_slot_type: str,
+        existing_slot_type: ResourceSlotTypeData,
     ) -> None:
-        purger = ResourceSlotTypePurger(slot_name=existing_slot_type)
+        purger = ResourceSlotTypePurger(
+            slot_name=existing_slot_type.slot_name, slot_type_id=existing_slot_type.uuid
+        )
         async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
-            data = await w.purge_global_entity(purger)
+            data = await w.purge_entity(purger)
             assert data is not None
-            assert data.slot_name == existing_slot_type
+            assert data.slot_name == existing_slot_type.slot_name
 
         async with db_with_referencing_tables.begin_readonly_session() as db_sess:
             remaining = await db_sess.scalar(
                 sa.select(sa.func.count())
                 .select_from(ResourceSlotTypeRow)
-                .where(ResourceSlotTypeRow.slot_name == existing_slot_type)
+                .where(ResourceSlotTypeRow.slot_name == existing_slot_type.slot_name)
             )
             assert remaining == 0
 
     async def test_refuses_while_an_agent_reports_the_slot(
         self,
         db_with_referencing_tables: ExtendedAsyncSAEngine,
-        existing_slot_type: str,
+        existing_slot_type: ResourceSlotTypeData,
     ) -> None:
         agent_id = "i-conflict"
         resource_group_id = ResourceGroupID(uuid.uuid4())
@@ -281,12 +294,12 @@ class TestResourceSlotTypePurger:
                 )
             )
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=resource_group_id,
                     name="conflict-sgroup",
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             await db_sess.flush()
@@ -308,20 +321,22 @@ class TestResourceSlotTypePurger:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=agent_id,
-                    slot_name=existing_slot_type,
+                    slot_name=existing_slot_type.slot_name,
                     capacity=Decimal(2),
                 )
             )
 
-        purger = ResourceSlotTypePurger(slot_name=existing_slot_type)
+        purger = ResourceSlotTypePurger(
+            slot_name=existing_slot_type.slot_name, slot_type_id=existing_slot_type.uuid
+        )
         with pytest.raises(ResourceSlotTypeInUse):
             async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
-                await w.purge_global_entity(purger)
+                await w.purge_entity(purger)
 
         async with db_with_referencing_tables.begin_readonly_session() as db_sess:
             remaining = await db_sess.scalar(
                 sa.select(sa.func.count())
                 .select_from(ResourceSlotTypeRow)
-                .where(ResourceSlotTypeRow.slot_name == existing_slot_type)
+                .where(ResourceSlotTypeRow.slot_name == existing_slot_type.slot_name)
             )
             assert remaining == 1

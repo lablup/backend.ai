@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 
-from .types import ActionOperationType, ActionSpec, OperationStatus
+from .types import ActionOperationType, OperationStatus
 
 __all__ = ("AuditLogPolicy",)
 
@@ -25,9 +25,9 @@ class AuditLogPolicy:
     def __init__(self, record_read_operations: Iterable[ActionOperationType]) -> None:
         self._record_read_operations = frozenset(record_read_operations)
 
-    def should_record(self, spec: ActionSpec, status: OperationStatus) -> bool:
+    def should_record(self, operation_type: ActionOperationType, status: OperationStatus) -> bool:
         if status is not OperationStatus.SUCCESS:
             return True
-        if spec.operation_type not in ActionOperationType.read_operations():
+        if operation_type not in ActionOperationType.read_operations():
             return True
-        return spec.operation_type in self._record_read_operations
+        return operation_type in self._record_read_operations

@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.data.deployment.types import ModelDeploymentAccessTokenData
@@ -15,8 +14,9 @@ class CreateAccessTokenAction(DeploymentAccessTokenBaseAction):
     creator: ModelDeploymentAccessTokenCreator
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.creator.model_deployment_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_access_token"
 
     @override
     @classmethod
@@ -25,9 +25,5 @@ class CreateAccessTokenAction(DeploymentAccessTokenBaseAction):
 
 
 @dataclass
-class CreateAccessTokenActionResult(BaseActionResult):
+class CreateAccessTokenActionResult:
     data: ModelDeploymentAccessTokenData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)

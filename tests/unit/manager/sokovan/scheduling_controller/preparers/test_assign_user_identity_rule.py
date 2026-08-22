@@ -7,8 +7,8 @@ import uuid
 import pytest
 
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.resource.types import SlotTypeInfo
 from ai.backend.manager.data.session.creation import ContainerUserInfo

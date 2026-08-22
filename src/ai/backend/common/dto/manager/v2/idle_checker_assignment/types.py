@@ -11,6 +11,7 @@ class IdleCheckerScopeTypeDTO(StrEnum):
     DOMAIN = "domain"
     PROJECT = "project"
     RESOURCE_GROUP = "resource_group"
+    USER = "user"
 
 
 class ScopeTypeFilter(BaseRequestModel):

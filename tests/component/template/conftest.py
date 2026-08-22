@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.session_template import SESSION_TEMPLATE_ENTITY_TYPE
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.cluster_template.handler import ClusterTemplateHandler
@@ -19,13 +24,14 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.group.repositories import GroupRepositories
-from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.project.repositories import ProjectRepositories
+from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.template.repository import TemplateRepository
-from ai.backend.manager.services.group.processors import GroupProcessors
-from ai.backend.manager.services.group.service import GroupService
+from ai.backend.manager.services.project.processors import ProjectProcessors
+from ai.backend.manager.services.project.service import ProjectService
 from ai.backend.manager.services.template.processors import TemplateProcessors
 from ai.backend.manager.services.template.service import TemplateService
 
@@ -40,44 +46,49 @@ def _mock_action_validators() -> MagicMock:
 
 
 @pytest.fixture()
-def template_processors(database_engine: ExtendedAsyncSAEngine) -> TemplateProcessors:
+def template_processors(
+    database_engine: ExtendedAsyncSAEngine, processor_registry: ProcessorRegistry[Any]
+) -> TemplateProcessors:
     repo = TemplateRepository(database_engine)
     service = TemplateService(repository=repo)
     return TemplateProcessors(
-        service=service, action_monitors=[], validators=_mock_action_validators()
+        processor_registry.group(GroupMeta(SESSION_TEMPLATE_ENTITY_TYPE)), service
     )
 
 
 @pytest.fixture()
-def group_processors(
+def project_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
     storage_manager: StorageSessionManager,
-) -> GroupProcessors:
-    group_repo = GroupRepository(
-        database_engine, config_provider, valkey_clients.stat, storage_manager
+    processor_registry: ProcessorRegistry[Any],
+) -> ProjectProcessors:
+    group_repo = ProjectRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        config_provider,
+        valkey_clients.stat,
+        storage_manager,
     )
-    group_repos = GroupRepositories(repository=group_repo)
-    service = GroupService(storage_manager, config_provider, valkey_clients.stat, group_repos)
-    return GroupProcessors(
-        group_service=service, action_monitors=[], validators=_mock_action_validators()
-    )
+    group_repos = ProjectRepositories(repository=group_repo)
+    service = ProjectService(storage_manager, config_provider, valkey_clients.stat, group_repos)
+    return ProjectProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     template_processors: TemplateProcessors,
-    group_processors: GroupProcessors,
+    project_processors: ProjectProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for template-domain tests."""
     session_tpl_registry = register_session_template_routes(
-        SessionTemplateHandler(template=template_processors, group=group_processors),
+        SessionTemplateHandler(template=template_processors, project=project_processors),
         route_deps,
     )
     cluster_tpl_registry = register_cluster_template_routes(
-        ClusterTemplateHandler(template=template_processors, group=group_processors),
+        ClusterTemplateHandler(template=template_processors, project=project_processors),
         route_deps,
     )
     return [
@@ -95,7 +106,7 @@ async def group_name_fixture(
     """Query the group name from the database for the test group."""
     async with db_engine.begin() as conn:
         result = await conn.execute(
-            sa.select(GroupRow.__table__.c.name).where(GroupRow.__table__.c.id == group_fixture)
+            sa.select(ProjectRow.__table__.c.name).where(ProjectRow.__table__.c.id == group_fixture)
         )
         row = result.first()
         assert row is not None

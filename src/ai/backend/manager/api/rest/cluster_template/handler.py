@@ -13,6 +13,7 @@ import logging
 import uuid
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
+from uuid import UUID
 
 import yaml
 
@@ -22,6 +23,10 @@ from ai.backend.common.api_handlers import (
     PathParam,
     QueryParam,
 )
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session_template import SessionTemplateID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.template.request import (
     CreateClusterTemplateRequest,
     DeleteClusterTemplateRequest,
@@ -38,14 +43,11 @@ from ai.backend.common.dto.manager.template.response import (
     ListClusterTemplatesResponse,
     UpdateClusterTemplateResponse,
 )
-from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.services.group.actions.resolve_project_id_by_name import (
-    ResolveProjectIdByNameAction,
-)
+from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
 from ai.backend.manager.services.template.actions.create_cluster_template import (
     CreateClusterTemplateAction,
 )
@@ -63,7 +65,7 @@ from ai.backend.manager.services.template.actions.update_cluster_template import
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.group.processors import GroupProcessors
+    from ai.backend.manager.services.project.processors import ProjectProcessors
     from ai.backend.manager.services.template.processors import TemplateProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -76,20 +78,16 @@ class ClusterTemplateHandler:
         self,
         *,
         template: TemplateProcessors,
-        group: GroupProcessors,
+        project: ProjectProcessors,
     ) -> None:
         self._template = template
-        self._group = group
+        self._project = project
 
     async def _resolve_project_id(self, domain_name: str, project_name: str) -> ProjectID:
-        result = await self._group.resolve_project_id_by_name.wait_for_complete(
-            ResolveProjectIdByNameAction(domain_name=domain_name, project_name=project_name)
+        result = await self._project.lookup.run(
+            LookupProjectAction(domain_name=DomainName(domain_name), project_name=project_name)
         )
-        if result.project_id is None:
-            raise InvalidAPIParameters(
-                f"No active group named {project_name!r} exists in domain {domain_name!r}"
-            )
-        return result.project_id
+        return ProjectID(result.entity_id())
 
     async def create(
         self,
@@ -125,7 +123,7 @@ class ClusterTemplateHandler:
             owner_access_key=owner_access_key,
             template_data=payload,
         )
-        create_result = await self._template.create_cluster.wait_for_complete(action)
+        create_result = await self._template.create_cluster.run(action)
         return APIResponse.build(
             HTTPStatus.OK,
             CreateClusterTemplateResponse(id=create_result.id, user=create_result.user),
@@ -145,14 +143,14 @@ class ClusterTemplateHandler:
         raw_group_id = params.group_id if hasattr(params, "group_id") else None
         group_id_filter = uuid.UUID(raw_group_id) if raw_group_id is not None else None
         action = ListClusterTemplatesAction(
-            user_uuid=ctx.user_uuid,
+            user_uuid=UserID(ctx.user_uuid),
             user_role=user_role,
             domain_name=ctx.user_domain,
             is_superadmin=ctx.is_superadmin,
             list_all=params.all if hasattr(params, "all") else False,
             group_id_filter=group_id_filter,
         )
-        result = await self._template.list_cluster.wait_for_complete(action)
+        result = await self._template.list_cluster.run(action)
 
         items = [
             ClusterTemplateListItemDTO(
@@ -192,8 +190,8 @@ class ClusterTemplateHandler:
         )
 
         template_id = path.parsed.template_id
-        action = GetClusterTemplateAction(template_id=template_id)
-        result = await self._template.get_cluster.wait_for_complete(action)
+        action = GetClusterTemplateAction(template_id=SessionTemplateID(UUID(template_id)))
+        result = await self._template.get_cluster.run(action)
         return APIResponse.build(
             HTTPStatus.OK,
             GetClusterTemplateResponse(root=result.template),
@@ -225,10 +223,10 @@ class ClusterTemplateHandler:
                 raise InvalidAPIParameters("Malformed payload") from e
 
         action = UpdateClusterTemplateAction(
-            template_id=template_id,
+            template_id=SessionTemplateID(UUID(template_id)),
             template_data=payload,
         )
-        await self._template.update_cluster.wait_for_complete(action)
+        await self._template.update_cluster.run(action)
         return APIResponse.build(
             HTTPStatus.OK,
             UpdateClusterTemplateResponse(success=True),
@@ -251,8 +249,8 @@ class ClusterTemplateHandler:
             else "*",
         )
 
-        action = DeleteClusterTemplateAction(template_id=template_id)
-        await self._template.delete_cluster.wait_for_complete(action)
+        action = DeleteClusterTemplateAction(template_id=SessionTemplateID(UUID(template_id)))
+        await self._template.delete_cluster.run(action)
         return APIResponse.build(
             HTTPStatus.OK,
             DeleteClusterTemplateResponse(success=True),

@@ -1,9 +1,7 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.types import ImageID
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.services.image.actions.base import ImageAction
@@ -15,12 +13,8 @@ class UntagImageFromRegistryAction(ImageAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.IMAGE_TAG
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.image_id)
+    def action_name(cls) -> str:
+        return "untag_image_from_registry"
 
     @override
     @classmethod
@@ -29,9 +23,5 @@ class UntagImageFromRegistryAction(ImageAction):
 
 
 @dataclass
-class UntagImageFromRegistryActionResult(BaseActionResult):
+class UntagImageFromRegistryActionResult:
     image: ImageData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.image.id)

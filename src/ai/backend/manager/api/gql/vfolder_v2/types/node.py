@@ -9,9 +9,9 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCardsInput
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.api.gql.common_types import BinarySizeInfoGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,

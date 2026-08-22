@@ -75,7 +75,7 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
             type=session.session_type.value,
             status=session.status.value,
             image=session.images,
-            scaling_group=session.scaling_group_name,
+            scaling_group=session.resource_group_name,
             resource_slots=resource_slots,
             occupied_slots=occupied_slots,
             created_at=session.created_at,
@@ -144,11 +144,11 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
         if filter.scaling_group_name is not None:
             condition = self.convert_string_filter(
                 filter.scaling_group_name,
-                contains_factory=SessionConditions.by_scaling_group_contains,
-                equals_factory=SessionConditions.by_scaling_group_equals,
-                starts_with_factory=SessionConditions.by_scaling_group_starts_with,
-                ends_with_factory=SessionConditions.by_scaling_group_ends_with,
-                in_factory=SessionConditions.by_scaling_group_in,
+                contains_factory=SessionConditions.by_resource_group_contains,
+                equals_factory=SessionConditions.by_resource_group_equals,
+                starts_with_factory=SessionConditions.by_resource_group_starts_with,
+                ends_with_factory=SessionConditions.by_resource_group_ends_with,
+                in_factory=SessionConditions.by_resource_group_in,
             )
             if condition is not None:
                 conditions.append(condition)

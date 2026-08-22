@@ -32,7 +32,7 @@ class V2AppConfigHandler:
         body: BodyParam[MyGetAppConfigsInput],
     ) -> APIResponse:
         """Get the acting user's merged AppConfigs (auth required)."""
-        result = await self._adapter.my_get_app_configs(body.parsed)
+        result = await self._adapter.my_app_configs(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def public_get_app_configs(
@@ -40,5 +40,5 @@ class V2AppConfigHandler:
         body: BodyParam[PublicGetAppConfigsInput],
     ) -> APIResponse:
         """Get merged AppConfigs from public fragments only (anonymous)."""
-        result = await self._adapter.public_get_app_configs(body.parsed)
+        result = await self._adapter.public_app_configs(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

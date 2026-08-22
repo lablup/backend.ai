@@ -1,22 +1,26 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.services.user.actions.base import (
-    UserSingleEntityAction,
-    UserSingleEntityActionResult,
-)
+
+__all__ = ("GetUserAction", "GetUserActionResult")
 
 
-@dataclass
-class GetUserAction(UserSingleEntityAction):
-    """Action to retrieve a single user by UUID."""
+@dataclass(frozen=True)
+class GetUserAction(BaseSingleEntityAction):
+    """Read one user by id."""
 
-    user_uuid: UUID
+    user_id: UserID
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.user_id
 
     @override
     @classmethod
@@ -24,24 +28,11 @@ class GetUserAction(UserSingleEntityAction):
         return ActionOperationType.GET
 
     @override
-    def target_entity_id(self) -> str:
-        return str(self.user_uuid)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.USER, str(self.user_uuid))
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_user"
 
 
-@dataclass
-class GetUserActionResult(UserSingleEntityActionResult):
-    """Result of GetUserAction containing user data."""
-
+@dataclass(frozen=True)
+class GetUserActionResult:
     user: UserData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.user.uuid)
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.user.uuid)

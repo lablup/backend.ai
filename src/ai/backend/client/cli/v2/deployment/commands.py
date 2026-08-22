@@ -146,6 +146,7 @@ def create(
 
     from pathlib import Path
 
+    from ai.backend.common.data.entity.resource_group import ResourceGroupName
     from ai.backend.common.data.model_deployment.types import DeploymentStrategy
     from ai.backend.common.dto.manager.v2.deployment.request import (
         CreateDeploymentInput,
@@ -154,7 +155,6 @@ def create(
         ModelDeploymentMetadataInput,
         ModelDeploymentNetworkAccessInput,
     )
-    from ai.backend.common.identifier.resource_group import ResourceGroupName
 
     revision_dto: CreateRevisionInput | None = None
     if initial_revision is not None:

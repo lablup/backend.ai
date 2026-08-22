@@ -52,6 +52,7 @@ from ai.backend.agent.resources import (
 )
 from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
 from ai.backend.common.asyncio import current_loop
+from ai.backend.common.cgroup import CgroupController
 from ai.backend.common.docker import ImageRef, KernelFeatures
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -1022,7 +1023,9 @@ class KubernetesAgent(
         await self._kernel_recovery.save_kernel_registry(kernel_registry, metadata)
 
     @override
-    def get_cgroup_path(self, controller: str, container_id: str) -> Path:
+    async def get_cgroup_path(
+        self, controller: CgroupController, container_id: ContainerId
+    ) -> Path:
         # Not implemented yet for K8s Agent
         return Path()
 

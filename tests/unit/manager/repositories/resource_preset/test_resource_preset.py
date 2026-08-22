@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.exception import ResourcePresetConflict
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
@@ -79,11 +80,11 @@ class TestResourcePresetRepository:
     def sample_preset_row(self) -> MagicMock:
         """Create sample resource preset row for testing"""
         preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="test-preset",
             resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")}),
             shared_memory=BinarySize(BinarySize.from_str("2G")),
-            scaling_group_name=None,
+            resource_group_name=None,
         )
 
         mock_row = MagicMock(spec=ResourcePresetRow)
@@ -91,7 +92,7 @@ class TestResourcePresetRepository:
         mock_row.name = preset_data.name
         mock_row.resource_slots = preset_data.resource_slots
         mock_row.shared_memory = preset_data.shared_memory
-        mock_row.scaling_group_name = preset_data.scaling_group_name
+        mock_row.resource_group_name = preset_data.resource_group_name
         mock_row.to_dataclass.return_value = preset_data
 
         return mock_row
@@ -104,7 +105,7 @@ class TestResourcePresetRepository:
                 name="new-preset",
                 resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
                 shared_memory="1 GiB",
-                scaling_group_name=None,
+                resource_group_name=None,
             )
         )
 
@@ -289,19 +290,19 @@ class TestResourcePresetRepository:
                 name=OptionalState.update("modified-preset"),
                 resource_slots=OptionalState.update(ResourceSlot({"cpu": "8", "mem": "16G"})),
                 shared_memory=TriState.nullify(),
-                scaling_group_name=TriState.update("new-group"),
+                resource_group_name=TriState.update("new-group"),
             ),
             pk_value=preset_id,
         )
 
         # Mock modify operation
-        mock_db_source.modify_preset = AsyncMock(return_value=preset_data)
+        mock_db_source.update_preset = AsyncMock(return_value=preset_data)
         mock_cache_source.invalidate_preset = AsyncMock()
 
         result = await resource_preset_repository.modify_preset_validated(updater)
 
         assert result is not None
-        mock_db_source.modify_preset.assert_called_once_with(updater)
+        mock_db_source.update_preset.assert_called_once_with(updater)
         mock_cache_source.invalidate_preset.assert_called_once_with(preset_id, None)
 
     async def test_modify_preset_validated_not_found(
@@ -320,7 +321,7 @@ class TestResourcePresetRepository:
         )
 
         # Mock modify to raise exception
-        mock_db_source.modify_preset = AsyncMock(side_effect=ResourcePresetNotFound())
+        mock_db_source.update_preset = AsyncMock(side_effect=ResourcePresetNotFound())
 
         with pytest.raises(ResourcePresetNotFound):
             await resource_preset_repository.modify_preset_validated(updater)
@@ -337,7 +338,7 @@ class TestResourcePresetRepository:
         )
 
         # Mock db_source to raise ValueError
-        mock_db_source.modify_preset = AsyncMock(
+        mock_db_source.update_preset = AsyncMock(
             side_effect=ValueError("Either preset_id or name must be provided")
         )
 
@@ -430,11 +431,11 @@ class TestResourcePresetRepository:
         """Test listing all presets"""
         preset_list = [
             ResourcePresetData(
-                id=uuid.uuid4(),
+                id=ResourcePresetID(uuid.uuid4()),
                 name=f"preset-{i}",
                 resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
                 shared_memory=None,
-                scaling_group_name=None,
+                resource_group_name=None,
             )
             for i in range(3)
         ]
@@ -459,14 +460,14 @@ class TestResourcePresetRepository:
         mock_cache_source: MagicMock,
     ) -> None:
         """Test listing presets filtered by scaling group"""
-        scaling_group = "gpu-cluster"
+        resource_group = "gpu-cluster"
         preset_list = [
             ResourcePresetData(
-                id=uuid.uuid4(),
+                id=ResourcePresetID(uuid.uuid4()),
                 name="gpu-preset",
                 resource_slots=ResourceSlot({"cpu": "4", "mem": "8G", "cuda.device": "1"}),
                 shared_memory=None,
-                scaling_group_name=scaling_group,
+                resource_group_name=resource_group,
             )
         ]
 
@@ -475,13 +476,13 @@ class TestResourcePresetRepository:
         mock_db_source.list_presets = AsyncMock(return_value=preset_list)
         mock_cache_source.set_preset_list = AsyncMock()
 
-        result = await resource_preset_repository.list_presets(scaling_group_name=scaling_group)
+        result = await resource_preset_repository.list_presets(resource_group_name=resource_group)
 
         assert len(result) == 1
-        assert result[0].scaling_group_name == scaling_group
-        mock_cache_source.get_preset_list.assert_called_once_with(scaling_group)
-        mock_db_source.list_presets.assert_called_once_with(scaling_group)
-        mock_cache_source.set_preset_list.assert_called_once_with(preset_list, scaling_group)
+        assert result[0].resource_group_name == resource_group
+        mock_cache_source.get_preset_list.assert_called_once_with(resource_group)
+        mock_db_source.list_presets.assert_called_once_with(resource_group)
+        mock_cache_source.set_preset_list.assert_called_once_with(preset_list, resource_group)
 
     async def test_list_presets_empty(
         self,
@@ -529,11 +530,11 @@ class TestResourcePresetDataModels:
     def test_resource_preset_data_conversion(self) -> None:
         """Test ResourcePresetData to/from dataclass conversion"""
         preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="test-preset",
             resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")}),
             shared_memory=BinarySize(1073741824),  # 1 GiB
-            scaling_group_name="default",
+            resource_group_name="default",
         )
 
         # Test to_cache method
@@ -542,7 +543,7 @@ class TestResourcePresetDataModels:
         assert cache_data["name"] == preset_data.name
         assert cache_data["resource_slots"] == preset_data.resource_slots.to_json()
         assert cache_data["shared_memory"] == str(preset_data.shared_memory)
-        assert cache_data["scaling_group_name"] == preset_data.scaling_group_name
+        assert cache_data["scaling_group_name"] == preset_data.resource_group_name
 
         # Test from_cache method
         restored = ResourcePresetData.from_cache(cache_data)
@@ -550,7 +551,7 @@ class TestResourcePresetDataModels:
         assert restored.name == preset_data.name
         assert restored.resource_slots == preset_data.resource_slots
         assert restored.shared_memory == preset_data.shared_memory
-        assert restored.scaling_group_name == preset_data.scaling_group_name
+        assert restored.resource_group_name == preset_data.resource_group_name
 
     def test_resource_slot_validation(self) -> None:
         """Test ResourceSlot validation and conversion"""
@@ -576,19 +577,19 @@ class TestResourcePresetDataModels:
     def test_scaling_group_name_validation(self) -> None:
         """Test scaling group name validation"""
         preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="test-preset",
             resource_slots=ResourceSlot({"cpu": "4", "mem": "8G"}),
             shared_memory=None,
-            scaling_group_name=None,  # Can be None
+            resource_group_name=None,  # Can be None
         )
-        assert preset_data.scaling_group_name is None
+        assert preset_data.resource_group_name is None
 
         preset_data_with_group = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="test-preset",
             resource_slots=ResourceSlot({"cpu": "4", "mem": "8G"}),
             shared_memory=None,
-            scaling_group_name="gpu-cluster",
+            resource_group_name="gpu-cluster",
         )
-        assert preset_data_with_group.scaling_group_name == "gpu-cluster"
+        assert preset_data_with_group.resource_group_name == "gpu-cluster"

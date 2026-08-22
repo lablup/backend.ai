@@ -1,28 +1,21 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
+from ai.backend.manager.data.service_catalog.types import ServiceCatalogData
 from ai.backend.manager.services.service_catalog.actions.search import (
     SearchServiceCatalogsAction,
-    SearchServiceCatalogsActionResult,
 )
-from ai.backend.manager.services.service_catalog.service import ServiceCatalogService
 
 
 class ServiceCatalogProcessors:
-    """Processor package for service catalog operations."""
+    """The search runs straight against ops, so this domain has no service."""
 
-    search_service_catalogs: ActionProcessor[
-        SearchServiceCatalogsAction, SearchServiceCatalogsActionResult
+    global_search_service_catalogs: GlobalActionProcessor[
+        SearchServiceCatalogsAction,
+        BatchOpsResult[ServiceCatalogData],
     ]
 
-    def __init__(
-        self,
-        service: ServiceCatalogService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.search_service_catalogs = ActionProcessor(
-            service.search_service_catalogs, action_monitors
-        )
+    def __init__(self, group: ProcessorGroup[ServiceCatalogData]) -> None:
+        self.global_search_service_catalogs = group.global_search_ops(SearchServiceCatalogsAction)

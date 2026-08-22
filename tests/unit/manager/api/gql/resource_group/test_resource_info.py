@@ -39,7 +39,7 @@ from ai.backend.manager.api.gql.resource_group.types import (
     ResourceGroupStatusGQL,
     ResourceInfoGQL,
 )
-from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.errors.resource import ResourceGroupNotFound
 
 
 class TestResourceSlotGQLNormalization:
@@ -353,10 +353,10 @@ class TestResourceGroupGQLResourceInfoResolver:
     ) -> None:
         """Test that ScalingGroupNotFound exception propagates correctly."""
         # Given
-        mock_context.adapters.resource_group.get_resource_info.side_effect = ScalingGroupNotFound(
+        mock_context.adapters.resource_group.get_resource_info.side_effect = ResourceGroupNotFound(
             "test-group"
         )
 
         # When / Then
-        with pytest.raises(ScalingGroupNotFound):
+        with pytest.raises(ResourceGroupNotFound):
             await resource_group_gql.resource_info(info=mock_info)

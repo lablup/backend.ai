@@ -91,11 +91,11 @@ result = await service.modify_project_resource_policy(action)
 ### Deleting a Policy
 
 ```python
-from ai.backend.manager.services.project_resource_policy.actions.delete_project_resource_policy import (
-    DeleteProjectResourcePolicyAction
+from ai.backend.manager.services.project_resource_policy.actions.purge_project_resource_policy import (
+    PurgeProjectResourcePolicyAction
 )
 
-action = DeleteProjectResourcePolicyAction(name="development-policy")
+action = PurgeProjectResourcePolicyAction(name="development-policy")
 result = await service.delete_project_resource_policy(action)
 ```
 

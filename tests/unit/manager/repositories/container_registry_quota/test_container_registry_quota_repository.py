@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import PerProjectContainerRegistryInfo
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
@@ -24,10 +25,10 @@ from ai.backend.manager.models.agent import AgentRow
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry_quota.repositories import (
     PerProjectRegistryQuotaRepositories,
@@ -41,7 +42,7 @@ from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 _ORM_CLUSTER = (
     AgentRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
 )
 
 
@@ -96,7 +97,7 @@ class TestPerProjectRegistryQuotaRepository:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
             ],
         ):
@@ -154,7 +155,7 @@ class TestPerProjectRegistryQuotaRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=registry_type,
@@ -167,7 +168,7 @@ class TestPerProjectRegistryQuotaRepository:
             )
             session.add(registry)
 
-            group = GroupRow(
+            group = ProjectRow(
                 name=f"test-group-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
@@ -206,7 +207,7 @@ class TestPerProjectRegistryQuotaRepository:
     ) -> _ProjectWithoutRegistry:
         """Pre-created project with no container_registry configured."""
         async with db_with_cleanup.begin_session() as session:
-            group = GroupRow(
+            group = ProjectRow(
                 name=f"test-group-no-reg-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
@@ -229,7 +230,7 @@ class TestPerProjectRegistryQuotaRepository:
     ) -> _ProjectWithInvalidRegistry:
         """Pre-created project with empty container_registry dict (missing required keys)."""
         async with db_with_cleanup.begin_session() as session:
-            group = GroupRow(
+            group = ProjectRow(
                 name=f"test-group-invalid-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
@@ -252,7 +253,7 @@ class TestPerProjectRegistryQuotaRepository:
     ) -> _ProjectWithOrphanedRegistry:
         """Pre-created project whose container_registry config points to a non-existent registry."""
         async with db_with_cleanup.begin_session() as session:
-            group = GroupRow(
+            group = ProjectRow(
                 name=f"test-group-orphan-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
@@ -283,7 +284,7 @@ class TestPerProjectRegistryQuotaRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=registry_type,
@@ -291,7 +292,7 @@ class TestPerProjectRegistryQuotaRepository:
             )
             session.add(registry)
 
-            group = GroupRow(
+            group = ProjectRow(
                 name=f"test-group-minimal-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),

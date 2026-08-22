@@ -34,7 +34,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.types import VFolderID
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint.row import EndpointRow

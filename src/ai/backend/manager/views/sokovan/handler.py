@@ -42,7 +42,7 @@ class HandlerSessionData:
     creation_id: str
     access_key: AccessKey
     status: SessionStatus
-    scaling_group: str
+    resource_group: str
     session_type: SessionTypes
     status_info: str | None = None
     kernels: list[HandlerKernelData] = field(default_factory=list)

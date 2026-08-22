@@ -26,6 +26,7 @@ from ai.backend.agent.resources import (
     known_slot_types,
 )
 from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo
+from ai.backend.common.cgroup import CgroupController
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -298,7 +299,9 @@ class DummyAgent(
         return "ubuntu16.04"
 
     @override
-    def get_cgroup_path(self, controller: str, container_id: str) -> Path:
+    async def get_cgroup_path(
+        self, controller: CgroupController, container_id: ContainerId
+    ) -> Path:
         #  Dummy agent does not use cgroups, so we return an empty path.
         return Path()
 

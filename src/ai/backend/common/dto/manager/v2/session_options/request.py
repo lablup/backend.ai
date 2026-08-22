@@ -21,6 +21,7 @@ from datetime import datetime
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
     MountItemInput,
@@ -31,7 +32,6 @@ from ai.backend.common.dto.manager.v2.session_options.types import (
     AgentSelectionPolicyEnum,
     FailurePolicyEnum,
 )
-from ai.backend.common.identifier.image import ImageID
 
 
 class HandlerOptionsInput(BaseRequestModel):
@@ -129,7 +129,7 @@ class KernelExecutionSpecInput(BaseRequestModel):
     """Per-kernel execution spec shared by all replicas of one group.
 
     Every field is optional. The resolver fills gaps from
-    `ScalingGroupRow.default_session_options.default_kernel_execution_spec`
+    `ResourceGroupRow.default_session_options.default_kernel_execution_spec`
     before a session is enqueued; any remaining gaps are surfaced as
     validation errors (e.g. an image must ultimately be resolved).
     """

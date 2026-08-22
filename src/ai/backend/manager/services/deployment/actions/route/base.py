@@ -1,15 +1,11 @@
-"""Base action class for route operations."""
+from dataclasses import dataclass
 
-from typing import override
-
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseAction
+from ai.backend.manager.services.deployment.actions.base import DeploymentSingleEntityAction
 
 
-class RouteBaseAction(BaseAction):
-    """Base action for route operations."""
+@dataclass
+class RouteBaseAction(DeploymentSingleEntityAction):
+    """Base for an operation on a deployment's routes.
 
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.DEPLOYMENT_ROUTE
+    Answered for by the deployment: what is touched lives under it.
+    """

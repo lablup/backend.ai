@@ -8,9 +8,9 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.errors.kernel import (

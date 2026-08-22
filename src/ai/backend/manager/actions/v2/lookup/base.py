@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.manager.actions.types import ActionOperationType, ActionSpec
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.manager.actions.types import ActionOperationType
 
 __all__ = ("LookupKey", "BaseLookupAction", "BaseLookupActionResult")
 
@@ -65,17 +64,9 @@ class BaseLookupAction(ABC):
         """
         return ActionOperationType.LOOKUP
 
-    @classmethod
-    def spec(cls) -> ActionSpec:
-        """Return the "entity:operation" spec keying reporter subscriptions and audit records."""
-        return ActionSpec(
-            entity_type=cls.entity_type(),
-            operation_type=cls.operation_type(),
-        )
-
 
 class BaseLookupActionResult(ABC):
     @abstractmethod
-    def resolved_entity_id(self) -> EntityID:
-        """Return the id the key resolved to."""
+    def entity_id(self) -> EntityIdentifier:
+        """Return the id the key names."""
         raise NotImplementedError

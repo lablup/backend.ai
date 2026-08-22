@@ -24,6 +24,9 @@ from uuid import UUID, uuid4
 
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     BulkRegisterRoutesResponse,
     BulkUnregisterRoutesResponse,
@@ -32,16 +35,13 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     RegisteredRoutesItem,
     UnregisteredRoutesItem,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
+from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 
@@ -87,8 +87,8 @@ def _wire_proxy_target(
 ) -> None:
     deployments = [_make_deployment_mock(UUID(str(eid)), resource_group) for eid in endpoint_ids]
     mock_deployment_repo.get_deployments_by_ids.return_value = deployments
-    mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = {
-        resource_group: ScalingGroupProxyTarget(addr=addr, api_token=token),
+    mock_deployment_repo.fetch_resource_group_proxy_targets.return_value = {
+        resource_group: ResourceGroupProxyTarget(addr=addr, api_token=token),
     }
 
 

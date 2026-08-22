@@ -13,11 +13,15 @@
 # can override.
 # Added in 25.12.0
 [agent]
-  # Unique identifier for this agent instance. If not specified, a random UUID
-  # is generated. In multi-agent mode, each agent must have a unique ID. Used
-  # for tracking, logging, and management.
+  # Unique identifier for this agent instance. If not specified, it is detected
+  # automatically on startup: the cloud instance ID on AWS, Azure and GCP, or
+  # 'i-<hostname>' otherwise. Because that value follows the host identity,
+  # renaming the host changes the agent ID and the manager registers it as a
+  # separate new agent; set this field explicitly to pin the ID. In multi-agent
+  # mode, each agent must have a unique ID. Used for tracking, logging, and
+  # management.
   # Added in 25.12.0
-  ## id = "agent-prod-001"
+  ## id = "i-node01"
   # Port number for the agent's socket communication with containers. Containers
   # connect to this port for the kernel runner protocol. In multi-agent mode,
   # each agent must use a unique port.

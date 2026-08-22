@@ -2,18 +2,27 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from uuid import UUID
+from typing import override
+
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
+)
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
 
 
 @dataclass(frozen=True)
-class PrometheusQueryPresetCategoryData:
+class PrometheusQueryPresetCategoryData(EntityData):
     """Domain model data for prometheus query preset category."""
 
-    id: UUID
+    id: PrometheusQueryPresetCategoryID
     name: str
     description: str | None
     created_at: datetime
     updated_at: datetime
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.id
 
 
 @dataclass

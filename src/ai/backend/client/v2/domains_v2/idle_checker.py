@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Final
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     CreateIdleCheckerInput,
     SearchIdleCheckersInput,
@@ -16,7 +17,6 @@ from ai.backend.common.dto.manager.v2.idle_checker.response import (
     SearchIdleCheckerPayload,
     UpdateIdleCheckerPayload,
 )
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
 
 _PATH: Final = "/v2/idle-checkers"
 

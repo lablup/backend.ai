@@ -24,13 +24,14 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.defs import (
     MODEL_VFOLDER_LENGTH_LIMIT,
     RESERVED_VFOLDER_PATTERNS,
     RESERVED_VFOLDERS,
 )
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     QuotaScopeID,
     SessionId,
@@ -66,8 +67,8 @@ from ai.backend.manager.models.base import (
     StrEnumType,
     metadata,
 )
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -137,7 +138,7 @@ def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
 
 
 def _get_group_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    return GroupRow.id == foreign(VFolderRow.group)
+    return ProjectRow.id == foreign(VFolderRow.group)
 
 
 class VFolderPermissionValidator(t.Trafaret):
@@ -333,7 +334,7 @@ class VFolderRow(LifecycleTimestampsMixin, Base):
     )
     # creator is always set to the user who created vfolder (regardless user/project types)
     creator: Mapped[str | None] = mapped_column("creator", sa.String(length=128), nullable=True)
-    creator_id: Mapped[uuid.UUID | None] = mapped_column("creator_id", GUID, nullable=True)
+    creator_id: Mapped[UserID | None] = mapped_column("creator_id", GUID(UserID), nullable=True)
     # unmanaged vfolder represents the host-side absolute path instead of storage-based path.
     unmanaged_path: Mapped[str | None] = mapped_column(
         "unmanaged_path", sa.String(length=512), nullable=True
@@ -345,11 +346,11 @@ class VFolderRow(LifecycleTimestampsMixin, Base):
         nullable=False,
         index=True,
     )
-    user: Mapped[uuid.UUID | None] = mapped_column(
-        "user", GUID, nullable=True
+    user: Mapped[UserID | None] = mapped_column(
+        "user", GUID(UserID), nullable=True
     )  # owner if user vfolder
-    group: Mapped[uuid.UUID | None] = mapped_column(
-        "group", GUID, nullable=True
+    group: Mapped[ProjectID | None] = mapped_column(
+        "group", GUID(ProjectID), nullable=True
     )  # owner if project vfolder
     cloneable: Mapped[bool] = mapped_column("cloneable", sa.Boolean, default=False, nullable=False)
     status: Mapped[VFolderOperationStatus] = mapped_column(
@@ -379,8 +380,8 @@ class VFolderRow(LifecycleTimestampsMixin, Base):
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
     )
-    group_row: Mapped[GroupRow | None] = relationship(
-        "GroupRow",
+    group_row: Mapped[ProjectRow | None] = relationship(
+        "ProjectRow",
         primaryjoin=_get_group_row_join_condition,
     )
 
@@ -470,8 +471,8 @@ vfolder_attachment = sa.Table(
 class VFolderInvitationRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "vfolder_invitations"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[VFolderUUID] = mapped_column(
+        "id", GUID(VFolderUUID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     permission: Mapped[VFolderPermission | None] = mapped_column(
         "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
@@ -500,8 +501,8 @@ vfolder_invitations = VFolderInvitationRow.__table__
 class VFolderPermissionRow(Base):
     __tablename__ = "vfolder_permissions"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[VFolderUUID] = mapped_column(
+        "id", GUID(VFolderUUID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     permission: Mapped[VFolderPermission | None] = mapped_column(
         "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
@@ -512,8 +513,8 @@ class VFolderPermissionRow(Base):
         sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
-    user: Mapped[uuid.UUID] = mapped_column(
-        "user", GUID, sa.ForeignKey("users.uuid"), nullable=False
+    user: Mapped[UserID] = mapped_column(
+        "user", GUID(UserID), sa.ForeignKey("users.uuid"), nullable=False
     )
 
 
@@ -550,7 +551,7 @@ async def query_accessible_vfolders(
     extra_vf_group_conds: Any = None,
     allowed_status_set: VFolderStatusSet | None = None,
 ) -> Sequence[Mapping[str, Any]]:
-    from ai.backend.manager.models.group import groups
+    from ai.backend.manager.models.project import groups
     from ai.backend.manager.models.user import users
 
     if allowed_vfolder_types is None:
@@ -689,7 +690,7 @@ async def query_accessible_vfolders(
             grps = result.fetchall()
             group_ids = [g.scope_id for g in grps]
             # Include MODEL_STORE projects in the same domain for cross-project model access
-            from ai.backend.manager.data.group.types import ProjectType
+            from ai.backend.manager.data.project.types import ProjectType
 
             model_store_query = sa.select(groups.c.id).where(
                 sa.and_(
@@ -763,7 +764,7 @@ async def get_allowed_vfolder_hosts_by_group(
     If the requester is a domain admin, gather all `allowed_vfolder_hosts` of the domain groups.
     """
     from ai.backend.manager.models.domain import domains
-    from ai.backend.manager.models.group import groups
+    from ai.backend.manager.models.project import groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -803,7 +804,7 @@ async def get_allowed_vfolder_hosts_by_user(
     All available `allowed_vfolder_hosts` of groups which requester associated will be merged.
     """
     from ai.backend.manager.models.domain import domains
-    from ai.backend.manager.models.group import groups
+    from ai.backend.manager.models.project import groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -1018,8 +1019,8 @@ async def ensure_quota_scope_accessible_by_user(
         raise InvalidAPIParameters
 
     # Lookup group table to match if quota is scoped to the group
-    group_query = sa.select(GroupRow).where(GroupRow.id == quota_scope.scope_id)
-    quota_scope_group: GroupRow | None = await conn.scalar(group_query)
+    group_query = sa.select(ProjectRow).where(ProjectRow.id == quota_scope.scope_id)
+    quota_scope_group: ProjectRow | None = await conn.scalar(group_query)
     if quota_scope_group:
         match user["role"]:
             case UserRole.SUPERADMIN:
@@ -1327,12 +1328,12 @@ class VFolderPermissionContextBuilder(
         result = VFolderPermissionContext()
 
         _project_stmt = (
-            sa.select(GroupRow)
+            sa.select(ProjectRow)
             .where(
-                GroupRow.domain_name == domain_name,
-                user_scope_membership_exists(PROJECT_SCOPE_TYPE, GroupRow.id, ctx.user_id),
+                ProjectRow.domain_name == domain_name,
+                user_scope_membership_exists(PROJECT_SCOPE_TYPE, ProjectRow.id, ctx.user_id),
             )
-            .options(load_only(GroupRow.id))
+            .options(load_only(ProjectRow.id))
         )
         for row in await self.db_session.scalars(_project_stmt):
             _row = row

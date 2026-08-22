@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 
 from .base import ContainerRegistryAction
@@ -29,18 +28,17 @@ class HandleHarborWebhookAction(ContainerRegistryAction):
 
     @override
     @classmethod
+    def action_name(cls) -> str:
+        return "handle_harbor_webhook"
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
 
 @dataclass
-class HandleHarborWebhookActionResult(BaseActionResult):
+class HandleHarborWebhookActionResult:
     """Result of handling a Harbor webhook event."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    pass

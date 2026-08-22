@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.session.actions.commit_base import SessionCommitAction
@@ -16,8 +15,9 @@ class CommitSessionAction(SessionCommitAction):
     filename: str | None
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "commit_session"
 
     @override
     @classmethod
@@ -26,12 +26,8 @@ class CommitSessionAction(SessionCommitAction):
 
 
 @dataclass
-class CommitSessionActionResult(BaseActionResult):
+class CommitSessionActionResult:
     session_data: SessionData
 
     # TODO: Add proper type
     commit_result: Mapping[str, Any]
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.session_data.id)

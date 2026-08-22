@@ -4,8 +4,8 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
@@ -20,9 +20,10 @@ from ai.backend.manager.data.auth.types import (
     UserCreationData,
 )
 from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
@@ -163,8 +164,9 @@ class AuthRepository:
         )
 
     @auth_repository_resilience.apply()
-    async def get_user_row_by_uuid(self, user_uuid: UUID) -> UserRow:
-        return await self._db_source.fetch_user_row_by_uuid(user_uuid)
+    async def default_keypair(self, user_uuid: UUID) -> KeyPairData:
+        """The keypair a user authorizes with; raises if they hold no active marked one."""
+        return await self._db_source.fetch_default_keypair(user_uuid)
 
     @auth_repository_resilience.apply()
     async def get_current_time(self) -> datetime:

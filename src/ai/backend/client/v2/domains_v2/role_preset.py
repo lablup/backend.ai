@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     BulkAddRolePermissionPresetsInput,
     BulkRemoveRolePermissionPresetsInput,
@@ -30,7 +31,6 @@ from ai.backend.common.dto.manager.v2.role_preset.response import (
     SearchRolePresetsPayload,
     UpdateRolePresetPayload,
 )
-from ai.backend.common.identifier.role_preset import RolePresetID
 
 _PATH = "/v2/role-presets"
 

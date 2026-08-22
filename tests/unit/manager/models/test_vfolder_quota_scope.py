@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
 from ai.backend.manager.data.permission.types import (
     EntityType as PermissionEntityType,
@@ -23,15 +23,16 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -40,7 +41,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
@@ -73,7 +73,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -81,7 +81,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 VFolderRow,
                 ContainerRegistryRow,
@@ -328,7 +328,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
         group_uuid = uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_uuid,
                 name=f"test_group_{group_uuid.hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -441,7 +441,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
         other_group_id = uuid4()
         async with db_with_cleanup.begin_session() as session:
             session.add(
-                GroupRow(
+                ProjectRow(
                     id=other_group_id,
                     name=f"other_group_{other_group_id.hex[:8]}",
                     domain_name=test_domain.domain_name,

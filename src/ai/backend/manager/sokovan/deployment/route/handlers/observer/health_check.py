@@ -21,7 +21,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
     ValkeyScheduleClient,
 )
 from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import RouteData

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -16,6 +16,11 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    GroupMeta,
+)
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -23,6 +28,7 @@ from ai.backend.manager.api.rest.v2.keypair.handler import V2KeypairHandler
 from ai.backend.manager.api.rest.v2.keypair.registry import register_v2_keypair_routes
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.user.processors import UserProcessors
@@ -32,9 +38,10 @@ from ai.backend.manager.services.user.service import UserService
 @pytest.fixture()
 def user_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
 ) -> UserProcessors:
     """Build UserProcessors with a real DB source for keypair tests."""
-    user_repo = UserRepository(database_engine)
+    user_repo = UserRepository(database_engine, V2DBOpsProvider(database_engine))
     user_service = UserService(
         storage_manager=MagicMock(spec=StorageSessionManager),
         valkey_stat_client=MagicMock(),
@@ -43,9 +50,8 @@ def user_processors(
         scheduling_controller=MagicMock(),
     )
     return UserProcessors(
-        user_service=user_service,
-        action_monitors=[],
-        validators=MagicMock(),  # Needs unrestricted mock for nested rbac.scope access
+        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        user_service,
     )
 
 

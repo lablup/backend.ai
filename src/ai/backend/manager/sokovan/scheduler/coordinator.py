@@ -8,6 +8,7 @@ from typing import Any, Final
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.kernel.anycast import (
     KernelCancelledAnycastEvent,
@@ -25,7 +26,6 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SchedulingBroadcastEvent,
 )
 from ai.backend.common.events.types import AbstractBroadcastEvent
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.leader.tasks import EventTaskSpec
 from ai.backend.common.types import AccessKey, AgentId, SessionId
 from ai.backend.logging import BraceStyleAdapter
@@ -58,7 +58,6 @@ from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.manager.views.sokovan.lifecycle import (
-    KernelCreationInfo,
     LastPhase,
     SessionWithKernels,
 )
@@ -1613,12 +1612,10 @@ class ScheduleCoordinator:
 
     async def handle_kernel_running(self, event: KernelStartedAnycastEvent) -> bool:
         """Handle kernel running event through the kernel state engine."""
-        # Convert event data to dataclass (always present, may be empty)
-        creation_info = KernelCreationInfo.from_dict(dict(event.creation_info))
         result = await self._kernel_state_engine.mark_kernel_running(
             event.kernel_id,
             event.reason,
-            creation_info,
+            event.creation_info,
         )
         if result:
             # Request CHECK_CREATING_PROGRESS to check if session should transition to RUNNING

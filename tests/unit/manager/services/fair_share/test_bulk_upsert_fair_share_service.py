@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.manager.repositories.base import BulkUpserterResult
 from ai.backend.manager.repositories.fair_share import (
     DomainFairShareBulkWeightUpserterSpec,

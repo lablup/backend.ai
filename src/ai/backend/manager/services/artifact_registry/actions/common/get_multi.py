@@ -2,7 +2,6 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
@@ -13,8 +12,9 @@ class GetArtifactRegistryMetasAction(ArtifactRegistryAction):
     registry_ids: list[uuid.UUID]
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_artifact_registry_metas"
 
     @override
     @classmethod
@@ -23,9 +23,5 @@ class GetArtifactRegistryMetasAction(ArtifactRegistryAction):
 
 
 @dataclass
-class GetArtifactRegistryMetasActionResult(BaseActionResult):
+class GetArtifactRegistryMetasActionResult:
     result: list[ArtifactRegistryData]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

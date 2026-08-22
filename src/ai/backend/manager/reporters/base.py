@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from ai.backend.common.data.entity.action import ActionID
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.identifier.action import ActionID
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 
 

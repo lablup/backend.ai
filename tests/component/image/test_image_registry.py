@@ -92,7 +92,7 @@ class TestSetImageResourceLimit:
                 max_value=Decimal("8"),
             ),
         )
-        result = await image_processors.set_image_resource_limit_by_id.wait_for_complete(action)
+        result = await image_processors.set_image_resource_limit_by_id.run(action)
         cpu_limit = next((r for r in result.image_data.resource_limits if r.key == "cpu"), None)
         assert cpu_limit is not None
         assert str(cpu_limit.min) == "2"
@@ -113,7 +113,7 @@ class TestSetImageResourceLimit:
                 max_value=Decimal("8589934592"),
             ),
         )
-        result = await image_processors.set_image_resource_limit_by_id.wait_for_complete(action)
+        result = await image_processors.set_image_resource_limit_by_id.run(action)
         mem_limit = next((r for r in result.image_data.resource_limits if r.key == "mem"), None)
         assert mem_limit is not None
         # INTRINSIC_SLOTS_MIN["mem"] = "1073741824" (1 GiB) > "536870912" (512 MiB),
@@ -136,7 +136,7 @@ class TestSetImageResourceLimit:
                 max_value=Decimal("16"),
             ),
         )
-        await image_processors.set_image_resource_limit_by_id.wait_for_complete(cpu_action)
+        await image_processors.set_image_resource_limit_by_id.run(cpu_action)
 
         gpu_action = SetImageResourceLimitByIdAction(
             image_id=ImageID(image_id),
@@ -146,7 +146,7 @@ class TestSetImageResourceLimit:
                 max_value=Decimal("4"),
             ),
         )
-        result = await image_processors.set_image_resource_limit_by_id.wait_for_complete(gpu_action)
+        result = await image_processors.set_image_resource_limit_by_id.run(gpu_action)
 
         keys = [r.key for r in result.image_data.resource_limits]
         assert "cpu" in keys
@@ -167,7 +167,7 @@ class TestSetImageResourceLimit:
                 max_value=Decimal("4"),
             ),
         )
-        await image_processors.set_image_resource_limit_by_id.wait_for_complete(action1)
+        await image_processors.set_image_resource_limit_by_id.run(action1)
 
         action2 = SetImageResourceLimitByIdAction(
             image_id=ImageID(image_id),
@@ -177,7 +177,7 @@ class TestSetImageResourceLimit:
                 max_value=Decimal("32"),
             ),
         )
-        result = await image_processors.set_image_resource_limit_by_id.wait_for_complete(action2)
+        result = await image_processors.set_image_resource_limit_by_id.run(action2)
         cpu_limit = next((r for r in result.image_data.resource_limits if r.key == "cpu"), None)
         assert cpu_limit is not None
         assert str(cpu_limit.min) == "8"
@@ -198,7 +198,7 @@ class TestSetImageResourceLimit:
             ),
         )
         with pytest.raises(ImageNotFound):
-            await image_processors.set_image_resource_limit_by_id.wait_for_complete(action)
+            await image_processors.set_image_resource_limit_by_id.run(action)
 
 
 class TestClearImageResourceLimit:
@@ -210,9 +210,7 @@ class TestClearImageResourceLimit:
         """S-7: Clear custom resource limit by ID → custom limits removed."""
         image_id, _ = image_fixture
         action = ClearImageCustomResourceLimitByIdAction(image_id=ImageID(image_id))
-        result = await image_processors.clear_image_custom_resource_limit_by_id.wait_for_complete(
-            action
-        )
+        result = await image_processors.clear_image_custom_resource_limit_by_id.run(action)
         # After clearing _resources, only label-derived intrinsic defaults remain (cpu, mem).
         # Custom max values from the fixture (cpu: "4", mem: "4294967296") are cleared.
         # ResourceLimit.max is typed as Decimal but is actually None for label defaults,
@@ -231,11 +229,9 @@ class TestClearImageResourceLimit:
         image_id, _ = image_fixture
         action = ClearImageCustomResourceLimitByIdAction(image_id=ImageID(image_id))
         # First clear: removes all custom resources
-        await image_processors.clear_image_custom_resource_limit_by_id.wait_for_complete(action)
+        await image_processors.clear_image_custom_resource_limit_by_id.run(action)
         # Second clear: should succeed without error
-        result = await image_processors.clear_image_custom_resource_limit_by_id.wait_for_complete(
-            action
-        )
+        result = await image_processors.clear_image_custom_resource_limit_by_id.run(action)
         # After clearing twice, only label-derived intrinsic defaults remain.
         by_key = {r.key: r for r in result.image_data.resource_limits}
         assert set(by_key.keys()) == {"cpu", "mem"}
@@ -254,7 +250,7 @@ class TestClearImageResourceLimit:
             image_canonical=canonical,
             architecture="x86_64",
         )
-        result = await image_processors.clear_image_custom_resource_limit.wait_for_complete(action)
+        result = await image_processors.clear_image_custom_resource_limit.run(action)
         # After clearing _resources, only label-derived intrinsic defaults remain (cpu, mem).
         by_key = {r.key: r for r in result.image_data.resource_limits}
         assert set(by_key.keys()) == {"cpu", "mem"}
@@ -269,7 +265,7 @@ class TestClearImageResourceLimit:
         """F-CLEAR-1: Clear limit by non-existent image ID → ImageNotFound."""
         action = ClearImageCustomResourceLimitByIdAction(image_id=ImageID(uuid.uuid4()))
         with pytest.raises(ImageNotFound):
-            await image_processors.clear_image_custom_resource_limit_by_id.wait_for_complete(action)
+            await image_processors.clear_image_custom_resource_limit_by_id.run(action)
 
     async def test_clear_by_nonexistent_canonical(
         self,
@@ -282,4 +278,4 @@ class TestClearImageResourceLimit:
             architecture="x86_64",
         )
         with pytest.raises(ImageNotFound):
-            await image_processors.clear_image_custom_resource_limit.wait_for_complete(action)
+            await image_processors.clear_image_custom_resource_limit.run(action)

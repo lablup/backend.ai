@@ -168,6 +168,7 @@ class AuthHandler:
             role=auth_result.role,
             status=auth_result.status,
             session_token=auth_result.session_token,
+            user_id=auth_result.user_id,
         )
         resp = AuthorizeResponse(data=data)
         return APIResponse.build(HTTPStatus.OK, resp)

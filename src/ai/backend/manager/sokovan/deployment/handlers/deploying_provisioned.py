@@ -4,7 +4,7 @@ import logging
 from collections.abc import Sequence
 from typing import override
 
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,

@@ -12,6 +12,9 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import (
@@ -27,9 +30,6 @@ from ai.backend.common.dto.manager.v2.session.types import (
     SessionStatusFilter,
 )
 from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (

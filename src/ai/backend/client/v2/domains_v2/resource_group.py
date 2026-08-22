@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInfo
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
@@ -35,7 +36,6 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     UpdateResourceGroupPayload,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInfo
-from ai.backend.common.identifier.resource_group import ResourceGroupName
 
 _PATH = "/v2/resource-groups"
 

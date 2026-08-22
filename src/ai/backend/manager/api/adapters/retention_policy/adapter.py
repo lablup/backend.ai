@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.dto.manager.v2.retention_policy.request import (
     CreateRetentionPolicyInput,
     RetentionPolicyFilter,
@@ -18,27 +19,24 @@ from ai.backend.common.dto.manager.v2.retention_policy.response import (
     UpdateRetentionPolicyPayload,
 )
 from ai.backend.common.dto.manager.v2.retention_policy.types import RetentionPolicyOrderField
-from ai.backend.common.identifier.retention_policy import RetentionPolicyID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.retention.types import RetentionPolicyData
-from ai.backend.manager.errors.retention import RetentionPolicyNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.retention.conditions import RetentionPolicyConditions
+from ai.backend.manager.models.retention.creators import RetentionPolicyCreator
 from ai.backend.manager.models.retention.orders import RetentionPolicyOrders
+from ai.backend.manager.models.retention.purgers import RetentionPolicyPurger
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.retention_policy.creators import RetentionPolicyCreatorSpec
-from ai.backend.manager.repositories.retention_policy.purgers import RetentionPolicyPurgerSpec
-from ai.backend.manager.repositories.retention_policy.updaters import RetentionPolicyUpdaterSpec
+from ai.backend.manager.models.retention.searchers import RetentionPolicySearcher
+from ai.backend.manager.models.retention.updaters import RetentionPolicyUpdater
 from ai.backend.manager.services.retention_policy.actions.create import (
     CreateRetentionPolicyAction,
 )
 from ai.backend.manager.services.retention_policy.actions.delete import (
     DeleteRetentionPolicyAction,
 )
+from ai.backend.manager.services.retention_policy.actions.get import GetRetentionPolicyAction
 from ai.backend.manager.services.retention_policy.actions.purge import (
     PurgeRetentionPolicyAction,
 )
@@ -68,7 +66,8 @@ class RetentionPolicyAdapter(BaseAdapter):
     ) -> SearchRetentionPoliciesPayload:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            RetentionPolicySearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_retention_policy_pagination_spec(),
@@ -79,8 +78,8 @@ class RetentionPolicyAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.retention_policy.search.wait_for_complete(
-            SearchRetentionPoliciesAction(querier=querier)
+        result = await self._processors.retention_policy.global_search.run(
+            SearchRetentionPoliciesAction(searcher=searcher)
         )
         return SearchRetentionPoliciesPayload(
             items=[self._data_to_node(d) for d in result.items],
@@ -90,41 +89,31 @@ class RetentionPolicyAdapter(BaseAdapter):
         )
 
     async def get(self, policy_id: RetentionPolicyID) -> RetentionPolicyNode:
-        conditions: list[QueryCondition] = [lambda: RetentionPolicyRow.id == policy_id]
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=[],
-            pagination_spec=_retention_policy_pagination_spec(),
-            limit=1,
+        result = await self._processors.retention_policy.get.run(
+            GetRetentionPolicyAction(policy_id=policy_id)
         )
-        result = await self._processors.retention_policy.search.wait_for_complete(
-            SearchRetentionPoliciesAction(querier=querier)
-        )
-        if not result.items:
-            raise RetentionPolicyNotFound()
-        return self._data_to_node(result.items[0])
+        return self._data_to_node(result.data)
 
     async def create(
         self,
         input: CreateRetentionPolicyInput,
     ) -> CreateRetentionPolicyPayload:
-        creator = Creator(
-            spec=RetentionPolicyCreatorSpec(
-                category=input.category,
-                retention_period=timedelta(days=input.retention_period_days),
-                enabled=input.enabled,
-            )
+        creator = RetentionPolicyCreator(
+            category=input.category,
+            retention_period=timedelta(days=input.retention_period_days),
+            enabled=input.enabled,
         )
-        result = await self._processors.retention_policy.create.wait_for_complete(
+        result = await self._processors.retention_policy.global_create.run(
             CreateRetentionPolicyAction(creator=creator)
         )
-        return CreateRetentionPolicyPayload(policy=self._data_to_node(result.policy))
+        return CreateRetentionPolicyPayload(policy=self._data_to_node(result.data))
 
     async def update(
         self,
         input: UpdateRetentionPolicyInput,
     ) -> UpdateRetentionPolicyPayload:
-        spec = RetentionPolicyUpdaterSpec(
+        updater = RetentionPolicyUpdater(
+            policy_id=input.id,
             category=(
                 OptionalState.update(input.category)
                 if input.category is not None
@@ -141,26 +130,23 @@ class RetentionPolicyAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        updater: Updater[RetentionPolicyRow] = Updater(spec=spec, pk_value=input.id)
-        result = await self._processors.retention_policy.update.wait_for_complete(
-            UpdateRetentionPolicyAction(id=input.id, updater=updater)
+        result = await self._processors.retention_policy.update.run(
+            UpdateRetentionPolicyAction(updater=updater)
         )
-        return UpdateRetentionPolicyPayload(policy=self._data_to_node(result.policy))
+        return UpdateRetentionPolicyPayload(policy=self._data_to_node(result.data))
 
     async def delete(self, policy_id: RetentionPolicyID) -> DeleteRetentionPolicyPayload:
-        result = await self._processors.retention_policy.delete.wait_for_complete(
+        result = await self._processors.retention_policy.delete.run(
             DeleteRetentionPolicyAction(id=policy_id)
         )
-        return DeleteRetentionPolicyPayload(id=result.policy.id)
+        return DeleteRetentionPolicyPayload(id=result.data.id)
 
     async def purge(self, policy_id: RetentionPolicyID) -> PurgeRetentionPolicyPayload:
-        purger: Purger[RetentionPolicyRow] = Purger(
-            spec=RetentionPolicyPurgerSpec(policy_id=policy_id)
+        purger = RetentionPolicyPurger(policy_id=policy_id)
+        result = await self._processors.retention_policy.purge.run(
+            PurgeRetentionPolicyAction(purger=purger)
         )
-        result = await self._processors.retention_policy.purge.wait_for_complete(
-            PurgeRetentionPolicyAction(id=policy_id, purger=purger)
-        )
-        return PurgeRetentionPolicyPayload(id=result.policy.id)
+        return PurgeRetentionPolicyPayload(id=result.data.id)
 
     def _convert_filter(self, filter_: RetentionPolicyFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

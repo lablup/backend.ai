@@ -2,9 +2,9 @@ import uuid
 from datetime import UTC, datetime
 from uuid import UUID
 
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
     ReplicaGroupScalingStatus,

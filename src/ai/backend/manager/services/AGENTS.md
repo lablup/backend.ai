@@ -22,11 +22,28 @@ grows a branch; the generic services take no hook or callback to hide one in.
 - Exactly one `Action` + `ActionResult` pair per action file.
 - Every concrete Action MUST override `entity_id()` and `operation_type()`.
 - v2 actions declare `action_name()`, recorded on audit rows: `<verb>_<entity>` in
-  lowercase snake_case (plural entity for searches, e.g. `search_resource_slot_types`;
-  qualifier prefix where the path differs, e.g. `admin_search_...`). Never derive it
+  lowercase snake_case (plural entity for searches, e.g. `search_resource_slot_types`),
+  prefixed by the shape where one applies (see Naming). Never derive it
   from the class name — a rename must not split the audit history. The
   `(entity_type, operation_type, action_name)` triple must be unique
   (`tests/unit/manager/actions/test_registry_catalog.py`).
+
+## Naming
+
+- The `global` and `public` shapes carry that name as a prefix on the action class,
+  the `action_name()` and the processor field —
+  `GlobalSearchErrorLogsAction` / `global_search_error_logs` / `global_search`.
+- Every other operation takes no prefix.
+- A lookup does not carry its key in its own name, because one lookup may come to
+  accept several — `LookupRuntimeVariantAction` / `lookup_runtime_variant`, never
+  `by_name`. The `LookupKey` subclass and its `kind()` name the key instead.
+- A scope operation's name never states the caller's relation to that scope. No `my`,
+  `own`, `for_current_user`. The scope is an argument and the adapter decides what goes
+  in it — the caller themselves or a target an admin named, one action either way:
+  `SearchKeypairResourcePoliciesAction(user_id=...)`, never
+  `SearchMyKeypairResourcePolicyAction()`.
+- For the same reason a domain writes no separate action for reading one's own. That is
+  a call with the current user in the scope argument.
 
 ## Service method rules
 
@@ -49,6 +66,15 @@ grows a branch; the generic services take no hook or callback to hide one in.
 - Wrap every service method in an `ActionProcessor`. Do NOT expose raw service methods to handlers.
 - Framework-level rules — v2 bases, `ProcessorGroup` wiring, gates, registry test —
   live in `actions/AGENTS.md`.
+- `Processors.__init__` takes its `ProcessorGroup`s first and the service after them.
+  Several groups are listed together, before the service.
+- A change to a domain's processor composition — a field added or removed, a different
+  factory, a different action base — updates that domain's `KNOWLEDGE.md` in the same
+  change. Its field table states the entity type, shape and operation each field runs
+  as, which the wiring silently contradicts once it moves.
+- A domain whose composition changes and has no `KNOWLEDGE.md` yet gets one, following
+  the `/knowledge` skill's schema. Record what the shapes are and why the surprising
+  ones were chosen — not the wiring, which the code already shows.
 
 ## What belongs here
 

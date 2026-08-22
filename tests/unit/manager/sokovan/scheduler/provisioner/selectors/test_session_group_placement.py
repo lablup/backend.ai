@@ -15,11 +15,16 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.identifier.architecture import ArchName
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.identifier.session_group import SessionGroupID
-from ai.backend.common.types import AgentId, AgentSelectionStrategy, PreemptionOrder, SessionId
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.types import (
+    AgentId,
+    AgentSelectionStrategy,
+    ArchName,
+    PreemptionOrder,
+    SessionId,
+)
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,

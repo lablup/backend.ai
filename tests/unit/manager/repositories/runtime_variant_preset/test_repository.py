@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
@@ -71,7 +72,7 @@ class TestRuntimeVariantPresetRepositoryFlag:
         runtime_variant_id: uuid.UUID,
     ) -> None:
         spec = RuntimeVariantPresetCreatorSpec(
-            runtime_variant_id=runtime_variant_id,
+            runtime_variant_id=RuntimeVariantID(runtime_variant_id),
             name="enable-verbose",
             description="Enable verbose logging",
             rank=0,

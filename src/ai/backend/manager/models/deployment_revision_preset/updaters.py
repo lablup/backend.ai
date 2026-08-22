@@ -1,0 +1,108 @@
+from __future__ import annotations
+
+import uuid
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from typing import Any, override
+from uuid import UUID
+
+from sqlalchemy.orm import InstrumentedAttribute
+
+from ai.backend.common.config import PresetModelDefinition
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
+from ai.backend.manager.models.base import ResourceOptsEntry
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.runtime_variant_preset.types import (
+    RuntimeVariantPresetValueEntry,
+)
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.types import OptionalState, TriState
+
+
+@dataclass
+class DeploymentPresetUpdater(
+    DataUpdater[DeploymentRevisionPresetRow, DeploymentRevisionPresetData]
+):
+    preset_id: DeploymentPresetID
+    runtime_variant: OptionalState[RuntimeVariantID] = field(
+        default_factory=OptionalState[RuntimeVariantID].nop
+    )
+    name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    description: TriState[str] = field(default_factory=TriState[str].nop)
+    rank: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+    image_id: TriState[uuid.UUID] = field(default_factory=TriState[uuid.UUID].nop)
+    model_definition: TriState[PresetModelDefinition] = field(
+        default_factory=TriState[PresetModelDefinition].nop
+    )
+    resource_opts: OptionalState[list[ResourceOptsEntry]] = field(
+        default_factory=OptionalState[list[ResourceOptsEntry]].nop
+    )
+    cluster_mode: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    cluster_size: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+    startup_command: TriState[str] = field(default_factory=TriState[str].nop)
+    bootstrap_script: TriState[str] = field(default_factory=TriState[str].nop)
+    environ: OptionalState[dict[str, str]] = field(
+        default_factory=OptionalState[dict[str, str]].nop
+    )
+    runtime_variant_preset_values: OptionalState[list[RuntimeVariantPresetValueEntry]] = field(
+        default_factory=OptionalState[list[RuntimeVariantPresetValueEntry]].nop
+    )
+    open_to_public: TriState[bool] = field(default_factory=TriState[bool].nop)
+    replica_count: TriState[int] = field(default_factory=TriState[int].nop)
+    revision_history_limit: TriState[int] = field(default_factory=TriState[int].nop)
+    deployment_strategy: TriState[DeploymentStrategy] = field(
+        default_factory=TriState[DeploymentStrategy].nop
+    )
+    deployment_strategy_spec: TriState[dict[str, Any]] = field(
+        default_factory=TriState[dict[str, Any]].nop
+    )
+
+    @property
+    @override
+    def row_class(self) -> type[DeploymentRevisionPresetRow]:
+        return DeploymentRevisionPresetRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return DeploymentRevisionPresetRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
+        return self.preset_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: DeploymentRevisionPresetRow) -> DeploymentRevisionPresetData:
+        return row.to_data()
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.runtime_variant.update_dict(to_update, "runtime_variant")
+        self.name.update_dict(to_update, "name")
+        self.description.update_dict(to_update, "description")
+        self.rank.update_dict(to_update, "rank")
+        self.image_id.update_dict(to_update, "image_id")
+        self.model_definition.update_dict(to_update, "model_definition")
+        self.resource_opts.update_dict(to_update, "resource_opts")
+        self.cluster_mode.update_dict(to_update, "cluster_mode")
+        self.cluster_size.update_dict(to_update, "cluster_size")
+        self.startup_command.update_dict(to_update, "startup_command")
+        self.bootstrap_script.update_dict(to_update, "bootstrap_script")
+        self.environ.update_dict(to_update, "environ")
+        # DB column name stays ``preset_values`` (ORM attr unchanged).
+        self.runtime_variant_preset_values.update_dict(to_update, "preset_values")
+        self.open_to_public.update_dict(to_update, "open_to_public")
+        self.replica_count.update_dict(to_update, "replica_count")
+        self.revision_history_limit.update_dict(to_update, "revision_history_limit")
+        self.deployment_strategy.update_dict(to_update, "deployment_strategy")
+        self.deployment_strategy_spec.update_dict(to_update, "deployment_strategy_spec")
+        return to_update

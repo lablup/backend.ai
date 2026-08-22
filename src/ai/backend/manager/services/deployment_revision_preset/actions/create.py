@@ -1,37 +1,56 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
-from ai.backend.manager.repositories.deployment_revision_preset.creators import (
-    DeploymentRevisionPresetCreatorSpec,
-    PresetResourceSlotDependentCreatorSpec,
+from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import CreateGlobalWithFieldsOpsAction
+from ai.backend.manager.data.deployment_revision_preset.types import (
+    DeploymentRevisionPresetData,
+    ResourceSlotEntryData,
 )
-from ai.backend.manager.services.deployment_revision_preset.actions.base import (
-    DeploymentRevisionPresetAction,
+from ai.backend.manager.models.deployment_revision_preset.creators import (
+    DeploymentPresetCreator,
+    PresetResourceSlotCreator,
 )
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
 
 
 @dataclass
-class CreateDeploymentRevisionPresetAction(DeploymentRevisionPresetAction):
-    creator_spec: DeploymentRevisionPresetCreatorSpec
-    resource_slot_specs: list[PresetResourceSlotDependentCreatorSpec]
+class CreateDeploymentPresetAction(
+    CreateGlobalWithFieldsOpsAction[
+        DeploymentRevisionPresetRow,
+        DeploymentRevisionPresetData,
+        PresetResourceSlotRow,
+        ResourceSlotEntryData,
+    ]
+):
+    """Register a preset together with the slot quantities it declares.
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    One action so the preset and its slot rows share a transaction: a preset without
+    its slots would ask for resources it never stated.
+    """
+
+    creator: DeploymentPresetCreator
+    slot_creators: Sequence[PresetResourceSlotCreator]
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-
-@dataclass
-class CreateDeploymentRevisionPresetActionResult(BaseActionResult):
-    preset: DeploymentRevisionPresetData
+    def entity_type(cls) -> EntityType:
+        return DEPLOYMENT_PRESET_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.preset.id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_deployment_preset"
+
+    @override
+    def to_creator(self) -> DeploymentPresetCreator:
+        return self.creator
+
+    @override
+    def to_field_creators(self) -> Sequence[PresetResourceSlotCreator]:
+        return self.slot_creators

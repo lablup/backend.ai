@@ -1,59 +1,34 @@
-"""Search resource group-scoped domains action and result types."""
-
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.domain.types import DomainData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.domain.types import DomainOperationScope
-from ai.backend.manager.services.domain.actions.base import DomainAction
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain.searchers import DomainSearcher
 
 
-@dataclass
-class SearchRGDomainsAction(DomainAction):
-    """Action to search domains within a resource group scope.
+@dataclass(frozen=True)
+class SearchRGDomainsAction(SearchGlobalOpsAction[DomainRow, DomainData]):
+    """Page through the domains a resource group serves.
 
-    Returns only domains that are associated with the specified resource group
-    through the sgroups_for_domains relationship.
-
-    Args:
-        scope: DomainOperationScope containing resource_group filter.
-        querier: BatchQuerier containing additional filters, orders, and pagination.
+    A resource group is not a scope domains sit under, so the association is a
+    condition on the searcher rather than a scope the read is restricted to.
     """
 
-    scope: DomainOperationScope
-    querier: BatchQuerier
-
-    @override
-    def entity_id(self) -> str | None:
-        return self.scope.resource_group
+    searcher: DomainSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchRGDomainsActionResult(BaseActionResult):
-    """Result of SearchRGDomainsAction.
-
-    Args:
-        items: List of domain data items in the current page.
-        total_count: Total number of domains matching the filter within the scope.
-        has_next_page: Whether there are more items after the current page.
-        has_previous_page: Whether there are items before the current page.
-    """
-
-    items: list[DomainData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return DOMAIN_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_rg_domains"
+
+    @override
+    def to_searcher(self) -> DomainSearcher:
+        return self.searcher

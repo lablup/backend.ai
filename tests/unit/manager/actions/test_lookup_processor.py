@@ -13,10 +13,9 @@ from typing import Any, override
 import pytest
 
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.lookup.base import (
@@ -30,7 +29,17 @@ from ai.backend.manager.actions.v2.lookup.result import LookupActionProcessResul
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.user import UserNotFound
 
-_RESOLVED: EntityID = uuid.uuid4()
+_LOOKUP_ENTITY_TYPE = EntityType("image")
+
+
+class _ImageID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return _LOOKUP_ENTITY_TYPE
+
+
+_RESOLVED = _ImageID(uuid.uuid4())
 
 
 @dataclass(frozen=True)
@@ -69,7 +78,7 @@ class _Action(BaseLookupAction):
 @dataclass
 class _Result(BaseLookupActionResult):
     @override
-    def resolved_entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return _RESOLVED
 
 
@@ -148,7 +157,7 @@ async def test_a_resolved_lookup_returns_the_id(
     with with_user(authenticated_user):
         result = await processor.run(action)
 
-    assert result.resolved_entity_id() == _RESOLVED
+    assert result.entity_id() == _RESOLVED
     assert monitor.done_results[0].meta.status is OperationStatus.SUCCESS
 
 

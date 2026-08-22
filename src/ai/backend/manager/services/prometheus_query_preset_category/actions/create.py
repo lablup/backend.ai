@@ -1,38 +1,42 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.prometheus_query_preset_category import (
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
+from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,
 )
-from ai.backend.manager.models.prometheus_query_preset_category import (
-    PrometheusQueryPresetCategoryRow,
+from ai.backend.manager.models.prometheus_query_preset_category.creators import (
+    PrometheusQueryPresetCategoryCreator,
 )
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.prometheus_query_preset_category.actions.base import (
-    PrometheusQueryPresetCategoryAction,
+from ai.backend.manager.models.prometheus_query_preset_category.row import (
+    PrometheusQueryPresetCategoryRow,
 )
 
 
 @dataclass
-class CreateCategoryAction(PrometheusQueryPresetCategoryAction):
-    creator: Creator[PrometheusQueryPresetCategoryRow]
+class CreateCategoryAction(
+    CreateGlobalOpsAction[PrometheusQueryPresetCategoryRow, PrometheusQueryPresetCategoryData]
+):
+    """Add a category to the global preset catalog."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    creator: PrometheusQueryPresetCategoryCreator
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-
-@dataclass
-class CreateCategoryActionResult(BaseActionResult):
-    category: PrometheusQueryPresetCategoryData
+    def entity_type(cls) -> EntityType:
+        return PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.category.id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_prometheus_query_preset_category"
+
+    @override
+    def to_creator(self) -> PrometheusQueryPresetCategoryCreator:
+        return self.creator

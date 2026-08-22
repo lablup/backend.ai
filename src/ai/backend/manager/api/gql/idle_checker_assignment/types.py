@@ -80,6 +80,7 @@ class IdleCheckerScopeTypeGQL(StrEnum):
     DOMAIN = "domain"
     PROJECT = "project"
     RESOURCE_GROUP = "resource_group"
+    USER = "user"
 
 
 @gql_pydantic_input(

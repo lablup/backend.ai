@@ -6,6 +6,7 @@ import pytest
 
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.infra import (
     CheckPresetsRequest,
     CheckPresetsResponse,
@@ -29,7 +30,6 @@ from ai.backend.common.dto.manager.infra import (
     UsagePerPeriodRequest,
     UsagePerPeriodResponse,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupName
 
 
 class TestEtcdConfigRead:
@@ -230,11 +230,11 @@ class TestResourcePresets:
     async def test_list_presets_with_scaling_group_filter(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
     ) -> None:
         """Filtering presets by scaling group."""
         await admin_registry.infra.list_presets(
-            ListPresetsRequest(scaling_group=scaling_group_name)
+            ListPresetsRequest(scaling_group=resource_group_name)
         )
 
 

@@ -7,9 +7,11 @@ from datetime import datetime
 from typing import Any, Self, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.id import ScopeId
@@ -67,7 +69,7 @@ class SessionOwnerContext:
 
 
 @dataclass
-class UserData:
+class UserData(EntityData):
     id: UUID = field(compare=False)
     uuid: UUID = field(compare=False)  # legacy
     username: str
@@ -88,7 +90,6 @@ class UserData:
     totp_activated: bool
     totp_activated_at: datetime | None = field(compare=False)
     sudo_session_enabled: bool
-    default_access_key: str | None = field(compare=False)
     container_uid: int | None = field(compare=False)
     container_main_gid: int | None = field(compare=False)
     container_gids: list[int] | None = field(compare=False)
@@ -139,12 +140,15 @@ class UserData:
             totp_activated=row.totp_activated,
             totp_activated_at=row.totp_activated_at,
             sudo_session_enabled=row.sudo_session_enabled,
-            default_access_key=row.default_access_key,
             container_uid=row.container_uid,
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,
             integration_name=row.integration_id,  # DB column is integration_id
         )
+
+    @override
+    def entity_id(self) -> UserID:
+        return UserID(self.id)
 
 
 @dataclass

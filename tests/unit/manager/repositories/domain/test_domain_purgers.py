@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -20,30 +20,26 @@ from ai.backend.manager.errors.resource import DomainHasGroups, DomainHasUsers
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow, ProjectType
+from ai.backend.manager.models.domain.purgers import DomainKernelPurger, DomainPurger
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow, ProjectType
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow, SessionStatus, SessionTypes
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
-from ai.backend.manager.repositories.base.purger import (
-    BatchPurger,
-    Purger,
-    execute_batch_purger,
-    execute_purger,
-)
-from ai.backend.manager.repositories.domain.purgers import (
-    DomainBatchPurgerSpec,
-    DomainKernelBatchPurgerSpec,
-    DomainPurgerSpec,
-)
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
@@ -62,14 +58,19 @@ class TestDomainPurgersIntegration:
             database_connection,
             [
                 # FK dependency order: parents before children
+                RoleRow,
+                PermissionRow,
+                VirtualScopeRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
                 DomainRow,
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 SessionRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -159,11 +160,11 @@ class TestDomainPurgersIntegration:
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_domain: DomainFixtureData,
         project_resource_policy: str,
-    ) -> GroupRow:
+    ) -> ProjectRow:
         """Create a test group."""
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as session:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group for integration tests",
@@ -184,7 +185,7 @@ class TestDomainPurgersIntegration:
     async def sample_sessions(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_group: GroupRow,
+        sample_group: ProjectRow,
         sample_domain: DomainFixtureData,
         sample_user: UserRow,
     ) -> list[SessionRow]:
@@ -193,7 +194,7 @@ class TestDomainPurgersIntegration:
         sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
         sgroup_id = ResourceGroupID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as session:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 name=sgroup_name,
                 id=sgroup_id,
                 description="Test scaling group",
@@ -201,7 +202,7 @@ class TestDomainPurgersIntegration:
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             session.add(sgroup)
             await session.flush()
@@ -238,7 +239,7 @@ class TestDomainPurgersIntegration:
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_sessions: list[SessionRow],
         sample_domain: DomainFixtureData,
-        sample_group: GroupRow,
+        sample_group: ProjectRow,
         sample_user: UserRow,
     ) -> list[KernelRow]:
         """Create test kernels belonging to sessions in the domain."""
@@ -279,10 +280,9 @@ class TestDomainPurgersIntegration:
         domain_name = sample_domain.domain_name
 
         # Purge kernels
-        async with db_with_cleanup.begin_session() as session:
-            purger = BatchPurger(spec=DomainKernelBatchPurgerSpec(domain_name=domain_name))
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == len(sample_kernels)
+        async with V2DBOpsProvider(db_with_cleanup).write_ops() as w:
+            purged = await w.batch_purge_in_global(DomainKernelPurger(name=domain_name))
+            assert len(purged) == len(sample_kernels)
 
         # Verify kernels are deleted
         async with db_with_cleanup.begin_session() as session:
@@ -302,10 +302,11 @@ class TestDomainPurgersIntegration:
         domain_name = sample_domain.domain_name
 
         # Purge domain
-        async with db_with_cleanup.begin_session() as session:
-            purger = BatchPurger(spec=DomainBatchPurgerSpec(domain_name=domain_name), batch_size=1)
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == 1
+        async with V2DBOpsProvider(db_with_cleanup).write_ops() as w:
+            purged = await w.purge_entity(
+                DomainPurger(domain_id=sample_domain.domain_id, name=domain_name)
+            )
+            assert purged is not None
 
         # Verify domain is deleted
         async with db_with_cleanup.begin_session() as session:
@@ -321,20 +322,15 @@ class TestDomainPurgersIntegration:
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_domain: DomainFixtureData,
     ) -> None:
-        """DomainPurgerSpec deletes a domain with no bound users or groups."""
+        """DomainPurger deletes a domain with no bound users or groups."""
         domain_name = sample_domain.domain_name
 
-        async with db_with_cleanup.begin_session() as session:
-            result = await execute_purger(
-                session,
-                Purger(
-                    spec=DomainPurgerSpec(
-                        domain_name=domain_name, domain_id=sample_domain.domain_id
-                    )
-                ),
+        async with V2DBOpsProvider(db_with_cleanup).write_ops() as w:
+            purged = await w.purge_entity(
+                DomainPurger(domain_id=sample_domain.domain_id, name=domain_name)
             )
-            assert result is not None
-            assert result.row.name == domain_name
+            assert purged is not None
+            assert purged.name == domain_name
 
         async with db_with_cleanup.begin_session() as session:
             count = await session.scalar(
@@ -350,18 +346,13 @@ class TestDomainPurgersIntegration:
         sample_domain: DomainFixtureData,
         sample_user: UserRow,
     ) -> None:
-        """DomainPurgerSpec raises DomainHasUsers while users remain bound."""
+        """DomainPurger raises DomainHasUsers while users remain bound."""
         domain_name = sample_domain.domain_name
 
-        async with db_with_cleanup.begin_session() as session:
+        async with V2DBOpsProvider(db_with_cleanup).write_ops() as w:
             with pytest.raises(DomainHasUsers):
-                await execute_purger(
-                    session,
-                    Purger(
-                        spec=DomainPurgerSpec(
-                            domain_name=domain_name, domain_id=sample_domain.domain_id
-                        )
-                    ),
+                await w.purge_entity(
+                    DomainPurger(domain_id=sample_domain.domain_id, name=domain_name)
                 )
 
         async with db_with_cleanup.begin_session() as session:
@@ -376,20 +367,15 @@ class TestDomainPurgersIntegration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_domain: DomainFixtureData,
-        sample_group: GroupRow,
+        sample_group: ProjectRow,
     ) -> None:
-        """DomainPurgerSpec raises DomainHasGroups while groups remain bound."""
+        """DomainPurger raises DomainHasGroups while groups remain bound."""
         domain_name = sample_domain.domain_name
 
-        async with db_with_cleanup.begin_session() as session:
+        async with V2DBOpsProvider(db_with_cleanup).write_ops() as w:
             with pytest.raises(DomainHasGroups):
-                await execute_purger(
-                    session,
-                    Purger(
-                        spec=DomainPurgerSpec(
-                            domain_name=domain_name, domain_id=sample_domain.domain_id
-                        )
-                    ),
+                await w.purge_entity(
+                    DomainPurger(domain_id=sample_domain.domain_id, name=domain_name)
                 )
 
         async with db_with_cleanup.begin_session() as session:

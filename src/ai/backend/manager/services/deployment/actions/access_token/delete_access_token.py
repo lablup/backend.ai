@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.deployment.actions.access_token.base import (
     DeploymentAccessTokenBaseAction,
@@ -14,8 +13,9 @@ class DeleteAccessTokenAction(DeploymentAccessTokenBaseAction):
     access_token_id: UUID
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.access_token_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "delete_access_token"
 
     @override
     @classmethod
@@ -24,9 +24,5 @@ class DeleteAccessTokenAction(DeploymentAccessTokenBaseAction):
 
 
 @dataclass
-class DeleteAccessTokenActionResult(BaseActionResult):
+class DeleteAccessTokenActionResult:
     success: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

@@ -6,8 +6,8 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardAccessLevel
-from ai.backend.common.identifier.vfolder import VFolderUUID
 
 
 class ResourceSlotEntryInfo(BaseResponseModel):

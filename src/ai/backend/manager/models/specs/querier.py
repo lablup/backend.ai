@@ -1,10 +1,14 @@
-"""Single-row read spec of the v2 lineage: fetch by primary key."""
+"""Single-row read spec of the v2 lineage: fetch by the entity id."""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from uuid import UUID
+from typing import Any
 
+import sqlalchemy as sa
+from sqlalchemy.orm import InstrumentedAttribute
+
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData
 from ai.backend.manager.models.base import Base
 
 
@@ -25,7 +29,10 @@ class DataQuerier[TRow: Base, TData](ABC):
             def row_class(self) -> type[UserRow]:
                 return UserRow
 
-            def pk_value(self) -> UUID:
+            def entity_id_column(self) -> InstrumentedAttribute[Any]:
+                return UserRow.uuid
+
+            def entity_id_value(self) -> UserID:
                 return self._user_id
 
             def to_data(self, row: UserRow) -> UserData:
@@ -37,15 +44,53 @@ class DataQuerier[TRow: Base, TData](ABC):
 
     @abstractmethod
     def row_class(self) -> type[TRow]:
-        """Return the ORM class for table access and PK detection."""
+        """Return the ORM class the row is read from."""
         raise NotImplementedError
 
     @abstractmethod
-    def pk_value(self) -> UUID | str | int:
-        """Return the primary key value identifying the target row."""
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        """Return the column that carries the entity id.
+
+        Named rather than derived from the primary key, because the two part ways: a
+        table whose key is a name (``domains.name``, ``resource_slot_types.slot_name``)
+        still identifies its entity by a uuid column beside it.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def entity_id_value(self) -> EntityIdentifier:
+        """Return the id of the entity to read."""
         raise NotImplementedError
 
     @abstractmethod
     def to_data(self, row: TRow) -> TData:
         """Convert the fetched row into its ``data/`` type."""
+        raise NotImplementedError
+
+
+class OwnedFieldQuerier[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](ABC):
+    """The one field row each named entity designates.
+
+    A querier rather than a :class:`~...searcher.Searcher`: an owner designates exactly
+    one row, so the answer is one per owner and a second row for the same owner is a
+    fault, not a page that happens to be longer. Keyed by the owner, which is what a
+    field operation is authorized and recorded against.
+
+    What makes a row the designated one belongs in ``build_select``; the ops layer adds
+    the owner filter and keys the answer by ``owner_id_column``.
+    """
+
+    @abstractmethod
+    def build_select(self) -> sa.sql.Select[Any]:
+        """Build the SELECT narrowed to designated rows, without the owner filter."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def owner_id_column(self) -> InstrumentedAttribute[Any]:
+        """Return the column naming the entity a row belongs to."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert the designated row into its ``data/`` type."""
         raise NotImplementedError

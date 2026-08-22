@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
+from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.base import (
@@ -35,12 +36,15 @@ class StorageNamespaceRow(Base):
         sa.UniqueConstraint("storage_id", "namespace", name="uq_storage_id_namespace"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[StorageNamespaceID] = mapped_column(
+        "id",
+        GUID(StorageNamespaceID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
-    storage_id: Mapped[uuid.UUID] = mapped_column(
+    storage_id: Mapped[ObjectStorageID] = mapped_column(
         "storage_id",
-        GUID,
+        GUID(ObjectStorageID),
         nullable=False,
     )
     namespace: Mapped[str] = mapped_column("namespace", sa.String, nullable=False)
@@ -52,7 +56,7 @@ class StorageNamespaceRow(Base):
 
     def to_dataclass(self) -> StorageNamespaceData:
         return StorageNamespaceData(
-            id=self.id,
+            id=StorageNamespaceID(self.id),
             storage_id=self.storage_id,
             namespace=self.namespace,
         )

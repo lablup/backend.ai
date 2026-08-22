@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
+from typing import Any
+
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 
 from .actions.create_cluster_template import (
     CreateClusterTemplateAction,
@@ -52,32 +54,51 @@ __all__ = ("TemplateProcessors",)
 class TemplateProcessors:
     """Processor package for session and cluster template operations."""
 
-    create_task: ActionProcessor[CreateTaskTemplateAction, CreateTaskTemplateActionResult]
-    list_task: ActionProcessor[ListTaskTemplatesAction, ListTaskTemplatesActionResult]
-    get_task: ActionProcessor[GetTaskTemplateAction, GetTaskTemplateActionResult]
-    update_task: ActionProcessor[UpdateTaskTemplateAction, UpdateTaskTemplateActionResult]
-    delete_task: ActionProcessor[DeleteTaskTemplateAction, DeleteTaskTemplateActionResult]
+    create_task: ScopeActionProcessor[CreateTaskTemplateAction, CreateTaskTemplateActionResult]
+    list_task: ScopeActionProcessor[ListTaskTemplatesAction, ListTaskTemplatesActionResult]
+    get_task: SingleEntityActionProcessor[GetTaskTemplateAction, GetTaskTemplateActionResult]
+    update_task: SingleEntityActionProcessor[
+        UpdateTaskTemplateAction, UpdateTaskTemplateActionResult
+    ]
+    delete_task: SingleEntityActionProcessor[
+        DeleteTaskTemplateAction, DeleteTaskTemplateActionResult
+    ]
 
-    create_cluster: ActionProcessor[CreateClusterTemplateAction, CreateClusterTemplateActionResult]
-    list_cluster: ActionProcessor[ListClusterTemplatesAction, ListClusterTemplatesActionResult]
-    get_cluster: ActionProcessor[GetClusterTemplateAction, GetClusterTemplateActionResult]
-    update_cluster: ActionProcessor[UpdateClusterTemplateAction, UpdateClusterTemplateActionResult]
-    delete_cluster: ActionProcessor[DeleteClusterTemplateAction, DeleteClusterTemplateActionResult]
+    create_cluster: ScopeActionProcessor[
+        CreateClusterTemplateAction, CreateClusterTemplateActionResult
+    ]
+    list_cluster: ScopeActionProcessor[ListClusterTemplatesAction, ListClusterTemplatesActionResult]
+    get_cluster: SingleEntityActionProcessor[
+        GetClusterTemplateAction, GetClusterTemplateActionResult
+    ]
+    update_cluster: SingleEntityActionProcessor[
+        UpdateClusterTemplateAction, UpdateClusterTemplateActionResult
+    ]
+    delete_cluster: SingleEntityActionProcessor[
+        DeleteClusterTemplateAction, DeleteClusterTemplateActionResult
+    ]
 
-    def __init__(
-        self,
-        service: TemplateService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.create_task = ActionProcessor(service.create_task_template, action_monitors)
-        self.list_task = ActionProcessor(service.list_task_templates, action_monitors)
-        self.get_task = ActionProcessor(service.get_task_template, action_monitors)
-        self.update_task = ActionProcessor(service.update_task_template, action_monitors)
-        self.delete_task = ActionProcessor(service.delete_task_template, action_monitors)
+    def __init__(self, group: ProcessorGroup[Any], service: TemplateService) -> None:
+        self.create_task = group.scope(CreateTaskTemplateAction, service.create_task_template)
+        self.list_task = group.scope(ListTaskTemplatesAction, service.list_task_templates)
+        self.get_task = group.single_entity(GetTaskTemplateAction, service.get_task_template)
+        self.update_task = group.single_entity(
+            UpdateTaskTemplateAction, service.update_task_template
+        )
+        self.delete_task = group.single_entity(
+            DeleteTaskTemplateAction, service.delete_task_template
+        )
 
-        self.create_cluster = ActionProcessor(service.create_cluster_template, action_monitors)
-        self.list_cluster = ActionProcessor(service.list_cluster_templates, action_monitors)
-        self.get_cluster = ActionProcessor(service.get_cluster_template, action_monitors)
-        self.update_cluster = ActionProcessor(service.update_cluster_template, action_monitors)
-        self.delete_cluster = ActionProcessor(service.delete_cluster_template, action_monitors)
+        self.create_cluster = group.scope(
+            CreateClusterTemplateAction, service.create_cluster_template
+        )
+        self.list_cluster = group.scope(ListClusterTemplatesAction, service.list_cluster_templates)
+        self.get_cluster = group.single_entity(
+            GetClusterTemplateAction, service.get_cluster_template
+        )
+        self.update_cluster = group.single_entity(
+            UpdateClusterTemplateAction, service.update_cluster_template
+        )
+        self.delete_cluster = group.single_entity(
+            DeleteClusterTemplateAction, service.delete_cluster_template
+        )

@@ -17,7 +17,6 @@ def _make_monitoring_input() -> MonitoringInput:
         local_config={"key": "value"},
         allowed_plugins={"plugin_a"},
         disabled_plugins={"plugin_b"},
-        error_log_repository=MagicMock(),
     )
 
 
@@ -43,7 +42,6 @@ class TestErrorMonitorDependency:
                 monitoring_input.etcd, monitoring_input.local_config
             )
             mock_ctx.init.assert_called_once_with(
-                context={"error_log_repository": monitoring_input.error_log_repository},
                 allowlist=monitoring_input.allowed_plugins,
             )
 

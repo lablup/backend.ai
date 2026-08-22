@@ -6,9 +6,9 @@ from typing import override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,

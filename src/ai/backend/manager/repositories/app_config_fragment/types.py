@@ -9,16 +9,23 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.entity.app_config import AppConfigScopeID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UserNotFound
-from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.manager.errors.resource import DomainNotFound
+from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
 
-__all__ = ("AppConfigFragmentOperationScope",)
+__all__ = (
+    "AppConfigFragmentOperationScope",
+    "PublicAppConfigFragmentOperationScope",
+    "VisibleAppConfigFragmentOperationScope",
+)
 
 
 @dataclass(frozen=True)
@@ -72,3 +79,48 @@ class AppConfigFragmentOperationScope(OperationScope):
                         error=UserNotFound(extra_data={"user_id": str(self.scope_id)}),
                     ),
                 ]
+
+
+@dataclass(frozen=True)
+class VisibleAppConfigFragmentOperationScope(OperationScope):
+    """Everything one signed-in user may read: ``public``, their domain's, and their own.
+
+    One scope rather than three the caller ORs together, so no call site can read the
+    merge with a part of the rule missing.
+    """
+
+    user_id: UserID
+    domain_id: DomainID
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        visibilities = [
+            AppConfigFragmentConditions.by_public_visibility(),
+            AppConfigFragmentConditions.by_user_visibility(self.user_id),
+            AppConfigFragmentConditions.by_domain_visibility(self.domain_id),
+        ]
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.or_(*(visibility() for visibility in visibilities))
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        # Both ids come from the session, and the RBAC gate already answered for them.
+        return ()
+
+
+@dataclass(frozen=True)
+class PublicAppConfigFragmentOperationScope(OperationScope):
+    """What a caller may read before signing in — ``public`` alone."""
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        return AppConfigFragmentConditions.by_public_visibility()
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return ()

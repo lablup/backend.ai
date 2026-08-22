@@ -71,9 +71,7 @@ class StreamService:
     async def get_streaming_session(
         self, action: GetStreamingSessionAction
     ) -> GetStreamingSessionActionResult:
-        session = await self._repository.get_streaming_session(
-            action.session_name, action.user_uuid
-        )
+        session = await self._repository.get_streaming_session(action.session_id)
         kernel = session.main_kernel
         return GetStreamingSessionActionResult(
             session_id=session.id,
@@ -86,9 +84,7 @@ class StreamService:
         )
 
     async def execute_in_stream(self, action: ExecuteInStreamAction) -> ExecuteInStreamActionResult:
-        session = await self._repository.get_streaming_session(
-            action.session_name, action.user_uuid
-        )
+        session = await self._repository.get_streaming_session(action.session_id)
         result = await self._registry.execute(
             session,
             action.api_version,
@@ -111,18 +107,14 @@ class StreamService:
     async def interrupt_in_stream(
         self, action: InterruptInStreamAction
     ) -> InterruptInStreamActionResult:
-        session = await self._repository.get_streaming_session(
-            action.session_name, action.user_uuid
-        )
+        session = await self._repository.get_streaming_session(action.session_id)
         result = await self._registry.interrupt_session(session)
         return InterruptInStreamActionResult(result=dict(result))
 
     async def start_service_in_stream(
         self, action: StartServiceInStreamAction
     ) -> StartServiceInStreamActionResult:
-        session = await self._repository.get_streaming_session(
-            action.session_name, action.user_uuid
-        )
+        session = await self._repository.get_streaming_session(action.session_id)
         main_kernel = session.main_kernel
         if main_kernel.agent is None:
             raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")

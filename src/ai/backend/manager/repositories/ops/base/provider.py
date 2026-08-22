@@ -15,9 +15,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.types import EntityID
 from ai.backend.manager.errors.repository import (
-    AmbiguousEntityKeyError,
     EmptyOperationScopeError,
     EntityNotFoundError,
 )
@@ -35,7 +34,6 @@ from ai.backend.manager.repositories.base import (
     BulkCreatorResult,
     BulkCreatorResultWithFailures,
     BulkPurgerResultWithFailures,
-    BulkResultWithFailures,
     BulkUpdaterResult,
     BulkUpserter,
     BulkUpserterError,
@@ -46,12 +44,11 @@ from ai.backend.manager.repositories.base import (
     DataBatchPurger,
     DataBatchUpdater,
     DataCreator,
-    DataLookup,
     DataPurger,
-    DataQuerier,
     DataUpdater,
     DataUpserter,
     DependentCreatorSpec,
+    LegacyBulkResultWithFailures,
     NextValuePolicy,
     Purger,
     PurgerResult,
@@ -121,44 +118,6 @@ class ReadOps:
     async def query[TRow: Base](self, querier: Querier[TRow]) -> QuerierResult[TRow] | None:
         """Fetch a single row by primary key."""
         return await execute_querier(self._sess, querier)
-
-    async def query_data[TRow: Base, TData](
-        self, querier: DataQuerier[TRow, TData]
-    ) -> TData | None:
-        """Fetch a single row by primary key and return it as its ``data/`` type.
-
-        Converting counterpart of :meth:`query`, mirroring what :meth:`search_with_scopes`
-        does for lists: the querier carries its own conversion, so the ORM row is
-        consumed here and never reaches the caller.
-        """
-        result = await execute_querier(
-            self._sess, Querier(row_class=querier.row_class(), pk_value=querier.pk_value())
-        )
-        if result is None:
-            return None
-        return querier.to_data(result.row)
-
-    async def lookup_data[TRow: Base, TData](self, lookup: DataLookup[TRow, TData]) -> TData | None:
-        """Fetch one row by a key that is not its primary key, as its ``data/`` type.
-
-        Reads at most two rows and rejects the second: a lookup key is expected to be
-        unique, so more than one match means the conditions are wrong or the constraint
-        that should enforce it is missing. Answering with an arbitrary one would hide
-        both. No count is computed, unlike the search path.
-        """
-        row_class = lookup.row_class()
-        query = sa.select(row_class)
-        for condition in lookup.conditions():
-            query = query.where(condition())
-        result = await self._sess.execute(query.limit(2))
-        rows = result.scalars().all()
-        if not rows:
-            return None
-        if len(rows) > 1:
-            raise AmbiguousEntityKeyError(
-                f"The given key matches more than one {row_class.__name__}"
-            )
-        return lookup.to_data(rows[0])
 
     async def batch_query_in_global(
         self,
@@ -256,7 +215,7 @@ class WriteOps(ReadOps):
     ) -> TData | None:
         """Update a single row by primary key and return it as its ``data/`` type."""
         result = await execute_updater(
-            self._sess, Updater(spec=updater, pk_value=updater.pk_value())
+            self._sess, Updater(spec=updater, pk_value=updater.target_id_value())
         )
         if result is None:
             return None
@@ -284,7 +243,7 @@ class WriteOps(ReadOps):
 
     async def bulk_update_data[TRow: Base, TData](
         self, updaters: Mapping[EntityID, DataUpdater[TRow, TData]]
-    ) -> BulkResultWithFailures[TData]:
+    ) -> LegacyBulkResultWithFailures[TData]:
         """Update each named entity independently, reporting per entity.
 
         Each row is written inside its own savepoint, so one failure rolls back only
@@ -303,20 +262,20 @@ class WriteOps(ReadOps):
             try:
                 async with self._sess.begin_nested():
                     result = await execute_updater(
-                        self._sess, Updater(spec=updater, pk_value=updater.pk_value())
+                        self._sess, Updater(spec=updater, pk_value=updater.target_id_value())
                     )
                     if result is None:
                         raise EntityNotFoundError(
-                            f"{updater.row_class.__name__} {updater.pk_value()} not found"
+                            f"{updater.row_class.__name__} {updater.target_id_value()} not found"
                         )
                     successes[entity_id] = updater.to_data(result.row)
             except Exception as e:
                 errors[entity_id] = e
-        return BulkResultWithFailures(successes=successes, errors=errors)
+        return LegacyBulkResultWithFailures(successes=successes, errors=errors)
 
     async def bulk_purge_data[TRow: Base, TData](
         self, purgers: Mapping[EntityID, DataPurger[TRow, TData]]
-    ) -> BulkResultWithFailures[TData]:
+    ) -> LegacyBulkResultWithFailures[TData]:
         """Delete each named entity independently, reporting per entity.
 
         Same savepoint isolation and the same reason for the explicit loop as
@@ -335,7 +294,7 @@ class WriteOps(ReadOps):
                     successes[entity_id] = purger.to_data(result.row)
             except Exception as e:
                 errors[entity_id] = e
-        return BulkResultWithFailures(successes=successes, errors=errors)
+        return LegacyBulkResultWithFailures(successes=successes, errors=errors)
 
     async def batch_update_data[TRow: Base, TData](
         self, updater: DataBatchUpdater[TRow, TData]

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -13,10 +13,16 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
+from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
+from ai.backend.manager.actions.registry.types import (
+    GroupMeta,
+)
 from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
 )
@@ -30,14 +36,13 @@ from ai.backend.manager.api.rest.v2.deployment_revision_preset.registry import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
-    DeploymentRevisionPresetRepository,
+    DeploymentPresetRepository,
 )
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.services.deployment_revision_preset.processors import (
-    DeploymentRevisionPresetProcessors,
+    DeploymentPresetProcessors,
 )
 from ai.backend.manager.services.deployment_revision_preset.service import (
-    DeploymentRevisionPresetService,
+    DeploymentPresetService,
 )
 from ai.backend.manager.services.processors import Processors
 
@@ -61,20 +66,19 @@ async def _seed_resource_slot_types(db_engine: SAEngine) -> None:
 @pytest.fixture()
 def deployment_revision_preset_processors(
     database_engine: ExtendedAsyncSAEngine,
-) -> DeploymentRevisionPresetProcessors:
-    repo = DeploymentRevisionPresetRepository(DBOpsProvider(database_engine))
-    service = DeploymentRevisionPresetService(repo)
-    return DeploymentRevisionPresetProcessors(
-        service=service,
-        action_monitors=[],
-        validators=MagicMock(),
+    processor_registry: ProcessorRegistry[Any],
+) -> DeploymentPresetProcessors:
+    repo = DeploymentPresetRepository(V2DBOpsProvider(database_engine))
+    service = DeploymentPresetService(repo)
+    return DeploymentPresetProcessors(
+        processor_registry.group(GroupMeta(DEPLOYMENT_PRESET_ENTITY_TYPE)), service
     )
 
 
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    deployment_revision_preset_processors: DeploymentRevisionPresetProcessors,
+    deployment_revision_preset_processors: DeploymentPresetProcessors,
 ) -> list[RouteRegistry]:
     processors = MagicMock(spec=Processors)
     processors.deployment_revision_preset = deployment_revision_preset_processors

@@ -1,40 +1,46 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import UpdateSingleEntityOpsAction
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
+from ai.backend.manager.models.deployment_revision_preset.creators import (
+    PresetResourceSlotCreator,
+)
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.deployment_revision_preset.creators import (
-    PresetResourceSlotDependentCreatorSpec,
-)
-from ai.backend.manager.services.deployment_revision_preset.actions.base import (
-    DeploymentRevisionPresetAction,
-)
+from ai.backend.manager.models.deployment_revision_preset.updaters import DeploymentPresetUpdater
 
 
 @dataclass
-class UpdateDeploymentRevisionPresetAction(DeploymentRevisionPresetAction):
-    id: UUID
-    updater: Updater[DeploymentRevisionPresetRow]
-    resource_slot_specs: list[PresetResourceSlotDependentCreatorSpec] | None
+class UpdateDeploymentPresetAction(
+    UpdateSingleEntityOpsAction[DeploymentRevisionPresetRow, DeploymentRevisionPresetData]
+):
+    """Retune a preset, optionally restating the slot quantities it declares.
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.id)
+    ``slot_creators`` of ``None`` leaves the slots alone; a sequence replaces the whole
+    set, because a preset states its resources as one thing.
+    """
+
+    updater: DeploymentPresetUpdater
+    slot_creators: Sequence[PresetResourceSlotCreator] | None
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-@dataclass
-class UpdateDeploymentRevisionPresetActionResult(BaseActionResult):
-    preset: DeploymentRevisionPresetData
+    def action_name(cls) -> str:
+        return "update_deployment_preset"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.preset.id)
+    def entity_id(self) -> EntityIdentifier:
+        return self.preset_id
+
+    @property
+    def preset_id(self) -> DeploymentPresetID:
+        return self.updater.preset_id
+
+    @override
+    def to_updater(self) -> DeploymentPresetUpdater:
+        return self.updater

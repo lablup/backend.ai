@@ -19,9 +19,9 @@ from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot.conditions import ResourceSlotTypeConditions
 from ai.backend.manager.models.resource_slot.orders import ResourceSlotTypeOrders
+from ai.backend.manager.models.resource_slot.searchers import ResourceSlotTypeSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
-from ai.backend.manager.repositories.resource_slot.searchers import ResourceSlotTypeSearcher
 
 __all__ = ("ResourceSlotAdapter",)
 

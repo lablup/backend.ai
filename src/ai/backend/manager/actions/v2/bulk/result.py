@@ -3,14 +3,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from ai.backend.common.data.entity.action import ActionID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import ErrorCode
-from ai.backend.common.identifier.action import ActionID
-from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.types import OperationStatus
 
 __all__ = (
     "BulkEntityResult",
-    "BaseBulkActionResult",
+    "BasePartialBulkActionResult",
     "BulkActionResultMeta",
     "BulkActionProcessResult",
 )
@@ -20,13 +20,19 @@ __all__ = (
 class BulkEntityResult:
     """How one entity of a bulk run fared."""
 
-    entity_id: EntityID
+    entity_id: EntityIdentifier
     status: OperationStatus
     description: str
     error_code: ErrorCode | None
 
 
-class BaseBulkActionResult(ABC):
+class BasePartialBulkActionResult(ABC):
+    """The result of a run whose entities may not share one fate.
+
+    Only such a run has anything to report per entity; one that stands or falls as a
+    whole is judged by whether it raised, so it needs no result of this kind.
+    """
+
     @abstractmethod
     def entity_results(self) -> Sequence[BulkEntityResult]:
         """Return one result per entity in ``action.entity_ids()``.

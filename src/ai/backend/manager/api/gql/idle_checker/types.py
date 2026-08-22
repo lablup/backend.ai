@@ -10,6 +10,7 @@ from uuid import UUID
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.idle_checker.types import SESSION_ID_LABEL
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     CreateIdleCheckerInput as CreateIdleCheckerInputDTO,
@@ -53,7 +54,6 @@ from ai.backend.common.dto.manager.v2.idle_checker.response import (
 from ai.backend.common.dto.manager.v2.idle_checker.types import (
     CheckerTypeFilter as CheckerTypeFilterDTO,
 )
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter

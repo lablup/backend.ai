@@ -9,12 +9,12 @@ from datetime import datetime
 import sqlalchemy as sa
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.data.deployment.types import DeploymentLifecycleSubStep
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_correlated_exists, make_string_in_factory

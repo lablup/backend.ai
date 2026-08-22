@@ -8,16 +8,16 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.types import (
     ClusterMode,
@@ -98,7 +98,7 @@ from ai.backend.manager.types import OptionalState
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.deployment_revision_preset.repository import (
-        DeploymentRevisionPresetRepository,
+        DeploymentPresetRepository,
     )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -115,7 +115,7 @@ class DeploymentControllerArgs:
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
     revision_draft_reader: RevisionDraftReader
-    deployment_revision_preset_repository: "DeploymentRevisionPresetRepository | None"
+    deployment_revision_preset_repository: "DeploymentPresetRepository | None"
 
 
 class DeploymentController:
@@ -137,7 +137,7 @@ class DeploymentController:
     _event_producer: EventProducer
     _valkey_schedule: ValkeyScheduleClient
     _revision_draft_reader: RevisionDraftReader
-    _deployment_revision_preset_repository: "DeploymentRevisionPresetRepository | None"
+    _deployment_revision_preset_repository: "DeploymentPresetRepository | None"
     _deployment_revision_validator: DeploymentRevisionValidator
 
     def __init__(self, args: DeploymentControllerArgs) -> None:
@@ -693,7 +693,7 @@ class DeploymentController:
         architecture = image_identifier.architecture
         if not architecture:
             architecture = (
-                await self._deployment_repository.get_default_architecture_from_scaling_group(
+                await self._deployment_repository.get_default_architecture_from_resource_group(
                     resource_group
                 )
             )

@@ -12,6 +12,9 @@ from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.deployment import DeploymentClient
 from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     RouteTrafficStatus,
@@ -49,9 +52,6 @@ from ai.backend.common.dto.manager.deployment.request import (
     RevisionInput,
     UpdateRouteTrafficStatusRequest,
 )
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
 
 from .conftest import MockAuth

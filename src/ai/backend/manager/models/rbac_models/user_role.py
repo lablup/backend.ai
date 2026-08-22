@@ -9,6 +9,8 @@ from sqlalchemy.orm import (
     mapped_column,
 )
 
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentData,
     UserRoleAssignmentInput,
@@ -26,20 +28,20 @@ class UserRoleRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(
+    user_id: Mapped[UserID] = mapped_column(
         "user_id",
-        GUID,
+        GUID(UserID),
         sa.ForeignKey("users.uuid", ondelete="CASCADE"),
         nullable=False,
     )
-    role_id: Mapped[uuid.UUID] = mapped_column(
+    role_id: Mapped[RoleID] = mapped_column(
         "role_id",
-        GUID,
+        GUID(RoleID),
         sa.ForeignKey("roles.id", ondelete="CASCADE"),
         nullable=False,
     )
-    granted_by: Mapped[uuid.UUID | None] = mapped_column(
-        "granted_by", GUID, nullable=True
+    granted_by: Mapped[UserID | None] = mapped_column(
+        "granted_by", GUID(UserID), nullable=True
     )  # Null if granted by system
     granted_at: Mapped[datetime] = mapped_column(
         "granted_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()

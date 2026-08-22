@@ -27,6 +27,7 @@ from ai.backend.appproxy.coordinator.errors import InvalidCircuitStateError
 from ai.backend.appproxy.coordinator.models import Circuit
 from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     BulkCreateEndpointRequest,
     BulkDeleteEndpointRequest,
@@ -47,7 +48,6 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     SessionTagsModel,
     TagsModel,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import BackendAISchema
 
 from .types import StubResponseModel

@@ -9,8 +9,8 @@ from ai.backend.common.dto.manager.v2.storage_host.response import (
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.services.vfolder.actions.get_my_storage_host_permissions import (
-    GetMyStorageHostPermissionsAction,
+from ai.backend.manager.services.vfolder.actions.search_storage_host_permissions import (
+    SearchStorageHostPermissionsAction,
     StorageHostPermissionEntry,
 )
 
@@ -27,8 +27,8 @@ class StorageHostAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        result = await self._processors.vfolder.get_my_storage_host_permissions.wait_for_complete(
-            GetMyStorageHostPermissionsAction(
+        result = await self._processors.vfolder.search_storage_host_permissions.run(
+            SearchStorageHostPermissionsAction(
                 user_uuid=me.user_id,
                 domain_name=me.domain_name,
             )

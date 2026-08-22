@@ -6,6 +6,9 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
+from ai.backend.common.data.entity.resource_policy import (
+    UserResourcePolicyUUID,
+)
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
@@ -67,6 +70,7 @@ def mock_user_resource_policy_repository() -> AsyncMock:
     mock_repo = AsyncMock(spec=UserResourcePolicyRepository)
     # Default: policy with no concurrent login limit (unlimited)
     mock_repo.get_by_name.return_value = UserResourcePolicyData(
+        uuid=UserResourcePolicyUUID(uuid4()),
         name="default",
         max_vfolder_count=10,
         max_quota_scope_size=0,
@@ -120,18 +124,15 @@ def _make_mock_user(
     return mock_user
 
 
-def _make_mock_keypair_row(
+def _make_mock_keypair(
     *,
     access_key: str = "test_access_key",
     secret_key: str = "test_secret_key",
-    max_concurrent_sessions: int = 1,
 ) -> MagicMock:
-    """Create a mock keypair row with access_key, secret_key, and mapping."""
+    """The keypair data the repository answers a default-keypair read with."""
     mock_keypair = MagicMock()
     mock_keypair.access_key = access_key
     mock_keypair.secret_key = secret_key
-    mock_keypair.mapping = {"access_key": access_key}
-    mock_keypair.resource_policy_row.max_concurrent_sessions = max_concurrent_sessions
     return mock_keypair
 
 
@@ -145,7 +146,7 @@ def setup_successful_auth(
 
     The authorize flow calls:
       1. _verify_user: dispatch AUTHORIZE hook, then verify_credential
-      2. _post_check: user status checks, get_user_row_by_uuid, dispatch POST_AUTHORIZE hook,
+      2. _post_check: user status checks, default keypair read, dispatch POST_AUTHORIZE hook,
          Valkey cross-check of active sessions
       3. _create_login_session: create_login_session in DB, set_login_session in Valkey
     """
@@ -162,10 +163,8 @@ def setup_successful_auth(
         active_sessions=[],
     )
 
-    # Step 2: get_user_row_by_uuid returns a user row with a default keypair
-    mock_user_row = MagicMock()
-    mock_user_row.get_default_keypair_row.return_value = _make_mock_keypair_row()
-    mock_auth_repository.get_user_row_by_uuid.return_value = mock_user_row
+    # Step 2: the repository answers with the user's default keypair
+    mock_auth_repository.default_keypair.return_value = _make_mock_keypair()
 
     # Step 3: create_login_session returns the session token
     mock_auth_repository.create_login_session.return_value = LoginSessionCreationResult(
@@ -284,13 +283,10 @@ async def test_authorize_with_hook_authorization(
     # When hook provides user, _verify_user calls get_active_session_tokens
     mock_auth_repository.get_active_session_tokens.return_value = []
 
-    # Mock user row with keypair
-    mock_user_row = MagicMock()
-    mock_user_row.get_default_keypair_row.return_value = _make_mock_keypair_row(
+    mock_auth_repository.default_keypair.return_value = _make_mock_keypair(
         access_key="hook_access_key",
         secret_key="hook_secret_key",
     )
-    mock_auth_repository.get_user_row_by_uuid.return_value = mock_user_row
 
     # create_login_session returns session token
     mock_auth_repository.create_login_session.return_value = LoginSessionCreationResult(
@@ -374,9 +370,7 @@ async def test_authorize_with_post_hook_response(
     )
 
     # Mock user row with keypair (needed for _post_check)
-    mock_user_row = MagicMock()
-    mock_user_row.get_default_keypair_row.return_value = _make_mock_keypair_row()
-    mock_auth_repository.get_user_row_by_uuid.return_value = mock_user_row
+    mock_auth_repository.default_keypair.return_value = _make_mock_keypair()
 
     # First hook (AUTHORIZE) passes normally
     # Second hook (POST_AUTHORIZE) returns a stream response
@@ -423,9 +417,7 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
     )
 
     # Mock user row with keypair
-    mock_user_row = MagicMock()
-    mock_user_row.get_default_keypair_row.return_value = _make_mock_keypair_row()
-    mock_auth_repository.get_user_row_by_uuid.return_value = mock_user_row
+    mock_auth_repository.default_keypair.return_value = _make_mock_keypair()
 
     # Both hooks pass
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
@@ -472,6 +464,7 @@ async def test_authorize_force_invalidates_existing_sessions(
 
     # Set max_concurrent_logins=1 so that the one live session triggers force-eviction.
     mock_user_resource_policy_repository.get_by_name.return_value = UserResourcePolicyData(
+        uuid=UserResourcePolicyUUID(uuid4()),
         name="default",
         max_vfolder_count=10,
         max_quota_scope_size=0,
@@ -493,9 +486,7 @@ async def test_authorize_force_invalidates_existing_sessions(
     )
 
     # Mock user row with keypair
-    mock_user_row = MagicMock()
-    mock_user_row.get_default_keypair_row.return_value = _make_mock_keypair_row()
-    mock_auth_repository.get_user_row_by_uuid.return_value = mock_user_row
+    mock_auth_repository.default_keypair.return_value = _make_mock_keypair()
 
     # Both hooks pass
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
@@ -554,7 +545,7 @@ async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_rep
             otp=None,
         ),
         user=_make_mock_user(),
-        keypair_row=_make_mock_keypair_row(),
+        keypair=_make_mock_keypair(),
         live_sessions=[],
         auth_config=AuthConfig(
             max_password_age=timedelta(days=90),

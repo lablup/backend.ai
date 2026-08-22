@@ -5,6 +5,8 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
@@ -12,8 +14,6 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardAccessLevel,
     ModelCardOrderField,
 )
-from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 
 
 class ResourceSlotEntryInput(BaseRequestModel):

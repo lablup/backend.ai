@@ -7,11 +7,11 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
 from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId
 
 __all__ = (

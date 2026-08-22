@@ -6,13 +6,13 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     CreateIdleCheckerInput,
     PurgeIdleCheckerInput,
     SearchIdleCheckersInput,
     UpdateIdleCheckerInput,
 )
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.manager.api.rest.v2.path_params import IdleCheckerIdPathParam
 
 if TYPE_CHECKING:

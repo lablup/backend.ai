@@ -32,6 +32,25 @@ class ActionKind(enum.StrEnum):
     UNKNOWN = "unknown"
 
 
+class ActionGate(enum.StrEnum):
+    """Who a wired processor lets through, orthogonal to :class:`ActionKind`."""
+
+    ANONYMOUS = "anonymous"
+    # Every authenticated caller, whatever their roles.
+    PUBLIC = "public"
+    # Checked against the caller's permissions; ``ActionKind`` says where.
+    PERMISSION = "permission"
+
+
+class ActionBacking(enum.StrEnum):
+    """What runs a wired processor's operation."""
+
+    # A generic service over the repository's ops, driven by the spec on the action.
+    OPS = "ops"
+    # A method the domain wrote.
+    SERVICE = "service"
+
+
 class ActionOperationType(enum.StrEnum):
     GET = "get"
     SEARCH = "search"
@@ -104,7 +123,11 @@ class ActionOperationType(enum.StrEnum):
 
 
 @dataclass
+@dataclass(frozen=True)
 class ActionSpec:
+    """Legacy actions' (entity, operation) pair. The v2 bases carry an action_name
+    instead, which is declared rather than composed."""
+
     entity_type: EntityType
     operation_type: ActionOperationType
 

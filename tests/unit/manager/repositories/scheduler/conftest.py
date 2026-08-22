@@ -18,15 +18,24 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.session_group import SessionGroupID
+from ai.backend.common.events.event_types.kernel.types import (
+    KernelCreationInfo,
+    UsedDevice,
+    UsedDevices,
+)
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
+    ContainerId,
     DefaultForUnspecified,
+    DeviceId,
+    DeviceName,
     KernelId,
     ResourceSlot,
     SecretKey,
@@ -41,16 +50,17 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import (
     AssociationScopesEntitiesRow,
     EntityFieldRow,
     RoleRow,
     UserRoleRow,
 )
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -58,7 +68,6 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
@@ -68,14 +77,13 @@ from ai.backend.manager.views.sokovan.allocation import (
     KernelAllocation,
     SessionAllocation,
 )
-from ai.backend.manager.views.sokovan.lifecycle import KernelCreationInfo
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 # Tables required to satisfy FK constraints for ScheduleDBSource, in dependency order.
 _SCHEDULER_ROWS: list[type] = [
     DomainRow,
-    ScalingGroupRow,
+    ResourceGroupRow,
     UserResourcePolicyRow,
     ProjectResourcePolicyRow,
     KeyPairResourcePolicyRow,
@@ -83,7 +91,7 @@ _SCHEDULER_ROWS: list[type] = [
     UserRoleRow,
     UserRow,
     KeyPairRow,
-    GroupRow,
+    ProjectRow,
     AssociationScopesEntitiesRow,
     EntityFieldRow,
     AgentRow,
@@ -150,12 +158,12 @@ async def test_scaling_group_name(
     sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
-            ScalingGroupRow(
+            ResourceGroupRow(
                 id=test_scaling_group_id,
                 name=sg_name,
                 driver="static",
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(
+                scheduler_opts=ResourceGroupOpts(
                     allowed_session_types=[],
                     pending_timeout=timedelta(hours=1),
                     config={},
@@ -264,7 +272,6 @@ async def test_access_key(
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
             KeyPairRow(
-                user_id=f"test-user-{uuid.uuid4().hex[:8]}@test.com",
                 access_key=access_key,
                 secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
                 is_active=True,
@@ -288,7 +295,7 @@ async def test_group_id(
     group_id = uuid.uuid4()
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
-            GroupRow(
+            ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group",
@@ -345,19 +352,33 @@ async def resource_slot_types(
 
 
 def make_creation_info(cpu: str = "2", mem: str = "4096") -> KernelCreationInfo:
-    """Build a KernelCreationInfo whose get_resource_allocations() returns the given slots."""
+    """Build a KernelCreationInfo whose used devices aggregate to the given slots."""
     return KernelCreationInfo(
-        container_id=f"container-{uuid.uuid4().hex[:8]}",
-        resource_spec={
-            "allocations": {
-                "cpu": {"cpu": {"0": cpu}},
-                "mem": {"mem": {"0": mem}},
-            },
-        },
+        container_id=ContainerId(f"container-{uuid.uuid4().hex[:8]}"),
+        kernel_host="127.0.0.1",
         repl_in_port=2001,
         repl_out_port=2002,
-        stdin_port=2003,
-        stdout_port=2004,
+        service_ports=[],
+        used_devices=UsedDevices(
+            units={
+                DeviceName("cpu"): {
+                    DeviceId("0"): UsedDevice(
+                        model_name=None,
+                        used={ResourceSlotName("cpu"): Decimal(cpu)},
+                        processing_units=None,
+                        memory_size=None,
+                    )
+                },
+                DeviceName("mem"): {
+                    DeviceId("0"): UsedDevice(
+                        model_name=None,
+                        used={ResourceSlotName("mem"): Decimal(mem)},
+                        processing_units=None,
+                        memory_size=None,
+                    )
+                },
+            }
+        ),
     )
 
 
@@ -396,7 +417,7 @@ async def create_pending_session_with_kernels(
     domain_id: DomainID,
     domain_name: str,
     resource_group_id: ResourceGroupID,
-    scaling_group_name: str,
+    resource_group_name: str,
     group_id: uuid.UUID,
     user_uuid: uuid.UUID,
     access_key: AccessKey,
@@ -441,7 +462,7 @@ async def create_pending_session_with_kernels(
                 user_uuid=user_uuid,
                 access_key=access_key,
                 resource_group_id=resource_group_id,
-                scaling_group_name=scaling_group_name,
+                scaling_group_name=resource_group_name,
                 status=session_status,
                 status_info="test",
                 job_priority=job_priority,
@@ -469,7 +490,7 @@ async def create_pending_session_with_kernels(
                     session_id=session_id,
                     agent=agent_id if assign_agents else None,
                     agent_addr="127.0.0.1:6001" if assign_agents else None,
-                    scaling_group=scaling_group_name,
+                    scaling_group=resource_group_name,
                     resource_group_id=resource_group_id,
                     cluster_idx=idx,
                     cluster_role="main" if idx == 0 else "sub",

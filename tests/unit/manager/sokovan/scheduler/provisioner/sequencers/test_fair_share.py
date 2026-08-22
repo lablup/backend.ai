@@ -7,7 +7,7 @@ from collections.abc import Callable
 from decimal import Decimal
 from unittest.mock import AsyncMock
 
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.fair_share import ProjectUserIds, UserFairShareFactors
 from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.fair_share import (
     FairShareSequencer,

@@ -3,10 +3,9 @@ from __future__ import annotations
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.entity.types import ScopeType
+from ai.backend.common.data.entity.types import ScopeID, ScopeType
+from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
 from ai.backend.common.data.permission.virtual_scope import VirtualScopeData
-from ai.backend.common.identifier.scope import ScopeID
-from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.manager.models.base import (
     GUID,
     Base,

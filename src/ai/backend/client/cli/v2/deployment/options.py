@@ -21,7 +21,7 @@ def options() -> None:
 @click.argument("deployment_id", type=str)
 def get_options(deployment_id: str) -> None:
     """Show the current options surface of a deployment."""
-    from ai.backend.common.identifier.deployment import DeploymentID
+    from ai.backend.common.data.entity.deployment import DeploymentID
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -146,7 +146,7 @@ def replace_options(
             ),
         )
 
-    from ai.backend.common.identifier.deployment import DeploymentID
+    from ai.backend.common.data.entity.deployment import DeploymentID
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())

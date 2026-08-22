@@ -7,10 +7,10 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import PageInfo
 
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     SearchAppConfigDefinitionsInput,
 )
-from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,

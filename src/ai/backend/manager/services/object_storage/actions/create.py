@@ -1,32 +1,32 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.models.object_storage import ObjectStorageRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.object_storage.actions.base import ObjectStorageAction
+from ai.backend.manager.models.object_storage.creators import ObjectStorageCreator
+from ai.backend.manager.models.object_storage.row import ObjectStorageRow
 
 
 @dataclass
-class CreateObjectStorageAction(ObjectStorageAction):
-    creator: Creator[ObjectStorageRow]
+class CreateObjectStorageAction(CreateGlobalOpsAction[ObjectStorageRow, ObjectStorageData]):
+    """Register an object storage."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    creator: ObjectStorageCreator
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-
-@dataclass
-class CreateObjectStorageActionResult(BaseActionResult):
-    result: ObjectStorageData
+    def entity_type(cls) -> EntityType:
+        return OBJECT_STORAGE_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.result.id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_object_storage"
+
+    @override
+    def to_creator(self) -> ObjectStorageCreator:
+        return self.creator

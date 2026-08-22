@@ -90,7 +90,7 @@ class TestDeleteConfigRequest:
         assert req.prefix is True
 
 
-# --- scaling_group requests ---
+# --- resource_group requests ---
 
 
 class TestListScalingGroupsRequest:

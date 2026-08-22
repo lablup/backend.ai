@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 
 
 @dataclass

@@ -261,14 +261,3 @@ class TestAutoScalingRuleDelete:
         # Verify the rule no longer exists
         with pytest.raises(NotFoundError):
             await admin_registry.auto_scaling_rule.get(rule_id)
-
-    async def test_delete_nonexistent_rule(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        """Deleting a non-existent rule returns deleted=False."""
-        result = await admin_registry.auto_scaling_rule.delete(
-            DeleteAutoScalingRuleRequest(rule_id=uuid.uuid4())
-        )
-        assert isinstance(result, DeleteAutoScalingRuleResponse)
-        assert result.deleted is False

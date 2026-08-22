@@ -4,28 +4,48 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.model_card import ModelCardID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
-from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
-from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 
 __all__ = (
     "AvailablePresetsSearchResult",
-    "ModelCardSearchResult",
+    "ModelCardResourceRequirementOperationScope",
     "ProjectModelCardOperationScope",
     "VFolderModelCardOperationScope",
 )
+
+
+@dataclass
+class ModelCardResourceRequirementOperationScope(OperationScope):
+    """The minimum quantities one card declares."""
+
+    model_card_id: ModelCardID
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        model_card_id = self.model_card_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ModelCardResourceRequirementRow.model_card_id == model_card_id
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return ()
 
 
 @dataclass
@@ -38,26 +58,11 @@ class AvailablePresetsSearchResult:
     has_previous_page: bool
 
 
-@dataclass
-class ModelCardSearchResult:
-    """Result from searching model cards."""
-
-    items: list[ModelCardData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-
 @dataclass(frozen=True)
 class ProjectModelCardOperationScope(OperationScope):
-    """Scope for searching model cards within a MODEL_STORE project.
-
-    Includes user_id for membership validation — only project members
-    can search model cards in the project.
-    """
+    """Scope for searching model cards within a MODEL_STORE project."""
 
     project_id: UUID
-    user_id: UUID
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -73,18 +78,11 @@ class ProjectModelCardOperationScope(OperationScope):
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         return [
             ExistenceCheck(
-                column=GroupRow.id,
+                column=ProjectRow.id,
                 value=self.project_id,
                 error=ProjectNotFound(str(self.project_id)),
             ),
         ]
-
-    @property
-    def membership_check_query(self) -> sa.Select[tuple[bool]]:
-        """Query to validate user is a member of this project."""
-        return sa.select(
-            user_scope_membership_exists(PROJECT_SCOPE_TYPE, self.project_id, self.user_id)
-        )
 
 
 @dataclass(frozen=True)

@@ -5,169 +5,33 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
 from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound, ScalingGroupNotFound
+from ai.backend.manager.data.resource_usage_history.types import (
+    DomainUsageBucketData,
+    KernelUsageRecordData,
+    ProjectUsageBucketData,
+    UserUsageBucketData,
+)
+from ai.backend.manager.errors.resource import (
+    DomainNotFound,
+    ProjectNotFound,
+    ResourceGroupNotFound,
+)
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
-    KernelUsageRecordRow,
     ProjectUsageBucketRow,
     UserUsageBucketRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
-
-
-@dataclass(frozen=True)
-class KernelUsageRecordData:
-    """Kernel usage record data (per-period usage slice)."""
-
-    id: uuid.UUID
-    kernel_id: uuid.UUID
-    session_id: uuid.UUID
-    user_uuid: uuid.UUID
-    project_id: uuid.UUID
-    domain_name: str
-    resource_group: str
-    resource_group_id: ResourceGroupID
-    period_start: datetime
-    period_end: datetime
-    resource_usage: ResourceSlot
-
-    @classmethod
-    def from_row(cls, row: KernelUsageRecordRow) -> KernelUsageRecordData:
-        """Create KernelUsageRecordData from a KernelUsageRecordRow."""
-        return cls(
-            id=row.id,
-            kernel_id=row.kernel_id,
-            session_id=row.session_id,
-            user_uuid=row.user_uuid,
-            project_id=row.project_id,
-            domain_name=row.domain_name,
-            resource_group=row.resource_group,
-            resource_group_id=row.resource_group_id,
-            period_start=row.period_start,
-            period_end=row.period_end,
-            resource_usage=row.resource_usage,
-        )
-
-
-@dataclass(frozen=True)
-class DomainUsageBucketData:
-    """Domain usage bucket data (period-based aggregation)."""
-
-    id: uuid.UUID
-    domain_name: str
-    resource_group: str
-    resource_group_id: ResourceGroupID
-    period_start: date
-    period_end: date
-    decay_unit_days: int
-    resource_usage: ResourceSlot
-    capacity_snapshot: ResourceSlot
-    created_at: datetime
-    updated_at: datetime
-
-    @classmethod
-    def from_row(cls, row: DomainUsageBucketRow) -> DomainUsageBucketData:
-        """Create DomainUsageBucketData from a DomainUsageBucketRow."""
-        return cls(
-            id=row.id,
-            domain_name=row.domain_name,
-            resource_group=row.resource_group,
-            resource_group_id=row.resource_group_id,
-            period_start=row.period_start,
-            period_end=row.period_end,
-            decay_unit_days=row.decay_unit_days,
-            resource_usage=row.resource_usage,
-            capacity_snapshot=row.capacity_snapshot,
-            created_at=row.created_at,
-            updated_at=row.updated_at,
-        )
-
-
-@dataclass(frozen=True)
-class ProjectUsageBucketData:
-    """Project usage bucket data (period-based aggregation)."""
-
-    id: uuid.UUID
-    project_id: uuid.UUID
-    domain_name: str
-    resource_group: str
-    resource_group_id: ResourceGroupID
-    period_start: date
-    period_end: date
-    decay_unit_days: int
-    resource_usage: ResourceSlot
-    capacity_snapshot: ResourceSlot
-    created_at: datetime
-    updated_at: datetime
-
-    @classmethod
-    def from_row(cls, row: ProjectUsageBucketRow) -> ProjectUsageBucketData:
-        """Create ProjectUsageBucketData from a ProjectUsageBucketRow."""
-        return cls(
-            id=row.id,
-            project_id=row.project_id,
-            domain_name=row.domain_name,
-            resource_group=row.resource_group,
-            resource_group_id=row.resource_group_id,
-            period_start=row.period_start,
-            period_end=row.period_end,
-            decay_unit_days=row.decay_unit_days,
-            resource_usage=row.resource_usage,
-            capacity_snapshot=row.capacity_snapshot,
-            created_at=row.created_at,
-            updated_at=row.updated_at,
-        )
-
-
-@dataclass(frozen=True)
-class UserUsageBucketData:
-    """User usage bucket data (period-based aggregation)."""
-
-    id: uuid.UUID
-    user_uuid: uuid.UUID
-    project_id: uuid.UUID
-    domain_name: str
-    resource_group: str
-    resource_group_id: ResourceGroupID
-    period_start: date
-    period_end: date
-    decay_unit_days: int
-    resource_usage: ResourceSlot
-    capacity_snapshot: ResourceSlot
-    created_at: datetime
-    updated_at: datetime
-
-    @classmethod
-    def from_row(cls, row: UserUsageBucketRow) -> UserUsageBucketData:
-        """Create UserUsageBucketData from a UserUsageBucketRow."""
-        return cls(
-            id=row.id,
-            user_uuid=row.user_uuid,
-            project_id=row.project_id,
-            domain_name=row.domain_name,
-            resource_group=row.resource_group,
-            resource_group_id=row.resource_group_id,
-            period_start=row.period_start,
-            period_end=row.period_end,
-            decay_unit_days=row.decay_unit_days,
-            resource_usage=row.resource_usage,
-            capacity_snapshot=row.capacity_snapshot,
-            created_at=row.created_at,
-            updated_at=row.updated_at,
-        )
 
 
 @dataclass(frozen=True)
@@ -238,9 +102,9 @@ class DomainUsageBucketOperationScope(OperationScope):
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(
-                column=ScalingGroupRow.name,
+                column=ResourceGroupRow.name,
                 value=self.resource_group,
-                error=ScalingGroupNotFound(self.resource_group),
+                error=ResourceGroupNotFound(self.resource_group),
             ),
             ExistenceCheck(
                 column=DomainRow.name,
@@ -278,9 +142,9 @@ class ProjectUsageBucketOperationScope(OperationScope):
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(
-                column=ScalingGroupRow.name,
+                column=ResourceGroupRow.name,
                 value=self.resource_group,
-                error=ScalingGroupNotFound(self.resource_group),
+                error=ResourceGroupNotFound(self.resource_group),
             ),
             ExistenceCheck(
                 column=DomainRow.name,
@@ -288,7 +152,7 @@ class ProjectUsageBucketOperationScope(OperationScope):
                 error=DomainNotFound(self.domain_name),
             ),
             ExistenceCheck(
-                column=GroupRow.id,
+                column=ProjectRow.id,
                 value=self.project_id,
                 error=ProjectNotFound(extra_data={"project_id": str(self.project_id)}),
             ),
@@ -326,9 +190,9 @@ class UserUsageBucketOperationScope(OperationScope):
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(
-                column=ScalingGroupRow.name,
+                column=ResourceGroupRow.name,
                 value=self.resource_group,
-                error=ScalingGroupNotFound(self.resource_group),
+                error=ResourceGroupNotFound(self.resource_group),
             ),
             ExistenceCheck(
                 column=DomainRow.name,
@@ -336,7 +200,7 @@ class UserUsageBucketOperationScope(OperationScope):
                 error=DomainNotFound(self.domain_name),
             ),
             ExistenceCheck(
-                column=GroupRow.id,
+                column=ProjectRow.id,
                 value=self.project_id,
                 error=ProjectNotFound(extra_data={"project_id": str(self.project_id)}),
             ),

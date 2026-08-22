@@ -29,7 +29,7 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.permission_controller.creators import (
@@ -64,7 +64,7 @@ ALL_OWNER_OPS = (
 _ORM_CLUSTER = (
     AgentRow,
     ImageRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
 )
 
 

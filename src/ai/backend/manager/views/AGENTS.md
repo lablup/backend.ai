@@ -11,5 +11,5 @@ coordinator / scheduling layer belongs here.
 ## Type rules
 
 - A plain `@dataclass` (no framework dependencies — no SQLAlchemy, Pydantic, aiohttp).
-- May import enums / identifiers from `data/` and `common/identifier/` (views sits above data).
+- May import enums / identifiers from `data/` and `common/data/entity/` (views sits above data).
 - No business-logic methods — pure containers.

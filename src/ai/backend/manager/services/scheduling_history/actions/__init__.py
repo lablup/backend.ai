@@ -5,10 +5,6 @@ from .global_search_replica_group_history import (
     GlobalSearchReplicaGroupHistoryAction,
     GlobalSearchReplicaGroupHistoryActionResult,
 )
-from .resolve_kernel_session import (
-    ResolveKernelSessionAction,
-    ResolveKernelSessionActionResult,
-)
 from .scoped_search_replica_group_history import (
     ScopedSearchReplicaGroupHistoryAction,
     ScopedSearchReplicaGroupHistoryActionResult,
@@ -47,8 +43,6 @@ from .search_session_scoped_history import (
 )
 
 __all__ = (
-    "ResolveKernelSessionAction",
-    "ResolveKernelSessionActionResult",
     "SchedulingHistoryAction",
     # Admin actions
     "SearchSessionHistoryAction",

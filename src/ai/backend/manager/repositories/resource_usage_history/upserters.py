@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, override
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,

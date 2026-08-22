@@ -18,12 +18,10 @@ def register_manager_api_routes(handler: ManagerHandler, route_deps: RouteDeps) 
 
     reg = RouteRegistry.create("manager", route_deps.cors_options)
 
-    # Public endpoints (no auth required)
-    reg.add("GET", "/status", handler.fetch_manager_status)
-    reg.add("GET", "/announcement", handler.get_announcement)
-    reg.add("GET", "/prom", handler.get_manager_status_for_prom)
-
     # Superadmin endpoints
+    reg.add("GET", "/status", handler.fetch_manager_status, middlewares=[superadmin_required])
+    reg.add("GET", "/announcement", handler.get_announcement, middlewares=[superadmin_required])
+    reg.add("GET", "/prom", handler.get_manager_status_for_prom, middlewares=[superadmin_required])
     reg.add("PUT", "/status", handler.update_manager_status, middlewares=[superadmin_required])
     reg.add(
         "POST",

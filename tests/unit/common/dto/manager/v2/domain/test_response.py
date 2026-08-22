@@ -6,6 +6,7 @@ import json
 import uuid
 from datetime import UTC, datetime
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.domain.response import (
     DeleteDomainPayload,
@@ -17,7 +18,6 @@ from ai.backend.common.dto.manager.v2.domain.response import (
     PurgeDomainPayload,
     SearchDomainsPayload,
 )
-from ai.backend.common.identifier.domain import DomainID
 
 
 def make_domain_node(name: str = "test-domain", domain_id: DomainID | None = None) -> DomainNode:

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.models.network.row import NetworkRow
 from ai.backend.manager.repositories.base import CreatorSpec
 
@@ -19,7 +19,7 @@ class NetworkCreatorSpec(CreatorSpec[NetworkRow]):
     ref_name: str
     driver: str
     domain_name: str
-    project_id: uuid.UUID
+    project_id: ProjectID
     options: Mapping[str, Any]
 
     @override

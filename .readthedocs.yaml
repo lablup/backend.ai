@@ -9,9 +9,10 @@ build:
     python: "3.12"
   jobs:
     post_checkout:
-      # Skip building the documentation if there are no changes in the docs/ directory
+      # Skip building the documentation if there are no changes in the docs/ directory.
+      # `docs/conf.py` also renders `API_VERSION`, so a bump to it must build a preview.
       - |
-        if [ "$READTHEDOCS_VERSION_TYPE" = "external" ] && git diff --quiet origin/main -- docs/ .readthedocs.yaml;
+        if [ "$READTHEDOCS_VERSION_TYPE" = "external" ] && git diff --quiet origin/main -- docs/ .readthedocs.yaml src/ai/backend/client/config.py;
         then
           exit 183;
         fi

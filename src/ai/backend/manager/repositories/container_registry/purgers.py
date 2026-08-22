@@ -9,9 +9,9 @@ from typing import override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.identifier.container_registry import ContainerRegistryID
-from ai.backend.common.identifier.project import ProjectID
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,

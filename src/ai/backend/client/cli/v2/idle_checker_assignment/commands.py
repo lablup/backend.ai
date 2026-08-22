@@ -132,10 +132,10 @@ def scoped_search(
 )
 def update(idle_checker_assignment_id: uuid.UUID, enabled: bool) -> None:
     """Update an idle checker assignment's enabled state by ID."""
+    from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID
     from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
         UpdateIdleCheckerAssignmentInput,
     )
-    from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())

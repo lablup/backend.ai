@@ -16,13 +16,13 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
-from ai.backend.common.identifier.domain import DomainName
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.identifier.session import SessionID
-from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.types import (
     MountInfoEntry,
     ResourceSlotEntry,

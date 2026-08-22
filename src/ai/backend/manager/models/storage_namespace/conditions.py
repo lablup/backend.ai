@@ -20,3 +20,10 @@ class StorageNamespaceConditions:
             return StorageNamespaceRow.id.in_(namespace_ids)
 
         return inner
+
+    @staticmethod
+    def by_storage_id(storage_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return StorageNamespaceRow.storage_id == storage_id
+
+        return inner

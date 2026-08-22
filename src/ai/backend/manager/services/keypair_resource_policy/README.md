@@ -11,8 +11,8 @@ The KeyPair Resource Policy service manages resource policies applied to API acc
    - Action: `ModifyKeyPairResourcePolicyAction`  
    - Result: `ModifyKeyPairResourcePolicyActionResult`  
 3. **Delete KeyPair Resource Policy** – Delete a policy  
-   - Action: `DeleteKeyPairResourcePolicyAction`  
-   - Result: `DeleteKeyPairResourcePolicyActionResult`  
+   - Action: `PurgeKeyPairResourcePolicyAction`  
+   - Result: `PurgeKeyPairResourcePolicyActionResult`  
 
 ## Operation Scenarios
 
@@ -54,10 +54,10 @@ result = await service.modify_keypair_resource_policy(action)
 ### Deleting a KeyPair Resource Policy
 
 ```python
-from ai.backend.manager.services.keypair_resource_policy.actions.delete_keypair_resource_policy import DeleteKeyPairResourcePolicyAction
+from ai.backend.manager.services.keypair_resource_policy.actions.purge_keypair_resource_policy import PurgeKeyPairResourcePolicyAction
 
 # Delete a policy
-action = DeleteKeyPairResourcePolicyAction(name="example-policy")
+action = PurgeKeyPairResourcePolicyAction(name="example-policy")
 result = await service.delete_keypair_resource_policy(action)
 ```
 
@@ -101,9 +101,9 @@ Built on Backend.AI's action framework with three main operations:
    - Accepts policy name and modifier object
    - Returns `ModifyKeyPairResourcePolicyActionResult` with updated policy
 
-3. **DeleteKeyPairResourcePolicyAction** (src/ai/backend/manager/services/keypair_resource_policy/actions/delete_keypair_resource_policy.py)
+3. **PurgeKeyPairResourcePolicyAction** (src/ai/backend/manager/services/keypair_resource_policy/actions/delete_keypair_resource_policy.py)
    - Requires only policy name for deletion
-   - Returns `DeleteKeyPairResourcePolicyActionResult` with deleted policy data
+   - Returns `PurgeKeyPairResourcePolicyActionResult` with deleted policy data
 
 All actions inherit from `KeypairResourcePolicyAction` base class and follow the standard action pattern with entity_id() and operation_type() methods.
 

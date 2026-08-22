@@ -1,15 +1,11 @@
-from .create import CreateCategoryAction, CreateCategoryActionResult
-from .delete import DeleteCategoryAction, DeleteCategoryActionResult
-from .get import GetCategoryAction, GetCategoryActionResult
-from .search import SearchCategoriesAction, SearchCategoriesActionResult
+from .create import CreateCategoryAction
+from .get import GetCategoryAction
+from .purge import PurgeCategoryAction
+from .search import SearchCategoriesAction
 
 __all__ = [
     "CreateCategoryAction",
-    "CreateCategoryActionResult",
-    "DeleteCategoryAction",
-    "DeleteCategoryActionResult",
     "GetCategoryAction",
-    "GetCategoryActionResult",
+    "PurgeCategoryAction",
     "SearchCategoriesAction",
-    "SearchCategoriesActionResult",
 ]

@@ -10,28 +10,32 @@ from ai.backend.manager.actions.types import BLANK_ID
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, LookupKey
 from ai.backend.manager.actions.v2.lookup.monitor.base import LookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.result import LookupActionProcessResult
-from ai.backend.manager.repositories.audit_log.creators import LookupAuditLogCreatorSpec
-from ai.backend.manager.repositories.audit_log.repository import AuditLogRepository
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.models.audit_log.creators import (
+    LookupAuditLogCreator,
+    MissedLookupAuditLogCreator,
+)
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = ("LookupActionAuditLogMonitor",)
 
 
 class LookupActionAuditLogMonitor(LookupActionMonitor):
-    """Persists an audit-log row for a lookup that did not resolve.
+    """Persists an audit-log row for a lookup.
 
-    A lookup has no entity id — producing one is what the run failed to do — so the
-    key it was looking for is what identifies the row, and ``entity_id`` stays NULL.
-    Putting the name in ``entity_id`` is the conflation these columns exist to undo.
+    The key is what identifies the row; ``entity_id`` carries what the key resolved to
+    and stays NULL when the run did not get that far — a denial on the resolved entity
+    still names it. Putting the key in ``entity_id`` is the conflation these columns
+    exist to undo.
 
     Successful lookups are not recorded by default, but that is not a special case: a
     lookup reads, so the ordinary rule for reads applies to it unchanged.
     """
 
-    _repository: AuditLogRepository
+    _repository: OpsRepository[AuditLogData]
     _policy: AuditLogPolicy
 
-    def __init__(self, repository: AuditLogRepository, policy: AuditLogPolicy) -> None:
+    def __init__(self, repository: OpsRepository[AuditLogData], policy: AuditLogPolicy) -> None:
         self._repository = repository
         self._policy = policy
 
@@ -42,15 +46,35 @@ class LookupActionAuditLogMonitor(LookupActionMonitor):
     @override
     async def done(self, action: BaseLookupAction, result: LookupActionProcessResult) -> None:
         meta = result.meta
-        if not self._policy.should_record(action.spec(), meta.status):
+        if not self._policy.should_record(action.operation_type(), meta.status):
             return
         key = action.lookup_key()
         trigger = triggered_user()
         acting = current_user()
-        creator = Creator(
-            spec=LookupAuditLogCreatorSpec(
+        if meta.entity_id is None:
+            # The key named nothing, so only the key itself identifies the row.
+            await self._repository.create_dangling_field(
+                action.entity_type(),
+                MissedLookupAuditLogCreator(
+                    action_id=meta.action_id,
+                    operation=action.operation_type(),
+                    action_name=action.action_name(),
+                    created_at=meta.started_at,
+                    description=meta.description,
+                    status=meta.status,
+                    lookup_kind=key.kind(),
+                    lookup_key=self._render_key(key),
+                    request_id=current_request_id() or BLANK_ID,
+                    triggered_by=str(trigger.user_id) if trigger else None,
+                    acted_as=acting.user_id if acting else None,
+                    duration=meta.duration,
+                ),
+            )
+            return
+        await self._repository.create_field(
+            meta.entity_id,
+            LookupAuditLogCreator(
                 action_id=meta.action_id,
-                entity_type=action.entity_type(),
                 operation=action.operation_type(),
                 action_name=action.action_name(),
                 created_at=meta.started_at,
@@ -62,9 +86,8 @@ class LookupActionAuditLogMonitor(LookupActionMonitor):
                 triggered_by=str(trigger.user_id) if trigger else None,
                 acted_as=acting.user_id if acting else None,
                 duration=meta.duration,
-            )
+            ),
         )
-        await self._repository.create(creator)
 
     def _render_key(self, key: LookupKey) -> str:
         """Render the key as one filterable string.

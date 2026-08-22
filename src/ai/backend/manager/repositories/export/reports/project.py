@@ -12,9 +12,9 @@ from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.resource_group import ResourceGroupForProjectRow, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow, ScalingGroupRow
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,
     ExportFieldType,
@@ -53,17 +53,17 @@ def _serialize_json(value: Any) -> str:
 # Resource Policy JOIN (N:1, no duplication)
 RESOURCE_POLICY_JOIN = JoinDef(
     table=ProjectResourcePolicyRow.__table__,
-    condition=GroupRow.resource_policy == ProjectResourcePolicyRow.name,
+    condition=ProjectRow.resource_policy == ProjectResourcePolicyRow.name,
 )
 
 # Scaling Group JOINs (1:N, causes duplication)
 SCALING_GROUP_FOR_PROJECT_JOIN = JoinDef(
-    table=ScalingGroupForProjectRow.__table__,
-    condition=GroupRow.id == ScalingGroupForProjectRow.group,
+    table=ResourceGroupForProjectRow.__table__,
+    condition=ProjectRow.id == ResourceGroupForProjectRow.group,
 )
 SCALING_GROUP_JOIN = JoinDef(
-    table=ScalingGroupRow.__table__,
-    condition=ScalingGroupForProjectRow.resource_group_id == ScalingGroupRow.id,
+    table=ResourceGroupRow.__table__,
+    condition=ResourceGroupForProjectRow.resource_group_id == ResourceGroupRow.id,
 )
 SCALING_GROUP_JOINS = (SCALING_GROUP_FOR_PROJECT_JOIN, SCALING_GROUP_JOIN)
 
@@ -78,11 +78,11 @@ CONTAINER_REGISTRY_JOIN = JoinDef(
         sa.select(sa.literal(1))
         .where(
             sa.and_(
-                _assoc_table.c.group_id == GroupRow.id,
+                _assoc_table.c.group_id == ProjectRow.id,
                 _assoc_table.c.registry_id == ContainerRegistryRow.id,
             ),
         )
-        .correlate(GroupRow.__table__, ContainerRegistryRow.__table__)
+        .correlate(ProjectRow.__table__, ContainerRegistryRow.__table__)
         .exists(),
     ),
 )
@@ -94,42 +94,42 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="ID",
         description="Project UUID",
         field_type=ExportFieldType.UUID,
-        column=GroupRow.id,
+        column=ProjectRow.id,
     ),
     ExportFieldDef(
         key="name",
         name="Name",
         description="Project name",
         field_type=ExportFieldType.STRING,
-        column=GroupRow.name,
+        column=ProjectRow.name,
     ),
     ExportFieldDef(
         key="description",
         name="Description",
         description="Project description",
         field_type=ExportFieldType.STRING,
-        column=GroupRow.description,
+        column=ProjectRow.description,
     ),
     ExportFieldDef(
         key="domain_name",
         name="Domain",
         description="Domain name",
         field_type=ExportFieldType.STRING,
-        column=GroupRow.domain_name,
+        column=ProjectRow.domain_name,
     ),
     ExportFieldDef(
         key="is_active",
         name="Active",
         description="Active status",
         field_type=ExportFieldType.BOOLEAN,
-        column=GroupRow.is_active,
+        column=ProjectRow.is_active,
     ),
     ExportFieldDef(
         key="total_resource_slots",
         name="Resource Slots",
         description="Total resource slots allocated",
         field_type=ExportFieldType.JSON,
-        column=GroupRow.total_resource_slots,
+        column=ProjectRow.total_resource_slots,
         formatter=_serialize_json,
     ),
     ExportFieldDef(
@@ -137,7 +137,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Created At",
         description="Creation time",
         field_type=ExportFieldType.DATETIME,
-        column=GroupRow.created_at,
+        column=ProjectRow.created_at,
         formatter=lambda v: v.isoformat() if v else "",
     ),
     ExportFieldDef(
@@ -145,29 +145,29 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Modified At",
         description="Last modification time",
         field_type=ExportFieldType.DATETIME,
-        column=GroupRow.updated_at,
+        column=ProjectRow.updated_at,
         formatter=lambda v: v.isoformat() if v else "",
     ),
     # =========================================================================
-    # Folder Host Permission (no JOIN needed, already in GroupRow as JSONB)
+    # Folder Host Permission (no JOIN needed, already in ProjectRow as JSONB)
     # =========================================================================
     ExportFieldDef(
         key="allowed_vfolder_hosts",
         name="Allowed VFolder Hosts",
         description="Allowed virtual folder hosts with permissions",
         field_type=ExportFieldType.JSON,
-        column=GroupRow.allowed_vfolder_hosts,
+        column=ProjectRow.allowed_vfolder_hosts,
         formatter=_serialize_json,
     ),
     # =========================================================================
-    # Container Registry for Image Commit (no JOIN needed, already in GroupRow as JSONB)
+    # Container Registry for Image Commit (no JOIN needed, already in ProjectRow as JSONB)
     # =========================================================================
     ExportFieldDef(
         key="container_registry",
         name="Container Registry",
         description="Container registry and project for image commit",
         field_type=ExportFieldType.JSON,
-        column=GroupRow.container_registry,
+        column=ProjectRow.container_registry,
         formatter=_serialize_json,
     ),
     # =========================================================================
@@ -222,7 +222,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Scaling Group Name",
         description="Scaling group name",
         field_type=ExportFieldType.STRING,
-        column=ScalingGroupRow.name,
+        column=ResourceGroupRow.name,
         joins=SCALING_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -230,7 +230,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Scaling Group Description",
         description="Scaling group description",
         field_type=ExportFieldType.STRING,
-        column=ScalingGroupRow.description,
+        column=ResourceGroupRow.description,
         joins=SCALING_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -238,7 +238,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Scaling Group Is Active",
         description="Scaling group active status",
         field_type=ExportFieldType.BOOLEAN,
-        column=ScalingGroupRow.is_active,
+        column=ResourceGroupRow.is_active,
         joins=SCALING_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -246,7 +246,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Scaling Group Is Public",
         description="Scaling group public status",
         field_type=ExportFieldType.BOOLEAN,
-        column=ScalingGroupRow.is_public,
+        column=ResourceGroupRow.is_public,
         joins=SCALING_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -254,7 +254,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Scaling Group Driver",
         description="Scaling group driver type",
         field_type=ExportFieldType.STRING,
-        column=ScalingGroupRow.driver,
+        column=ResourceGroupRow.driver,
         joins=SCALING_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -262,7 +262,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Scaling Group Scheduler",
         description="Scaling group scheduler type",
         field_type=ExportFieldType.STRING,
-        column=ScalingGroupRow.scheduler,
+        column=ResourceGroupRow.scheduler,
         joins=SCALING_GROUP_JOINS,
     ),
     ExportFieldDef(
@@ -270,7 +270,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Scaling Group Created At",
         description="Scaling group creation time",
         field_type=ExportFieldType.DATETIME,
-        column=ScalingGroupRow.created_at,
+        column=ResourceGroupRow.created_at,
         formatter=lambda v: v.isoformat() if v else "",
         joins=SCALING_GROUP_JOINS,
     ),
@@ -334,6 +334,6 @@ PROJECT_REPORT = ReportDef(
     report_key="projects",
     name="Projects",
     description="Project (group) export report",
-    select_from=GroupRow.__table__,
+    select_from=ProjectRow.__table__,
     fields=PROJECT_FIELDS,
 )

@@ -10,10 +10,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    ArchName,
     AutoPullBehavior,
     ClusterMode,
     KernelId,
@@ -156,7 +156,7 @@ def _create_kernel_binding_data(
         startup_command=None,
         internal_data={},
         preopen_ports=[],
-        scaling_group="default",
+        resource_group="default",
     )
 
 

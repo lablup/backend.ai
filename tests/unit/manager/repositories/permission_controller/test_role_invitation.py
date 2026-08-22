@@ -7,7 +7,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.action.rbac_role_invitation import (
     CreateRoleInvitationByEmailAction,
@@ -22,17 +22,18 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.group.row import AssocGroupUserRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.project.row import AssocGroupUserRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -41,7 +42,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -73,7 +73,7 @@ async def db(
         database_connection,
         [
             DomainRow,
-            ScalingGroupRow,
+            ResourceGroupRow,
             UserResourcePolicyRow,
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
@@ -81,7 +81,7 @@ async def db(
             UserRoleRow,
             UserRow,
             KeyPairRow,
-            GroupRow,
+            ProjectRow,
             AssocGroupUserRow,
             AssociationScopesEntitiesRow,
             ContainerRegistryRow,

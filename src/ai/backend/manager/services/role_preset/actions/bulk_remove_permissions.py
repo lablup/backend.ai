@@ -1,30 +1,59 @@
-from collections.abc import Sequence
-from dataclasses import dataclass, field
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.common.bulk import BulkPurgeFailure
+from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.manager.actions.v2.field.ops import (
+    PartialBulkPurgeFieldOpsAction,
+)
 from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
-from ai.backend.manager.services.role_preset.actions.base import RolePermissionPresetBulkAction
+from ai.backend.manager.models.rbac_models.role_permission_preset.purgers import (
+    RolePermissionPresetPurger,
+)
+from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+    RolePermissionPresetRow,
+)
+from ai.backend.manager.services.role_preset.actions.lookup_permission_owner import (
+    LookupBulkRolePermissionPresetOwnerAction,
+)
 
 
 @dataclass
-class BulkRemoveRolePermissionPresetsAction(RolePermissionPresetBulkAction):
+class BulkRemoveRolePermissionPresetsAction(
+    PartialBulkPurgeFieldOpsAction[
+        RolePermissionPresetID,
+        RolePresetID,
+        RolePermissionPresetRow,
+        RolePermissionPresetData,
+    ]
+):
+    """Drop the named permission entries, answering for each one.
+
+    The entries may belong to different presets; every one of those presets answers for
+    the removal of the entries it owns.
+    """
+
     ids: Sequence[RolePermissionPresetID]
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-@dataclass
-class BulkRemoveRolePermissionPresetsActionResult(BaseActionResult):
-    successes: list[RolePermissionPresetData] = field(default_factory=list)
-    failures: list[BulkPurgeFailure] = field(default_factory=list)
+    def action_name(cls) -> str:
+        return "bulk_remove_role_permission_presets"
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def field_ids(self) -> Sequence[RolePermissionPresetID]:
+        return tuple(self.ids)
+
+    @override
+    def to_owner_lookup_action(self) -> LookupBulkRolePermissionPresetOwnerAction:
+        return LookupBulkRolePermissionPresetOwnerAction(permission_preset_ids=self.ids)
+
+    @override
+    def to_purgers(self) -> Mapping[RolePermissionPresetID, RolePermissionPresetPurger]:
+        return {
+            permission_id: RolePermissionPresetPurger(permission_preset_id=permission_id)
+            for permission_id in self.ids
+        }

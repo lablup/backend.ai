@@ -15,7 +15,7 @@ from typing import NamedTuple
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import (
     BinarySize,
     ResourceSlot,
@@ -24,22 +24,22 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
     RelationType,
     RoleSource,
 )
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -92,7 +92,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AssocGroupUserRow,
                 VFolderRow,
                 VFolderInvitationRow,
@@ -208,7 +208,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
     ) -> uuid.UUID:
         group_uuid = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_uuid,
                 name=f"test-group-{group_uuid.hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -309,7 +309,6 @@ class TestVFolderOwnershipTransferRBACCleanup:
             db_sess.add(user_role_row)
 
             keypair = KeyPairRow(
-                user_id=email,
                 user=user_uuid,
                 access_key=f"AK{user_uuid.hex[:18].upper()}",
                 secret_key=f"SK{user_uuid.hex[:38]}",

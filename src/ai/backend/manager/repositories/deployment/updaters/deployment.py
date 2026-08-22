@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, override
 from uuid import UUID
 
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState

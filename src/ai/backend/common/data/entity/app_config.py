@@ -1,7 +1,26 @@
+from typing import NewType
+from uuid import UUID
+
 from ai.backend.common.data.entity.types import EntityType
 
-__all__ = ("APP_CONFIG_ALLOW_LIST_ENTITY_TYPE",)
+__all__ = (
+    "APP_CONFIG_ALLOW_LIST_ENTITY_TYPE",
+    "APP_CONFIG_ENTITY_TYPE",
+    "APP_CONFIG_FRAGMENT_ENTITY_TYPE",
+    "AppConfigScopeID",
+)
 
 
 # Raw string mirroring the RBAC-managed EntityType.APP_CONFIG_ALLOW_LIST value.
 APP_CONFIG_ALLOW_LIST_ENTITY_TYPE = EntityType("app_config_allow_list")
+
+# Raw string mirroring the RBAC-managed EntityType.APP_CONFIG_FRAGMENT value.
+APP_CONFIG_FRAGMENT_ENTITY_TYPE = EntityType("app_config_fragment")
+
+# The merged config a caller reads; the fragments it is merged from are their own type.
+APP_CONFIG_ENTITY_TYPE = EntityType("app_config")
+
+# Who an app config fragment belongs to. Polymorphic across scope kinds (domain/user); the
+# concrete kind is discriminated by the accompanying ``AppConfigScopeType``, and ``public``
+# has no owner at all, so its absence is spelled ``| None`` at each use.
+AppConfigScopeID = NewType("AppConfigScopeID", UUID)

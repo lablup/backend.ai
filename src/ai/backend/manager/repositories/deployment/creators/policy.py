@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.repositories.base import CreatorSpec

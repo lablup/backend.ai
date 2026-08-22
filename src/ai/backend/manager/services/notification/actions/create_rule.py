@@ -1,43 +1,32 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast, override
+from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.notification import NotificationRuleData
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.notification.creators import NotificationRuleCreatorSpec
-
-from .base import NotificationAction
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.notification import NotificationRuleRow
+from ai.backend.common.data.entity.notification import NOTIFICATION_RULE_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
+from ai.backend.manager.data.notification.types import NotificationRuleData
+from ai.backend.manager.models.notification.creators import NotificationRuleCreator
+from ai.backend.manager.models.notification.row import NotificationRuleRow
 
 
 @dataclass
-class CreateRuleAction(NotificationAction):
-    """Action to create a notification rule."""
+class CreateRuleAction(CreateGlobalOpsAction[NotificationRuleRow, NotificationRuleData]):
+    """Register a notification rule."""
 
-    creator: RBACEntityCreator[NotificationRuleRow]
+    creator: NotificationRuleCreator
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
+    def entity_type(cls) -> EntityType:
+        return NOTIFICATION_RULE_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        spec = cast(NotificationRuleCreatorSpec, self.creator.spec)
-        return spec.name
-
-
-@dataclass
-class CreateRuleActionResult(BaseActionResult):
-    """Result of creating a notification rule."""
-
-    rule_data: NotificationRuleData
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_notification_rule"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.rule_data.id)
+    def to_creator(self) -> NotificationRuleCreator:
+        return self.creator

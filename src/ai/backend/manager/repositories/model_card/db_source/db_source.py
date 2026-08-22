@@ -22,7 +22,6 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
 from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
 from ai.backend.common.types import VFolderID, VFolderUsageMode
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.model_card.types import (
     BulkModelCardDeleteFailure,
     BulkModelCardDeleteResultData,
@@ -30,7 +29,7 @@ from ai.backend.manager.data.model_card.types import (
     ResourceRequirementEntry,
     VFolderScanData,
 )
-from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.resource import (
     InvalidProjectTypeForModelCard,
     ModelCardNotFound,
@@ -38,8 +37,8 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -53,12 +52,7 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     get_sessions_by_mounted_folder,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.purger import Purger, execute_purger
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    execute_rbac_entity_creator,
-)
 from ai.backend.manager.repositories.base.updater import (
     Updater,
     execute_updater,
@@ -66,8 +60,6 @@ from ai.backend.manager.repositories.base.updater import (
 from ai.backend.manager.repositories.base.upserter import BulkUpserter, execute_bulk_upserter
 from ai.backend.manager.repositories.model_card.types import (
     AvailablePresetsSearchResult,
-    ModelCardSearchResult,
-    ProjectModelCardOperationScope,
 )
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
@@ -82,19 +74,6 @@ class ModelCardDBSource:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-
-    async def create(self, creator: RBACEntityCreator[ModelCardRow]) -> ModelCardData:
-        async with self._db.begin_session() as session:
-            result = await execute_rbac_entity_creator(session, creator)
-            return result.row.to_data()
-
-    async def get_by_id(self, card_id: UUID) -> ModelCardData:
-        async with self._db.begin_readonly_session_read_committed() as session:
-            stmt = sa.select(ModelCardRow).where(ModelCardRow.id == card_id)
-            row = (await session.execute(stmt)).scalar_one_or_none()
-            if row is None:
-                raise ModelCardNotFound()
-            return row.to_data()
 
     async def update(self, updater: Updater[ModelCardRow]) -> ModelCardData:
         async with self._db.begin_session() as session:
@@ -111,10 +90,6 @@ class ModelCardDBSource:
             # touch this child table, so we delete-then-insert explicitly.
             if isinstance(updater.spec, ModelCardUpdaterSpec):
                 await self._apply_min_resource_change(session, row.id, updater.spec.min_resource)
-                if updater.spec.min_resource.is_update() or updater.spec.min_resource.is_nullify():
-                    # Re-read so to_data() reflects the new child rows via
-                    # the resource_requirement_rows relationship.
-                    await session.refresh(row)
 
             return row.to_data()
 
@@ -268,38 +243,6 @@ class ModelCardDBSource:
                     f"The vfolder(id: {vfolder_row.id}) is mounted on sessions(ids: {session_ids})."
                 )
 
-    async def search(
-        self,
-        querier: BatchQuerier,
-    ) -> ModelCardSearchResult:
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ModelCardRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-            return ModelCardSearchResult(
-                items=[row.ModelCardRow.to_data() for row in result.rows],
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_in_project(
-        self,
-        querier: BatchQuerier,
-        scope: ProjectModelCardOperationScope,
-    ) -> ModelCardSearchResult:
-        async with self._db.begin_readonly_session() as db_sess:
-            is_member = (await db_sess.execute(scope.membership_check_query)).scalar()
-            if not is_member:
-                raise GenericForbidden("User is not a member of this project")
-            query = sa.select(ModelCardRow)
-            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
-            return ModelCardSearchResult(
-                items=[row.ModelCardRow.to_data() for row in result.rows],
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
     async def search_available_presets(
         self,
         model_card_id: UUID,
@@ -368,7 +311,7 @@ class ModelCardDBSource:
 
     async def get_scan_target_vfolders(self, project_id: UUID) -> list[VFolderScanData]:
         async with self._db.begin_readonly_session() as session:
-            project_stmt = sa.select(GroupRow.type).where(GroupRow.id == project_id)
+            project_stmt = sa.select(ProjectRow.type).where(ProjectRow.id == project_id)
             project_type = (await session.execute(project_stmt)).scalar_one_or_none()
             if project_type is None:
                 raise ProjectNotFound(str(project_id))

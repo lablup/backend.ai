@@ -17,6 +17,11 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
+from ai.backend.common.data.entity.resource_policy import (
+    KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
+    PROJECT_RESOURCE_POLICY_ENTITY_TYPE,
+    USER_RESOURCE_POLICY_ENTITY_TYPE,
+)
 from ai.backend.common.dto.manager.v2.common import BinarySizeInput
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     CreateKeypairResourcePolicyInput,
@@ -28,7 +33,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
     CreateProjectResourcePolicyPayload,
     CreateUserResourcePolicyPayload,
 )
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -42,34 +47,17 @@ from ai.backend.manager.models.resource_policy.row import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.keypair_resource_policy.repository import (
-    KeypairResourcePolicyRepository,
-)
-from ai.backend.manager.repositories.project_resource_policy.repository import (
-    ProjectResourcePolicyRepository,
-)
-from ai.backend.manager.repositories.user_resource_policy.repository import (
-    UserResourcePolicyRepository,
-)
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
-)
-from ai.backend.manager.services.keypair_resource_policy.service import (
-    KeypairResourcePolicyService,
 )
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
-from ai.backend.manager.services.project_resource_policy.service import (
-    ProjectResourcePolicyService,
-)
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
 )
-from ai.backend.manager.services.user_resource_policy.service import (
-    UserResourcePolicyService,
-)
+from ai.backend.testutils.processors import ops_processor_group
 
 KeypairResourcePolicyFactory = Callable[
     ..., Coroutine[Any, Any, CreateKeypairResourcePolicyPayload]
@@ -88,28 +76,15 @@ def resource_policy_processors(
     UserResourcePolicyProcessors,
     ProjectResourcePolicyProcessors,
 ]:
-    kp_repo = KeypairResourcePolicyRepository(database_engine)
-    kp_service = KeypairResourcePolicyService(kp_repo)
     kp_processors = KeypairResourcePolicyProcessors(
-        service=kp_service,
-        action_monitors=[],
-        validators=MagicMock(spec=ActionValidators),
+        group=ops_processor_group(database_engine, GroupMeta(KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE))
     )
-
-    up_repo = UserResourcePolicyRepository(database_engine)
-    up_service = UserResourcePolicyService(up_repo)
     up_processors = UserResourcePolicyProcessors(
-        service=up_service,
-        action_monitors=[],
-        validators=MagicMock(spec=ActionValidators),
+        group=ops_processor_group(database_engine, GroupMeta(USER_RESOURCE_POLICY_ENTITY_TYPE))
     )
 
-    pp_repo = ProjectResourcePolicyRepository(database_engine)
-    pp_service = ProjectResourcePolicyService(pp_repo)
     pp_processors = ProjectResourcePolicyProcessors(
-        service=pp_service,
-        action_monitors=[],
-        validators=MagicMock(spec=ActionValidators),
+        group=ops_processor_group(database_engine, GroupMeta(PROJECT_RESOURCE_POLICY_ENTITY_TYPE))
     )
 
     return kp_processors, up_processors, pp_processors

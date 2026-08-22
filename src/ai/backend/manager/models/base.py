@@ -38,8 +38,8 @@ from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, TypeEngine, Unicod
 
 from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.exception import InvalidIpAddressValue
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import (
     AbstractPermission,
     BackendAISchema,

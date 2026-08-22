@@ -34,7 +34,7 @@ async def model_deployment_fixture(
     db_engine: SAEngine,
     domain_fixture: str,
     group_fixture: uuid.UUID,
-    scaling_group_fixture: str,
+    resource_group_fixture: str,
     admin_user_fixture: UserFixtureData,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a minimal EndpointRow (model deployment) for integration tests."""
@@ -78,7 +78,7 @@ async def model_deployment_fixture(
                 session_owner=str(admin_user_fixture.user_uuid),
                 domain=domain_fixture,
                 project=str(group_fixture),
-                resource_group=scaling_group_fixture,
+                resource_group=resource_group_fixture,
                 image=image_id,
                 lifecycle_stage=EndpointLifecycle.CREATED,
                 resource_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),

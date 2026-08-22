@@ -22,6 +22,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal
 
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.common import (
     ResourceSlotEntryInfo,
     ResourceSlotEntryInput,
@@ -43,9 +46,6 @@ from ai.backend.common.dto.manager.v2.session_options import (
     SessionHandlerOptionsInput,
 )
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     BinarySize,
     ClusterMode,

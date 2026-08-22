@@ -10,11 +10,11 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.scaling_group import ListScalingGroupsResponse
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupOpts,
-    scaling_groups,
+from ai.backend.manager.models.resource_group import (
+    ResourceGroupOpts,
+    resource_groups,
     sgroups_for_domains,
     sgroups_for_groups,
 )
@@ -32,7 +32,7 @@ async def extra_scaling_group_fixture(
     sgroup_id = uuid.uuid4()
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(scaling_groups).values(
+            sa.insert(resource_groups).values(
                 id=sgroup_id,
                 name=sgroup_name,
                 description=f"Extra scaling group {sgroup_name}",
@@ -41,7 +41,7 @@ async def extra_scaling_group_fixture(
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
         )
         await conn.execute(
@@ -64,7 +64,7 @@ async def extra_scaling_group_fixture(
         await conn.execute(
             sgroups_for_domains.delete().where(sgroups_for_domains.c.resource_group_id == sgroup_id)
         )
-        await conn.execute(scaling_groups.delete().where(scaling_groups.c.name == sgroup_name))
+        await conn.execute(resource_groups.delete().where(resource_groups.c.name == sgroup_name))
 
 
 @pytest.fixture()
@@ -77,7 +77,7 @@ async def private_scaling_group_fixture(
     sgroup_id = uuid.uuid4()
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(scaling_groups).values(
+            sa.insert(resource_groups).values(
                 id=sgroup_id,
                 name=sgroup_name,
                 description=f"Private scaling group {sgroup_name}",
@@ -86,7 +86,7 @@ async def private_scaling_group_fixture(
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
         )
         await conn.execute(
@@ -100,7 +100,7 @@ async def private_scaling_group_fixture(
         await conn.execute(
             sgroups_for_domains.delete().where(sgroups_for_domains.c.resource_group_id == sgroup_id)
         )
-        await conn.execute(scaling_groups.delete().where(scaling_groups.c.name == sgroup_name))
+        await conn.execute(resource_groups.delete().where(resource_groups.c.name == sgroup_name))
 
 
 class TestScalingGroupCRUDLifecycle:
@@ -109,7 +109,7 @@ class TestScalingGroupCRUDLifecycle:
     async def test_multiple_scaling_groups_listed(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         extra_scaling_group_fixture: str,
         group_fixture: uuid.UUID,
     ) -> None:
@@ -119,13 +119,13 @@ class TestScalingGroupCRUDLifecycle:
         )
         assert isinstance(result, ListScalingGroupsResponse)
         names = [sg.name for sg in result.scaling_groups]
-        assert scaling_group_name in names
+        assert resource_group_name in names
         assert extra_scaling_group_fixture in names
 
     async def test_scaling_group_domain_association(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
     ) -> None:
         """A scaling group associated with the test domain is visible via group filter."""
@@ -133,12 +133,12 @@ class TestScalingGroupCRUDLifecycle:
             group=str(group_fixture),
         )
         assert isinstance(result, ListScalingGroupsResponse)
-        assert any(sg.name == scaling_group_name for sg in result.scaling_groups)
+        assert any(sg.name == resource_group_name for sg in result.scaling_groups)
 
     async def test_regular_user_sees_public_scaling_groups(
         self,
         user_registry: BackendAIClientRegistry,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         private_scaling_group_fixture: str,
         group_fixture: uuid.UUID,
     ) -> None:
@@ -153,7 +153,7 @@ class TestScalingGroupCRUDLifecycle:
         )
         assert isinstance(result, ListScalingGroupsResponse)
         names = [sg.name for sg in result.scaling_groups]
-        assert scaling_group_name in names
+        assert resource_group_name in names
         assert private_scaling_group_fixture not in names
 
     async def test_admin_sees_private_scaling_groups(

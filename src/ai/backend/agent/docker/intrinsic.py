@@ -44,11 +44,13 @@ from ai.backend.agent.types import Container, MountInfo
 from ai.backend.agent.utils import read_sysfs
 from ai.backend.agent.vendor.linux import libnuma
 from ai.backend.common.asyncio import current_loop
+from ai.backend.common.cgroup import CgroupController, CgroupResolutionFailed
 from ai.backend.common.json import dump_json
 from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
     AcceleratorMetadata,
     ClusterInfo,
+    ContainerId,
     DeviceId,
     DeviceModelInfo,
     DeviceName,
@@ -71,7 +73,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # "sockfs", "debugfs", etc.
 _CONTAINER_STAT_TIMEOUT: float = 2.0
 _INVALID_PID: int = 0
-
 # The list of pruned fstype when checking the filesystem usage statistics.
 pruned_disk_types = frozenset([
     "vfat",
@@ -287,9 +288,11 @@ class CPUPlugin(AbstractComputePlugin):
             return []
 
         async def sysfs_impl(container_id: str) -> float | None:
-            cpu_path = ctx.agent.get_cgroup_path("cpuacct", container_id)
             version = ctx.agent.docker_info["CgroupVersion"]  # type: ignore[attr-defined]
             try:
+                cpu_path = await ctx.agent.get_cgroup_path(
+                    CgroupController.CPUACCT, ContainerId(container_id)
+                )
                 match version:
                     case "1":
                         cpu_used = read_sysfs(cpu_path / "cpuacct.usage", int) / 1e6
@@ -304,7 +307,7 @@ class CPUPlugin(AbstractComputePlugin):
                         cpu_used = int(cpu_stats["usage_usec"]) / 1e3
                     case _:
                         return None
-            except OSError as e:
+            except (OSError, CgroupResolutionFailed) as e:
                 log.warning(
                     "CPUPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
                     container_id[:7],
@@ -544,14 +547,43 @@ class MemoryPlugin(AbstractComputePlugin):
     ]
 
     _docker: Docker
+    _graph_root_prefix: str | None
 
     @override
     async def init(self, context: Any | None = None) -> None:
         self._docker = Docker()
+        self._graph_root_prefix = await self._get_graph_root_prefix()
 
     @override
     async def cleanup(self) -> None:
         await self._docker.close()
+
+    async def _get_graph_root_prefix(self) -> str | None:
+        try:
+            docker_info = await self._docker.system.info()
+        except DockerError:
+            return None
+        graph_root: str | None = docker_info.get("DockerRootDir")
+        if not graph_root:
+            return None
+        return graph_root.rstrip("/") + "/"
+
+    def _is_disk_stat_target(
+        self,
+        disk_info: Any,
+        per_disk_stat: Mapping[DeviceId, Measurement],
+    ) -> bool:
+        if disk_info.fstype in pruned_disk_types:
+            return False
+        if disk_info.mountpoint.startswith("/proc/docker/runtime-runc/moby/"):
+            return False
+        if disk_info.mountpoint == "/var/lib/docker/btrfs":
+            return False
+        if self._graph_root_prefix is not None and disk_info.mountpoint.startswith(
+            self._graph_root_prefix
+        ):
+            return False
+        return DeviceId(disk_info.device) not in per_disk_stat
 
     @override
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
@@ -595,22 +627,25 @@ class MemoryPlugin(AbstractComputePlugin):
         _nstat = psutil.net_io_counters()
         net_rx_bytes = _nstat.bytes_recv
         net_tx_bytes = _nstat.bytes_sent
+        if self._graph_root_prefix is None:
+            self._graph_root_prefix = await self._get_graph_root_prefix()
 
         def get_disk_stat() -> tuple[Decimal, Decimal, dict[DeviceId, Measurement]]:
             total_disk_usage = Decimal(0)
             total_disk_capacity = Decimal(0)
             per_disk_stat: dict[DeviceId, Measurement] = {}
             for disk_info in psutil.disk_partitions():
-                # Skip additional filesystem types not filtered by psutil, like squashfs.
-                if disk_info.fstype in pruned_disk_types:
+                if not self._is_disk_stat_target(disk_info, per_disk_stat):
                     continue
-                # Skip transient filesystems created/destroyed by Docker.
-                if disk_info.mountpoint.startswith("/proc/docker/runtime-runc/moby/"):
+                try:
+                    dstat = os.statvfs(disk_info.mountpoint)
+                except OSError as e:
+                    log.debug(
+                        "get_disk_stat(): skipping the unreadable mountpoint {}: {}",
+                        disk_info.mountpoint,
+                        e,
+                    )
                     continue
-                # Skip btrfs subvolumes used by Docker if configured.
-                if disk_info.mountpoint == "/var/lib/docker/btrfs":
-                    continue
-                dstat = os.statvfs(disk_info.mountpoint)
                 disk_usage = Decimal(dstat.f_frsize * (dstat.f_blocks - dstat.f_bavail))
                 disk_capacity = Decimal(dstat.f_frsize * dstat.f_blocks)
                 per_disk_stat[DeviceId(disk_info.device)] = Measurement(disk_usage, disk_capacity)
@@ -687,11 +722,15 @@ class MemoryPlugin(AbstractComputePlugin):
         async def sysfs_impl(
             container_id: str,
         ) -> ContainerStatResult | None:
-            mem_path = ctx.agent.get_cgroup_path("memory", container_id)
-            io_path = ctx.agent.get_cgroup_path("blkio", container_id)
             version = ctx.agent.get_cgroup_version()
 
             try:
+                mem_path = await ctx.agent.get_cgroup_path(
+                    CgroupController.MEMORY, ContainerId(container_id)
+                )
+                io_path = await ctx.agent.get_cgroup_path(
+                    CgroupController.BLKIO, ContainerId(container_id)
+                )
                 io_read_bytes = 0
                 io_write_bytes = 0
                 match version:
@@ -757,7 +796,7 @@ class MemoryPlugin(AbstractComputePlugin):
                                     io_write_bytes += int(value)
                     case _:
                         return None
-            except OSError as e:
+            except (OSError, CgroupResolutionFailed) as e:
                 log.warning(
                     "MemoryPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
                     container_id[:7],

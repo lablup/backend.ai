@@ -33,11 +33,15 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -56,6 +60,7 @@ from ai.backend.manager.data.session.types import (
     MountSpec,
     ResourceSpec,
     SessionData,
+    SessionEntityData,
     SessionExecution,
     SessionIdentity,
     SessionInfo,
@@ -86,11 +91,11 @@ from ai.backend.manager.models.base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.network import NetworkRow, NetworkType
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -471,12 +476,12 @@ class SessionRow(CreatedAtMixin, Base):
         index=True,
         nullable=False,
     )
-    group_id: Mapped[UUID] = mapped_column(
-        "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
+    group_id: Mapped[ProjectID] = mapped_column(
+        "group_id", GUID(ProjectID), sa.ForeignKey("groups.id"), nullable=False
     )
-    group: Mapped[GroupRow] = relationship("GroupRow")
-    user_uuid: Mapped[UUID] = mapped_column(
-        "user_uuid", GUID, server_default=sa.text("uuid_generate_v4()"), nullable=False
+    group: Mapped[ProjectRow] = relationship("ProjectRow")
+    user_uuid: Mapped[UserID] = mapped_column(
+        "user_uuid", GUID(UserID), server_default=sa.text("uuid_generate_v4()"), nullable=False
     )
     user: Mapped[UserRow] = relationship(
         "UserRow",
@@ -625,9 +630,9 @@ class SessionRow(CreatedAtMixin, Base):
     # nullable cycle with routings.session -> sessions.id; `use_alter` lets
     # create_all() order the two tables, and the routing/session_row relationship
     # below pins `foreign_keys` so SQLAlchemy can disambiguate the two FK paths.
-    replica_id: Mapped[UUID | None] = mapped_column(
+    replica_id: Mapped[ReplicaID | None] = mapped_column(
         "replica_id",
-        GUID,
+        GUID(ReplicaID),
         sa.ForeignKey(
             "routings.id",
             ondelete="SET NULL",
@@ -687,7 +692,7 @@ class SessionRow(CreatedAtMixin, Base):
             cluster_mode=session_data.cluster_mode,
             cluster_size=session_data.cluster_size,
             agent_ids=session_data.agent_ids,
-            scaling_group_name=session_data.scaling_group_name,
+            scaling_group_name=session_data.resource_group_name,
             target_sgroup_names=session_data.target_sgroup_names,
             domain_name=session_data.domain_name,
             group_id=session_data.group_id,
@@ -734,7 +739,7 @@ class SessionRow(CreatedAtMixin, Base):
             cluster_mode=ClusterMode(self.cluster_mode),
             cluster_size=self.cluster_size,
             agent_ids=self.agent_ids,
-            scaling_group_name=self.scaling_group_name,
+            resource_group_name=self.scaling_group_name,
             target_sgroup_names=self.target_sgroup_names,
             domain_name=self.domain_name,
             group_id=self.group_id,
@@ -774,6 +779,58 @@ class SessionRow(CreatedAtMixin, Base):
             replica_id=self.replica_id,
         )
 
+    def to_entity_data(self) -> SessionEntityData:
+        """This row as its own value; reads no other table."""
+        return SessionEntityData(
+            id=SessionID(self.id),
+            creation_id=self.creation_id,
+            name=self.name,
+            session_type=self.session_type,
+            priority=self.priority,
+            is_preemptible=self.is_preemptible,
+            job_priority=self.job_priority,
+            cluster_mode=self.cluster_mode,
+            cluster_size=self.cluster_size,
+            options=self.options,
+            agent_ids=self.agent_ids,
+            designated_agent_ids=self.designated_agent_ids,
+            session_group_id=self.session_group_id,
+            resource_group_id=self.resource_group_id,
+            resource_group_name=self.scaling_group_name,
+            target_sgroup_names=self.target_sgroup_names,
+            domain_name=self.domain_name,
+            domain_id=self.domain_id,
+            group_id=self.group_id,
+            user_uuid=self.user_uuid,
+            access_key=AccessKey(self.access_key) if self.access_key is not None else None,
+            images=self.images,
+            image_ids=self.image_ids,
+            tag=self.tag,
+            occupying_slots=self.occupying_slots,
+            requested_slots=self.requested_slots,
+            vfolder_mounts=self.vfolder_mounts,
+            environ=self.environ,
+            bootstrap_script=self.bootstrap_script,
+            use_host_network=self.use_host_network,
+            timeout=self.timeout,
+            batch_timeout=self.batch_timeout,
+            terminated_at=self.terminated_at,
+            starts_at=self.starts_at,
+            requested_starts_at=self.requested_starts_at,
+            status=self.status,
+            status_info=self.status_info,
+            status_data=self.status_data,
+            status_history=self.status_history,
+            callback_url=self.callback_url,
+            startup_command=self.startup_command,
+            result=self.result,
+            num_queries=self.num_queries,
+            last_stat=self.last_stat,
+            network_type=self.network_type,
+            network_id=self.network_id,
+            replica_id=self.replica_id,
+        )
+
     def to_session_info(self) -> SessionInfo:
         return SessionInfo(
             identity=SessionIdentity(
@@ -799,7 +856,7 @@ class SessionRow(CreatedAtMixin, Base):
                 cluster_size=self.cluster_size,
                 occupying_slots=self.occupying_slots,
                 requested_slots=self.requested_slots,
-                scaling_group_name=self.scaling_group_name,
+                resource_group_name=self.scaling_group_name,
                 target_sgroup_names=self.target_sgroup_names,
                 agent_ids=self.agent_ids,
             ),
@@ -907,7 +964,7 @@ class SessionRow(CreatedAtMixin, Base):
         async with db.connect() as db_conn:
             return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
 
-    def delegate_ownership(self, user_uuid: UUID, access_key: AccessKey) -> None:
+    def delegate_ownership(self, user_uuid: UserID, access_key: AccessKey) -> None:
         self.user_uuid = user_uuid
         self.access_key = access_key
         for kernel_row in self.kernels:
@@ -1223,16 +1280,16 @@ def by_raw_filter(filter_spec: FieldSpecType, raw_filter: str) -> QueryCondition
 
 class SessionDependencyRow(Base):
     __tablename__ = "session_dependencies"
-    session_id: Mapped[UUID] = mapped_column(
+    session_id: Mapped[SessionID] = mapped_column(
         "session_id",
-        GUID,
+        GUID(SessionID),
         sa.ForeignKey("sessions.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
-    depends_on: Mapped[UUID] = mapped_column(
+    depends_on: Mapped[SessionID] = mapped_column(
         "depends_on",
-        GUID,
+        GUID(SessionID),
         sa.ForeignKey("sessions.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
@@ -1478,9 +1535,9 @@ class ComputeSessionPermissionContextBuilder(
         result = ComputeSessionPermissionContext()
 
         _project_stmt = (
-            sa.select(GroupRow)
-            .where(GroupRow.domain_name == domain_name)
-            .options(load_only(GroupRow.id))
+            sa.select(ProjectRow)
+            .where(ProjectRow.domain_name == domain_name)
+            .options(load_only(ProjectRow.id))
         )
         for row in await self.db_session.scalars(_project_stmt):
             _row = row

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -83,14 +83,14 @@ class ProjectScopeOrders:
     @staticmethod
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return GroupRow.name.asc()
-        return GroupRow.name.desc()
+            return ProjectRow.name.asc()
+        return ProjectRow.name.desc()
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return GroupRow.created_at.asc()
-        return GroupRow.created_at.desc()
+            return ProjectRow.created_at.asc()
+        return ProjectRow.created_at.desc()
 
 
 class UserScopeOrders:

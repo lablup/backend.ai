@@ -12,6 +12,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     AppConfigAllowListFilter as AppConfigAllowListFilterDTO,
 )
@@ -42,7 +43,6 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
 from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigScopeTypeFilter as AppConfigScopeTypeFilterDTO,
 )
-from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,

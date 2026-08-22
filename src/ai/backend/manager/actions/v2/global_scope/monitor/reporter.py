@@ -31,7 +31,7 @@ class GlobalActionReporterMonitor(GlobalActionMonitor):
         acting = current_user()
         message = StartedActionMessage(
             action_id=meta.action_id,
-            action_type=action.spec().type(),
+            action_type=action.action_name(),
             entity_id=None,
             entity_type=action.entity_type(),
             request_id=current_request_id(),
@@ -49,7 +49,7 @@ class GlobalActionReporterMonitor(GlobalActionMonitor):
         meta = result.meta
         message = FinishedActionMessage(
             action_id=meta.action_id,
-            action_type=action.spec().type(),
+            action_type=action.action_name(),
             entity_id=None,
             request_id=current_request_id() or BLANK_ID,
             triggered_by=str(trigger.user_id) if trigger else None,

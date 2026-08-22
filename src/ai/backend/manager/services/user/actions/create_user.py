@@ -1,22 +1,20 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import cast, override
+from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.data.user.types import BulkUserCreateResultData, UserCreateResultData
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.user.creators import UserCreateSpec, UserCreatorSpec
-from ai.backend.manager.services.user.actions.base import (
-    UserAction,
-    UserScopeAction,
-    UserScopeActionResult,
-)
+from ai.backend.manager.repositories.user.creators import UserCreateSpec
 
 __all__ = (
     "CreateUserAction",
@@ -27,71 +25,65 @@ __all__ = (
 )
 
 
-@dataclass
-class CreateUserAction(UserScopeAction):
-    creator: Creator[UserRow]  # spec: UserCreatorSpec
-    _domain_id: DomainID
+@dataclass(frozen=True)
+class CreateUserAction(BaseScopeAction):
+    """Register a user in a domain, optionally enrolling it in projects."""
+
+    domain_id: DomainID
+    creator: Creator[UserRow]
     group_ids: list[str] | None = None
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
+    def entity_type(cls) -> EntityType:
+        return USER_ENTITY_TYPE
 
     @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.DOMAIN
-
-    @override
-    def scope_id(self) -> str:
-        spec = cast(UserCreatorSpec, self.creator.spec)
-        return spec.domain_name
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.DOMAIN, str(self._domain_id))
-
-
-@dataclass
-class CreateUserActionResult(UserScopeActionResult):
-    data: UserCreateResultData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.data.user.id)
-
-    @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.DOMAIN
-
-    @override
-    def scope_id(self) -> str:
-        # UserCreateResultData always has domain_name set (from creator.spec.domain_name)
-        return self.data.user.domain_name or ""
-
-
-@dataclass
-class BulkCreateUserAction(UserAction):
-    """Action for bulk creating multiple users."""
-
-    items: list[UserCreateSpec]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=self.domain_id),)
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_user"
 
-@dataclass
-class BulkCreateUserActionResult(BaseActionResult):
-    """Result of bulk user creation."""
 
-    data: BulkUserCreateResultData
+@dataclass(frozen=True)
+class CreateUserActionResult(BaseScopeActionResult):
+    data: UserCreateResultData
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return (UserID(self.data.user.id),)
+
+
+@dataclass(frozen=True)
+class BulkCreateUserAction(BaseGlobalAction):
+    """Register several users at once, across domains."""
+
+    items: list[UserCreateSpec]
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return USER_ENTITY_TYPE
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_create_users"
+
+
+@dataclass(frozen=True)
+class BulkCreateUserActionResult:
+    data: BulkUserCreateResultData

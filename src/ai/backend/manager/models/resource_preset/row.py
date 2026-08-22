@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Self
 from uuid import UUID
@@ -12,6 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql.dml import Delete, Update
 from sqlalchemy.sql.selectable import Select
 
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
@@ -44,8 +44,8 @@ type QueryOption = Callable[[WhereableStatement[Any]], WhereableStatement[Any]]
 
 class ResourcePresetRow(Base):
     __tablename__ = "resource_presets"
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ResourcePresetID] = mapped_column(
+        "id", GUID(ResourcePresetID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=256), nullable=False)
     resource_slots: Mapped[ResourceSlot] = mapped_column(
@@ -109,11 +109,11 @@ class ResourcePresetRow(Base):
 
     def to_dataclass(self) -> ResourcePresetData:
         return ResourcePresetData(
-            id=self.id,
+            id=ResourcePresetID(self.id),
             name=self.name,
             resource_slots=self.resource_slots,
             shared_memory=self.shared_memory,
-            scaling_group_name=self.scaling_group_name,
+            resource_group_name=self.scaling_group_name,
         )
 
 

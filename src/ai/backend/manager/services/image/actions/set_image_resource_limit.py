@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.types import ImageID
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import ImageData, ResourceLimitInput
 from ai.backend.manager.services.image.actions.resource_limit_base import ImageResourceLimitAction
@@ -14,8 +13,9 @@ class SetImageResourceLimitByIdAction(ImageResourceLimitAction):
     resource_limit: ResourceLimitInput
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.image_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "set_image_resource_limit_by_id"
 
     @override
     @classmethod
@@ -24,9 +24,5 @@ class SetImageResourceLimitByIdAction(ImageResourceLimitAction):
 
 
 @dataclass
-class SetImageResourceLimitByIdActionResult(BaseActionResult):
+class SetImageResourceLimitByIdActionResult:
     image_data: ImageData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.image_data.id)

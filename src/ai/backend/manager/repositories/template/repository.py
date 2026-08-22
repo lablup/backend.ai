@@ -4,8 +4,8 @@ import uuid
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy

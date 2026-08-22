@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.dto.manager.image import (
     ImageFilter,
     ImageOrder,
@@ -43,7 +44,7 @@ class ImageAdapter(BaseFilterAdapter):
             id=data.id,
             name=data.name,
             registry=data.registry,
-            registry_id=data.registry_id,
+            registry_id=ArtifactRegistryID(data.registry_id),
             project=data.project,
             tag=data.tag,
             architecture=data.architecture,
@@ -68,7 +69,7 @@ class ImageAdapter(BaseFilterAdapter):
             id=data.id,
             name=data.name,
             registry=data.registry,
-            registry_id=data.registry_id,
+            registry_id=ArtifactRegistryID(data.registry_id),
             project=data.project,
             tag=data.tag,
             architecture=data.architecture,

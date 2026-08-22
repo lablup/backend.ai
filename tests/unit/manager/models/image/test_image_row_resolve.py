@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import ImageAlias
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus, ImageType
@@ -20,13 +21,13 @@ from ai.backend.manager.models.agent import AgentRow
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
+from ai.backend.manager.models.resource_group import ResourceGroupForProjectRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
     AgentRow,
-    ScalingGroupForProjectRow,
+    ResourceGroupForProjectRow,
 )
 
 
@@ -57,7 +58,7 @@ class TestImageRowResolve:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 ContainerRegistryRow(
-                    id=registry_id,
+                    id=ContainerRegistryID(registry_id),
                     url="https://cr.example.com",
                     registry_name="cr.example.com",
                     type=ContainerRegistryType.DOCKER,

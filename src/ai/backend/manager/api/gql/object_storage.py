@@ -8,6 +8,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.dto.manager.v2.object_storage.request import (
     AdminSearchObjectStoragesInput,
 )
@@ -334,7 +335,7 @@ async def get_presigned_download_url(
 ) -> GetPresignedDownloadURLPayload | None:
     dto = input.to_pydantic()
     result = await info.context.adapters.object_storage.get_presigned_download_url(
-        artifact_revision_id=dto.artifact_revision_id,
+        artifact_revision_id=ArtifactRevisionID(dto.artifact_revision_id),
         key=dto.key,
         expiration=dto.expiration,
     )
@@ -347,7 +348,7 @@ async def get_presigned_upload_url(
 ) -> GetPresignedUploadURLPayload | None:
     dto = input.to_pydantic()
     result = await info.context.adapters.object_storage.get_presigned_upload_url(
-        artifact_revision_id=dto.artifact_revision_id,
+        artifact_revision_id=ArtifactRevisionID(dto.artifact_revision_id),
         key=dto.key,
     )
     return GetPresignedUploadURLPayload(

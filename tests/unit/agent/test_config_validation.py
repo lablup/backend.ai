@@ -581,7 +581,7 @@ class TestAgentUnifiedConfigValidation:
         assert config.agent.backend == AgentBackend.KUBERNETES
         assert config.container.scratch_type == ScratchType.K8S_NFS
 
-    def test_unknown_agent_field_is_warned_and_dropped(
+    def test_unknown_agent_field_is_warned_and_kept(
         self,
         default_raw_config: RawConfigT,
         caplog: pytest.LogCaptureFixture,
@@ -598,8 +598,8 @@ class TestAgentUnifiedConfigValidation:
 
         warnings = [r.getMessage() for r in caplog.records if r.name == CONFIG_LOGGER]
         assert any("use-experimental-redis-event-dispatcher" in m for m in warnings)
-        assert not hasattr(config.agent, "use_experimental_redis_event_dispatcher")
-        assert "use-experimental-redis-event-dispatcher" not in config.agent.model_fields_set
+        assert config.agent.model_dump()["use-experimental-redis-event-dispatcher"] is True
+        assert "use-experimental-redis-event-dispatcher" in config.agent.model_fields_set
 
     def test_docker_backend_validation_emits_no_unknown_field_warning(
         self,

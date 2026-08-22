@@ -34,8 +34,8 @@ import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -56,13 +56,14 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -72,7 +73,6 @@ from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.resource_slot import ResourceSlotTypeRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
@@ -114,7 +114,7 @@ class TestAutoMountVFolderResolution:
             [
                 ResourceSlotTypeRow,
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -122,7 +122,7 @@ class TestAutoMountVFolderResolution:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 VFolderRow,
                 VFolderPermissionRow,
@@ -245,7 +245,7 @@ class TestAutoMountVFolderResolution:
         group_id = uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=f"g-{group_id.hex[:6]}",
                     description="",

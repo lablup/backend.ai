@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.dto.clients.prometheus.response import (
     PrometheusQueryData,
     PrometheusResponse,
@@ -22,20 +23,32 @@ from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.data.prometheus_query_preset import (
     PrometheusQueryPresetData,
 )
+from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
+from ai.backend.manager.models.prometheus_query_preset.creators import (
+    PrometheusQueryPresetCreator,
+)
+from ai.backend.manager.models.prometheus_query_preset.purgers import (
+    PrometheusQueryPresetPurger,
+)
 from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
+from ai.backend.manager.models.prometheus_query_preset.searchers import (
+    PrometheusQueryPresetSearcher,
+)
 from ai.backend.manager.models.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryRow,
 )
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    Creator,
-)
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.prometheus_query_preset import (
-    PrometheusQueryPresetCreatorSpec,
     PrometheusQueryPresetRepository,
 )
 from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
@@ -55,9 +68,25 @@ class TestPrometheusQueryPresetRepository:
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         async with with_tables(
             database_connection,
-            [PrometheusQueryPresetCategoryRow, PrometheusQueryPresetRow],
+            [
+                VirtualScopeRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
+                RoleRow,
+                PermissionRow,
+                PrometheusQueryPresetCategoryRow,
+                PrometheusQueryPresetRow,
+            ],
         ):
             yield database_connection
+
+    @pytest.fixture
+    def preset_ops(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> OpsRepository[PrometheusQueryPresetData]:
+        """Writes and searches run through the generic ops repository."""
+        return OpsRepository(V2DBOpsProvider(database_connection))
 
     @pytest.fixture
     def preset_repository(
@@ -82,7 +111,7 @@ class TestPrometheusQueryPresetRepository:
                 id=preset_id,
                 name="container_cpu_rate",
                 metric_name="backendai_container_utilization",
-                query_template="sum by ({group_by})(rate({metric_name}{{{labels}}}[{window}]))",
+                query_template="sum by (${{group_by}})(rate({metric_name}{${{labels}}}[${{window}}]))",
                 time_window="5m",
                 options=PresetOptions(
                     filter_labels=["container_metric_name", "kernel_id"],
@@ -123,27 +152,26 @@ class TestPrometheusQueryPresetRepository:
 
     async def test_create(
         self,
+        preset_ops: OpsRepository[PrometheusQueryPresetData],
         preset_repository: PrometheusQueryPresetRepository,
     ) -> None:
         name = "gpu_memory_usage"
         metric_name = "backendai_gpu_memory"
-        query_template = "avg({metric_name}{{{labels}}})"
+        query_template = "avg({metric_name}{${{labels}}})"
         time_window = "10m"
         filter_labels = ["kernel_id", "device_id"]
         group_labels = ["kernel_id"]
 
-        creator = Creator(
-            spec=PrometheusQueryPresetCreatorSpec(
-                name=name,
-                metric_name=metric_name,
-                query_template=query_template,
-                time_window=time_window,
-                filter_labels=filter_labels,
-                group_labels=group_labels,
-            ),
+        creator = PrometheusQueryPresetCreator(
+            name=name,
+            metric_name=metric_name,
+            query_template=query_template,
+            time_window=time_window,
+            filter_labels=filter_labels,
+            group_labels=group_labels,
         )
 
-        result = await preset_repository.create(creator)
+        result = await preset_ops.create_global_entity(creator)
 
         assert isinstance(result, PrometheusQueryPresetData)
         assert result.name == name
@@ -179,16 +207,17 @@ class TestPrometheusQueryPresetRepository:
 
     async def test_search(
         self,
+        preset_ops: OpsRepository[PrometheusQueryPresetData],
         preset_repository: PrometheusQueryPresetRepository,
         sample_preset_ids: list[uuid.UUID],
     ) -> None:
         limit = 3
-        querier = BatchQuerier(
+        searcher = PrometheusQueryPresetSearcher(
             pagination=OffsetPagination(limit=limit, offset=0),
             conditions=[],
             orders=[],
         )
-        result = await preset_repository.search(querier=querier)
+        result = await preset_ops.search_in_global(searcher)
 
         assert len(result.items) == limit
         assert result.total_count == len(sample_preset_ids)
@@ -252,21 +281,26 @@ class TestPrometheusQueryPresetRepository:
 
     async def test_delete(
         self,
+        preset_ops: OpsRepository[PrometheusQueryPresetData],
         preset_repository: PrometheusQueryPresetRepository,
         sample_preset_id: uuid.UUID,
     ) -> None:
-        result = await preset_repository.delete(sample_preset_id)
-        assert result is True
+        result = await preset_ops.purge_entity(
+            PrometheusQueryPresetPurger(preset_id=PrometheusQueryPresetID(sample_preset_id))
+        )
+        assert result.id == sample_preset_id
 
         with pytest.raises(PrometheusQueryPresetNotFound):
             await preset_repository.get_by_id(sample_preset_id)
 
     async def test_delete_not_found(
         self,
-        preset_repository: PrometheusQueryPresetRepository,
+        preset_ops: OpsRepository[PrometheusQueryPresetData],
     ) -> None:
-        with pytest.raises(PrometheusQueryPresetNotFound):
-            await preset_repository.delete(uuid.uuid4())
+        with pytest.raises(EntityNotFoundError):
+            await preset_ops.purge_entity(
+                PrometheusQueryPresetPurger(preset_id=PrometheusQueryPresetID(uuid.uuid4()))
+            )
 
 
 class TestPrometheusQueryPresetRepositoryPreview:
@@ -302,12 +336,12 @@ class TestPrometheusQueryPresetRepositoryPreview:
         canned_response: PrometheusResponse,
     ) -> None:
         result = await repository.preview_template(
-            query_template="sum(rate(metric{{{labels}}}[{window}]))",
+            query_template="sum(rate(metric{${{labels}}}[${{window}}]))",
             default_window="5m",
         )
 
         prometheus_client.preview_query_template.assert_called_once_with(
-            query_template="sum(rate(metric{{{labels}}}[{window}]))",
+            query_template="sum(rate(metric{${{labels}}}[${{window}}]))",
             default_window="5m",
         )
         assert result is canned_response

@@ -5,48 +5,16 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import (
-    EntityType,
-    RBACElementType,
-    ScopeType,
-)
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.action.scope import BaseScopeAction
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.services.vfolder.actions.base import VFolderFileAction
 from ai.backend.manager.services.vfolder.types import FileInfo
 
 
 @dataclass
-class _VFolderFileV2ActionBase(BaseScopeAction):
-    """Common fields and RBAC wiring for v2 vfolder file actions."""
+class _VFolderFileV2ActionBase(VFolderFileAction):
+    """Common fields of the v2 vfolder file operations."""
 
     user_id: uuid.UUID
-    vfolder_id: uuid.UUID
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.VFOLDER
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_id)
-
-    @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.USER
-
-    @override
-    def scope_id(self) -> str:
-        return str(self.user_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.VFOLDER,
-            element_id=str(self.vfolder_id),
-        )
 
 
 # ---- List files ----
@@ -61,14 +29,15 @@ class ListFilesV2Action(_VFolderFileV2ActionBase):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "list_vfolder_files_v2"
+
 
 @dataclass
-class ListFilesV2ActionResult(BaseActionResult):
+class ListFilesV2ActionResult:
     files: list[FileInfo]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
 
 # ---- Mkdir ----
@@ -85,12 +54,15 @@ class MkdirV2Action(_VFolderFileV2ActionBase):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "vfolder_mkdir_v2"
+
 
 @dataclass
-class MkdirV2ActionResult(BaseActionResult):
-    @override
-    def entity_id(self) -> str | None:
-        return None
+class MkdirV2ActionResult:
+    pass
 
 
 # ---- Move file ----
@@ -106,12 +78,15 @@ class MoveFileV2Action(_VFolderFileV2ActionBase):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "move_vfolder_file_v2"
+
 
 @dataclass
-class MoveFileV2ActionResult(BaseActionResult):
-    @override
-    def entity_id(self) -> str | None:
-        return None
+class MoveFileV2ActionResult:
+    pass
 
 
 # ---- Delete files ----
@@ -127,14 +102,15 @@ class DeleteFilesV2Action(_VFolderFileV2ActionBase):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "delete_vfolder_files_v2"
+
 
 @dataclass
-class DeleteFilesV2ActionResult(BaseActionResult):
+class DeleteFilesV2ActionResult:
     bgtask_id: str = ""
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
 
 # ---- Download session ----
@@ -150,15 +126,16 @@ class CreateDownloadSessionV2Action(_VFolderFileV2ActionBase):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_vfolder_download_session_v2"
+
 
 @dataclass
-class CreateDownloadSessionV2ActionResult(BaseActionResult):
+class CreateDownloadSessionV2ActionResult:
     token: str
     url: str
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
 
 # ---- Clone ----
@@ -177,12 +154,13 @@ class CloneVFolderV2Action(_VFolderFileV2ActionBase):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "clone_vfolder_v2"
+
 
 @dataclass
-class CloneVFolderV2ActionResult(BaseActionResult):
+class CloneVFolderV2ActionResult:
     new_vfolder_id: uuid.UUID
     bgtask_id: str | None = None
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.new_vfolder_id)

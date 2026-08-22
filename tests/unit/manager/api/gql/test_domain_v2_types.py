@@ -5,13 +5,13 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.v2.domain.response import (
     DomainBasicInfo,
     DomainLifecycleInfo,
     DomainNode,
     DomainRegistryInfo,
 )
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.api.gql.domain_v2.types import (
     DomainV2GQL,
 )

@@ -207,8 +207,8 @@ class AdminHandler:
         gql_deps = self._gql_deps
         gql_ctx = StrawberryGQLContext(
             config_provider=gql_deps.config_provider,
-            event_hub=gql_deps.processors.events.event_hub,
-            event_fetcher=gql_deps.processors.events.event_fetcher,
+            event_hub=gql_deps.processors.event_hub,
+            event_fetcher=gql_deps.processors.event_fetcher,
             gql_adapter=gql_deps.strawberry_gql_adapter,
             data_loaders=DataLoaders(gql_deps.adapters),
             metric_observer=gql_deps.metric_observer,

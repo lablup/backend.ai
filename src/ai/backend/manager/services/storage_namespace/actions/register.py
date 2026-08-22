@@ -1,34 +1,32 @@
-import uuid
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.storage_namespace import STORAGE_NAMESPACE_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
-from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.storage_namespace.actions.base import StorageNamespaceAction
+from ai.backend.manager.models.storage_namespace.creators import StorageNamespaceCreator
+from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 
 
 @dataclass
-class RegisterNamespaceAction(StorageNamespaceAction):
-    creator: Creator[StorageNamespaceRow]
+class RegisterNamespaceAction(CreateGlobalOpsAction[StorageNamespaceRow, StorageNamespaceData]):
+    """Register a namespace under an object storage."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    creator: StorageNamespaceCreator
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-
-@dataclass
-class RegisterNamespaceActionResult(BaseActionResult):
-    storage_id: uuid.UUID
-    result: StorageNamespaceData
+    def entity_type(cls) -> EntityType:
+        return STORAGE_NAMESPACE_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.storage_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "register_storage_namespace"
+
+    @override
+    def to_creator(self) -> StorageNamespaceCreator:
+        return self.creator

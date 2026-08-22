@@ -64,7 +64,7 @@ class EtcdHandler:
     async def get_resource_slots(self) -> APIResponse:
         log.info("ETCD.GET_RESOURCE_SLOTS ()")
         action = GetResourceSlotsAction()
-        result = await self._etcd_config.get_resource_slots.wait_for_complete(action)
+        result = await self._etcd_config.get_resource_slots.run(action)
         resp = ResourceSlotsResponse(root=result.slots)
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -79,7 +79,7 @@ class EtcdHandler:
         params = query.parsed
         log.info("ETCD.GET_RESOURCE_METADATA (sg:{})", params.sgroup)
         action = GetResourceMetadataAction(sgroup=params.sgroup)
-        result = await self._etcd_config.get_resource_metadata.wait_for_complete(action)
+        result = await self._etcd_config.get_resource_metadata.run(action)
         resp = ResourceMetadataResponse(root=result.metadata)
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -90,7 +90,7 @@ class EtcdHandler:
     async def get_vfolder_types(self) -> APIResponse:
         log.info("ETCD.GET_VFOLDER_TYPES ()")
         action = GetVfolderTypesAction()
-        result = await self._etcd_config.get_vfolder_types.wait_for_complete(action)
+        result = await self._etcd_config.get_vfolder_types.run(action)
         resp = VfolderTypesResponse(root=result.types)
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -104,7 +104,7 @@ class EtcdHandler:
             "ETCD.GET_DOCKER_REGISTRIES has been deprecated because it no longer uses etcd."
             " Use /resource/container-registries API instead."
         )
-        result = await self._container_registry.get_container_registries.wait_for_complete(
+        result = await self._container_registry.get_container_registries.run(
             GetContainerRegistriesAction()
         )
         return APIResponse.build(HTTPStatus.OK, ContainerRegistriesResponse(root=result.registries))
@@ -133,7 +133,7 @@ class EtcdHandler:
             params.prefix,
         )
         action = GetConfigAction(key=params.key, prefix=params.prefix)
-        result = await self._etcd_config.get_config.wait_for_complete(action)
+        result = await self._etcd_config.get_config.run(action)
         return APIResponse.build(HTTPStatus.OK, ConfigResultResponse(result=result.result))
 
     # ------------------------------------------------------------------
@@ -154,7 +154,7 @@ class EtcdHandler:
             params.value,
         )
         action = SetConfigAction(key=params.key, value=params.value)
-        await self._etcd_config.set_config.wait_for_complete(action)
+        await self._etcd_config.set_config.run(action)
         return APIResponse.build(HTTPStatus.OK, OkResultResponse())
 
     # ------------------------------------------------------------------
@@ -181,5 +181,5 @@ class EtcdHandler:
             params.prefix,
         )
         action = DeleteConfigAction(key=params.key, prefix=params.prefix)
-        await self._etcd_config.delete_config.wait_for_complete(action)
+        await self._etcd_config.delete_config.run(action)
         return APIResponse.build(HTTPStatus.OK, OkResultResponse())

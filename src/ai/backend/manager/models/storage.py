@@ -179,7 +179,7 @@ class PermissionContextBuilder(
         ctx: ClientContext,
         scope: ProjectScope,
     ) -> PermissionContext:
-        from .group import GroupRow
+        from .project import ProjectRow
 
         permissions = await self.calculate_permission(ctx, scope)
         if not permissions:
@@ -187,9 +187,9 @@ class PermissionContextBuilder(
             return PermissionContext()
 
         stmt = (
-            sa.select(GroupRow)
-            .where(GroupRow.id == scope.project_id)
-            .options(load_only(GroupRow.allowed_vfolder_hosts))
+            sa.select(ProjectRow)
+            .where(ProjectRow.id == scope.project_id)
+            .options(load_only(ProjectRow.allowed_vfolder_hosts))
         )
         project_row = await self.db_session.scalar(stmt)
         if project_row is None:

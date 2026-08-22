@@ -7,8 +7,8 @@ from typing import override
 
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,

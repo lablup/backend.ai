@@ -8,8 +8,8 @@ from typing import Protocol, cast
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
@@ -301,7 +301,7 @@ class RoleManager:
                 )
             )
         ).all()
-        existing_role_user_maps = defaultdict(set)
+        existing_role_user_maps: defaultdict[uuid.UUID, set[uuid.UUID]] = defaultdict(set)
         for user_role in user_role_rows:
             existing_role_user_maps[user_role.role_id].add(user_role.user_id)
         return existing_role_user_maps

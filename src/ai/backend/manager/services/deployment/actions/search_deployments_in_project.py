@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import DeploymentSummaryData
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment.types import ProjectDeploymentOperationScope
-from ai.backend.manager.services.deployment.actions.base import DeploymentScopeAction
+from ai.backend.manager.services.deployment.actions.base import (
+    DeploymentScopeAction,
+    DeploymentScopeActionResult,
+)
 
 
 @dataclass
@@ -21,34 +24,28 @@ class SearchDeploymentsInProjectAction(DeploymentScopeAction):
     Used for project admin page.
     """
 
+    project_id: ProjectID
     scope: ProjectDeploymentOperationScope
     querier: BatchQuerier
+
+    @override
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id),)
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_deployments_in_project"
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
-    @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.PROJECT
-
-    @override
-    def scope_id(self) -> str:
-        return str(self.scope.project_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.PROJECT, str(self.scope.project_id))
-
 
 @dataclass
-class SearchDeploymentsInProjectActionResult(BaseActionResult):
+class SearchDeploymentsInProjectActionResult(DeploymentScopeActionResult):
     data: list[DeploymentSummaryData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

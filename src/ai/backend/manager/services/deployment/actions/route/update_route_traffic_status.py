@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import RouteInfo, RouteTrafficStatus
 
@@ -21,8 +20,9 @@ class UpdateRouteTrafficStatusAction(RouteBaseAction):
     traffic_status: RouteTrafficStatus
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.route_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_route_traffic_status"
 
     @override
     @classmethod
@@ -31,11 +31,7 @@ class UpdateRouteTrafficStatusAction(RouteBaseAction):
 
 
 @dataclass
-class UpdateRouteTrafficStatusActionResult(BaseActionResult):
+class UpdateRouteTrafficStatusActionResult:
     """Result of updating route traffic status."""
 
     route: RouteInfo
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.route.route_id)

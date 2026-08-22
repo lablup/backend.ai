@@ -30,12 +30,12 @@ class TestFairShareWeightLifecycle:
     async def test_upsert_then_get_and_search(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        resource_group_fixture: str,
         domain_fixture: str,
     ) -> None:
         # 1. Upsert domain weight
         upsert_result = await admin_registry.fair_share.upsert_domain_fair_share_weight(
-            resource_group=scaling_group_fixture,
+            resource_group=resource_group_fixture,
             domain_name=domain_fixture,
             request=UpsertDomainFairShareWeightRequest(weight=Decimal("2.5")),
         )
@@ -45,7 +45,7 @@ class TestFairShareWeightLifecycle:
 
         # 2. Get domain fair share — should now return the record
         get_result = await admin_registry.fair_share.get_domain_fair_share(
-            resource_group=scaling_group_fixture,
+            resource_group=resource_group_fixture,
             domain_name=domain_fixture,
         )
         assert isinstance(get_result, GetDomainFairShareResponse)
@@ -61,7 +61,7 @@ class TestFairShareWeightLifecycle:
         matching = [
             item
             for item in search_result.items
-            if item.domain_name == domain_fixture and item.resource_group == scaling_group_fixture
+            if item.domain_name == domain_fixture and item.resource_group == resource_group_fixture
         ]
         assert len(matching) >= 1
         assert matching[0].spec.weight == Decimal("2.5")
@@ -74,13 +74,13 @@ class TestFairShareBulkUpsertLifecycle:
     async def test_bulk_upsert_then_search(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        resource_group_fixture: str,
         domain_fixture: str,
     ) -> None:
         # 1. Bulk upsert domain weight
         bulk_result = await admin_registry.fair_share.bulk_upsert_domain_fair_share_weight(
             BulkUpsertDomainFairShareWeightRequest(
-                resource_group=scaling_group_fixture,
+                resource_group=resource_group_fixture,
                 inputs=[
                     DomainWeightEntryInput(
                         domain_name=domain_fixture,
@@ -98,7 +98,7 @@ class TestFairShareBulkUpsertLifecycle:
         matching = [
             item
             for item in search_result.items
-            if item.domain_name == domain_fixture and item.resource_group == scaling_group_fixture
+            if item.domain_name == domain_fixture and item.resource_group == resource_group_fixture
         ]
         assert len(matching) >= 1
 
@@ -110,18 +110,18 @@ class TestResourceGroupSpecLifecycle:
     async def test_get_update_get(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        resource_group_fixture: str,
     ) -> None:
         # 1. Get original spec
         original = await admin_registry.fair_share.get_resource_group_fair_share_spec(
-            resource_group=scaling_group_fixture,
+            resource_group=resource_group_fixture,
         )
         assert isinstance(original, GetResourceGroupFairShareSpecResponse)
-        assert original.resource_group == scaling_group_fixture
+        assert original.resource_group == resource_group_fixture
 
         # 2. Update spec
         update_result = await admin_registry.fair_share.update_resource_group_fair_share_spec(
-            resource_group=scaling_group_fixture,
+            resource_group=resource_group_fixture,
             request=UpdateResourceGroupFairShareSpecRequest(
                 half_life_days=21,
                 lookback_days=60,
@@ -133,7 +133,7 @@ class TestResourceGroupSpecLifecycle:
 
         # 3. Get again and verify
         updated = await admin_registry.fair_share.get_resource_group_fair_share_spec(
-            resource_group=scaling_group_fixture,
+            resource_group=resource_group_fixture,
         )
         assert updated.fair_share_spec.half_life_days == 21
         assert updated.fair_share_spec.lookback_days == 60
@@ -147,19 +147,19 @@ class TestRGScopedFairShareAccess:
         self,
         admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        resource_group_fixture: str,
         domain_fixture: str,
     ) -> None:
         # Both admin and regular user can access RG-scoped endpoints
         for registry in (admin_registry, user_registry):
             get_result = await registry.fair_share.rg_get_domain_fair_share(
-                resource_group=scaling_group_fixture,
+                resource_group=resource_group_fixture,
                 domain_name=domain_fixture,
             )
             assert isinstance(get_result, GetDomainFairShareResponse)
 
             search_result = await registry.fair_share.rg_search_domain_fair_shares(
-                resource_group=scaling_group_fixture,
+                resource_group=resource_group_fixture,
                 request=SearchDomainFairSharesRequest(),
             )
             assert isinstance(search_result, SearchDomainFairSharesResponse)
@@ -168,7 +168,7 @@ class TestRGScopedFairShareAccess:
         self,
         admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        resource_group_fixture: str,
         domain_fixture: str,
         group_fixture: uuid.UUID,
         admin_user_fixture: Any,
@@ -176,7 +176,7 @@ class TestRGScopedFairShareAccess:
         # Both admin and regular user can access RG-scoped user search
         for registry in (admin_registry, user_registry):
             result = await registry.fair_share.rg_search_user_fair_shares(
-                resource_group=scaling_group_fixture,
+                resource_group=resource_group_fixture,
                 domain_name=domain_fixture,
                 project_id=group_fixture,
                 request=SearchUserFairSharesRequest(),

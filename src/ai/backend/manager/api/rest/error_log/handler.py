@@ -8,7 +8,11 @@ from datetime import datetime
 from http import HTTPStatus
 from typing import Final
 
+import sqlalchemy as sa
+
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, QueryParam
+from ai.backend.common.data.entity.error_log import ErrorLogID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.error_log.request import (
     AppendErrorLogRequest,
     ListErrorLogsRequest,
@@ -23,12 +27,17 @@ from ai.backend.common.dto.manager.error_log.response import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.error_log.types import ErrorLogSeverity
 from ai.backend.manager.dto.context import UserContext
-from ai.backend.manager.repositories.base import Creator
-from ai.backend.manager.repositories.error_log.creators import ErrorLogCreatorSpec
-from ai.backend.manager.services.error_log.actions import CreateErrorLogAction
-from ai.backend.manager.services.error_log.actions.list import ListErrorLogsAction
-from ai.backend.manager.services.error_log.actions.mark_cleared import MarkClearedErrorLogAction
-from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
+from ai.backend.manager.models.error_log.creators import ErrorLogCreator
+from ai.backend.manager.models.error_log.row import ErrorLogRow
+from ai.backend.manager.models.error_log.searchers import ErrorLogSearcher
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.services.user.error_log.actions.create import CreateErrorLogAction
+from ai.backend.manager.services.user.error_log.actions.delete import DeleteErrorLogAction
+from ai.backend.manager.services.user.error_log.actions.global_search import (
+    GlobalSearchErrorLogsAction,
+)
+from ai.backend.manager.services.user.error_log.actions.search import SearchErrorLogsAction
+from ai.backend.manager.services.user.error_log.processors import ErrorLogProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -48,21 +57,18 @@ class ErrorLogHandler:
         log.info("CREATE (ak:{})", ctx.access_key)
 
         severity = ErrorLogSeverity(params.severity.lower())
-        creator = Creator(
-            spec=ErrorLogCreatorSpec(
-                severity=severity,
-                source=params.source,
-                user=ctx.user_uuid,
-                message=params.message,
-                context_lang=params.context_lang,
-                context_env=params.context_env,
-                request_url=params.request_url,
-                request_status=params.request_status,
-                traceback=params.traceback,
-            )
+        creator = ErrorLogCreator(
+            severity=severity,
+            source=params.source,
+            message=params.message,
+            context_lang=params.context_lang,
+            context_env=params.context_env,
+            request_url=params.request_url,
+            request_status=params.request_status,
+            traceback=params.traceback,
         )
-        action = CreateErrorLogAction(creator=creator)
-        await self._error_log.create.wait_for_complete(action)
+        action = CreateErrorLogAction(user_id=UserID(ctx.user_uuid), creator=creator)
+        await self._error_log.create.run(action)
 
         return APIResponse.build(HTTPStatus.OK, AppendErrorLogResponse(success=True))
 
@@ -74,20 +80,28 @@ class ErrorLogHandler:
         params = query.parsed
         log.info("LIST (ak:{})", ctx.access_key)
 
-        action = ListErrorLogsAction(
-            user_uuid=ctx.user_uuid,
-            user_domain=ctx.user_domain,
-            is_superadmin=ctx.is_superadmin,
-            is_admin=ctx.is_admin,
-            page_no=params.page_no,
-            page_size=params.page_size,
-            mark_read=params.mark_read,
+        searcher = ErrorLogSearcher(
+            pagination=OffsetPagination(
+                limit=params.page_size,
+                offset=(params.page_no - 1) * params.page_size,
+            ),
+            orders=[sa.desc(ErrorLogRow.created_at)],
         )
-        result = await self._error_log.list_logs.wait_for_complete(action)
+        # A super admin reads the whole table through the global action; everyone else
+        # reads within their own scope. The branch lives here because the two are
+        # separate actions with separate gates, not one action that widens itself.
+        if ctx.is_superadmin:
+            result = await self._error_log.global_search.run(
+                GlobalSearchErrorLogsAction(searcher=searcher)
+            )
+        else:
+            result = await self._error_log.scoped_search.run(
+                SearchErrorLogsAction(user_id=UserID(ctx.user_uuid), searcher=searcher)
+            )
 
         is_admin = ctx.is_superadmin or ctx.is_admin
         log_items: list[ErrorLogDTO] = []
-        for item in result.logs:
+        for item in result.items:
             user_str = str(item.meta.user) if item.meta.user is not None else None
             log_items.append(
                 ErrorLogDTO(
@@ -120,14 +134,8 @@ class ErrorLogHandler:
         log_id = uuid.UUID(path_params.log_id)
         log.info("CLEAR")
 
-        action = MarkClearedErrorLogAction(
-            log_id=log_id,
-            user_uuid=ctx.user_uuid,
-            user_domain=ctx.user_domain,
-            is_superadmin=ctx.is_superadmin,
-            is_admin=ctx.is_admin,
-        )
-        await self._error_log.mark_cleared.wait_for_complete(action)
+        action = DeleteErrorLogAction(log_id=ErrorLogID(log_id))
+        await self._error_log.delete.run(action)
 
         return APIResponse.build(
             HTTPStatus.OK,

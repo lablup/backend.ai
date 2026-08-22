@@ -19,8 +19,8 @@ from ai.backend.common.config import (
     ModelDefinitionDraft,
     ModelServiceConfigDraft,
 )
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.data.deployment.types import (
     DeploymentRevisionReadBundle,
     FetchedModelDefinition,

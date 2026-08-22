@@ -12,9 +12,9 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.types import (
     ReplicaProbeTarget,
 )
 from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,

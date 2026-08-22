@@ -16,13 +16,11 @@ from sqlalchemy.orm import joinedload, load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityRef, ScopeRef
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE, UserID
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -41,7 +39,7 @@ from ai.backend.manager.data.user.types import (
     UserData,
     UserSearchResult,
 )
-from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
+from ai.backend.manager.errors.keypair import NoDefaultKeypairResourcePolicy
 from ai.backend.manager.errors.user import (
     KeyPairForbidden,
     KeyPairNotFound,
@@ -53,10 +51,6 @@ from ai.backend.manager.errors.user import (
 )
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
-from ai.backend.manager.models.group import (
-    GroupRow,
-    ProjectType,
-)
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     RESOURCE_USAGE_KERNEL_STATUSES,
@@ -67,8 +61,13 @@ from ai.backend.manager.models.keypair import (
     generate_keypair_data,
     keypairs,
 )
+from ai.backend.manager.models.project import (
+    ProjectRow,
+    ProjectType,
+)
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 from ai.backend.manager.models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     QueryCondition,
@@ -106,7 +105,6 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicyKeypairOperationScope,
     UserKeypairOperationScope,
 )
 from ai.backend.manager.repositories.ops.rbac.provider import (
@@ -142,16 +140,6 @@ from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_de
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _default_access_key() -> sa.ScalarSelect[str]:
-    """The owner's default keypair access key, correlated to the enclosing ``users`` row."""
-    return (
-        sa.select(KeyPairRow.access_key)
-        .where((KeyPairRow.user == UserRow.uuid) & KeyPairRow.is_default)
-        .correlate(UserRow)
-        .scalar_subquery()
-    )
-
-
 class UserDBSource:
     """Database source for user-related operations."""
 
@@ -183,20 +171,32 @@ class UserDBSource:
             user_row = await self._get_user_by_email(session, email)
             return user_row.to_data()
 
+    async def _default_keypair_resource_policy(self, session: SASession) -> str:
+        """The name of the policy a keypair gets when nothing else names one."""
+        name = await session.scalar(
+            sa.select(KeyPairResourcePolicyRow.name).where(KeyPairResourcePolicyRow.is_default)
+        )
+        if name is None:
+            raise NoDefaultKeypairResourcePolicy()
+        return name
+
     async def create_user_validated(
         self, creator: Creator[UserRow], group_ids: list[str] | None
     ) -> UserCreateResultData:
         """
         Create a new user with default keypair and group associations.
         """
+        async with self._db.begin_readonly_session_read_committed() as session:
+            policy = await self._default_keypair_resource_policy(session)
         async with self._rbac_ops_provider.write_ops() as w:
-            return await self._create_user_with_keypair_and_groups(w, creator, group_ids)
+            return await self._create_user_with_keypair_and_groups(w, creator, group_ids, policy)
 
     async def _create_user_with_keypair_and_groups(
         self,
         w: RBACWriteOps,
         creator: Creator[UserRow],
         group_ids: list[str] | None,
+        keypair_resource_policy: str,
     ) -> UserCreateResultData:
         """Provision a user (row, default keypair, domain/project/model-store scope
         enrollments) within the caller's write ops transaction."""
@@ -228,8 +228,7 @@ class UserDBSource:
                 creation=UserScopeCreation(spec=creator.spec),
                 domain_id=domain_id,
                 project_ids=[ProjectID(UUID(gid)) for gid in group_ids or []],
-                keypair_resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
-                keypair_rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
+                keypair_resource_policy=keypair_resource_policy,
             )
         )
         return UserCreateResultData(
@@ -254,6 +253,8 @@ class UserDBSource:
         successes: list[UserCreateResultData] = []
         failures: list[BulkCreateFailure] = []
 
+        async with self._db.begin_readonly_session_read_committed() as session:
+            policy = await self._default_keypair_resource_policy(session)
         async with self._rbac_ops_provider.write_ops() as w:
             for idx, item in enumerate(items):
                 spec = cast(UserCreatorSpec, item.creator.spec)
@@ -261,7 +262,7 @@ class UserDBSource:
                     async with w.savepoint():
                         successes.append(
                             await self._create_user_with_keypair_and_groups(
-                                w, item.creator, item.group_ids
+                                w, item.creator, item.group_ids, policy
                             )
                         )
                 except Exception as e:
@@ -320,10 +321,7 @@ class UserDBSource:
             if status is not None and status != current_user.status:
                 to_update["status_info"] = "admin-requested"
             update_query = (
-                sa.update(users)
-                .where(users.c.email == email)
-                .values(to_update)
-                .returning(users, _default_access_key().label("default_access_key"))
+                sa.update(users).where(users.c.email == email).values(to_update).returning(users)
             )
             result = await session.execute(update_query)
             updated_user = result.first()
@@ -426,10 +424,7 @@ class UserDBSource:
         if status is not None and status != current_user.status:
             to_update["status_info"] = "admin-requested"
         update_query = (
-            sa.update(users)
-            .where(users.c.uuid == user_id)
-            .values(to_update)
-            .returning(users, _default_access_key().label("default_access_key"))
+            sa.update(users).where(users.c.uuid == user_id).values(to_update).returning(users)
         )
         result = await session.execute(update_query)
         updated_user = result.first()
@@ -466,11 +461,13 @@ class UserDBSource:
             await conn.execute(
                 sa.update(keypairs).values(is_active=False).where(keypairs.c.user == user_uuid)
             )
-            await conn.execute(
+            result = await conn.execute(
                 sa.update(users)
                 .values(status=UserStatus.DELETED, status_info="admin-requested")
                 .where(users.c.uuid == user_uuid)
             )
+            if result.rowcount == 0:
+                raise UserNotFound(f"User with UUID {user_uuid} not found.")
 
     async def soft_delete_user_validated(self, email: str) -> None:
         """
@@ -583,7 +580,7 @@ class UserDBSource:
                     f"User {target_user_uuid} has no default keypair to delegate endpoints to."
                 )
             await EndpointRow.delegate_endpoint_ownership(
-                session, user_uuid, target_user_uuid, default_access_key
+                session, user_uuid, UserID(target_user_uuid), default_access_key
             )
 
     async def delete_endpoints(
@@ -845,11 +842,11 @@ class UserDBSource:
         member_ref = EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=UserID(user_uuid))
         async with self._rbac_ops_provider.write_ops() as w:
             target_result = await w.batch_query_in_global(
-                sa.select(GroupRow.id).where(
-                    GroupRow.domain_name == domain_name,
+                sa.select(ProjectRow.id).where(
+                    ProjectRow.domain_name == domain_name,
                     sa.or_(
-                        GroupRow.id.in_([UUID(gid) for gid in group_ids]),
-                        GroupRow.type == ProjectType.MODEL_STORE,
+                        ProjectRow.id.in_([UUID(gid) for gid in group_ids]),
+                        ProjectRow.type == ProjectType.MODEL_STORE,
                     ),
                 ),
                 BatchQuerier(pagination=NoPagination()),
@@ -1153,28 +1150,18 @@ class UserDBSource:
                 )
             ).first()
 
-            if default_kp_row:
-                keypair_creator = KeyPairCreator(
-                    is_active=True,
-                    is_admin=default_kp_row.is_admin,
-                    resource_policy=default_kp_row.resource_policy,
-                    rate_limit=default_kp_row.rate_limit or DEFAULT_KEYPAIR_RATE_LIMIT,
-                )
-            else:
-                keypair_creator = KeyPairCreator(
-                    is_active=True,
-                    is_admin=False,
-                    resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
-                    rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
-                )
-
-            secrets = generate_keypair_data()
+            # A new keypair follows the user's existing default, or the marked policy.
+            fallback_policy = await self._default_keypair_resource_policy(session)
             kp_spec = KeyPairCreatorSpec(
-                creator=keypair_creator,
-                generated_data=secrets,
+                secrets=generate_keypair_data(),
                 user_id=user_uuid,
-                email=user_row.email,
+                is_active=True,
+                is_admin=default_kp_row.is_admin if default_kp_row else False,
                 is_default=False,
+                resource_policy=(
+                    default_kp_row.resource_policy if default_kp_row else fallback_policy
+                ),
+                rate_limit=default_kp_row.rate_limit if default_kp_row else None,
             )
             rbac_kp_creator = RBACEntityCreator(
                 spec=kp_spec,
@@ -1284,55 +1271,22 @@ class UserDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def search_keypairs_by_resource_policy(
-        self,
-        scope: KeypairResourcePolicyKeypairOperationScope,
-        querier: BatchQuerier,
-    ) -> SearchResult[KeyPairData]:
-        """Search keypairs assigned to a keypair resource policy.
-
-        Args:
-            scope: Search scope containing the resource policy name to filter by.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            SearchResult with matching keypairs and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(KeyPairRow)
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-            items = [row.KeyPairRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    # ------------------------------------------------------------------ admin keypair operations
-
     async def admin_create_keypair(
         self, user_id: UUID, creator: KeyPairCreator
     ) -> GeneratedKeyPairData:
         """Admin creates a keypair for a given user."""
         async with self._db.begin_session() as session:
-            user_row = (
-                await session.scalars(
-                    sa.select(UserRow)
-                    .where(UserRow.uuid == user_id)
-                    .options(load_only(UserRow.email))
-                )
-            ).first()
-            if not user_row:
+            if not await session.scalar(sa.select(sa.exists().where(UserRow.uuid == user_id))):
                 raise UserNotFound(f"User {user_id} not found")
 
-            secrets = generate_keypair_data()
             kp_spec = KeyPairCreatorSpec(
-                creator=creator,
-                generated_data=secrets,
+                secrets=generate_keypair_data(),
                 user_id=user_id,
-                email=user_row.email,
+                is_active=creator.is_active,
+                is_admin=creator.is_admin,
                 is_default=False,
+                resource_policy=creator.resource_policy,
+                rate_limit=creator.rate_limit,
             )
             rbac_kp_creator = RBACEntityCreator(
                 spec=kp_spec,

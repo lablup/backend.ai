@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from uuid import UUID
 
-from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.data.entity.replica import ReplicaID
 
 
 @dataclass

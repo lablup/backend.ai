@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import override
 from uuid import UUID
 
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.model_card import ModelCardID
+from ai.backend.common.data.entity.types import EntityData, FieldData
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID
 
 
@@ -17,7 +20,20 @@ class ResourceRequirementEntry:
 
 
 @dataclass(frozen=True)
-class ModelCardData:
+class ModelCardResourceRequirementData(FieldData):
+    """One minimum slot quantity row, naming the card it belongs to.
+
+    Carries the owner, unlike :class:`ResourceRequirementEntry`: a read spanning
+    several cards has to say which card each row came from.
+    """
+
+    model_card_id: ModelCardID
+    slot_name: str
+    min_quantity: str
+
+
+@dataclass(frozen=True)
+class ModelCardData(EntityData):
     id: UUID
     name: str
     vfolder_id: VFolderUUID
@@ -34,11 +50,14 @@ class ModelCardData:
     framework: list[str]
     label: list[str]
     license: str | None
-    min_resource: list[ResourceRequirementEntry]
     readme: str | None
     access_level: str
     created_at: datetime
     updated_at: datetime | None
+
+    @override
+    def entity_id(self) -> ModelCardID:
+        return ModelCardID(self.id)
 
 
 @dataclass(frozen=True)

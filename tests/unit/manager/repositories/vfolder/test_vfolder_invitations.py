@@ -10,7 +10,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.vfolder.types import (

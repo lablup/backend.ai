@@ -9,12 +9,13 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
 from ai.backend.common.exception import (
+    FailedToGetMetric,
     InvalidMetricPresetTemplate,
     PrometheusConnectionError,
 )
-from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
@@ -75,15 +76,15 @@ class TestSessionUtilizationMetrics:
     def preset(self) -> PrometheusQueryPresetData:
         now = datetime.now(tz=UTC)
         return PrometheusQueryPresetData(
-            id=uuid4(),
+            id=PrometheusQueryPresetID(uuid4()),
             name="session-cpu-utilization",
             description=None,
             rank=0,
             category_id=None,
             metric_name="cpu_used",
             query_template=(
-                'avg by ({group_by}) (backendai_container_utilization{{value_type="current",'
-                "{labels}}})"
+                'avg by (${{group_by}}) (backendai_container_utilization{value_type="current",'
+                "${{labels}}})"
             ),
             time_window="5m",
             filter_labels=["session_id", "container_metric_name"],
@@ -242,7 +243,7 @@ class TestSessionUtilizationMetrics:
     ) -> None:
         second_preset = replace(
             preset,
-            id=uuid4(),
+            id=PrometheusQueryPresetID(uuid4()),
             name="session-memory-utilization",
             metric_name="mem",
         )
@@ -338,6 +339,7 @@ class TestSessionUtilizationMetrics:
         "error",
         [
             PrometheusConnectionError("unavailable"),
+            FailedToGetMetric("prometheus rejected the query"),
             InvalidMetricPresetTemplate("failed to render template"),
         ],
     )

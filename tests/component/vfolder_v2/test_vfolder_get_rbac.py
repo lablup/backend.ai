@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
+from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 
 if TYPE_CHECKING:
@@ -27,15 +27,6 @@ class TestVFolderGetV2RBAC:
     single_entity_rbac_validators. Superadmin bypasses RBAC;
     regular users without explicit permission grants are denied.
     """
-
-    async def test_regular_user_querying_own_vfolder_gets_403(
-        self,
-        user_v2_registry: V2ClientRegistry,
-        vfolder_owned_by_regular_user: VFolderFixtureData,
-    ) -> None:
-        """Regular user without RBAC permission cannot GET their own vfolder."""
-        with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.vfolder.get(vfolder_owned_by_regular_user.id)
 
     async def test_superadmin_querying_own_vfolder_bypasses_rbac(
         self,

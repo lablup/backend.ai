@@ -6,22 +6,25 @@ from ai.backend.manager.actions.types import ActionOperationType
 
 # Import representative concrete action classes across different entity types
 # and operation types to verify enum usage at runtime.
-from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
-from ai.backend.manager.services.object_storage.actions.create import CreateObjectStorageAction
-from ai.backend.manager.services.object_storage.actions.update import UpdateObjectStorageAction
-from ai.backend.manager.services.session.actions.search import SearchSessionsAction
-from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
-from ai.backend.manager.services.vfs_storage.actions.delete import DeleteVFSStorageAction
-from ai.backend.manager.services.vfs_storage.actions.get import GetVFSStorageAction
+from ai.backend.manager.services.agent.actions.handle_heartbeat import HandleHeartbeatAction
+from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
+from ai.backend.manager.services.agent.actions.watcher_agent_start import WatcherAgentStartAction
+from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
+from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
+from ai.backend.manager.services.auth.actions.logout import LogoutAction
+from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 
+# Legacy-family actions only. The v2 families answer with
+# ``ai.backend.common.data.entity.types.EntityType``, a distinct NewType, so mixing
+# them in would conflate two type systems rather than test either one.
 _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
-    GetArtifactAction,
-    GetVFSStorageAction,
-    SearchSessionsAction,
-    CreateObjectStorageAction,
-    UpdateObjectStorageAction,
-    DeleteVFSStorageAction,
-    PurgeUserAction,
+    AuthorizeAction,
+    GetRoleAction,
+    HandleHeartbeatAction,
+    LogoutAction,
+    PurgeRoleAction,
+    SearchAgentsAction,
+    WatcherAgentStartAction,
 ]
 
 
@@ -146,15 +149,14 @@ class TestAllActionClassesUseEnums:
     def test_covers_all_operation_types(self) -> None:
         """Ensure the representative classes cover every declarable operation.
 
-        ``RESTORE`` and ``UPSERT`` are excluded: no concrete action declares them
-        yet. The existing upsert actions still sit on the legacy base and are
-        re-declared once they move to the v2 bases. ``LOOKUP`` is excluded because
-        only the v2 lookup base declares it, and every class here is a legacy one.
+        ``UPSERT`` is excluded: the upsert actions declare ``CREATE`` today, so
+        nothing can stand for it. ``LOOKUP`` and ``RESTORE`` are excluded because no
+        legacy action declares them, and every class here is a legacy one.
         """
         expected = set(ActionOperationType) - {
-            ActionOperationType.RESTORE,
             ActionOperationType.UPSERT,
             ActionOperationType.LOOKUP,
+            ActionOperationType.RESTORE,
         }
         covered = {cls.operation_type() for cls in _REPRESENTATIVE_ACTION_CLASSES}
         assert covered == expected, (

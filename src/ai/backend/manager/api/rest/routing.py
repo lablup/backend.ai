@@ -28,19 +28,25 @@ async def _handle_stream_response(
     resp = web.StreamResponse(status=result.status, headers=result.headers)
     body_iter = result.body.read()
 
+    # Pull the first chunk before sending headers so that a failing source
+    # can still be reported with an error status code.
     try:
-        first_chunk = await body_iter.__anext__()
-        await resp.prepare(request)
-        await resp.write(first_chunk)
+        first_chunk = await anext(body_iter, None)
     except Exception:
-        log.exception("Failed to send first chunk from stream")
+        log.exception("Failed to read first chunk from stream")
         raise web.HTTPInternalServerError(
             reason="Failed to initialize streaming response"
         ) from None
 
+    if first_chunk is None:
+        resp.content_length = 0
+
     try:
-        async for chunk in body_iter:
-            await resp.write(chunk)
+        await resp.prepare(request)
+        if first_chunk is not None:
+            await resp.write(first_chunk)
+            async for chunk in body_iter:
+                await resp.write(chunk)
         await resp.write_eof()
     except Exception:
         log.exception("Error during streaming response body iteration")

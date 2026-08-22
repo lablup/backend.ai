@@ -9,7 +9,7 @@ from ai.backend.manager.actions.action import (
 )
 from ai.backend.manager.actions.action.bulk import (
     BaseBulkAction,
-    BaseBulkActionResult,
+    BasePartialBulkActionResult,
 )
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validator.bulk import (
@@ -24,7 +24,7 @@ __all__ = ("BulkActionProcessor",)
 
 class BulkActionProcessor[
     TBulkAction: BaseBulkAction[Any],
-    TBulkActionResult: BaseBulkActionResult,
+    TBulkActionResult: BasePartialBulkActionResult,
 ]:
     _validators: Sequence[BulkActionValidator]
 

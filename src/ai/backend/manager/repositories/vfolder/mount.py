@@ -21,7 +21,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
-from ai.backend.manager.data.group.types import ProjectType as DataProjectType
+from ai.backend.manager.data.project.types import ProjectType as DataProjectType
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
 from ai.backend.manager.defs import VFOLDER_DSTPATHS_MAP
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -31,7 +31,7 @@ from ai.backend.manager.errors.storage import (
     VFolderOperationFailed,
     VFolderPermissionError,
 )
-from ai.backend.manager.models.group import groups as groups_table
+from ai.backend.manager.models.project import groups as groups_table
 from ai.backend.manager.models.vfolder.row import (
     DEAD_VFOLDER_STATUSES,
     VFolderRow,

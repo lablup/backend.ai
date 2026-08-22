@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -14,8 +13,9 @@ class DeleteContainerRegistryAction(ContainerRegistryAction):
     purger: Purger[ContainerRegistryRow]
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.purger.spec.pk_value())
+    @classmethod
+    def action_name(cls) -> str:
+        return "delete_container_registry"
 
     @override
     @classmethod
@@ -24,9 +24,5 @@ class DeleteContainerRegistryAction(ContainerRegistryAction):
 
 
 @dataclass
-class DeleteContainerRegistryActionResult(BaseActionResult):
+class DeleteContainerRegistryActionResult:
     data: ContainerRegistryData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)

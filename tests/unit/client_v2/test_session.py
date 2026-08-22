@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.session import SessionClient
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.session.request import (
     CommitSessionRequest,
     CompleteRequest,
@@ -54,6 +55,7 @@ from ai.backend.common.dto.manager.session.response import (
 from .conftest import MockAuth
 
 _DEFAULT_CONFIG = ClientConfig(endpoint=URL("https://api.example.com"))
+_SESSION_ID = SessionID(UUID("11111111-2222-3333-4444-555555555555"))
 
 
 def _make_request_session(resp: AsyncMock) -> MagicMock:
@@ -153,20 +155,20 @@ class TestSessionLifecycle:
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        result = await sc.get_info("my-sess")
+        result = await sc.get_info(_SESSION_ID)
 
         assert isinstance(result, GetSessionInfoResponse)
         assert result.root["status"] == "RUNNING"
         method, url, _ = _last_request_call(mock_session)
         assert method == "GET"
-        assert "/session/my-sess" in url
+        assert f"/session/{_SESSION_ID}" in url
 
     async def test_get_info_with_owner_access_key(self) -> None:
         resp = _json_response({"status": "RUNNING"})
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        await sc.get_info("my-sess", owner_access_key="AKID1234")
+        await sc.get_info(_SESSION_ID, owner_access_key="AKID1234")
 
         _, _, _ = _last_request_call(mock_session)
         call_kwargs = mock_session.request.call_args.kwargs
@@ -177,12 +179,12 @@ class TestSessionLifecycle:
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        result = await sc.destroy("my-sess", DestroySessionRequest(forced=True))
+        result = await sc.destroy(_SESSION_ID, DestroySessionRequest(forced=True))
 
         assert isinstance(result, DestroySessionResponse)
         method, url, _ = _last_request_call(mock_session)
         assert method == "DELETE"
-        assert "/session/my-sess" in url
+        assert f"/session/{_SESSION_ID}" in url
         call_kwargs = mock_session.request.call_args.kwargs
         assert call_kwargs["params"]["forced"] == "True"
 
@@ -191,22 +193,22 @@ class TestSessionLifecycle:
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        await sc.restart("my-sess")
+        await sc.restart(_SESSION_ID)
 
         method, url, _ = _last_request_call(mock_session)
         assert method == "PATCH"
-        assert "/session/my-sess" in url
+        assert f"/session/{_SESSION_ID}" in url
 
     async def test_rename(self) -> None:
         resp = _no_content_response()
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        await sc.rename("old-name", RenameSessionRequest(session_name="new-name"))
+        await sc.rename(_SESSION_ID, RenameSessionRequest(session_name="new-name"))
 
         method, url, body = _last_request_call(mock_session)
         assert method == "POST"
-        assert "/session/old-name/rename" in url
+        assert f"/session/{_SESSION_ID}/rename" in url
         assert body is not None
         assert body["session_name"] == "new-name"
 
@@ -215,11 +217,11 @@ class TestSessionLifecycle:
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        await sc.interrupt("my-sess")
+        await sc.interrupt(_SESSION_ID)
 
         method, url, _ = _last_request_call(mock_session)
         assert method == "POST"
-        assert "/session/my-sess/interrupt" in url
+        assert f"/session/{_SESSION_ID}/interrupt" in url
 
     async def test_match_sessions(self) -> None:
         resp = _json_response({"matches": [{"id": "s1"}, {"id": "s2"}]})
@@ -246,12 +248,12 @@ class TestCodeExecution:
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        result = await sc.execute("my-sess", ExecuteRequest(mode="query", code="print(1)"))
+        result = await sc.execute(_SESSION_ID, ExecuteRequest(mode="query", code="print(1)"))
 
         assert isinstance(result, ExecuteResponse)
         method, url, body = _last_request_call(mock_session)
         assert method == "POST"
-        assert url.endswith("/session/my-sess")
+        assert url.endswith(f"/session/{_SESSION_ID}")
         assert body is not None
         assert body["code"] == "print(1)"
 
@@ -260,12 +262,12 @@ class TestCodeExecution:
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        result = await sc.complete("my-sess", CompleteRequest(code="pri"))
+        result = await sc.complete(_SESSION_ID, CompleteRequest(code="pri"))
 
         assert isinstance(result, CompleteResponse)
         method, url, _ = _last_request_call(mock_session)
         assert method == "POST"
-        assert "/session/my-sess/complete" in url
+        assert f"/session/{_SESSION_ID}/complete" in url
 
 
 # ---------------------------------------------------------------------------
@@ -279,24 +281,24 @@ class TestServices:
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        result = await sc.start_service("my-sess", StartServiceRequest(app="jupyter"))
+        result = await sc.start_service(_SESSION_ID, StartServiceRequest(app="jupyter"))
 
         assert isinstance(result, StartServiceResponse)
         assert result.token == "tok-123"
         method, url, _ = _last_request_call(mock_session)
         assert method == "POST"
-        assert "/session/my-sess/start-service" in url
+        assert f"/session/{_SESSION_ID}/start-service" in url
 
     async def test_shutdown_service(self) -> None:
         resp = _no_content_response()
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        await sc.shutdown_service("my-sess", ShutdownServiceRequest(service_name="jupyter"))
+        await sc.shutdown_service(_SESSION_ID, ShutdownServiceRequest(service_name="jupyter"))
 
         method, url, body = _last_request_call(mock_session)
         assert method == "POST"
-        assert "/session/my-sess/shutdown-service" in url
+        assert f"/session/{_SESSION_ID}/shutdown-service" in url
         assert body is None
         _, kwargs = mock_session.request.call_args
         assert kwargs["params"]["service_name"] == "jupyter"
@@ -313,24 +315,24 @@ class TestCommitAndImage:
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        result = await sc.commit("my-sess", CommitSessionRequest())
+        result = await sc.commit(_SESSION_ID, CommitSessionRequest())
 
         assert isinstance(result, CommitSessionResponse)
         method, url, _ = _last_request_call(mock_session)
         assert method == "POST"
-        assert "/session/my-sess/commit" in url
+        assert f"/session/{_SESSION_ID}/commit" in url
 
     async def test_get_commit_status(self) -> None:
         resp = _json_response({"result": {"status": "ongoing"}})
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        result = await sc.get_commit_status("my-sess")
+        result = await sc.get_commit_status(_SESSION_ID)
 
         assert isinstance(result, GetCommitStatusResponse)
         method, url, _ = _last_request_call(mock_session)
         assert method == "GET"
-        assert "/session/my-sess/commit" in url
+        assert f"/session/{_SESSION_ID}/commit" in url
 
     async def test_convert_to_image(self) -> None:
         resp = _json_response({"task_id": "task-abc"})
@@ -338,7 +340,7 @@ class TestCommitAndImage:
         sc = _make_session_client(mock_session)
 
         result = await sc.convert_to_image(
-            "my-sess",
+            _SESSION_ID,
             ConvertSessionToImageRequest(image_name="my-custom-img"),
         )
 
@@ -346,7 +348,7 @@ class TestCommitAndImage:
         assert result.task_id == "task-abc"
         method, url, body = _last_request_call(mock_session)
         assert method == "POST"
-        assert "/session/my-sess/imagify" in url
+        assert f"/session/{_SESSION_ID}/imagify" in url
         # imagify is a body endpoint (manager reads BodyParam), so image_name
         # must travel in the JSON body, not the query string.
         assert body is not None
@@ -364,36 +366,36 @@ class TestFilesAndLogs:
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        result = await sc.list_files("my-sess", ListFilesRequest(path="/home"))
+        result = await sc.list_files(_SESSION_ID, ListFilesRequest(path="/home"))
 
         assert isinstance(result, ListFilesResponse)
         method, url, _ = _last_request_call(mock_session)
         assert method == "GET"
-        assert "/session/my-sess/files" in url
+        assert f"/session/{_SESSION_ID}/files" in url
 
     async def test_get_container_logs(self) -> None:
         resp = _json_response({"result": {"logs": "hello\n"}})
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        result = await sc.get_container_logs("my-sess")
+        result = await sc.get_container_logs(_SESSION_ID)
 
         assert isinstance(result, GetContainerLogsResponse)
         method, url, _ = _last_request_call(mock_session)
         assert method == "GET"
-        assert "/session/my-sess/logs" in url
+        assert f"/session/{_SESSION_ID}/logs" in url
 
     async def test_get_status_history(self) -> None:
         resp = _json_response({"result": {"history": []}})
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        result = await sc.get_status_history("my-sess")
+        result = await sc.get_status_history(_SESSION_ID)
 
         assert isinstance(result, GetStatusHistoryResponse)
         method, url, _ = _last_request_call(mock_session)
         assert method == "GET"
-        assert "/session/my-sess/status-history" in url
+        assert f"/session/{_SESSION_ID}/status-history" in url
 
 
 # ---------------------------------------------------------------------------
@@ -442,36 +444,36 @@ class TestOtherEndpoints:
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        result = await sc.get_direct_access_info("my-sess")
+        result = await sc.get_direct_access_info(_SESSION_ID)
 
         assert isinstance(result, GetDirectAccessInfoResponse)
         method, url, _ = _last_request_call(mock_session)
         assert method == "GET"
-        assert "/session/my-sess/direct-access-info" in url
+        assert f"/session/{_SESSION_ID}/direct-access-info" in url
 
     async def test_get_dependency_graph(self) -> None:
         resp = _json_response({"result": {"nodes": [], "edges": []}})
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        result = await sc.get_dependency_graph("my-sess")
+        result = await sc.get_dependency_graph(_SESSION_ID)
 
         assert isinstance(result, GetDependencyGraphResponse)
         method, url, _ = _last_request_call(mock_session)
         assert method == "GET"
-        assert "/session/my-sess/dependency-graph" in url
+        assert f"/session/{_SESSION_ID}/dependency-graph" in url
 
     async def test_get_abusing_report(self) -> None:
         resp = _json_response({"result": {"abuse_count": 0}})
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
-        result = await sc.get_abusing_report("my-sess")
+        result = await sc.get_abusing_report(_SESSION_ID)
 
         assert isinstance(result, GetAbusingReportResponse)
         method, url, _ = _last_request_call(mock_session)
         assert method == "GET"
-        assert "/session/my-sess/abusing-report" in url
+        assert f"/session/{_SESSION_ID}/abusing-report" in url
 
 
 # ---------------------------------------------------------------------------
@@ -489,12 +491,12 @@ class TestBinaryOperations:
         mock_upload = AsyncMock(return_value={"uploaded": True})
 
         with patch.object(mock_client, "upload", mock_upload):
-            result = await sc.upload_files("my-sess", [str(test_file)], basedir=str(tmp_path))
+            result = await sc.upload_files(_SESSION_ID, [str(test_file)], basedir=str(tmp_path))
 
         assert result == {"uploaded": True}
         mock_upload.assert_awaited_once()
         call_args = mock_upload.call_args
-        assert "/session/my-sess/upload" in call_args.args[0]
+        assert f"/session/{_SESSION_ID}/upload" in call_args.args[0]
 
     async def test_download_files(self) -> None:
         mock_client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
@@ -503,13 +505,13 @@ class TestBinaryOperations:
 
         with patch.object(mock_client, "download", mock_download):
             result = await sc.download_files(
-                "my-sess", DownloadFilesRequest(files=["a.txt", "b.txt"])
+                _SESSION_ID, DownloadFilesRequest(files=["a.txt", "b.txt"])
             )
 
         assert result == b"zip-content"
         mock_download.assert_awaited_once()
         call_args = mock_download.call_args
-        assert "/session/my-sess/download" in call_args.args[0]
+        assert f"/session/{_SESSION_ID}/download" in call_args.args[0]
         # download is a query-string endpoint (manager reads QueryParam), so the
         # files list must travel in the query string, not the JSON body.
         assert call_args.kwargs.get("json") is None
@@ -521,12 +523,12 @@ class TestBinaryOperations:
         mock_download = AsyncMock(return_value=b"file-bytes")
 
         with patch.object(mock_client, "download", mock_download):
-            result = await sc.download_single("my-sess", DownloadSingleRequest(file="data.csv"))
+            result = await sc.download_single(_SESSION_ID, DownloadSingleRequest(file="data.csv"))
 
         assert result == b"file-bytes"
         mock_download.assert_awaited_once()
         call_args = mock_download.call_args
-        assert "/session/my-sess/download_single" in call_args.args[0]
+        assert f"/session/{_SESSION_ID}/download_single" in call_args.args[0]
         # download_single is a query-string endpoint (manager reads QueryParam),
         # so the file param must travel in the query string, not the JSON body.
         assert call_args.kwargs.get("json") is None

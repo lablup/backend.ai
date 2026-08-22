@@ -20,7 +20,7 @@ class BaseBulkAction[TTarget: ActionTarget](BaseAction):
         raise NotImplementedError
 
 
-class BaseBulkActionResult(BaseActionResult):
+class BasePartialBulkActionResult(BaseActionResult):
     @override
     def entity_id(self) -> str | None:
         return None

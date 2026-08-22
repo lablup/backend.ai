@@ -5,8 +5,8 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     RouteStatus,

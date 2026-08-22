@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactData
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -15,8 +14,9 @@ class SearchArtifactsAction(ArtifactAction):
     querier: BatchQuerier
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_artifacts"
 
     @override
     @classmethod
@@ -25,12 +25,8 @@ class SearchArtifactsAction(ArtifactAction):
 
 
 @dataclass
-class SearchArtifactsActionResult(BaseActionResult):
+class SearchArtifactsActionResult:
     data: list[ArtifactData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

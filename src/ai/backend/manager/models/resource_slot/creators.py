@@ -4,6 +4,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.resource_slot import (
+    ResourceSlotTypeUUID,
+)
 from ai.backend.common.types import SlotTypes
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
@@ -33,6 +36,10 @@ class ResourceSlotTypeCreator(GlobalEntityCreator[ResourceSlotTypeRow, ResourceS
     display_icon: str
     number_format: NumberFormat
     rank: int
+
+    @override
+    def entity_id(self, row: ResourceSlotTypeRow) -> ResourceSlotTypeUUID:
+        return ResourceSlotTypeUUID(row.uuid)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

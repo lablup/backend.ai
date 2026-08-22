@@ -13,6 +13,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
@@ -22,7 +23,6 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsInfoDTO
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.common.types import (
     BackendAISchema,

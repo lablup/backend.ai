@@ -7,6 +7,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, PathParam
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import RegistryIdPathParam
 
@@ -28,6 +29,6 @@ class V2ArtifactRegistryHandler:
     ) -> APIResponse:
         """Get metadata for a single artifact registry by ID."""
         result = await self._adapter.get_registry_meta(
-            registry_id=path.parsed.registry_id,
+            registry_id=ArtifactRegistryID(path.parsed.registry_id),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

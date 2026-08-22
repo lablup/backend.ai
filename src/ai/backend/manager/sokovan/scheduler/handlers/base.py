@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.manager.data.session.types import StatusTransitions
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.kernel import KernelStatus

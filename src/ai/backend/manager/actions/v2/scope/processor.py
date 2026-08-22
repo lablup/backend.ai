@@ -3,7 +3,7 @@ import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.run_status import ActionRunStatus
@@ -66,7 +66,7 @@ class ScopeActionProcessor[TAction: BaseScopeAction, TResult: BaseScopeActionRes
         trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
 
         run_status = ActionRunStatus.unknown()
-        entity_ids: Sequence[EntityID] = []
+        entity_ids: Sequence[EntityIdentifier] = []
 
         # Validation runs inside the monitor lifecycle so a rejected action is
         # recorded too; monitors that only wrapped execution missed every denial.

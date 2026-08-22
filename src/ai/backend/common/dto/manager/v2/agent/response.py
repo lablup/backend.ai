@@ -13,10 +13,10 @@ from typing import Any
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.agent.types import ConflictingSessionCleanupPolicyEnum
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import AgentId
 
 __all__ = (

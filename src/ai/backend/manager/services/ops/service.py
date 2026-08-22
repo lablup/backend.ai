@@ -14,75 +14,104 @@ rather than hidden in an argument.
 
 from typing import Any
 
-from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.entity.types import EntityData, FieldData
+from ai.backend.manager.actions.run_status import ActionRunStatus
+from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.actions.v2.field.bulk_lookup import (
+    BulkFieldOwnerLookupOpsResult,
+    LookupBulkFieldOwnerOpsAction,
+)
+from ai.backend.manager.actions.v2.field.lookup import (
+    FieldOwnerKeyLookupOpsAction,
+    FieldOwnerLookupOpsAction,
+)
+from ai.backend.manager.actions.v2.lookup.bulk_base import BulkLookupKeyResult
 from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
     BatchUpdateOpsAction,
-    BulkUpdateOpsAction,
-    EntityBulkCreateOpsAction,
-    EntityBulkPurgeOpsAction,
+    BulkGetOwnedFieldOpsAction,
+    EntityAtomicCreateOpsAction,
+    EntityAtomicUpsertOpsAction,
     EntityCreateOpsAction,
+    EntityPartialBulkPurgeOpsAction,
     EntityPurgeOpsAction,
     EntityUpsertOpsAction,
-    FieldEntityBulkCreateOpsAction,
-    FieldEntityBulkPurgeOpsAction,
-    FieldEntityCreateOpsAction,
-    FieldEntityPurgeOpsAction,
-    FieldEntityUpsertOpsAction,
+    EntityWithFieldsCreateOpsAction,
+    FieldAtomicCreateOpsAction,
+    FieldCreateOpsAction,
+    FieldPartialBulkPurgeOpsAction,
+    FieldPurgeOpsAction,
+    FieldUpsertOpsAction,
     GetOpsAction,
     GlobalBatchPurgeOpsAction,
     GlobalBatchUpdateOpsAction,
-    GlobalEntityBulkCreateOpsAction,
-    GlobalEntityBulkPurgeOpsAction,
+    GlobalEntityAtomicCreateOpsAction,
+    GlobalEntityAtomicUpsertOpsAction,
     GlobalEntityCreateOpsAction,
-    GlobalEntityPurgeOpsAction,
+    GlobalEntityPartialBulkPurgeOpsAction,
     GlobalEntityUpsertOpsAction,
+    GlobalEntityWithFieldsCreateOpsAction,
     GlobalSearchOpsAction,
     LookupOpsAction,
-    RoleManagedEntityBulkCreateOpsAction,
+    PartialBulkUpdateOpsAction,
+    RoleManagedEntityAtomicCreateOpsAction,
     RoleManagedEntityCreateOpsAction,
-    RoleManagedEntityUpsertOpsAction,
     SearchOpsAction,
     UpdateOpsAction,
 )
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    BulkFieldOpsResult,
     BulkOpsResult,
     CreatedEntityOpsResult,
+    CreatedEntityWithFieldsOpsResult,
+    CreatedFieldOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
+    FieldOwnerLookupOpsResult,
+    FieldsOpsResult,
     LookupOpsResult,
+    OwnedFieldsOpsResult,
     ScopedBatchOpsResult,
+    ScopedFieldsOpsResult,
 )
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = (
     "GetService",
+    "BulkOwnedFieldGetService",
     "LookupService",
+    "BulkFieldOwnerLookupService",
+    "FieldOwnerKeyLookupService",
+    "FieldOwnerLookupService",
     "SearchService",
     "GlobalSearchService",
     "GlobalCreateService",
+    "GlobalCreateWithFieldsService",
     "EntityCreateService",
     "RoleManagedEntityCreateService",
     "FieldCreateService",
-    "GlobalBulkCreateService",
-    "EntityBulkCreateService",
-    "RoleManagedEntityBulkCreateService",
-    "FieldBulkCreateService",
+    "GlobalAtomicCreateService",
+    "EntityAtomicCreateService",
+    "RoleManagedEntityAtomicCreateService",
+    "FieldAtomicCreateService",
     "GlobalPurgeService",
     "EntityPurgeService",
     "FieldPurgeService",
-    "GlobalBulkPurgeService",
-    "EntityBulkPurgeService",
-    "FieldBulkPurgeService",
+    "GlobalPartialBulkPurgeService",
+    "EntityPartialBulkPurgeService",
+    "FieldPartialBulkPurgeService",
     "GlobalUpsertService",
     "EntityUpsertService",
-    "RoleManagedEntityUpsertService",
+    "EntityAtomicUpsertService",
+    "GlobalAtomicUpsertService",
     "FieldUpsertService",
     "UpdateService",
     "DeleteService",
-    "BulkUpdateService",
-    "BulkDeleteService",
+    "RestoreService",
+    "PartialBulkUpdateService",
+    "PartialBulkDeleteService",
+    "PartialBulkRestoreService",
     "BatchUpdateService",
     "GlobalBatchUpdateService",
     "BatchPurgeService",
@@ -102,6 +131,21 @@ class GetService[TData]:
         return EntityOpsResult(data=await self._repository.get(action.to_querier()))
 
 
+class BulkOwnedFieldGetService[TFieldData: FieldData]:
+    """Reads the field row each entity the action names designates."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: BulkGetOwnedFieldOpsAction[Any, Any, TFieldData]
+    ) -> OwnedFieldsOpsResult[Any, TFieldData]:
+        designated = await self._repository.owned_fields(action.to_querier(), action.owner_ids())
+        return OwnedFieldsOpsResult(designated=designated)
+
+
 class LookupService[TData: EntityData]:
     """Resolves the key the action's lookup spec describes into an entity."""
 
@@ -110,8 +154,67 @@ class LookupService[TData: EntityData]:
     def __init__(self, repository: OpsRepository[TData]) -> None:
         self._repository = repository
 
-    async def execute(self, action: LookupOpsAction[Any, TData]) -> LookupOpsResult[TData]:
-        return LookupOpsResult(data=await self._repository.lookup(action.to_lookup()))
+    async def execute(self, action: LookupOpsAction[Any, Any]) -> LookupOpsResult[Any]:
+        return LookupOpsResult(resolved_entity_id=await self._repository.lookup(action.to_lookup()))
+
+
+class FieldOwnerLookupService:
+    """Reads the id of the entity that owns a field row."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: FieldOwnerLookupOpsAction[Any, Any]
+    ) -> FieldOwnerLookupOpsResult:
+        owner_entity_id = await self._repository.field_owner(
+            action.to_owner_lookup(), action.field_id()
+        )
+        return FieldOwnerLookupOpsResult(owner_entity_id=owner_entity_id)
+
+
+class FieldOwnerKeyLookupService:
+    """Reads the id of the entity that owns the field row a key names."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: FieldOwnerKeyLookupOpsAction[Any]) -> FieldOwnerLookupOpsResult:
+        owner_entity_id = await self._repository.field_owner_by_key(action.to_owner_lookup())
+        return FieldOwnerLookupOpsResult(owner_entity_id=owner_entity_id)
+
+
+class BulkFieldOwnerLookupService:
+    """Reads the entities owning the field rows an action names, answering per row."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: LookupBulkFieldOwnerOpsAction[Any, Any]
+    ) -> BulkFieldOwnerLookupOpsResult[Any]:
+        field_ids = action.field_ids()
+        owners = await self._repository.field_owners(action.to_owner_lookup(), field_ids)
+        found = ActionRunStatus.success()
+        key_results = [
+            BulkLookupKeyResult(
+                key=action.to_lookup_key(field_id),
+                status=found.status if field_id in owners else OperationStatus.ERROR,
+                description=found.description
+                if field_id in owners
+                else "No field row matches the given id.",
+                error_code=None,
+                entity_id=owners.get(field_id),
+            )
+            for field_id in field_ids
+        ]
+        return BulkFieldOwnerLookupOpsResult(owners=owners, key_results=key_results)
 
 
 class SearchService[TData: EntityData]:
@@ -132,6 +235,30 @@ class SearchService[TData: EntityData]:
             action.operation_scopes(), action.to_searcher()
         )
         return ScopedBatchOpsResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+
+class SearchFieldsService[TData]:
+    """Runs the action's searcher over the owner scopes it names.
+
+    Same read as :class:`SearchService`; what differs is the result, which names no
+    entity because field rows are not entities.
+    """
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: SearchOpsAction[Any, TData]) -> ScopedFieldsOpsResult[TData]:
+        result = await self._repository.search_in_scopes(
+            action.operation_scopes(), action.to_searcher()
+        )
+        return ScopedFieldsOpsResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
@@ -163,7 +290,7 @@ class GlobalSearchService[TData]:
 
 
 class GlobalCreateService[TData: EntityData]:
-    """Inserts the global-family row the action's creator describes."""
+    """Inserts the global row the action's creator describes."""
 
     _repository: OpsRepository[TData]
 
@@ -176,6 +303,23 @@ class GlobalCreateService[TData: EntityData]:
         return CreatedEntityOpsResult(
             data=await self._repository.create_global_entity(action.to_creator())
         )
+
+
+class GlobalCreateWithFieldsService[TData: EntityData]:
+    """Inserts a global row and the field rows it owns, in one transaction."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: GlobalEntityWithFieldsCreateOpsAction[Any, TData, Any, Any]
+    ) -> CreatedEntityWithFieldsOpsResult[TData, Any]:
+        result = await self._repository.create_global_entity_with_fields(
+            action.to_creator(), action.to_field_creators()
+        )
+        return CreatedEntityWithFieldsOpsResult(data=result.data, fields=result.fields)
 
 
 class EntityCreateService[TData: EntityData]:
@@ -195,6 +339,23 @@ class EntityCreateService[TData: EntityData]:
         )
 
 
+class EntityCreateWithFieldsService[TData: EntityData]:
+    """Inserts an entity row and the field rows it owns, in one transaction."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: EntityWithFieldsCreateOpsAction[Any, TData, Any, Any]
+    ) -> CreatedEntityWithFieldsOpsResult[TData, Any]:
+        result = await self._repository.create_entity_with_fields(
+            action.to_creator(), action.to_field_creators()
+        )
+        return CreatedEntityWithFieldsOpsResult(data=result.data, fields=result.fields)
+
+
 class RoleManagedEntityCreateService[TData: EntityData]:
     """Inserts the role-managed entity row, preset roles included."""
 
@@ -211,23 +372,23 @@ class RoleManagedEntityCreateService[TData: EntityData]:
         )
 
 
-class FieldCreateService[TData: EntityData]:
+class FieldCreateService[TData: FieldData]:
     """Inserts the field row the action's creator describes under the action's owner."""
 
-    _repository: OpsRepository[TData]
+    _repository: OpsRepository[Any]
 
-    def __init__(self, repository: OpsRepository[TData]) -> None:
+    def __init__(self, repository: OpsRepository[Any]) -> None:
         self._repository = repository
 
     async def execute(
-        self, action: FieldEntityCreateOpsAction[Any, Any, TData]
-    ) -> CreatedEntityOpsResult[TData]:
-        return CreatedEntityOpsResult(
-            data=await self._repository.create_field_entity(action.owner_id(), action.to_creator())
+        self, action: FieldCreateOpsAction[Any, Any, TData]
+    ) -> CreatedFieldOpsResult[TData]:
+        return CreatedFieldOpsResult(
+            data=await self._repository.create_field(action.owner_id(), action.to_creator())
         )
 
 
-class GlobalBulkCreateService[TData: EntityData]:
+class GlobalAtomicCreateService[TData: EntityData]:
     """Inserts every global row the action's creators describe, atomically."""
 
     _repository: OpsRepository[TData]
@@ -236,14 +397,14 @@ class GlobalBulkCreateService[TData: EntityData]:
         self._repository = repository
 
     async def execute(
-        self, action: GlobalEntityBulkCreateOpsAction[Any, TData]
+        self, action: GlobalEntityAtomicCreateOpsAction[Any, TData]
     ) -> EntitiesOpsResult[TData]:
         return EntitiesOpsResult(
-            items=await self._repository.bulk_create_global_entities(action.to_creators())
+            items=await self._repository.atomic_create_global_entities(action.to_creators())
         )
 
 
-class EntityBulkCreateService[TData: EntityData]:
+class EntityAtomicCreateService[TData: EntityData]:
     """Inserts every entity row the action's creators describe, atomically."""
 
     _repository: OpsRepository[TData]
@@ -252,14 +413,14 @@ class EntityBulkCreateService[TData: EntityData]:
         self._repository = repository
 
     async def execute(
-        self, action: EntityBulkCreateOpsAction[Any, TData]
+        self, action: EntityAtomicCreateOpsAction[Any, TData]
     ) -> EntitiesOpsResult[TData]:
         return EntitiesOpsResult(
-            items=await self._repository.bulk_create_entities(action.to_creators())
+            items=await self._repository.atomic_create_entities(action.to_creators())
         )
 
 
-class RoleManagedEntityBulkCreateService[TData: EntityData]:
+class RoleManagedEntityAtomicCreateService[TData: EntityData]:
     """Inserts every role-managed entity row atomically, preset roles included."""
 
     _repository: OpsRepository[TData]
@@ -268,43 +429,41 @@ class RoleManagedEntityBulkCreateService[TData: EntityData]:
         self._repository = repository
 
     async def execute(
-        self, action: RoleManagedEntityBulkCreateOpsAction[Any, TData]
+        self, action: RoleManagedEntityAtomicCreateOpsAction[Any, TData]
     ) -> EntitiesOpsResult[TData]:
         return EntitiesOpsResult(
-            items=await self._repository.bulk_create_role_managed_entities(action.to_creators())
+            items=await self._repository.atomic_create_role_managed_entities(action.to_creators())
         )
 
 
-class FieldBulkCreateService[TData: EntityData]:
+class FieldAtomicCreateService[TData: FieldData]:
     """Inserts every field row the action's creators describe under the action's owner."""
 
-    _repository: OpsRepository[TData]
+    _repository: OpsRepository[Any]
 
-    def __init__(self, repository: OpsRepository[TData]) -> None:
+    def __init__(self, repository: OpsRepository[Any]) -> None:
         self._repository = repository
 
     async def execute(
-        self, action: FieldEntityBulkCreateOpsAction[Any, Any, TData]
-    ) -> EntitiesOpsResult[TData]:
-        return EntitiesOpsResult(
-            items=await self._repository.bulk_create_field_entities(
+        self, action: FieldAtomicCreateOpsAction[Any, Any, TData]
+    ) -> FieldsOpsResult[TData]:
+        return FieldsOpsResult(
+            items=await self._repository.atomic_create_field_entities(
                 action.owner_id(), action.to_creators()
             )
         )
 
 
 class GlobalPurgeService[TData]:
-    """Hard-deletes the global-family row the action's purger describes."""
+    """Hard-deletes the global row the action's purger describes."""
 
     _repository: OpsRepository[TData]
 
     def __init__(self, repository: OpsRepository[TData]) -> None:
         self._repository = repository
 
-    async def execute(
-        self, action: GlobalEntityPurgeOpsAction[Any, TData]
-    ) -> EntityOpsResult[TData]:
-        return EntityOpsResult(data=await self._repository.purge_global_entity(action.to_purger()))
+    async def execute(self, action: EntityPurgeOpsAction[Any, TData]) -> EntityOpsResult[TData]:
+        return EntityOpsResult(data=await self._repository.purge_entity(action.to_purger()))
 
 
 class EntityPurgeService[TData]:
@@ -319,7 +478,7 @@ class EntityPurgeService[TData]:
         return EntityOpsResult(data=await self._repository.purge_entity(action.to_purger()))
 
 
-class FieldPurgeService[TData]:
+class FieldPurgeService[TData: FieldData]:
     """Hard-deletes the field row the action's purger describes; no membership work."""
 
     _repository: OpsRepository[TData]
@@ -327,13 +486,11 @@ class FieldPurgeService[TData]:
     def __init__(self, repository: OpsRepository[TData]) -> None:
         self._repository = repository
 
-    async def execute(
-        self, action: FieldEntityPurgeOpsAction[Any, TData]
-    ) -> EntityOpsResult[TData]:
+    async def execute(self, action: FieldPurgeOpsAction[Any, TData]) -> EntityOpsResult[TData]:
         return EntityOpsResult(data=await self._repository.purge_field_entity(action.to_purger()))
 
 
-class GlobalBulkPurgeService[TData]:
+class GlobalPartialBulkPurgeService[TData]:
     """Hard-deletes each global entity the action named, answering for every one."""
 
     _repository: OpsRepository[TData]
@@ -342,13 +499,13 @@ class GlobalBulkPurgeService[TData]:
         self._repository = repository
 
     async def execute(
-        self, action: GlobalEntityBulkPurgeOpsAction[Any, TData]
+        self, action: GlobalEntityPartialBulkPurgeOpsAction[Any, TData]
     ) -> BulkOpsResult[TData]:
-        result = await self._repository.bulk_purge_global_entities(action.to_purgers())
+        result = await self._repository.partial_bulk_purge_entities(action.to_purgers())
         return BulkOpsResult(successes=result.successes, errors=result.errors)
 
 
-class EntityBulkPurgeService[TData]:
+class EntityPartialBulkPurgeService[TData]:
     """Hard-deletes each entity the action named, answering for every one."""
 
     _repository: OpsRepository[TData]
@@ -356,12 +513,14 @@ class EntityBulkPurgeService[TData]:
     def __init__(self, repository: OpsRepository[TData]) -> None:
         self._repository = repository
 
-    async def execute(self, action: EntityBulkPurgeOpsAction[Any, TData]) -> BulkOpsResult[TData]:
-        result = await self._repository.bulk_purge_entities(action.to_purgers())
+    async def execute(
+        self, action: EntityPartialBulkPurgeOpsAction[Any, TData]
+    ) -> BulkOpsResult[TData]:
+        result = await self._repository.partial_bulk_purge_entities(action.to_purgers())
         return BulkOpsResult(successes=result.successes, errors=result.errors)
 
 
-class FieldBulkPurgeService[TData]:
+class FieldPartialBulkPurgeService[TData: FieldData]:
     """Hard-deletes each field row the action named, answering for every one."""
 
     _repository: OpsRepository[TData]
@@ -370,10 +529,9 @@ class FieldBulkPurgeService[TData]:
         self._repository = repository
 
     async def execute(
-        self, action: FieldEntityBulkPurgeOpsAction[Any, TData]
-    ) -> BulkOpsResult[TData]:
-        result = await self._repository.bulk_purge_field_entities(action.to_purgers())
-        return BulkOpsResult(successes=result.successes, errors=result.errors)
+        self, action: FieldPartialBulkPurgeOpsAction[Any, Any, TData]
+    ) -> BulkFieldOpsResult[TData]:
+        return await self._repository.partial_bulk_purge_field_entities(action.to_purgers())
 
 
 class GlobalUpsertService[TData]:
@@ -405,9 +563,8 @@ class EntityUpsertService[TData]:
         return EntityOpsResult(data=await self._repository.upsert_entity(action.to_upserter()))
 
 
-class RoleManagedEntityUpsertService[TData]:
-    """Inserts or updates a role-managed entity row; preset roles are provisioned
-    only when the upsert actually created the scope."""
+class GlobalAtomicUpsertService[TData: EntityData]:
+    """Inserts or updates every global row the action's upserters describe, atomically."""
 
     _repository: OpsRepository[TData]
 
@@ -415,14 +572,30 @@ class RoleManagedEntityUpsertService[TData]:
         self._repository = repository
 
     async def execute(
-        self, action: RoleManagedEntityUpsertOpsAction[Any, TData]
-    ) -> EntityOpsResult[TData]:
-        return EntityOpsResult(
-            data=await self._repository.upsert_role_managed_entity(action.to_upserter())
+        self, action: GlobalEntityAtomicUpsertOpsAction[Any, TData]
+    ) -> EntitiesOpsResult[TData]:
+        return EntitiesOpsResult(
+            items=await self._repository.atomic_upsert_global_entities(action.to_upserters())
         )
 
 
-class FieldUpsertService[TData]:
+class EntityAtomicUpsertService[TData: EntityData]:
+    """Inserts or updates every entity row the action's upserters describe, atomically."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: EntityAtomicUpsertOpsAction[Any, TData]
+    ) -> EntitiesOpsResult[TData]:
+        return EntitiesOpsResult(
+            items=await self._repository.atomic_upsert_entities(action.to_upserters())
+        )
+
+
+class FieldUpsertService[TData: FieldData]:
     """Inserts or updates a field row on conflict, under the action's owner."""
 
     _repository: OpsRepository[TData]
@@ -431,7 +604,7 @@ class FieldUpsertService[TData]:
         self._repository = repository
 
     async def execute(
-        self, action: FieldEntityUpsertOpsAction[Any, Any, TData]
+        self, action: FieldUpsertOpsAction[Any, Any, TData]
     ) -> EntityOpsResult[TData]:
         return EntityOpsResult(
             data=await self._repository.upsert_field_entity(action.owner_id(), action.to_upserter())
@@ -469,7 +642,24 @@ class DeleteService[TData]:
         return EntityOpsResult(data=await self._repository.update(action.to_updater()))
 
 
-class BulkUpdateService[TData]:
+class RestoreService[TData]:
+    """Restores by applying the action's updater.
+
+    Identical to :class:`DeleteService` under the hood. The action declares
+    ``operation_type() == RESTORE``, so the audit says restore while the permission
+    checked stays soft-delete.
+    """
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: UpdateOpsAction[Any, TData]) -> EntityOpsResult[TData]:
+        return EntityOpsResult(data=await self._repository.update(action.to_updater()))
+
+
+class PartialBulkUpdateService[TData]:
     """Updates each entity the action named, answering for every one of them."""
 
     _repository: OpsRepository[TData]
@@ -477,15 +667,15 @@ class BulkUpdateService[TData]:
     def __init__(self, repository: OpsRepository[TData]) -> None:
         self._repository = repository
 
-    async def execute(self, action: BulkUpdateOpsAction[Any, TData]) -> BulkOpsResult[TData]:
-        result = await self._repository.bulk_update(action.to_updaters())
+    async def execute(self, action: PartialBulkUpdateOpsAction[Any, TData]) -> BulkOpsResult[TData]:
+        result = await self._repository.partial_bulk_update(action.to_updaters())
         return BulkOpsResult(successes=result.successes, errors=result.errors)
 
 
-class BulkDeleteService[TData]:
+class PartialBulkDeleteService[TData]:
     """Soft-deletes each entity the action named.
 
-    Takes ``BulkUpdateOpsAction`` for the same reason the single-entity delete does: the
+    Takes ``PartialBulkUpdateOpsAction`` for the same reason the single-entity delete does: the
     status transition is domain knowledge and ops has no delete operation to generalize.
     """
 
@@ -494,8 +684,21 @@ class BulkDeleteService[TData]:
     def __init__(self, repository: OpsRepository[TData]) -> None:
         self._repository = repository
 
-    async def execute(self, action: BulkUpdateOpsAction[Any, TData]) -> BulkOpsResult[TData]:
-        result = await self._repository.bulk_update(action.to_updaters())
+    async def execute(self, action: PartialBulkUpdateOpsAction[Any, TData]) -> BulkOpsResult[TData]:
+        result = await self._repository.partial_bulk_update(action.to_updaters())
+        return BulkOpsResult(successes=result.successes, errors=result.errors)
+
+
+class PartialBulkRestoreService[TData]:
+    """Restores each entity the action named, answering for every one of them."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: PartialBulkUpdateOpsAction[Any, TData]) -> BulkOpsResult[TData]:
+        result = await self._repository.partial_bulk_update(action.to_updaters())
         return BulkOpsResult(successes=result.successes, errors=result.errors)
 
 

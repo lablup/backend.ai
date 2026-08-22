@@ -1,46 +1,59 @@
-"""Action for searching resource slots of a deployment revision preset."""
-
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import override
-from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.deployment_revision_preset.actions.base import (
-    DeploymentRevisionPresetAction,
+from ai.backend.common.data.entity.deployment_preset import (
+    DEPLOYMENT_PRESET_ENTITY_TYPE,
+    DeploymentPresetID,
+)
+from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
+from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotData
+from ai.backend.manager.models.deployment_revision_preset.searchers import (
+    PresetResourceSlotSearcher,
+)
+from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.repositories.deployment_revision_preset.types import (
+    DeploymentPresetSlotOperationScope,
 )
 
 
 @dataclass
-class SearchPresetResourceSlotsAction(DeploymentRevisionPresetAction):
-    """Action to search resource slots allocated to a deployment revision preset."""
+class SearchPresetResourceSlotsAction(
+    OperationScopeOpsAction[PresetResourceSlotRow, PresetResourceSlotData]
+):
+    """Page through the slot amounts inside one preset.
 
-    preset_id: UUID
-    querier: BatchQuerier
+    The preset is the scope, so ops applies that condition. There is no unpaginated
+    variant -- a caller that wants every slot passes no pagination.
+    """
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.preset_id)
+    preset_id: DeploymentPresetID
+    searcher: PresetResourceSlotSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchPresetResourceSlotsActionResult(BaseActionResult):
-    """Result of searching preset resource slots."""
-
-    items: list[tuple[str, Decimal]]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return DEPLOYMENT_PRESET_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (
+            ScopeRef(scope_type=ScopeType(DEPLOYMENT_PRESET_ENTITY_TYPE), scope_id=self.preset_id),
+        )
+
+    @override
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return (DeploymentPresetSlotOperationScope(preset_id=self.preset_id),)
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_deployment_preset_resource_slots"
+
+    @override
+    def to_searcher(self) -> PresetResourceSlotSearcher:
+        return self.searcher

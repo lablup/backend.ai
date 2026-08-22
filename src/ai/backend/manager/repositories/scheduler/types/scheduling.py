@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
-from ai.backend.common.identifier.session_group import SessionGroupID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.types import AgentId
 from ai.backend.manager.views.sokovan.agent import AgentMeta
 from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta

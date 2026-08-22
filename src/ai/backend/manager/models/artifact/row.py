@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -45,8 +46,8 @@ class ArtifactRow(Base):
 
     __tablename__ = "artifacts"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ArtifactID] = mapped_column(
+        "id", GUID(ArtifactID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     type: Mapped[ArtifactType] = mapped_column(
         "type", sa.Enum(ArtifactType), index=True, nullable=False
@@ -56,6 +57,8 @@ class ArtifactRow(Base):
     registry_type: Mapped[str] = mapped_column(
         "registry_type", sa.String, nullable=False, index=True
     )
+    # Both registry columns hold a per-type registry row's id (huggingface / reservoir),
+    # not an ``artifact_registries`` id, so neither carries a typed identifier.
     source_registry_id: Mapped[uuid.UUID] = mapped_column(
         "source_registry_id", GUID, nullable=False, index=True
     )

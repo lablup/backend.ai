@@ -18,6 +18,7 @@ from sqlalchemy import exc as sa_exc
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnreachableError
@@ -32,7 +33,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.group.types import ProjectResourceInfo
+from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     VFolderCreateParams,
@@ -57,7 +58,7 @@ from ai.backend.manager.errors.storage import (
     VFolderOperationFailed,
 )
 from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.models.group import ProjectType
+from ai.backend.manager.models.project import ProjectType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (
     VFolderCloneInfo,
@@ -82,14 +83,14 @@ from ai.backend.manager.services.vfolder.actions.base import (
     DeleteForeverVFolderActionResult,
     ForceDeleteVFolderAction,
     ForceDeleteVFolderActionResult,
-    GetAccessibleVFolderAction,
-    GetAccessibleVFolderActionResult,
     GetTaskLogsAction,
     GetTaskLogsActionResult,
     GetVFolderAction,
     GetVFolderActionResult,
     ListVFolderAction,
     ListVFolderActionResult,
+    LookupAccessibleVFolderAction,
+    LookupAccessibleVFolderActionResult,
     MoveToTrashVFolderAction,
     MoveToTrashVFolderActionResult,
     PurgeVFolderAction,
@@ -100,8 +101,8 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
-    BatchLoadVFoldersByIdsAction,
-    BatchLoadVFoldersByIdsActionResult,
+    GlobalBatchLoadVFoldersAction,
+    GlobalBatchLoadVFoldersActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.create_v2 import (
     CreateVFolderV2Action,
@@ -110,11 +111,6 @@ from ai.backend.manager.services.vfolder.actions.create_v2 import (
 from ai.backend.manager.services.vfolder.actions.file_v2 import (
     CloneVFolderV2Action,
     CloneVFolderV2ActionResult,
-)
-from ai.backend.manager.services.vfolder.actions.get_my_storage_host_permissions import (
-    GetMyStorageHostPermissionsAction,
-    GetMyStorageHostPermissionsActionResult,
-    StorageHostPermissionEntry,
 )
 from ai.backend.manager.services.vfolder.actions.get_row import (
     GetVFolderLegacyRowAction,
@@ -128,13 +124,18 @@ from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
-    ResolveIdsByNamesAction,
-    ResolveIdsByNamesActionResult,
+from ai.backend.manager.services.vfolder.actions.lookup import (
+    LookupVFolderAction,
+    LookupVFolderActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
     SearchVFoldersInProjectActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.search_storage_host_permissions import (
+    SearchStorageHostPermissionsAction,
+    SearchStorageHostPermissionsActionResult,
+    StorageHostPermissionEntry,
 )
 from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
     SearchUserVFoldersAction,
@@ -143,29 +144,29 @@ from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ChangeVFolderOwnershipAction,
     ChangeVFolderOwnershipActionResult,
-    GetFstabContentsAction,
-    GetFstabContentsActionResult,
     GetQuotaAction,
     GetQuotaActionResult,
     GetVFolderUsageLegacyAction,
     GetVFolderUsageLegacyActionResult,
     GetVFolderUsedBytesAction,
     GetVFolderUsedBytesActionResult,
-    GetVolumePerfMetricAction,
-    GetVolumePerfMetricActionResult,
-    ListAllHostsAction,
-    ListAllHostsActionResult,
-    ListAllowedTypesAction,
-    ListAllowedTypesActionResult,
-    ListHostsAction,
-    ListHostsActionResult,
-    ListMountsAction,
-    ListMountsActionResult,
-    MountHostAction,
-    MountHostActionResult,
+    GlobalGetFstabContentsAction,
+    GlobalGetFstabContentsActionResult,
+    GlobalGetVolumePerfMetricAction,
+    GlobalGetVolumePerfMetricActionResult,
+    GlobalListAllHostsAction,
+    GlobalListAllHostsActionResult,
+    GlobalListAllowedTypesAction,
+    GlobalListAllowedTypesActionResult,
+    GlobalListMountsAction,
+    GlobalListMountsActionResult,
+    GlobalMountHostAction,
+    GlobalMountHostActionResult,
+    GlobalUmountHostAction,
+    GlobalUmountHostActionResult,
     MountResultData,
-    UmountHostAction,
-    UmountHostActionResult,
+    SearchHostsAction,
+    SearchHostsActionResult,
     UpdateQuotaAction,
     UpdateQuotaActionResult,
 )
@@ -235,36 +236,28 @@ class VFolderService:
         self._valkey_stat_client = valkey_stat_client
 
     async def batch_load_by_ids(
-        self, action: BatchLoadVFoldersByIdsAction
-    ) -> BatchLoadVFoldersByIdsActionResult:
+        self, action: GlobalBatchLoadVFoldersAction
+    ) -> GlobalBatchLoadVFoldersActionResult:
         """Batch fetch vfolders by IDs for cross-entity reference resolution.
 
         Audit log records this as ``vfolder.GET`` (not as a search).
         """
         data = await self._vfolder_repository.batch_load_by_ids(action.ids)
-        return BatchLoadVFoldersByIdsActionResult(data=data)
+        return GlobalBatchLoadVFoldersActionResult(data=data)
 
-    async def resolve_vfolder_ids_by_names(
-        self, action: ResolveIdsByNamesAction
-    ) -> ResolveIdsByNamesActionResult:
-        """Resolve a batch of vfolder names into their UUIDs in one query.
+    async def lookup_vfolder(self, action: LookupVFolderAction) -> LookupVFolderActionResult:
+        """Resolve one vfolder name into its id.
 
-        No access checking — used by session-creation paths that still
-        accept vfolder names in ``creation_config["mounts"]`` to convert
-        them into ids before the real session-create action runs. The
-        downstream action validates the user's access against the
-        resolved ids.
-
-        Raises ``VFolderNotFound`` if any requested name has no matching
-        row, with the missing names attached as ``extra_data``.
+        No access checking — the session-create path that still accepts names in
+        ``creation_config["mounts"]`` validates the resolved ids downstream.
         """
-        name_to_id = await self._vfolder_repository.resolve_vfolder_ids_by_names(
-            action.vfolder_names
-        )
-        missing = [name for name in action.vfolder_names if name not in name_to_id]
-        if missing:
-            raise VFolderNotFound(extra_data=missing)
-        return ResolveIdsByNamesActionResult(name_to_id=name_to_id)
+        name_to_id = await self._vfolder_repository.resolve_vfolder_ids_by_names([
+            action.vfolder_name
+        ])
+        vfolder_id = name_to_id.get(action.vfolder_name)
+        if vfolder_id is None:
+            raise VFolderNotFound(extra_data=[action.vfolder_name])
+        return LookupVFolderActionResult(vfolder_uuid=VFolderUUID(vfolder_id))
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         user_role = action.user_role
@@ -617,8 +610,6 @@ class VFolderService:
         return ListVFolderActionResult(
             user_uuid=action.user_uuid,
             vfolders=vfolders,
-            _scope_type=action.scope_type(),
-            _scope_id=action.scope_id(),
         )
 
     async def search_in_project(
@@ -957,14 +948,16 @@ class VFolderService:
         return GetTaskLogsActionResult(response=response, vfolder_data=log_vfolder_data)
 
     async def list_allowed_types(
-        self, action: ListAllowedTypesAction
-    ) -> ListAllowedTypesActionResult:
+        self, action: GlobalListAllowedTypesAction
+    ) -> GlobalListAllowedTypesActionResult:
         allowed_vfolder_types = (
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
-        return ListAllowedTypesActionResult(allowed_types=list(allowed_vfolder_types))
+        return GlobalListAllowedTypesActionResult(allowed_types=list(allowed_vfolder_types))
 
-    async def list_all_hosts(self, action: ListAllHostsAction) -> ListAllHostsActionResult:
+    async def list_all_hosts(
+        self, action: GlobalListAllHostsAction
+    ) -> GlobalListAllHostsActionResult:
         all_volumes = await self._storage_manager.get_all_volumes()
         all_hosts = {
             f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes
@@ -972,15 +965,15 @@ class VFolderService:
         default_host = self._config_provider.config.volumes.default_host
         if default_host not in all_hosts:
             default_host = None
-        return ListAllHostsActionResult(default=default_host, allowed=sorted(all_hosts))
+        return GlobalListAllHostsActionResult(default=default_host, allowed=sorted(all_hosts))
 
     async def get_volume_perf_metric(
-        self, action: GetVolumePerfMetricAction
-    ) -> GetVolumePerfMetricActionResult:
+        self, action: GlobalGetVolumePerfMetricAction
+    ) -> GlobalGetVolumePerfMetricActionResult:
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(action.folder_host)
         manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
         storage_reply = await manager_client.get_volume_performance_metric(volume_name)
-        return GetVolumePerfMetricActionResult(data=dict(storage_reply))
+        return GlobalGetVolumePerfMetricActionResult(data=dict(storage_reply))
 
     async def get_usage_legacy(
         self, action: GetVFolderUsageLegacyAction
@@ -989,7 +982,7 @@ class VFolderService:
             action.folder_host, is_unmanaged(action.unmanaged_path)
         )
         client = self._storage_manager.get_manager_facing_client(proxy_name)
-        usage = await client.get_folder_usage(volume_name, action.vfolder_id)
+        usage = await client.get_folder_usage(volume_name, action.vfid)
         return GetVFolderUsageLegacyActionResult(data=dict(usage))
 
     async def get_used_bytes(
@@ -999,10 +992,10 @@ class VFolderService:
             action.folder_host, is_unmanaged(action.unmanaged_path)
         )
         client = self._storage_manager.get_manager_facing_client(proxy_name)
-        usage = await client.get_used_bytes(volume_name, action.vfolder_id)
+        usage = await client.get_used_bytes(volume_name, action.vfid)
         return GetVFolderUsedBytesActionResult(data=dict(usage))
 
-    async def list_hosts(self, action: ListHostsAction) -> ListHostsActionResult:
+    async def list_hosts(self, action: SearchHostsAction) -> SearchHostsActionResult:
         allowed_vfolder_types = (
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
@@ -1036,7 +1029,7 @@ class VFolderService:
             for proxy_name, volume_data in volumes
         ]
         get_sftp_tasks = [
-            self._storage_manager.get_sftp_scaling_groups(proxy_name)
+            self._storage_manager.get_sftp_resource_groups(proxy_name)
             for proxy_name, volume_data in volumes
         ]
 
@@ -1046,7 +1039,7 @@ class VFolderService:
         )
 
         volume_info: dict[str, Any] = {}
-        for (proxy_name, volume_data), usage, sftp_scaling_groups in zip(
+        for (proxy_name, volume_data), usage, sftp_resource_groups in zip(
             volumes,
             fetch_results,
             sftp_results,
@@ -1057,18 +1050,18 @@ class VFolderService:
                 "backend": volume_data["backend"],
                 "capabilities": volume_data["capabilities"],
                 "usage": usage,
-                "sftp_scaling_groups": sftp_scaling_groups,
+                "sftp_scaling_groups": sftp_resource_groups,
             }
 
-        return ListHostsActionResult(
+        return SearchHostsActionResult(
             default=default_host,
             allowed=sorted(allowed_hosts),
             volume_info=volume_info,
         )
 
-    async def get_my_storage_host_permissions(
-        self, action: GetMyStorageHostPermissionsAction
-    ) -> GetMyStorageHostPermissionsActionResult:
+    async def search_storage_host_permissions(
+        self, action: SearchStorageHostPermissionsAction
+    ) -> SearchStorageHostPermissionsActionResult:
         """Resolve storage hosts and per-host permissions accessible to the user.
 
         Restricts the result to hosts whose backing volume is currently registered
@@ -1090,7 +1083,7 @@ class VFolderService:
             for host, perms in sorted(allowed_hosts.items())
             if host in all_hosts
         ]
-        return GetMyStorageHostPermissionsActionResult(
+        return SearchStorageHostPermissionsActionResult(
             user_uuid=action.user_uuid,
             items=items,
         )
@@ -1144,7 +1137,7 @@ class VFolderService:
                 await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
             )
             await self._vfolder_repository.check_vfolder_accessible(
-                vfolder_id=action.vfolder_id,
+                vfolder_id=action.vfolder_uuid,
                 user_uuid=action.user_uuid,
                 user_role=action.user_role,
                 domain_name=action.domain_name,
@@ -1174,7 +1167,7 @@ class VFolderService:
                 domain_name=action.domain_name,
             )
             await self._vfolder_repository.check_vfolder_accessible(
-                vfolder_id=action.vfolder_id,
+                vfolder_id=action.vfolder_uuid,
                 user_uuid=action.user_uuid,
                 user_role=action.user_role,
                 domain_name=action.domain_name,
@@ -1189,7 +1182,7 @@ class VFolderService:
         await manager_client.update_volume_quota(volume_name, action.vfid, quota)
 
         await self._vfolder_repository.update_vfolder_max_size(
-            action.vfolder_id, math.ceil(quota / 2**20)
+            action.vfolder_uuid, math.ceil(quota / 2**20)
         )
 
         return UpdateQuotaActionResult(size_bytes=quota)
@@ -1198,7 +1191,7 @@ class VFolderService:
         self, action: ChangeVFolderOwnershipAction
     ) -> ChangeVFolderOwnershipActionResult:
         await self._vfolder_repository.change_vfolder_ownership(
-            action.vfolder_id, action.user_email
+            action.vfolder_uuid, action.user_email
         )
         return ChangeVFolderOwnershipActionResult()
 
@@ -1230,7 +1223,7 @@ class VFolderService:
             mount_prefix = "/mnt"
         return mount_prefix
 
-    async def list_mounts(self, action: ListMountsAction) -> ListMountsActionResult:
+    async def list_mounts(self, action: GlobalListMountsAction) -> GlobalListMountsActionResult:
         """List mount points from manager, storage proxy, and agents."""
         mount_prefix = await self._get_mount_prefix()
         _ = mount_prefix  # mount_prefix used contextually by caller if needed
@@ -1291,27 +1284,27 @@ class VFolderService:
                     continue
                 agents_result[mount[0]] = mount[1]
 
-        return ListMountsActionResult(
+        return GlobalListMountsActionResult(
             manager=manager_result,
             storage_proxy=storage_proxy_result,
             agents=agents_result,
         )
 
-    async def mount_host(self, action: MountHostAction) -> MountHostActionResult:
+    async def mount_host(self, action: GlobalMountHostAction) -> GlobalMountHostActionResult:
         """Mount a filesystem on agents via agent watchers."""
         manager_result = MountResultData(
             success=True,
             message="Managers do not have mountpoints since v20.09.",
         )
 
-        agent_ids = await self._vfolder_repository.get_alive_agent_ids(action.scaling_group)
+        agent_ids = await self._vfolder_repository.get_alive_agent_ids(action.resource_group)
 
         mount_params = {
             "fs_location": action.fs_location,
             "name": action.name,
             "fs_type": action.fs_type,
             "options": action.options,
-            "scaling_group": action.scaling_group,
+            "scaling_group": action.resource_group,
             "fstab_path": action.fstab_path,
             "edit_fstab": action.edit_fstab,
         }
@@ -1351,12 +1344,12 @@ class VFolderService:
                     continue
                 agents_result[mount_result[0]] = mount_result[1]
 
-        return MountHostActionResult(
+        return GlobalMountHostActionResult(
             manager=manager_result,
             agents=agents_result,
         )
 
-    async def umount_host(self, action: UmountHostAction) -> UmountHostActionResult:
+    async def umount_host(self, action: GlobalUmountHostAction) -> GlobalUmountHostActionResult:
         """Unmount a filesystem from agents via agent watchers."""
         mount_prefix = await self._get_mount_prefix()
         mountpoint = Path(mount_prefix) / action.name
@@ -1368,7 +1361,7 @@ class VFolderService:
         if action.name in mounted_names:
             raise VFolderOperationFailed("Target host is used in sessions")
 
-        agent_ids = await self._vfolder_repository.get_alive_agent_ids(action.scaling_group)
+        agent_ids = await self._vfolder_repository.get_alive_agent_ids(action.resource_group)
 
         manager_result = MountResultData(
             success=True,
@@ -1377,7 +1370,7 @@ class VFolderService:
 
         umount_params = {
             "name": action.name,
-            "scaling_group": action.scaling_group,
+            "scaling_group": action.resource_group,
             "fstab_path": action.fstab_path,
             "edit_fstab": action.edit_fstab,
         }
@@ -1417,18 +1410,18 @@ class VFolderService:
                     continue
                 agents_result[umount_result[0]] = umount_result[1]
 
-        return UmountHostActionResult(
+        return GlobalUmountHostActionResult(
             manager=manager_result,
             agents=agents_result,
         )
 
     async def get_fstab_contents(
-        self, action: GetFstabContentsAction
-    ) -> GetFstabContentsActionResult:
+        self, action: GlobalGetFstabContentsAction
+    ) -> GlobalGetFstabContentsActionResult:
         """Get fstab contents from an agent watcher or return a manager stub."""
         fstab_path = action.fstab_path if action.fstab_path is not None else "/etc/fstab"
         if action.agent_id is None:
-            return GetFstabContentsActionResult(
+            return GlobalGetFstabContentsActionResult(
                 content=(
                     "# Since Backend.AI 20.09, reading the manager fstab is no longer supported."
                 ),
@@ -1446,7 +1439,7 @@ class VFolderService:
                 async with sess.get(url, headers=headers, params=params) as resp:
                     if resp.status == 200:
                         content = await resp.text()
-                        return GetFstabContentsActionResult(
+                        return GlobalGetFstabContentsActionResult(
                             content=content,
                             node="agent",
                             node_id=action.agent_id,
@@ -1472,8 +1465,8 @@ class VFolderService:
         return GetVFolderLegacyRowActionResult(row=row)
 
     async def get_accessible_vfolder(
-        self, action: GetAccessibleVFolderAction
-    ) -> GetAccessibleVFolderActionResult:
+        self, action: LookupAccessibleVFolderAction
+    ) -> LookupAccessibleVFolderActionResult:
         allowed_vfolder_types = (
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
@@ -1494,7 +1487,7 @@ class VFolderService:
         row = entries[0]
         if action.required_status is not None:
             await _check_vfolder_status(row["status"], action.required_status)
-        return GetAccessibleVFolderActionResult(row=row)
+        return LookupAccessibleVFolderActionResult(row=row)
 
     def _check_user_role_for_group(
         self, user_role: UserRole, group_type: ProjectType | None
@@ -1703,7 +1696,7 @@ class VFolderService:
         if user.domain_name is None:
             raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_id, user.id, user.domain_name
+            action.vfolder_uuid, user.id, user.domain_name
         )
 
         # Host permission check — resolved from user_id
@@ -1847,7 +1840,7 @@ class VFolderService:
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_id)
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
 
         # Host permission check — resolved from current user context
         await self._vfolder_repository.ensure_host_permission_allowed_by_user(
@@ -1857,7 +1850,7 @@ class VFolderService:
         )
 
         await self._vfolder_repository.move_vfolders_to_trash([vfolder_data.id])
-        return DeleteVFolderV2ActionResult(vfolder_id=action.vfolder_id)
+        return DeleteVFolderV2ActionResult(vfolder_id=action.vfolder_uuid)
 
     async def purge_v2(self, action: PurgeVFolderV2Action) -> PurgeVFolderV2ActionResult:
         """Permanently purge a vfolder by ID. RBAC enforced at processor level.
@@ -1869,7 +1862,7 @@ class VFolderService:
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_id)
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
 
         # Host permission check — resolved from current user context
         await self._vfolder_repository.ensure_host_permission_allowed_by_user(
@@ -1879,14 +1872,14 @@ class VFolderService:
         )
 
         result = await self._vfolder_repository.delete_vfolders_forever(
-            [action.vfolder_id],
+            [action.vfolder_uuid],
             cascade_model_card=action.cascade_model_card,
             force=action.force,
         )
         if result.failures:
             raise result.failures[0].exception
         await self._remove_vfolder_from_storage(vfolder_data)
-        return PurgeVFolderV2ActionResult(vfolder_id=action.vfolder_id)
+        return PurgeVFolderV2ActionResult(vfolder_id=action.vfolder_uuid)
 
     async def clone_v2(self, action: CloneVFolderV2Action) -> CloneVFolderV2ActionResult:
         """Clone a vfolder (v2). Resolves policy internally from user_id."""
@@ -1908,7 +1901,7 @@ class VFolderService:
             user_role=user_role,
             domain_name=user_domain_name,
             allowed_vfolder_types=list(allowed_vfolder_types),
-            extra_conditions=(VFolderRow.id == action.vfolder_id),
+            extra_conditions=(VFolderRow.id == action.vfolder_uuid),
         )
 
         if not vfolder_list_result.vfolders:

@@ -55,7 +55,7 @@ class StorageProxyInfo:
     secret: str
     client_api_url: yarl.URL
     manager_api_url: yarl.URL
-    sftp_scaling_groups: list[str]
+    sftp_resource_groups: list[str]
 
 
 class StorageSessionManager:
@@ -76,7 +76,7 @@ class StorageSessionManager:
                 secret=proxy_config.secret,
                 client_api_url=yarl.URL(proxy_config.client_api),
                 manager_api_url=yarl.URL(proxy_config.manager_api),
-                sftp_scaling_groups=proxy_config.sftp_scaling_groups or [],
+                sftp_resource_groups=proxy_config.sftp_resource_groups or [],
             )
         self._manager_facing_clients = self._setup_manager_facing_clients(storage_config)
         self._client_facing_clients = self._setup_client_facing_clients(storage_config)
@@ -188,7 +188,7 @@ class StorageSessionManager:
         _ctx_volumes_cache.set(results)
         return results
 
-    async def get_sftp_scaling_groups(self, proxy_name: str) -> list[str]:
+    async def get_sftp_resource_groups(self, proxy_name: str) -> list[str]:
         if proxy_name not in self._proxies:
             raise IndexError(f"proxy {proxy_name} does not exist")
-        return self._proxies[proxy_name].sftp_scaling_groups or []
+        return self._proxies[proxy_name].sftp_resource_groups or []

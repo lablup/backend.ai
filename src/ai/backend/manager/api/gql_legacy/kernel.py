@@ -27,7 +27,6 @@ from ai.backend.common.types import (
 from ai.backend.manager.api.gql_legacy.stat_converter import LegacyLiveStatConverter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -42,6 +41,7 @@ from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
     QueryFilterParser,
 )
+from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.services.metric.actions.live_stat import ContainerLiveStatAction
 

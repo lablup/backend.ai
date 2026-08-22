@@ -9,12 +9,12 @@ import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.service import ModelServiceNotFound
@@ -24,9 +24,6 @@ from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVa
 from ai.backend.manager.services.model_serving.actions.delete_model_service import (
     DeleteModelServiceAction,
     DeleteModelServiceActionResult,
-)
-from ai.backend.manager.services.model_serving.processors.model_serving import (
-    ModelServingProcessors,
 )
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -101,7 +98,7 @@ class TestDeleteModelService:
     @pytest.fixture
     def mock_deployment_repository(self) -> MagicMock:
         mock = MagicMock()
-        mock.get_default_architecture_from_scaling_group = AsyncMock(return_value=None)
+        mock.get_default_architecture_from_resource_group = AsyncMock(return_value=None)
         return mock
 
     @pytest.fixture
@@ -163,19 +160,6 @@ class TestDeleteModelService:
         )
 
     @pytest.fixture
-    def model_serving_processors(
-        self,
-        mock_action_monitor: MagicMock,
-        model_serving_service: ModelServingService,
-        mock_action_validators: ActionValidators,
-    ) -> ModelServingProcessors:
-        return ModelServingProcessors(
-            service=model_serving_service,
-            action_monitors=[mock_action_monitor],
-            validators=mock_action_validators,
-        )
-
-    @pytest.fixture
     def mock_get_endpoint_by_id(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
         return cast(
             AsyncMock,
@@ -229,7 +213,7 @@ class TestDeleteModelService:
             ScenarioBase.success(
                 "successful model deletion",
                 DeleteModelServiceAction(
-                    service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
+                    deployment_id=DeploymentID(uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111")),
                 ),
                 DeleteModelServiceActionResult(
                     service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
@@ -238,7 +222,7 @@ class TestDeleteModelService:
             ScenarioBase.failure(
                 "non-existent model",
                 DeleteModelServiceAction(
-                    service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
+                    deployment_id=DeploymentID(uuid.UUID("dddddddd-eeee-ffff-1111-222222222222")),
                 ),
                 ModelServiceNotFound,
             ),
@@ -246,9 +230,9 @@ class TestDeleteModelService:
     )
     async def test_delete_model_service(
         self,
+        model_serving_service: ModelServingService,
         scenario: ScenarioBase[DeleteModelServiceAction, DeleteModelServiceActionResult],
         user_data: UserData,
-        model_serving_processors: ModelServingProcessors,
         mock_get_endpoint_by_id: AsyncMock,
         mock_get_endpoint_access_validation_data: AsyncMock,
         mock_update_endpoint_lifecycle: AsyncMock,
@@ -275,6 +259,6 @@ class TestDeleteModelService:
         async def delete_model_service(
             action: DeleteModelServiceAction,
         ) -> DeleteModelServiceActionResult:
-            return await model_serving_processors.delete_model_service.wait_for_complete(action)
+            return await model_serving_service.delete(action)
 
         await scenario.test(delete_model_service)

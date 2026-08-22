@@ -6987,7 +6987,7 @@
         {
             "id": "0acb8b75-c8bb-4227-88a6-f35b784e37ee",
             "scope_type": "domain",
-            "scope_id": "default",
+            "scope_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "entity_type": "role",
             "entity_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
             "registered_at": "2025-09-12 09:51:58.265582+00",
@@ -6996,7 +6996,7 @@
         {
             "id": "40bae437-988a-477e-89ce-d600842a127b",
             "scope_type": "domain",
-            "scope_id": "default",
+            "scope_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "entity_type": "role",
             "entity_id": "bfb69730-1374-4ba4-bc26-0ea0b8dd2708",
             "registered_at": "2025-09-12 09:51:58.265582+00",
@@ -7219,6 +7219,63 @@
             "entity_type": "vfolder",
             "operation": "update",
             "created_at": "2025-09-12 09:51:58.265582+00"
+        }
+    ],
+    "entity_memberships": [
+        {
+            "virtual_scope_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "entity_type": "role",
+            "entity_id": "e79d7074-076d-4629-953d-55286b26490c"
+        },
+        {
+            "virtual_scope_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "entity_type": "role",
+            "entity_id": "08001cc1-1b3a-410b-a3a6-b312b8b78a52"
+        },
+        {
+            "virtual_scope_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "entity_type": "role",
+            "entity_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e"
+        },
+        {
+            "virtual_scope_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "entity_type": "role",
+            "entity_id": "254fef91-2574-46f5-afc6-c9b18cfa340b"
+        },
+        {
+            "virtual_scope_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "entity_type": "role",
+            "entity_id": "416fca68-f247-457b-ac83-32a0a45bb7d1"
+        },
+        {
+            "virtual_scope_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "entity_type": "role",
+            "entity_id": "bfb69730-1374-4ba4-bc26-0ea0b8dd2708"
+        },
+        {
+            "virtual_scope_id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
+            "entity_type": "role",
+            "entity_id": "72293d83-1849-4bb5-a555-80e561515428"
+        },
+        {
+            "virtual_scope_id": "19a685b0-dc01-5497-885e-8e9a05109574",
+            "entity_type": "role",
+            "entity_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b"
+        },
+        {
+            "virtual_scope_id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
+            "entity_type": "role",
+            "entity_id": "fe53e90e-f619-43d8-99c8-574487485bab"
+        },
+        {
+            "virtual_scope_id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
+            "entity_type": "role",
+            "entity_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058"
+        },
+        {
+            "virtual_scope_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
+            "entity_type": "role",
+            "entity_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67"
         }
     ]
 }

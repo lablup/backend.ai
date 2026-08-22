@@ -11,12 +11,12 @@ import pytest
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
 from ai.backend.common.exception import AgentWatcherResponseError
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AgentId,

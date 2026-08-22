@@ -6,6 +6,9 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -14,11 +17,10 @@ from ai.backend.common.data.idle_checker.types import (
 from ai.backend.common.data.permission.types import (
     ScopeType,
 )
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleCheckerData
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.idle_checker import (
     IdleCheckerAssignmentAlreadyExists,
     IdleCheckerAssignmentNotFound,
@@ -27,19 +29,21 @@ from ai.backend.manager.errors.idle_checker import (
 )
 from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -71,8 +75,10 @@ class TestIdleCheckerAssignmentRepository:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                GroupRow,
-                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectRow,
+                UserRow,
+                ResourceGroupRow,
                 RoleRow,
                 PermissionRow,
                 AssociationScopesEntitiesRow,
@@ -117,12 +123,12 @@ class TestIdleCheckerAssignmentRepository:
         resource_group_id = ResourceGroupID(uuid.uuid4())
         async with database.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=resource_group_id,
                     name=f"rg-{resource_group_id.hex[:8]}",
                     driver="test",
                     scheduler="test",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
         return resource_group_id
@@ -146,7 +152,7 @@ class TestIdleCheckerAssignmentRepository:
             )
             await db_sess.flush()
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=f"project-{project_id.hex[:8]}",
                     domain_name=f"domain-{domain_id.hex[:8]}",
@@ -155,6 +161,42 @@ class TestIdleCheckerAssignmentRepository:
                 )
             )
         return project_id
+
+    @pytest.fixture
+    async def user_id(
+        self,
+        database: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+    ) -> uuid.UUID:
+        user_id = uuid.uuid4()
+        policy_name = f"urp-{user_id.hex[:8]}"
+        async with database.begin_session() as db_sess:
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_session_count_per_model_session=0,
+                    max_customized_image_count=0,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                UserRow(
+                    uuid=user_id,
+                    username=f"user-{user_id.hex[:8]}",
+                    email=f"{user_id.hex[:8]}@example.com",
+                    password=None,
+                    need_password_change=False,
+                    status=UserStatus.ACTIVE,
+                    status_info="active",
+                    domain_name=f"domain-{domain_id.hex[:8]}",
+                    role=UserRole.USER,
+                    resource_policy=policy_name,
+                    domain_id=domain_id,
+                )
+            )
+        return user_id
 
     @pytest.fixture
     async def checker(self, repository: IdleCheckerRepository) -> IdleCheckerData:
@@ -262,6 +304,65 @@ class TestIdleCheckerAssignmentRepository:
                     scope_id=uuid.uuid4(),
                     idle_checker_id=checker.id,
                     enabled=True,
+                )
+            )
+
+    async def test_create_assignment_on_user_scope(
+        self,
+        repository: IdleCheckerRepository,
+        checker: IdleCheckerData,
+        user_id: uuid.UUID,
+    ) -> None:
+        assignment = await repository.create_assignment(
+            IdleCheckerAssignmentCreatorSpec(
+                scope_type=ScopeType.USER,
+                scope_id=user_id,
+                idle_checker_id=checker.id,
+                enabled=True,
+            )
+        )
+
+        assert assignment.scope_type is ScopeType.USER
+        assert assignment.scope_id == user_id
+        assert assignment.enabled is True
+
+    async def test_create_assignment_missing_user_scope_raises(
+        self,
+        repository: IdleCheckerRepository,
+        checker: IdleCheckerData,
+    ) -> None:
+        with pytest.raises(IdleCheckerAssignmentScopeNotFound):
+            await repository.create_assignment(
+                IdleCheckerAssignmentCreatorSpec(
+                    scope_type=ScopeType.USER,
+                    scope_id=uuid.uuid4(),
+                    idle_checker_id=checker.id,
+                    enabled=True,
+                )
+            )
+
+    async def test_create_duplicate_user_scope_assignment_raises(
+        self,
+        repository: IdleCheckerRepository,
+        checker: IdleCheckerData,
+        user_id: uuid.UUID,
+    ) -> None:
+        await repository.create_assignment(
+            IdleCheckerAssignmentCreatorSpec(
+                scope_type=ScopeType.USER,
+                scope_id=user_id,
+                idle_checker_id=checker.id,
+                enabled=True,
+            )
+        )
+
+        with pytest.raises(IdleCheckerAssignmentAlreadyExists):
+            await repository.create_assignment(
+                IdleCheckerAssignmentCreatorSpec(
+                    scope_type=ScopeType.USER,
+                    scope_id=user_id,
+                    idle_checker_id=checker.id,
+                    enabled=False,
                 )
             )
 

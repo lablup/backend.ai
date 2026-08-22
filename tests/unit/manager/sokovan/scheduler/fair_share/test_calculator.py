@@ -15,7 +15,8 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
@@ -542,7 +543,7 @@ class TestCalculateFactors:
                     )
                 },
                 project={
-                    project_id: ProjectFairShareData(
+                    ProjectID(project_id): ProjectFairShareData(
                         resource_group="default",
                         resource_group_id=ResourceGroupID(uuid4()),
                         project_id=project_id,
@@ -958,7 +959,7 @@ class TestIntegrationScenarios:
                     ),
                 },
                 project={
-                    project_a: ProjectFairShareData(
+                    ProjectID(project_a): ProjectFairShareData(
                         resource_group="default",
                         resource_group_id=ResourceGroupID(uuid4()),
                         project_id=project_a,
@@ -970,7 +971,7 @@ class TestIntegrationScenarios:
                             use_default=False,
                         ),
                     ),
-                    project_b: ProjectFairShareData(
+                    ProjectID(project_b): ProjectFairShareData(
                         resource_group="default",
                         resource_group_id=ResourceGroupID(uuid4()),
                         project_id=project_b,
@@ -1059,7 +1060,7 @@ class TestDomainNameResolution:
 
     Verifies that domain_name is correctly resolved from:
     1. fair_shares (existing record) - primary source
-    2. project_domain_names (GroupRow lookup) - fallback
+    2. project_domain_names (ProjectRow lookup) - fallback
     3. Empty string - when project is deleted and no source available
     """
 
@@ -1074,7 +1075,7 @@ class TestDomainNameResolution:
             fair_shares=FairSharesByLevel(
                 domain={},
                 project={
-                    project_id: ProjectFairShareData(
+                    ProjectID(project_id): ProjectFairShareData(
                         resource_group="default",
                         resource_group_id=ResourceGroupID(uuid4()),
                         project_id=project_id,
@@ -1200,7 +1201,7 @@ class TestDomainNameResolution:
             fair_shares=FairSharesByLevel(
                 domain={},
                 project={
-                    project_id: ProjectFairShareData(
+                    ProjectID(project_id): ProjectFairShareData(
                         resource_group="default",
                         resource_group_id=ResourceGroupID(uuid4()),
                         project_id=project_id,

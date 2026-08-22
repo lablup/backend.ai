@@ -5,6 +5,16 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
+from ai.backend.common import msgpack
+from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
+from ai.backend.manager.errors.storage import (
+    DotfileAlreadyExists,
+    DotfileCreationFailed,
+    DotfileNotFound,
+)
+
+MAXIMUM_DOTFILE_COUNT = 100
+
 
 class DotfileScope(enum.StrEnum):
     DOMAIN = "domain"
@@ -26,6 +36,60 @@ class DotfileEntry:
 class DotfileQueryResult:
     entries: list[DotfileEntry]
     leftover_space: int
+
+
+@dataclass(frozen=True)
+class DotfileEntries:
+    """The dotfile entries packed into one row's column.
+
+    Every edit is a read of the whole set followed by a write of the whole set, so
+    the limits the set has to hold — one entry per path, a count, a packed size —
+    are decided here rather than at each of the three tables that store one.
+    """
+
+    entries: tuple[DotfileEntry, ...] = ()
+
+    @classmethod
+    def unpack(cls, packed: bytes) -> DotfileEntries:
+        rows = msgpack.unpackb(packed) or []
+        return cls(
+            entries=tuple(
+                DotfileEntry(path=row["path"], perm=row["perm"], data=row["data"]) for row in rows
+            )
+        )
+
+    def get(self, path: str) -> DotfileEntry:
+        for entry in self.entries:
+            if entry.path == path:
+                return entry
+        raise DotfileNotFound
+
+    def added(self, entry: DotfileEntry) -> DotfileEntries:
+        if any(e.path == entry.path for e in self.entries):
+            raise DotfileAlreadyExists
+        if len(self.entries) >= MAXIMUM_DOTFILE_COUNT:
+            raise DotfileCreationFailed("Dotfile creation limit reached")
+        return DotfileEntries(entries=(*self.entries, entry))
+
+    def replaced(self, entry: DotfileEntry) -> DotfileEntries:
+        kept = tuple(e for e in self.entries if e.path != entry.path)
+        if len(kept) == len(self.entries):
+            raise DotfileNotFound
+        return DotfileEntries(entries=(*kept, entry))
+
+    def removed(self, path: str) -> DotfileEntries:
+        kept = tuple(e for e in self.entries if e.path != path)
+        if len(kept) == len(self.entries):
+            raise DotfileNotFound
+        return DotfileEntries(entries=kept)
+
+    def pack(self) -> bytes:
+        packed = msgpack.packb([
+            {"path": e.path, "perm": e.perm, "data": e.data} for e in self.entries
+        ])
+        if len(packed) > MAXIMUM_DOTFILE_SIZE:
+            raise DotfileCreationFailed("No leftover space for dotfile storage")
+        return packed
 
 
 @dataclass(frozen=True)

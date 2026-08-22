@@ -18,9 +18,9 @@ from ai.backend.manager.models.specs.searcher import (
     SearcherResult,
 )
 from ai.backend.manager.models.specs.types import (
-    BulkResultWithFailures,
     IntegrityErrorCheck,
 )
+from ai.backend.manager.repositories.base.types import LegacyBulkResultWithFailures
 
 from .creator import (
     BulkCreator,
@@ -116,7 +116,7 @@ from .utils import (
 
 __all__ = [
     # Types
-    "BulkResultWithFailures",
+    "LegacyBulkResultWithFailures",
     "CursorConditionFactory",
     "IntegrityErrorCheck",
     # Integrity

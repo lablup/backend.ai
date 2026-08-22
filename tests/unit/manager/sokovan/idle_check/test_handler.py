@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -14,7 +15,6 @@ from ai.backend.common.data.idle_checker.types import (
     NetworkTimeoutSpec,
     SessionLifetimeSpec,
 )
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.errors.common import InternalServerError

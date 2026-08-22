@@ -2,6 +2,7 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -9,7 +10,6 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.errors.common import ObjectNotFound
 
 

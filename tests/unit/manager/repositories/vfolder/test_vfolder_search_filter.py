@@ -10,9 +10,9 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
-from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
@@ -20,9 +20,9 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -56,7 +56,7 @@ class TestVfolderSearchFilter:
                 KeyPairResourcePolicyRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -175,7 +175,6 @@ class TestVfolderSearchFilter:
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="usera@example.com",
                     user=user_a_id,
                     access_key="TESTKEYCLONE000A",
                     secret_key="test-secret-ca",
@@ -187,7 +186,6 @@ class TestVfolderSearchFilter:
             )
             db_sess.add(
                 KeyPairRow(
-                    user_id="userb@example.com",
                     user=user_b_id,
                     access_key="TESTKEYCLONE000B",
                     secret_key="test-secret-cb",
@@ -200,7 +198,7 @@ class TestVfolderSearchFilter:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="project-clone",
                     domain_name=domain_name,

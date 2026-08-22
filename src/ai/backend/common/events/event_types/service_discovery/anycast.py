@@ -7,7 +7,6 @@ from pydantic import Field
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
-from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.types import BackendAISchema
 
 __all__ = (
@@ -82,36 +81,6 @@ class ServiceRegisteredEvent(BackendAISchema, BaseServiceDiscoveryEvent):
     def event_name(cls) -> str:
         return "service_registered"
 
-    @override
-    def serialize(self) -> tuple[bytes, ...]:
-        return (
-            dump_json_str({
-                "instance_id": self.instance_id,
-                "service_group": self.service_group,
-                "display_name": self.display_name,
-                "version": self.version,
-                "labels": self.labels,
-                "endpoints": [ep.model_dump() for ep in self.endpoints],
-                "config_hash": self.config_hash,
-            }).encode(),
-            self.startup_time.isoformat().encode(),
-        )
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[bytes, ...]) -> ServiceRegisteredEvent:
-        data = load_json(value[0])
-        return cls(
-            instance_id=data["instance_id"],
-            service_group=data["service_group"],
-            display_name=data["display_name"],
-            version=data["version"],
-            labels=data.get("labels", {}),
-            endpoints=[ServiceEndpointInfo(**ep) for ep in data.get("endpoints", [])],
-            startup_time=datetime.fromisoformat(value[1].decode()),
-            config_hash=data.get("config_hash", ""),
-        )
-
 
 class DoSweepStaleServicesEvent(BaseServiceDiscoveryEvent):
     """Event to trigger sweeping stale services in the catalog."""
@@ -120,15 +89,6 @@ class DoSweepStaleServicesEvent(BaseServiceDiscoveryEvent):
     @override
     def event_name(cls) -> str:
         return "do_sweep_stale_services"
-
-    @override
-    def serialize(self) -> tuple[bytes, ...]:
-        return (b"",)
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[bytes, ...]) -> DoSweepStaleServicesEvent:
-        return cls()
 
 
 class ServiceDeregisteredEvent(BackendAISchema, BaseServiceDiscoveryEvent):
@@ -141,18 +101,3 @@ class ServiceDeregisteredEvent(BackendAISchema, BaseServiceDiscoveryEvent):
     @override
     def event_name(cls) -> str:
         return "service_deregistered"
-
-    @override
-    def serialize(self) -> tuple[bytes, ...]:
-        return (
-            self.instance_id.encode(),
-            self.service_group.encode(),
-        )
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[bytes, ...]) -> ServiceDeregisteredEvent:
-        return cls(
-            instance_id=value[0].decode(),
-            service_group=value[1].decode(),
-        )

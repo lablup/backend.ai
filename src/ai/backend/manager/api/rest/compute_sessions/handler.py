@@ -8,6 +8,7 @@ from typing import Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.compute_session import (
     PaginationInfo,
     SearchComputeSessionsRequest,
@@ -47,8 +48,8 @@ class ComputeSessionsHandler:
 
         # Step 1: Search sessions
         session_querier = self._adapter.build_session_querier(body.parsed)
-        session_result = await self._session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=session_querier, user_id=user.user_id)
+        session_result = await self._session.search_sessions.run(
+            SearchSessionsAction(querier=session_querier, user_id=UserID(user.user_id))
         )
 
         # Step 2: Fetch kernels for found sessions
@@ -56,8 +57,8 @@ class ComputeSessionsHandler:
         kernels_by_session = {}
         if session_ids:
             kernel_querier = self._adapter.build_kernel_querier_for_sessions(session_ids)
-            kernel_result = await self._session.search_kernels.wait_for_complete(
-                SearchKernelsAction(querier=kernel_querier, user_id=user.user_id)
+            kernel_result = await self._session.search_kernels.run(
+                SearchKernelsAction(querier=kernel_querier, user_id=UserID(user.user_id))
             )
             kernels_by_session = self._adapter.group_kernels_by_session(kernel_result.data)
 

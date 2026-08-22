@@ -1,33 +1,34 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
+from __future__ import annotations
+
+from ai.backend.common.data.entity.vfs_storage import VFSStorageID
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+    LookupOpsResult,
+)
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    SingleEntityActionProcessor,
+)
 from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
     StorageProxyManagerFacingClient,
 )
-from ai.backend.manager.services.vfs_storage.actions.create import (
-    CreateVFSStorageAction,
-    CreateVFSStorageActionResult,
-)
-from ai.backend.manager.services.vfs_storage.actions.delete import (
-    DeleteVFSStorageAction,
-    DeleteVFSStorageActionResult,
-)
-from ai.backend.manager.services.vfs_storage.actions.get import (
-    GetVFSStorageAction,
-    GetVFSStorageActionResult,
-)
+from ai.backend.manager.data.vfs_storage.types import VFSStorageData
+from ai.backend.manager.services.vfs_storage.actions.create import CreateVFSStorageAction
+from ai.backend.manager.services.vfs_storage.actions.get import GetVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.get_quota_scope import (
     GetQuotaScopeAction,
     GetQuotaScopeActionResult,
 )
-from ai.backend.manager.services.vfs_storage.actions.list import (
-    ListVFSStorageAction,
-    ListVFSStorageActionResult,
+from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageAction
+from ai.backend.manager.services.vfs_storage.actions.lookup import (
+    LookupVFSStorageAction,
 )
-from ai.backend.manager.services.vfs_storage.actions.search import (
-    SearchVFSStoragesAction,
-    SearchVFSStoragesActionResult,
-)
+from ai.backend.manager.services.vfs_storage.actions.purge import PurgeVFSStorageAction
+from ai.backend.manager.services.vfs_storage.actions.search import SearchVFSStoragesAction
 from ai.backend.manager.services.vfs_storage.actions.search_quota_scopes import (
     SearchQuotaScopesAction,
     SearchQuotaScopesActionResult,
@@ -40,42 +41,62 @@ from ai.backend.manager.services.vfs_storage.actions.unset_quota_scope import (
     UnsetQuotaScopeAction,
     UnsetQuotaScopeActionResult,
 )
-from ai.backend.manager.services.vfs_storage.actions.update import (
-    UpdateVFSStorageAction,
-    UpdateVFSStorageActionResult,
-)
+from ai.backend.manager.services.vfs_storage.actions.update import UpdateVFSStorageAction
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
 
 
 class VFSStorageProcessors:
-    create: ActionProcessor[CreateVFSStorageAction, CreateVFSStorageActionResult]
-    update: ActionProcessor[UpdateVFSStorageAction, UpdateVFSStorageActionResult]
-    delete: ActionProcessor[DeleteVFSStorageAction, DeleteVFSStorageActionResult]
-    get: ActionProcessor[GetVFSStorageAction, GetVFSStorageActionResult]
-    list_storages: ActionProcessor[ListVFSStorageAction, ListVFSStorageActionResult]
-    search_vfs_storages: ActionProcessor[SearchVFSStoragesAction, SearchVFSStoragesActionResult]
-    get_quota_scope: ActionProcessor[GetQuotaScopeAction, GetQuotaScopeActionResult]
-    search_quota_scopes: ActionProcessor[SearchQuotaScopesAction, SearchQuotaScopesActionResult]
-    set_quota_scope: ActionProcessor[SetQuotaScopeAction, SetQuotaScopeActionResult]
-    unset_quota_scope: ActionProcessor[UnsetQuotaScopeAction, UnsetQuotaScopeActionResult]
+    """The registry CRUD runs against ops; the quota-scope paths keep a service."""
+
+    global_create: GlobalActionProcessor[
+        CreateVFSStorageAction, CreatedEntityOpsResult[VFSStorageData]
+    ]
+    update: SingleEntityActionProcessor[UpdateVFSStorageAction, EntityOpsResult[VFSStorageData]]
+    purge: SingleEntityActionProcessor[PurgeVFSStorageAction, EntityOpsResult[VFSStorageData]]
+    get: SingleEntityActionProcessor[GetVFSStorageAction, EntityOpsResult[VFSStorageData]]
+    lookup: LookupActionProcessor[LookupVFSStorageAction, LookupOpsResult[VFSStorageID]]
+    global_list_storages: GlobalActionProcessor[
+        ListVFSStorageAction, BatchOpsResult[VFSStorageData]
+    ]
+    global_search_vfs_storages: GlobalActionProcessor[
+        SearchVFSStoragesAction, BatchOpsResult[VFSStorageData]
+    ]
+    global_get_quota_scope: GlobalActionProcessor[GetQuotaScopeAction, GetQuotaScopeActionResult]
+    global_search_quota_scopes: GlobalActionProcessor[
+        SearchQuotaScopesAction, SearchQuotaScopesActionResult
+    ]
+    global_set_quota_scope: GlobalActionProcessor[SetQuotaScopeAction, SetQuotaScopeActionResult]
+    global_unset_quota_scope: GlobalActionProcessor[
+        UnsetQuotaScopeAction, UnsetQuotaScopeActionResult
+    ]
+
+    _service: VFSStorageService
 
     def __init__(
         self,
+        group: ProcessorGroup[VFSStorageData],
         service: VFSStorageService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
     ) -> None:
         self._service = service
-        self.create = ActionProcessor(service.create, action_monitors)
-        self.update = ActionProcessor(service.update, action_monitors)
-        self.delete = ActionProcessor(service.delete, action_monitors)
-        self.get = ActionProcessor(service.get, action_monitors)
-        self.list_storages = ActionProcessor(service.list, action_monitors)
-        self.search_vfs_storages = ActionProcessor(service.search, action_monitors)
-        self.get_quota_scope = ActionProcessor(service.get_quota_scope, action_monitors)
-        self.search_quota_scopes = ActionProcessor(service.search_quota_scopes, action_monitors)
-        self.set_quota_scope = ActionProcessor(service.set_quota_scope, action_monitors)
-        self.unset_quota_scope = ActionProcessor(service.unset_quota_scope, action_monitors)
+        self.global_create = group.global_create_ops(CreateVFSStorageAction)
+        self.update = group.single_update_ops(UpdateVFSStorageAction)
+        self.purge = group.entity_purge_ops(PurgeVFSStorageAction)
+        self.get = group.single_get_ops(GetVFSStorageAction)
+        self.lookup = group.lookup_ops(LookupVFSStorageAction)
+        self.global_list_storages = group.global_search_ops(ListVFSStorageAction)
+        self.global_search_vfs_storages = group.global_search_ops(SearchVFSStoragesAction)
+        self.global_get_quota_scope = group.global_scope(
+            GetQuotaScopeAction, service.get_quota_scope
+        )
+        self.global_search_quota_scopes = group.global_scope(
+            SearchQuotaScopesAction, service.search_quota_scopes
+        )
+        self.global_set_quota_scope = group.global_scope(
+            SetQuotaScopeAction, service.set_quota_scope
+        )
+        self.global_unset_quota_scope = group.global_scope(
+            UnsetQuotaScopeAction, service.unset_quota_scope
+        )
 
     def get_manager_facing_client(self, proxy_name: str) -> StorageProxyManagerFacingClient:
         """Get a storage proxy client for the given proxy name.

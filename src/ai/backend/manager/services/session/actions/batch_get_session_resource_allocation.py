@@ -4,47 +4,23 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType, RBACElementType
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.types import SessionId
-from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
-from ai.backend.manager.actions.action.types import ActionTarget
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
+from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.bulk.result import BasePartialBulkActionResult, BulkEntityResult
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 
 
-@dataclass(frozen=True)
-class SessionResourceAllocationTarget(ActionTarget):
-    """Bulk-action target identifying a single session by ID."""
-
-    session_id: SessionId
-
-    @override
-    def to_rbac_element_ref(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.SESSION,
-            element_id=str(self.session_id),
-        )
-
-
 @dataclass
-class BatchGetSessionResourceAllocationAction(BaseBulkAction[SessionResourceAllocationTarget]):
-    """Batch-aggregate resource allocations for one or more sessions.
+class BatchGetSessionResourceAllocationAction(BaseBulkAction):
+    """Aggregate the slot amounts recorded against the sessions the caller named.
 
-    Used by the GraphQL DataLoader backing ``SessionV2.resourceAllocation``; the
-    session ids originate from already-authorized session nodes.
+    Answered for by each session the ids name.
     """
 
     session_ids: list[SessionId]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.SESSION
 
     @override
     @classmethod
@@ -52,17 +28,27 @@ class BatchGetSessionResourceAllocationAction(BaseBulkAction[SessionResourceAllo
         return ActionOperationType.SEARCH
 
     @override
-    def targets(self) -> Sequence[SessionResourceAllocationTarget]:
-        return [SessionResourceAllocationTarget(session_id=sid) for sid in self.session_ids]
+    @classmethod
+    def action_name(cls) -> str:
+        return "batch_get_session_resource_allocation"
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return [SessionID(_id) for _id in self.session_ids]
 
 
 @dataclass
-class BatchGetSessionResourceAllocationActionResult(BaseBulkActionResult):
+class BatchGetSessionResourceAllocationActionResult(BasePartialBulkActionResult):
     data: dict[SessionId, ResourceAllocationAggregate]
 
     @override
-    def element_refs(self) -> list[RBACElementRef]:
+    def entity_results(self) -> Sequence[BulkEntityResult]:
         return [
-            RBACElementRef(element_type=RBACElementType.SESSION, element_id=str(sid))
-            for sid in self.data
+            BulkEntityResult(
+                entity_id=SessionID(_id),
+                status=OperationStatus.SUCCESS,
+                description="aggregated",
+                error_code=None,
+            )
+            for _id in self.data
         ]

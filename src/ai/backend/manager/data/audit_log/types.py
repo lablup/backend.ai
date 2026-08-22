@@ -4,20 +4,21 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from ai.backend.common.identifier.action import ActionID
+from ai.backend.common.data.entity.action import ActionID
+from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.entity.types import FieldData
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 
 
 @dataclass
-class AuditLogData:
+class AuditLogData(FieldData):
     """One audit record, mirroring the row.
 
-    ``action_kind`` says which shape wrote it, so only the target columns belonging
-    to that shape are set. Writers use the per-shape creator specs, which is where
-    that invariant is enforced.
+    ``action_kind`` says which shape wrote it; only that shape's target columns are
+    set. ``id`` is this record; ``target_entity_id`` is what it is about.
     """
 
-    id: uuid.UUID
+    id: AuditLogID
     action_id: ActionID
     action_kind: ActionKind | None
     action_name: str
@@ -26,7 +27,7 @@ class AuditLogData:
     created_at: datetime
     description: str
     status: OperationStatus
-    entity_id: str | None
+    target_entity_id: str | None
     lookup_kind: str | None
     lookup_key: str | None
     request_id: str | None
@@ -43,3 +44,12 @@ class AuditLogListResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass(frozen=True)
+class AuditLogScopeData(FieldData):
+    """One scope an audited run covered."""
+
+    audit_log_id: AuditLogID
+    scope_type: str
+    scope_id: str

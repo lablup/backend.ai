@@ -6,7 +6,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.project import ProjectRow
 
 
 @pytest.fixture()
@@ -17,7 +17,7 @@ async def group_name_fixture(
     """Query the group name from the database for the test group."""
     async with db_engine.begin() as conn:
         result = await conn.execute(
-            sa.select(GroupRow.__table__.c.name).where(GroupRow.__table__.c.id == group_fixture)
+            sa.select(ProjectRow.__table__.c.name).where(ProjectRow.__table__.c.id == group_fixture)
         )
         row = result.first()
         assert row is not None

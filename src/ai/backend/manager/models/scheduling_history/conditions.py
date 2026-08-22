@@ -9,8 +9,8 @@ from typing import cast
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
-from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus

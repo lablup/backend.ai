@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.vfs_storage.actions.base import VFSStorageAction
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
 
 @dataclass
@@ -16,10 +17,16 @@ class QuotaScopeInfo:
 
 
 @dataclass
-class SearchQuotaScopesAction(VFSStorageAction):
+class SearchQuotaScopesAction(BaseGlobalAction):
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return VFS_STORAGE_ENTITY_TYPE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_vfs_quota_scopes"
 
     @override
     @classmethod
@@ -28,9 +35,5 @@ class SearchQuotaScopesAction(VFSStorageAction):
 
 
 @dataclass
-class SearchQuotaScopesActionResult(BaseActionResult):
+class SearchQuotaScopesActionResult:
     quota_scopes: list[QuotaScopeInfo]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

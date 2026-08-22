@@ -8,7 +8,6 @@ from typing import override
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.logging.types import LogLevel
-from ai.backend.manager.plugin.error_monitor import ErrorEventDispatcher
 from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
     create_agent_selector,
@@ -190,25 +189,12 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
             ),
         )
 
-        # Stage 6.5: Re-initialize ErrorEventDispatcher plugin with repository.
-        # The plugin was disabled during Stage 4 (Plugins) because
-        # error_log_repository was not yet available.
-        for plugin_instance in plugins.event_dispatcher_plugin_ctx.plugins.values():
-            if isinstance(plugin_instance, ErrorEventDispatcher):
-                await plugin_instance.init(
-                    context={
-                        "error_log_repository": domain.repositories.error_log.repository,
-                    },
-                )
-
         # Stage 6.5: Monitoring (error_monitor, stats_monitor)
-        # Must run after Domain so that error_log_repository is available.
         monitoring_input = MonitoringInput(
             etcd=bootstrap.etcd,
             local_config=config.model_dump(by_alias=True),
             allowed_plugins=config.manager.allowed_plugins,
             disabled_plugins=config.manager.disabled_plugins,
-            error_log_repository=domain.repositories.error_log.repository,
         )
         error_monitor = await stack.enter_dependency(
             ErrorMonitorDependency(),

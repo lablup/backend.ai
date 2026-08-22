@@ -13,6 +13,7 @@ from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.config import DEFAULT_SHELL
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStrategyInput as DeploymentStrategyInputDTO,
@@ -82,7 +83,6 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     PresetModelDefinitionInfoDTO,
     PresetModelServiceConfigInfoDTO,
 )
-from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL

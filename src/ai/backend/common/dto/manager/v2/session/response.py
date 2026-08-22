@@ -13,9 +13,9 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 

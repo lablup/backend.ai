@@ -9,8 +9,8 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel, BaseRootResponseModel
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.identifier.app_config import AppConfigScopeID
-from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.data.entity.app_config import AppConfigScopeID
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 
 __all__ = (
     "AppConfigFragmentBulkErrorInfo",

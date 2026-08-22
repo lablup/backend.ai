@@ -6,13 +6,13 @@ from dataclasses import replace
 
 import pytest
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
     NetworkTimeoutSpec,
     SessionLifetimeSpec,
 )
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.errors.idle_checker import IdleCheckerNotFound

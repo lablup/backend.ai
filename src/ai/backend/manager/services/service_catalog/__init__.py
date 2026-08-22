@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from .actions.search import SearchServiceCatalogsAction, SearchServiceCatalogsActionResult
+from .actions.search import SearchServiceCatalogsAction
 from .processors import ServiceCatalogProcessors
-from .service import ServiceCatalogService
 
 __all__ = (
     "SearchServiceCatalogsAction",
-    "SearchServiceCatalogsActionResult",
     "ServiceCatalogProcessors",
-    "ServiceCatalogService",
 )

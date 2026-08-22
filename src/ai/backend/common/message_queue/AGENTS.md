@@ -13,7 +13,8 @@ Abstraction over Redis streams (anycast) and pub/sub (broadcast). `RedisQueue` (
 - Subscribers do not ack (broadcast may be lost by design).
 - Anycast carries `AnycastMessagePayload`, broadcast carries `BroadcastMessagePayload`. Do not mix, and do not hand-build the wire mapping — the payload models own the encoding.
 - An event's own body reaches this layer as `EventMessage` (`common/events/message.py`) — `name` plus the already-serialized `payload`. This layer adds `source`, `metadata`, and `retry_count`; an event never supplies them.
-- `legacy_source` / `legacy_body` are on the way out. Construct them by their wire keys (`source=` / `body=`) and do not add new readers of them — new code goes through `payload`.
+- `legacy_source` is on the way out. Construct it by its wire key (`source=`) and do not add new readers of it.
+- The body on the wire is JSON and nothing else — do NOT reintroduce msgpack here.
 - Decode received messages with `from_stream_fields()` / `from_json()`; they raise `InvalidMessagePayloadError` instead of failing later at field access.
 - Configure only the streams/channels you use (`consume_stream_keys=None` / `subscribe_channels=None`) to avoid idle background loops.
 - Always `await close()` the queue/components to avoid connection and task leaks.

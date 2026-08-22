@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import Field
 
-from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.types import BackendAISchema
 
 

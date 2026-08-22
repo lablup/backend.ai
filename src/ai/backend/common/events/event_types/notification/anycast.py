@@ -8,7 +8,6 @@ from pydantic import Field
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
-from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.types import BackendAISchema
 
 __all__ = ("NotificationTriggeredEvent",)
@@ -54,20 +53,3 @@ class NotificationTriggeredEvent(BackendAISchema, AbstractAnycastEvent):
     @override
     def user_event(self) -> UserEvent | None:
         return None
-
-    @override
-    def serialize(self) -> tuple[bytes, ...]:
-        return (
-            self.rule_type.encode(),
-            self.timestamp.isoformat().encode(),
-            dump_json_str(self.notification_data).encode(),
-        )
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[bytes, ...]) -> NotificationTriggeredEvent:
-        return cls(
-            rule_type=value[0].decode(),
-            timestamp=datetime.fromisoformat(value[1].decode()),
-            notification_data=load_json(value[2]),
-        )

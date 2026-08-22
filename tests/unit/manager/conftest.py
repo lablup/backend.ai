@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.lock import FileLock
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import LocalLogger, LogLevel
@@ -170,6 +171,6 @@ def domain_factory() -> DomainFactory:
                 sa.insert(domains).values(values).returning(domains.c.id, domains.c.name)
             )
             row = result.one()
-        return DomainFixtureData(domain_name=row.name, domain_id=row.id)
+        return DomainFixtureData(domain_name=DomainName(row.name), domain_id=DomainID(row.id))
 
     return _create

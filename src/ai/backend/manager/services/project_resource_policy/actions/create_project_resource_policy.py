@@ -1,35 +1,38 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.project_resource_policy.actions.base import (
-    ProjectResourcePolicyAction,
+from ai.backend.common.data.entity.resource_policy import (
+    PROJECT_RESOURCE_POLICY_ENTITY_TYPE,
 )
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
+from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
+from ai.backend.manager.models.resource_policy.creators import (
+    ProjectResourcePolicyCreator,
+)
+from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 
 
 @dataclass
-class CreateProjectResourcePolicyAction(ProjectResourcePolicyAction):
-    creator: Creator[ProjectResourcePolicyRow]
+class CreateProjectResourcePolicyAction(
+    CreateGlobalOpsAction[ProjectResourcePolicyRow, ProjectResourcePolicyData]
+):
+    """Register a project resource policy."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    creator: ProjectResourcePolicyCreator
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-
-@dataclass
-class CreateProjectResourcePolicyActionResult(BaseActionResult):
-    # TODO: Create a return type.
-    project_resource_policy: ProjectResourcePolicyData
+    def entity_type(cls) -> EntityType:
+        return PROJECT_RESOURCE_POLICY_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return self.project_resource_policy.name
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_create_project_resource_policy"
+
+    @override
+    def to_creator(self) -> ProjectResourcePolicyCreator:
+        return self.creator

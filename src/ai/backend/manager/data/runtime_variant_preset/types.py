@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from uuid import UUID
+from typing import override
 
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
 )
-from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
 
 
 @dataclass(frozen=True)
@@ -58,9 +60,9 @@ class UIOptionData:
 
 
 @dataclass(frozen=True)
-class RuntimeVariantPresetData:
-    id: UUID
-    runtime_variant_id: UUID
+class RuntimeVariantPresetData(EntityData):
+    id: RuntimeVariantPresetID
+    runtime_variant_id: RuntimeVariantID
     name: str
     description: str | None
     rank: int
@@ -75,3 +77,7 @@ class RuntimeVariantPresetData:
     ui_option: UIOptionData | None
     created_at: datetime
     updated_at: datetime | None
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.id

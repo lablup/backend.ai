@@ -9,13 +9,13 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     SearchVFoldersInput,
     VFolderFilter,
 )
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.data.vfolder.types import (
@@ -89,7 +89,7 @@ class TestVFolderAdapterMySearch:
             has_next_page=False,
             has_previous_page=False,
         )
-        processors.vfolder.search_user_vfolders.wait_for_complete = AsyncMock(
+        processors.vfolder.search_user_vfolders.run = AsyncMock(
             return_value=result,
         )
         return processors
@@ -113,8 +113,8 @@ class TestVFolderAdapterMySearch:
         ):
             await adapter.my_search(input_dto)
 
-        mock_processors.vfolder.search_user_vfolders.wait_for_complete.assert_called_once()
-        action = mock_processors.vfolder.search_user_vfolders.wait_for_complete.call_args[0][0]
+        mock_processors.vfolder.search_user_vfolders.run.assert_called_once()
+        action = mock_processors.vfolder.search_user_vfolders.run.call_args[0][0]
         assert action.scope.user_id == user_data.user_id
 
     async def test_my_search_returns_payload(
@@ -187,7 +187,7 @@ class TestVFolderAdapterProjectSearch:
             has_next_page=False,
             has_previous_page=False,
         )
-        processors.vfolder.search_vfolders_in_project.wait_for_complete = AsyncMock(
+        processors.vfolder.search_vfolders_in_project.run = AsyncMock(
             return_value=result,
         )
         return processors
@@ -207,10 +207,8 @@ class TestVFolderAdapterProjectSearch:
 
         await adapter.project_search(project_id, input_dto)
 
-        mock_processors.vfolder.search_vfolders_in_project.wait_for_complete.assert_called_once()
-        action = mock_processors.vfolder.search_vfolders_in_project.wait_for_complete.call_args[0][
-            0
-        ]
+        mock_processors.vfolder.search_vfolders_in_project.run.assert_called_once()
+        action = mock_processors.vfolder.search_vfolders_in_project.run.call_args[0][0]
         assert action.scope.project_id == project_id
 
     async def test_project_search_returns_payload(
@@ -287,7 +285,7 @@ class TestVFolderAdapterGetFolderUsage:
                 used_bytes=524308,
             ),
         )
-        mock_processors.vfolder.get_folder_usage.wait_for_complete = AsyncMock(
+        mock_processors.vfolder.get_folder_usage.run = AsyncMock(
             return_value=action_result,
         )
 
@@ -307,7 +305,7 @@ class TestVFolderAdapterGetFolderUsage:
             vfolder_uuid=uuid4(),
             usage=None,
         )
-        mock_processors.vfolder.get_folder_usage.wait_for_complete = AsyncMock(
+        mock_processors.vfolder.get_folder_usage.run = AsyncMock(
             return_value=action_result,
         )
 

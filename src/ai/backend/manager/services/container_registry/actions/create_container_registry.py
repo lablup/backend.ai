@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -14,8 +13,9 @@ class CreateContainerRegistryAction(ContainerRegistryAction):
     creator: Creator[ContainerRegistryRow]
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_container_registry"
 
     @override
     @classmethod
@@ -24,9 +24,5 @@ class CreateContainerRegistryAction(ContainerRegistryAction):
 
 
 @dataclass
-class CreateContainerRegistryActionResult(BaseActionResult):
+class CreateContainerRegistryActionResult:
     data: ContainerRegistryData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)

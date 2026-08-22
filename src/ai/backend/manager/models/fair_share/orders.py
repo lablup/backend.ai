@@ -9,7 +9,7 @@ from ai.backend.manager.models.fair_share.row import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.user import UserRow
 
 
@@ -52,12 +52,12 @@ class ProjectFairShareOrders:
 
     @staticmethod
     def by_project_name(ascending: bool = True) -> QueryOrder:
-        col = GroupRow.name
+        col = ProjectRow.name
         return col.asc() if ascending else col.desc()
 
     @staticmethod
     def by_project_is_active(ascending: bool = True) -> QueryOrder:
-        col = GroupRow.is_active
+        col = ProjectRow.is_active
         return col.asc() if ascending else col.desc()
 
 

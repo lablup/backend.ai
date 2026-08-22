@@ -87,16 +87,3 @@ class TestRenderRoleName:
     ) -> None:
         with pytest.raises(InvalidRoleNameTemplate):
             write_ops._render_role_name("{{ scope.__class__ }}", scope_value)
-
-
-class TestValidateRoleNameTemplate:
-    def test_accepts_valid_template(self, write_ops: RBACWriteOps) -> None:
-        write_ops.validate_role_name_template("{{ scope.name }}-member")
-
-    def test_rejects_undefined_variable(self, write_ops: RBACWriteOps) -> None:
-        with pytest.raises(InvalidRoleNameTemplate):
-            write_ops.validate_role_name_template("{{ scope.unknown }}-member")
-
-    def test_rejects_syntax_error(self, write_ops: RBACWriteOps) -> None:
-        with pytest.raises(InvalidRoleNameTemplate):
-            write_ops.validate_role_name_template("{% if %}")

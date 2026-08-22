@@ -10,9 +10,9 @@ from strawberry import Info
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.user.request import DeleteUserInput, PurgeUserInput
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, ReadableCIDR
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -54,12 +54,12 @@ from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     UserCreateSpec,
 )
-from ai.backend.manager.services.user.actions.modify_user import (
-    BulkModifyUserAction,
-    ModifyUserAction,
+from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAction
+from ai.backend.manager.services.user.actions.update_user import (
+    BulkUpdateUserAction,
+    UpdateUserAction,
     UserUpdateSpec,
 )
-from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAction
 from ai.backend.manager.types import OptionalState, TriState
 
 # Create Mutations
@@ -221,7 +221,7 @@ async def admin_update_user_v2(
     """
     check_admin_only()
     ctx = info.context
-    payload = await ctx.adapters.user.modify_user_by_id(user_id, input.to_pydantic())
+    payload = await ctx.adapters.user.update_user_by_id(user_id, input.to_pydantic())
     return UpdateUserPayloadGQL.from_pydantic(payload)
 
 
@@ -346,7 +346,7 @@ async def admin_bulk_update_users_v2(
             default_key_switches[UserID(user_item.user_id)] = AccessKey(dto.main_access_key)
         items.append(UserUpdateSpec(user_id=UserID(user_item.user_id), updater_spec=updater_spec))
 
-    action = BulkModifyUserAction(items=items)
+    action = BulkUpdateUserAction(items=items)
     payload = await ctx.adapters.user.bulk_modify_users(action, default_key_switches)
     return BulkUpdateUsersV2PayloadGQL.from_pydantic(payload)
 
@@ -376,7 +376,7 @@ async def update_user_v2(
     me = current_user()
     if me is None:
         raise UnreachableError("User context is not available")
-    payload = await ctx.adapters.user.modify_user_by_id(me.user_id, input.to_pydantic())
+    payload = await ctx.adapters.user.update_user_by_id(me.user_id, input.to_pydantic())
     return UpdateUserPayloadGQL.from_pydantic(payload)
 
 
@@ -557,10 +557,6 @@ async def update_my_allowed_client_ip(
         raise UnreachableError("User context is not available")
     ctx = info.context
 
-    # Get user email (needed for ModifyUserAction)
-    user_payload = await ctx.adapters.user.get(me.user_id)
-    email = user_payload.user.basic_info.email
-
     new_allowlist = input.allowed_client_ip
 
     if new_allowlist is not None:
@@ -608,11 +604,10 @@ async def update_my_allowed_client_ip(
         allowed_client_ip = TriState.nullify()
 
     updater_spec = UserUpdaterSpec(allowed_client_ip=allowed_client_ip)
-    action = ModifyUserAction(
-        email=email,
-        updater=Updater(spec=updater_spec, pk_value=email),
-        user_uuid=me.user_id,
+    action = UpdateUserAction(
+        user_id=UserID(me.user_id),
+        updater=Updater(spec=updater_spec, pk_value=me.user_id),
     )
-    await ctx.adapters.user.modify_user(action)
+    await ctx.adapters.user.update_user(action)
 
     return UpdateMyAllowedClientIPPayloadGQL(success=True)

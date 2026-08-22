@@ -14,7 +14,8 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
@@ -29,20 +30,20 @@ from ai.backend.manager.models.association_container_registries_groups import (
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.image.row import (
     ImagePermissionContextBuilder,
 )
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
@@ -57,7 +58,7 @@ PROJECT_RESOURCE_POLICY_NAME = "test-project-policy"
 
 _ORM_CLUSTER = (
     AgentRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
 )
 
 
@@ -78,7 +79,7 @@ class TestImagePermissionContextNonGlobalRegistry:
         project_id = uuid4()
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=name,
                     domain_name=domain.domain_name,
@@ -137,7 +138,7 @@ class TestImagePermissionContextNonGlobalRegistry:
                 KeyPairResourcePolicyRow,
                 KeyPairRow,
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 AssocGroupUserRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
@@ -234,7 +235,7 @@ class TestImagePermissionContextNonGlobalRegistry:
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 ContainerRegistryRow(
-                    id=registry_id,
+                    id=ContainerRegistryID(registry_id),
                     url=REGISTRY_URL,
                     registry_name=REGISTRY_NAME,
                     type=ContainerRegistryType.HARBOR2,
@@ -257,7 +258,7 @@ class TestImagePermissionContextNonGlobalRegistry:
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 ContainerRegistryRow(
-                    id=registry_id,
+                    id=ContainerRegistryID(registry_id),
                     url=REGISTRY_URL,
                     registry_name=REGISTRY_NAME,
                     type=ContainerRegistryType.HARBOR2,
