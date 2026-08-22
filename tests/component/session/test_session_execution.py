@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.exceptions import InvalidRequestError, NotFoundError, ServerError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.session.request import (
     CompleteRequest,
     ExecuteRequest,
@@ -79,7 +81,7 @@ class TestSessionExecuteQuery:
         }
 
         result = await admin_registry.session.execute(
-            session_seed.session_name,
+            session_seed.session_id,
             ExecuteRequest(mode="query", code="print('hello')", run_id="abc"),
         )
 
@@ -106,7 +108,7 @@ class TestSessionExecuteQuery:
         }
 
         result = await admin_registry.session.execute(
-            session_seed.session_name,
+            session_seed.session_id,
             ExecuteRequest(mode="query", code="print('hello')"),
         )
 
@@ -130,7 +132,7 @@ class TestSessionExecuteQuery:
         }
 
         result = await admin_registry.session.execute(
-            session_seed.session_name,
+            session_seed.session_id,
             ExecuteRequest(mode="query", run_id="abc", code=None),
         )
 
@@ -165,7 +167,7 @@ class TestSessionExecuteModes:
         }
 
         result = await admin_registry.session.execute(
-            session_seed.session_name,
+            session_seed.session_id,
             ExecuteRequest(mode="batch", code="x = 1", run_id="batch-run-1"),
         )
 
@@ -186,7 +188,7 @@ class TestSessionExecuteModes:
         agent_registry.get_completions.return_value = mock_completion
 
         result = await admin_registry.session.execute(
-            session_seed.session_name,
+            session_seed.session_id,
             ExecuteRequest(mode="complete", code="os."),
         )
 
@@ -211,7 +213,7 @@ class TestSessionExecuteFailures:
         """F-BIZ-1: mode='continue', run_id=None → error (requires run_id)."""
         with pytest.raises(ServerError):
             await admin_registry.session.execute(
-                session_seed.session_name,
+                session_seed.session_id,
                 ExecuteRequest(mode="continue"),
             )
 
@@ -223,7 +225,7 @@ class TestSessionExecuteFailures:
         """F-BIZ-2: mode='invalid' → error."""
         with pytest.raises(ServerError):
             await admin_registry.session.execute(
-                session_seed.session_name,
+                session_seed.session_id,
                 ExecuteRequest(mode="invalid", run_id="r1"),
             )
 
@@ -235,7 +237,7 @@ class TestSessionExecuteFailures:
         """F-BIZ-3: mode=None in v2 API → error (mode is required)."""
         with pytest.raises(ServerError):
             await admin_registry.session.execute(
-                session_seed.session_name,
+                session_seed.session_id,
                 ExecuteRequest(mode=None),
             )
 
@@ -246,7 +248,7 @@ class TestSessionExecuteFailures:
         """F-BIZ-4: Execute on nonexistent session → NotFoundError."""
         with pytest.raises(NotFoundError):
             await admin_registry.session.execute(
-                "nonexistent-session-xyz-99999",
+                SessionID(uuid4()),
                 ExecuteRequest(mode="query", code="print('hi')", run_id="r1"),
             )
 
@@ -268,7 +270,7 @@ class TestSessionInterrupt:
         """S-8: Interrupt running session → success, agent_registry.interrupt_session called."""
         agent_registry.interrupt_session.return_value = None
 
-        await admin_registry.session.interrupt(session_seed.session_name)
+        await admin_registry.session.interrupt(session_seed.session_id)
 
         agent_registry.interrupt_session.assert_called_once()
 
@@ -278,7 +280,7 @@ class TestSessionInterrupt:
     ) -> None:
         """F-BIZ-5: Interrupt nonexistent session → NotFoundError."""
         with pytest.raises(NotFoundError):
-            await admin_registry.session.interrupt("nonexistent-session-xyz-99999")
+            await admin_registry.session.interrupt(SessionID(uuid4()))
 
 
 # ---------------------------------------------------------------------------
@@ -301,7 +303,7 @@ class TestSessionComplete:
         agent_registry.get_completions.return_value = mock_completion
 
         result = await admin_registry.session.complete(
-            session_seed.session_name,
+            session_seed.session_id,
             CompleteRequest(code="impo"),
         )
 
@@ -315,7 +317,7 @@ class TestSessionComplete:
         """F-BIZ-6: Complete on nonexistent session → NotFoundError."""
         with pytest.raises(NotFoundError):
             await admin_registry.session.complete(
-                "nonexistent-session-xyz-99999",
+                SessionID(uuid4()),
                 CompleteRequest(code="impo"),
             )
 
@@ -370,7 +372,7 @@ class TestSessionStartService:
             return_value=mock_session_cls,
         ):
             result = await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="ttyd"),
             )
 
@@ -429,7 +431,7 @@ class TestSessionStartService:
             return_value=mock_session_cls,
         ):
             result = await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="ttyd", port=8888),
             )
 
@@ -477,7 +479,7 @@ class TestSessionStartService:
             return_value=mock_session_cls,
         ):
             result = await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(
                     app="ttyd",
                     arguments=json.dumps(["--port", "8080"]),
@@ -543,7 +545,7 @@ class TestSessionStartService:
             return_value=mock_session_cls,
         ):
             result = await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="ttyd"),
             )
 
@@ -593,7 +595,7 @@ class TestSessionStartService:
             return_value=mock_session_cls,
         ):
             result = await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="ttyd"),
             )
 
@@ -644,7 +646,7 @@ class TestSessionStartServiceFailures:
 
         with pytest.raises(NotFoundError):
             await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="nonexistent-app"),
             )
 
@@ -692,7 +694,7 @@ class TestSessionStartServiceFailures:
 
         with pytest.raises(InvalidRequestError):
             await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="inference-svc"),
             )
 
@@ -730,7 +732,7 @@ class TestSessionStartServiceFailures:
 
         with pytest.raises(InvalidRequestError):
             await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="ttyd", port=9999),
             )
 
@@ -752,7 +754,7 @@ class TestSessionStartServiceFailures:
 
         with pytest.raises(ServerError):
             await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="ttyd"),
             )
 
@@ -796,7 +798,7 @@ class TestSessionStartServiceFailures:
 
         with pytest.raises(ServerError):
             await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="ttyd"),
             )
 
@@ -819,7 +821,7 @@ class TestSessionShutdownService:
         agent_registry.shutdown_service.return_value = None
 
         await admin_registry.session.shutdown_service(
-            session_seed.session_name,
+            session_seed.session_id,
             ShutdownServiceRequest(service_name="ttyd"),
         )
 
@@ -832,6 +834,6 @@ class TestSessionShutdownService:
         """F-BIZ-7: Shutdown service on nonexistent session → NotFoundError."""
         with pytest.raises(NotFoundError):
             await admin_registry.session.shutdown_service(
-                "nonexistent-session-xyz-99999",
+                SessionID(uuid4()),
                 ShutdownServiceRequest(service_name="ttyd"),
             )

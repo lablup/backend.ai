@@ -30,7 +30,7 @@ from ai.backend.common.data.entity.resource_group import (
     ResourceGroupName,
 )
 from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.permission.types import (
     EntityType,
@@ -42,7 +42,7 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext
-from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
@@ -104,7 +104,7 @@ AgentFactoryFunc = Callable[[dict[str, str]], Coroutine[Any, Any, str]]
 
 @dataclass
 class SessionSeedData:
-    session_id: SessionId
+    session_id: SessionID
     session_name: str
     kernel_id: uuid.UUID
     access_key: str
@@ -349,7 +349,7 @@ async def _seed_session(
     SessionRow + kernel + AssociationScopesEntitiesRow (session → user scope, session → project scope).
     """
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-session-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -443,7 +443,7 @@ async def _seed_session(
     )
 
 
-async def _cleanup_session(db_engine: SAEngine, session_id: SessionId) -> None:
+async def _cleanup_session(db_engine: SAEngine, session_id: SessionID) -> None:
     """Remove session, kernel, and RBAC association rows."""
     async with db_engine.begin() as conn:
         await conn.execute(

@@ -8,6 +8,7 @@ from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
 from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
@@ -22,6 +23,7 @@ from ai.backend.client.v2.exceptions import (
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.dto.manager.compute_session import (
     SearchComputeSessionsRequest,
@@ -36,7 +38,7 @@ from ai.backend.common.dto.manager.session.response import (
     GetStatusHistoryResponse,
     MatchSessionsResponse,
 )
-from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     GroupMeta,
@@ -128,7 +130,7 @@ async def system_session_seed(
     """
     unique = secrets.token_hex(4)
     agent_id = f"test-agent-{unique}"
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-system-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -251,7 +253,7 @@ async def system_session_no_agent_seed(
     Used for F-BIZ-2: Direct access with agent_row=None raises KernelNotReady (HTTP 400).
     """
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-sysnoagent-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -348,7 +350,7 @@ async def second_session_seed(
     when multiple sessions exist with similar names.
     """
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"{session_seed.session_name}-alt-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -436,7 +438,7 @@ class TestSessionStatusHistory:
         session_seed: SessionSeedData,
     ) -> None:
         """S-5: Status history retrieval returns dict with PENDING/RUNNING timestamps."""
-        result = await admin_registry.session.get_status_history(session_seed.session_name)
+        result = await admin_registry.session.get_status_history(session_seed.session_id)
         assert isinstance(result, GetStatusHistoryResponse)
         assert isinstance(result.root, dict)
         assert "PENDING" in result.root
@@ -448,7 +450,7 @@ class TestSessionStatusHistory:
     ) -> None:
         """F-BIZ-1: Nonexistent session raises NotFoundError (HTTP 404)."""
         with pytest.raises(NotFoundError):
-            await admin_registry.session.get_status_history("nonexistent-session-xyz-99999")
+            await admin_registry.session.get_status_history(SessionID(uuid4()))
 
 
 class TestSessionInfo:
@@ -460,7 +462,7 @@ class TestSessionInfo:
         session_seed: SessionSeedData,
     ) -> None:
         """S-7: Session info returns LegacySessionInfo with status=RUNNING, domainName."""
-        result = await admin_registry.session.get_info(session_seed.session_name)
+        result = await admin_registry.session.get_info(session_seed.session_id)
         assert isinstance(result, GetSessionInfoResponse)
         assert result.root["status"] == "RUNNING"
         assert "domainName" in result.root
@@ -478,7 +480,7 @@ class TestSessionInfo:
         results in SessionNotFound (HTTP 404).
         """
         with pytest.raises(NotFoundError):
-            await user_registry.session.get_info(session_seed.session_name)
+            await user_registry.session.get_info(session_seed.session_id)
 
 
 class TestSessionDirectAccessInfo:
@@ -494,7 +496,7 @@ class TestSessionDirectAccessInfo:
         Non-SYSTEM sessions (INTERACTIVE, BATCH) are not in PRIVATE_SESSION_TYPES,
         so direct access info returns an empty response dict without any agent calls.
         """
-        result = await admin_registry.session.get_direct_access_info(session_seed.session_name)
+        result = await admin_registry.session.get_direct_access_info(session_seed.session_id)
         assert isinstance(result, GetDirectAccessInfoResponse)
         assert result.root == {}
 
@@ -504,9 +506,7 @@ class TestSessionDirectAccessInfo:
         system_session_seed: SessionSeedData,
     ) -> None:
         """S-9: SYSTEM session direct access info returns sshd/sftpd ports."""
-        result = await admin_registry.session.get_direct_access_info(
-            system_session_seed.session_name
-        )
+        result = await admin_registry.session.get_direct_access_info(system_session_seed.session_id)
         assert isinstance(result, GetDirectAccessInfoResponse)
         assert "sshd_ports" in result.root
         assert "public_host" in result.root
@@ -525,7 +525,7 @@ class TestSessionDirectAccessInfo:
         """
         with pytest.raises(InvalidRequestError):
             await admin_registry.session.get_direct_access_info(
-                system_session_no_agent_seed.session_name
+                system_session_no_agent_seed.session_id
             )
 
 

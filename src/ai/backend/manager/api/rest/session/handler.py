@@ -462,6 +462,21 @@ class SessionHandler:
         )
         return result.entity_id()
 
+    async def _resolve_session_id_of_user(self, user_id: UUID, session_name: str) -> SessionID:
+        """Resolve the session a request names, keyed by the user rather than an access key.
+
+        Same two forms as :meth:`_resolve_session_id`: an id reaches a terminated session,
+        a name resolves among the live ones.
+        """
+        try:
+            return SessionID(UUID(session_name))
+        except ValueError:
+            pass
+        resolved = await self._session.lookup.run(
+            LookupSessionAction(user_uuid=user_id, name=session_name)
+        )
+        return resolved.entity_id()
+
     def _require_user_id(self) -> UUID:
         """Return the authenticated user's id from the request context.
 
@@ -1143,12 +1158,9 @@ class SessionHandler:
         if myself is None:
             raise NoCurrentTaskContext("No current task context")
         user_id = self._require_user_id()
-        resolved = await self._session.lookup.run(
-            LookupSessionAction(user_uuid=user_id, name=session_name)
-        )
         result = await self._session.start_service.run(
             StartServiceAction(
-                session_id=resolved.entity_id(),
+                session_id=await self._resolve_session_id_of_user(user_id, session_name),
                 service=params.app,
                 login_session_token=params.login_session_token,
                 port=params.port,

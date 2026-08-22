@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.user import (
 )
 from ai.backend.common.dto.manager.user.types import UserRole as UserRoleDTO
 from ai.backend.common.dto.manager.user.types import UserStatus as UserStatusDTO
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.rest.user.adapter import UserAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData, UserStatus
@@ -494,7 +495,7 @@ class TestUserAdapterConversion:
         )
 
         adapter = UserAdapter()
-        dto = adapter.convert_to_dto(user_data, None)
+        dto = adapter.convert_to_dto(user_data, AccessKey("AKIAIOSFODNN7EXAMPLE"))
 
         assert isinstance(dto, UserDTO)
         assert dto.id == user_id

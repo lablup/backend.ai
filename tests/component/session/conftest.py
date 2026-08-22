@@ -23,11 +23,11 @@ from ai.backend.common.data.entity.resource_group import (
     ResourceGroupName,
 )
 from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.common.plugin.monitor import ErrorPluginContext
-from ai.backend.common.types import AgentId, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import AgentId, ResourceSlot, SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     ConcernMeta,
@@ -79,7 +79,7 @@ class UserFixtureData:
 
 @dataclass
 class SessionSeedData:
-    session_id: SessionId
+    session_id: SessionID
     session_name: str
     kernel_id: uuid.UUID
     access_key: str
@@ -241,7 +241,7 @@ async def session_seed(
     the SDK v2 SessionClient.
     """
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-session-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -337,7 +337,7 @@ async def terminated_session_seed(
     for terminated sessions (no agent RPC needed).
     """
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-terminated-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -432,7 +432,7 @@ async def user_session_seed(
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session owned by the regular user."""
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-user-session-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
