@@ -11,14 +11,11 @@ from ai.backend.common.data.filter_specs import (
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.keypair.row import KeyPairRow
 
-__all__ = (
-    "KeypairConditions",
-    "KeypairOrders",
-)
+__all__ = ("KeypairConditions",)
 
 
 class KeypairConditions:
@@ -293,43 +290,3 @@ class KeypairConditions:
             return KeyPairRow.created_at > subquery
 
         return inner
-
-
-class KeypairOrders:
-    """Query orders for sorting keypairs."""
-
-    @staticmethod
-    def created_at(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return KeyPairRow.created_at.asc()
-        return KeyPairRow.created_at.desc()
-
-    @staticmethod
-    def last_used(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return KeyPairRow.last_used.asc()
-        return KeyPairRow.last_used.desc()
-
-    @staticmethod
-    def access_key(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return KeyPairRow.access_key.asc()
-        return KeyPairRow.access_key.desc()
-
-    @staticmethod
-    def is_active(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return KeyPairRow.is_active.asc()
-        return KeyPairRow.is_active.desc()
-
-    @staticmethod
-    def is_default(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return KeyPairRow.is_default.asc()
-        return KeyPairRow.is_default.desc()
-
-    @staticmethod
-    def resource_policy(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return KeyPairRow.resource_policy.asc()
-        return KeyPairRow.resource_policy.desc()

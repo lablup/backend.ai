@@ -101,7 +101,8 @@ from ai.backend.manager.data.user.types import UserStatus as DataUserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair.conditions import KeypairConditions, KeypairOrders
+from ai.backend.manager.models.keypair.conditions import KeypairConditions
+from ai.backend.manager.models.keypair.orders import KeypairOrders
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
