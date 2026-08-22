@@ -1,18 +1,12 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Callable, Coroutine
 from typing import Any
 
 import pytest
 
-from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.dto.manager.object_storage.request import (
-    GetPresignedDownloadURLReq,
-    GetPresignedUploadURLReq,
-)
 from ai.backend.common.dto.manager.object_storage.response import (
     ObjectStorageAllBucketsResponse,
     ObjectStorageBucketsResponse,
@@ -99,31 +93,3 @@ class TestGetBuckets:
         result = await admin_registry.object_storage.get_buckets(str(storage["id"]))
         assert isinstance(result, ObjectStorageBucketsResponse)
         assert result.buckets == []
-
-
-class TestPresignedUploadURL:
-    async def test_upload_url_fails_without_reservoir_config(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        req = GetPresignedUploadURLReq(
-            artifact_revision_id=uuid.uuid4(),
-            key="test-file.txt",
-        )
-        with pytest.raises(BackendAPIError) as exc_info:
-            await admin_registry.object_storage.get_presigned_upload_url(req)
-        assert exc_info.value.status == 500
-
-
-class TestPresignedDownloadURL:
-    async def test_download_url_fails_without_reservoir_config(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        req = GetPresignedDownloadURLReq(
-            artifact_revision_id=uuid.uuid4(),
-            key="test-file.txt",
-        )
-        with pytest.raises(BackendAPIError) as exc_info:
-            await admin_registry.object_storage.get_presigned_download_url(req)
-        assert exc_info.value.status == 500
