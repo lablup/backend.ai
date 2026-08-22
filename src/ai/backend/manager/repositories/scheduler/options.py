@@ -8,7 +8,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 
 if TYPE_CHECKING:
     from ai.backend.common.data.filter_specs import (
@@ -49,9 +49,9 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group(scaling_group: str) -> QueryCondition:
+    def by_resource_group(resource_group: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return SessionRow.scaling_group_name == scaling_group
+            return SessionRow.scaling_group_name == resource_group
 
         return inner
 
@@ -212,7 +212,7 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group_contains(spec: StringMatchSpec) -> QueryCondition:
+    def by_resource_group_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = SessionRow.scaling_group_name.ilike(f"%{spec.value}%")
@@ -225,7 +225,7 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group_equals(spec: StringMatchSpec) -> QueryCondition:
+    def by_resource_group_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = sa.func.lower(SessionRow.scaling_group_name) == spec.value.lower()
@@ -238,7 +238,7 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
+    def by_resource_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = SessionRow.scaling_group_name.ilike(f"{spec.value}%")
@@ -251,7 +251,7 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
+    def by_resource_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = SessionRow.scaling_group_name.ilike(f"%{spec.value}")
@@ -619,11 +619,11 @@ class KernelConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group(scaling_group: str) -> QueryCondition:
+    def by_resource_group(resource_group: str) -> QueryCondition:
         """Filter kernels by scaling group."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return KernelRow.scaling_group == scaling_group
+            return KernelRow.scaling_group == resource_group
 
         return inner
 
@@ -668,7 +668,7 @@ class KernelConditions:
 
     @staticmethod
     def for_fair_share_observation(
-        scaling_group: str,
+        resource_group: str,
     ) -> QueryCondition:
         """Filter kernels that need fair share observation.
 
@@ -687,19 +687,19 @@ class KernelConditions:
         """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            # Subquery to get lookback_days from scaling_group's fair_share_spec
+            # Subquery to get lookback_days from resource_group's fair_share_spec
             # Falls back to DEFAULT_LOOKBACK_DAYS if not set
             lookback_days_subquery = (
                 sa.select(
                     sa.func.coalesce(
                         sa.cast(
-                            ScalingGroupRow.fair_share_spec["lookback_days"].as_string(),
+                            ResourceGroupRow.fair_share_spec["lookback_days"].as_string(),
                             sa.Integer,
                         ),
                         DEFAULT_LOOKBACK_DAYS,
                     )
                 )
-                .where(ScalingGroupRow.name == scaling_group)
+                .where(ResourceGroupRow.name == resource_group)
                 .scalar_subquery()
             )
 
@@ -707,7 +707,7 @@ class KernelConditions:
             lookback_cutoff = sa.func.now() - sa.func.make_interval(0, 0, 0, lookback_days_subquery)
 
             return sa.and_(
-                KernelRow.scaling_group == scaling_group,
+                KernelRow.scaling_group == resource_group,
                 KernelRow.starts_at.isnot(None),  # Must have started
                 sa.or_(
                     # Running kernels (not yet terminated)

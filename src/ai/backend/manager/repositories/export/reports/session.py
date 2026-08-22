@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.export import (
@@ -46,14 +46,14 @@ def _serialize_json(value: Any) -> str:
 
 # Project JOIN (N:1, no duplication)
 PROJECT_JOIN = JoinDef(
-    table=GroupRow.__table__,
-    condition=SessionRow.group_id == GroupRow.id,
+    table=ProjectRow.__table__,
+    condition=SessionRow.group_id == ProjectRow.id,
 )
 
 # Project Resource Policy JOIN (N:1 through Project, no duplication)
 PROJECT_RESOURCE_POLICY_JOIN = JoinDef(
     table=ProjectResourcePolicyRow.__table__,
-    condition=GroupRow.resource_policy == ProjectResourcePolicyRow.name,
+    condition=ProjectRow.resource_policy == ProjectResourcePolicyRow.name,
 )
 PROJECT_POLICY_JOINS = (PROJECT_JOIN, PROJECT_RESOURCE_POLICY_JOIN)
 
@@ -71,8 +71,8 @@ KERNEL_JOIN = JoinDef(
 
 # Scaling Group JOIN (N:1, no duplication)
 SCALING_GROUP_JOIN = JoinDef(
-    table=ScalingGroupRow.__table__,
-    condition=SessionRow.scaling_group_name == ScalingGroupRow.name,
+    table=ResourceGroupRow.__table__,
+    condition=SessionRow.scaling_group_name == ResourceGroupRow.name,
 )
 
 # Field definitions for session export
@@ -175,7 +175,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Project Name",
         description="Project (group) name",
         field_type=ExportFieldType.STRING,
-        column=GroupRow.name,
+        column=ProjectRow.name,
         joins=frozenset({PROJECT_JOIN}),
     ),
     ExportFieldDef(
@@ -183,7 +183,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Project Description",
         description="Project description",
         field_type=ExportFieldType.STRING,
-        column=GroupRow.description,
+        column=ProjectRow.description,
         joins=frozenset({PROJECT_JOIN}),
     ),
     ExportFieldDef(
@@ -191,7 +191,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Project Resource Policy",
         description="Project resource policy name",
         field_type=ExportFieldType.STRING,
-        column=GroupRow.resource_policy,
+        column=ProjectRow.resource_policy,
         joins=frozenset({PROJECT_JOIN}),
     ),
     ExportFieldDef(
@@ -199,7 +199,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Project Active",
         description="Project active status",
         field_type=ExportFieldType.BOOLEAN,
-        column=GroupRow.is_active,
+        column=ProjectRow.is_active,
         joins=frozenset({PROJECT_JOIN}),
     ),
     ExportFieldDef(
@@ -207,7 +207,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Project Created At",
         description="Project creation time",
         field_type=ExportFieldType.DATETIME,
-        column=GroupRow.created_at,
+        column=ProjectRow.created_at,
         formatter=lambda v: v.isoformat() if v else "",
         joins=frozenset({PROJECT_JOIN}),
     ),
@@ -282,7 +282,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Resource Group Name",
         description="Resource group name",
         field_type=ExportFieldType.STRING,
-        column=ScalingGroupRow.name,
+        column=ResourceGroupRow.name,
         joins=frozenset({SCALING_GROUP_JOIN}),
     ),
     ExportFieldDef(
@@ -290,7 +290,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Resource Group Description",
         description="Resource group description",
         field_type=ExportFieldType.STRING,
-        column=ScalingGroupRow.description,
+        column=ResourceGroupRow.description,
         joins=frozenset({SCALING_GROUP_JOIN}),
     ),
     ExportFieldDef(
@@ -298,7 +298,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Resource Group Active",
         description="Resource group active status",
         field_type=ExportFieldType.BOOLEAN,
-        column=ScalingGroupRow.is_active,
+        column=ResourceGroupRow.is_active,
         joins=frozenset({SCALING_GROUP_JOIN}),
     ),
     ExportFieldDef(
@@ -306,7 +306,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Resource Group Public",
         description="Resource group public status",
         field_type=ExportFieldType.BOOLEAN,
-        column=ScalingGroupRow.is_public,
+        column=ResourceGroupRow.is_public,
         joins=frozenset({SCALING_GROUP_JOIN}),
     ),
     ExportFieldDef(
@@ -314,7 +314,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Resource Group Scheduler",
         description="Resource group scheduler type",
         field_type=ExportFieldType.STRING,
-        column=ScalingGroupRow.scheduler,
+        column=ResourceGroupRow.scheduler,
         joins=frozenset({SCALING_GROUP_JOIN}),
     ),
     ExportFieldDef(
@@ -322,7 +322,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Resource Group Created At",
         description="Resource group creation time",
         field_type=ExportFieldType.DATETIME,
-        column=ScalingGroupRow.created_at,
+        column=ResourceGroupRow.created_at,
         formatter=lambda v: v.isoformat() if v else "",
         joins=frozenset({SCALING_GROUP_JOIN}),
     ),

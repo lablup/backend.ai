@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from aiohttp import web
 
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.api.rest.middleware.auth import (
     admin_required,
     auth_required,
@@ -21,7 +21,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderPermissionSetAlias,
     VFolderStatusSet,
 )
-from ai.backend.manager.services.vfolder.actions.base import GetAccessibleVFolderAction
+from ai.backend.manager.services.vfolder.actions.base import LookupAccessibleVFolderAction
 from ai.backend.manager.services.vfolder.actions.get_row import GetVFolderLegacyRowAction
 
 from .handler import VFolderHandler
@@ -61,8 +61,8 @@ def _vfolder_resolver(
             try:
                 vfolder_uuid = VFolderUUID(uuid.UUID(piece))
             except ValueError:
-                result = await vfolder_processors.get_accessible_vfolder.wait_for_complete(
-                    GetAccessibleVFolderAction(
+                result = await vfolder_processors.get_accessible_vfolder.run(
+                    LookupAccessibleVFolderAction(
                         user_uuid=request["user"]["uuid"],
                         user_role=request["user"]["role"],
                         domain_name=request["user"]["domain_name"],
@@ -75,7 +75,7 @@ def _vfolder_resolver(
                 )
                 request["vfolder_row"] = result.row
             else:
-                row_result = await vfolder_processors.get_vfolder_row.wait_for_complete(
+                row_result = await vfolder_processors.get_vfolder_row.run(
                     GetVFolderLegacyRowAction(vfolder_uuid=vfolder_uuid)
                 )
                 request["vfolder_row"] = row_result.row

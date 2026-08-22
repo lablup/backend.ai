@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from typing import Any, Self
 
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import MountInfoEntry, MountPermission, ResourceSlot, SessionTypes
 from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,

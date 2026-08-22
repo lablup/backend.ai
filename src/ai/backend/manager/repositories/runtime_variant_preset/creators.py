@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
@@ -19,7 +19,7 @@ from ai.backend.manager.repositories.base.creator import CreatorSpec
 
 @dataclass
 class RuntimeVariantPresetCreatorSpec(CreatorSpec[RuntimeVariantPresetRow]):
-    runtime_variant_id: UUID
+    runtime_variant_id: RuntimeVariantID
     name: str
     description: str | None
     rank: int

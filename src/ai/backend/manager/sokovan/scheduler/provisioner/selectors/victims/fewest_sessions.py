@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import override
 
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import AgentId
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.victims.order import (
     AbstractVictimOrder,

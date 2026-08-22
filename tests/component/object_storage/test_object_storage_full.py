@@ -15,20 +15,17 @@ StorageNamespaceFactory = Callable[..., Coroutine[Any, Any, dict[str, Any]]]
 
 
 class TestListObjectStorageFull:
-    async def test_user_lists_storages_same_as_admin(
+    async def test_admin_lists_every_registered_storage(
         self,
         admin_registry: BackendAIClientRegistry,
-        user_registry: BackendAIClientRegistry,
         object_storage_factory: ObjectStorageFactory,
     ) -> None:
-        await object_storage_factory()
-        admin_result = await admin_registry.object_storage.list()
-        user_result = await user_registry.object_storage.list()
-        assert isinstance(admin_result, ObjectStorageListResponse)
-        assert isinstance(user_result, ObjectStorageListResponse)
-        admin_names = {s.name for s in admin_result.storages}
-        user_names = {s.name for s in user_result.storages}
-        assert admin_names == user_names
+        first = await object_storage_factory()
+        second = await object_storage_factory()
+        result = await admin_registry.object_storage.list()
+        assert isinstance(result, ObjectStorageListResponse)
+        names = {s.name for s in result.storages}
+        assert {first["name"], second["name"]} <= names
 
 
 class TestGetBucketsFull:

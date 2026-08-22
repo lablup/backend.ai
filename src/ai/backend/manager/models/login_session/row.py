@@ -7,6 +7,9 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
+from ai.backend.common.data.entity.login_history import LoginHistoryID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
     LoginSessionStatus,
@@ -33,17 +36,17 @@ class LoginSessionRow(CreatedAtMixin, Base):
     session_token: Mapped[str] = mapped_column(
         "session_token", sa.String(64), unique=True, nullable=False, index=True
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(
+    user_id: Mapped[UserID] = mapped_column(
         "user_id",
-        GUID,
+        GUID(UserID),
         sa.ForeignKey("users.uuid", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     access_key: Mapped[str] = mapped_column("access_key", sa.String(20), nullable=False)
-    login_client_type_id: Mapped[uuid.UUID | None] = mapped_column(
+    login_client_type_id: Mapped[LoginClientTypeID | None] = mapped_column(
         "login_client_type_id",
-        GUID,
+        GUID(LoginClientTypeID),
         sa.ForeignKey("login_client_types.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
@@ -85,12 +88,12 @@ class LoginSessionRow(CreatedAtMixin, Base):
 class LoginHistoryRow(Base):
     __tablename__ = "login_history"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[LoginHistoryID] = mapped_column(
+        "id", GUID(LoginHistoryID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(
+    user_id: Mapped[UserID] = mapped_column(
         "user_id",
-        GUID,
+        GUID(UserID),
         sa.ForeignKey("users.uuid", ondelete="CASCADE"),
         nullable=False,
         index=True,

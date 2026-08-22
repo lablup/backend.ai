@@ -5,7 +5,7 @@ Mirrors the shape of ``data/deployment/types.py::DeploymentOptions`` and
 handler-keyed scheduler-policy semantics. Every option in this module
 is stored on either ``SessionRow`` individual columns or
 ``SessionRow.options`` JSONB (resp.
-``ScalingGroupRow.default_session_options`` JSONB) and reassembled into
+``ResourceGroupRow.default_session_options`` JSONB) and reassembled into
 the dataclasses here at read time.
 
 See ``SessionOptions`` docstring for the column vs JSONB split.
@@ -20,7 +20,7 @@ from typing import Any, Protocol
 
 from pydantic import ConfigDict, Field
 
-from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.types import (
     AgentId,
     BackendAISchema,
@@ -399,7 +399,7 @@ class KernelGroup(_OptionsBaseModel):
 class DefaultSessionOptions(_OptionsBaseModel):
     """Baseline options used when a session create request omits fields.
 
-    Stored as ``ScalingGroupRow.default_session_options`` JSONB. Fields
+    Stored as ``ResourceGroupRow.default_session_options`` JSONB. Fields
     that only make sense per session (``kernel_groups``,
     ``designated_agents``, ``cluster_size``) do not live here.
     ``default_kernel_execution_spec`` seeds

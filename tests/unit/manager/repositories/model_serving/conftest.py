@@ -9,9 +9,11 @@ import pytest
 import yarl
 from pytest_mock import MockerFixture
 
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     ClusterMode,
     ResourceSlot,
@@ -164,7 +166,7 @@ def sample_vfolder() -> VFolderRow:
     vfolder = VFolderRow()
     vfolder.id = VFolderUUID(uuid.uuid4())
     vfolder.name = "model-vfolder"
-    vfolder.user = uuid.uuid4()
+    vfolder.user = UserID(uuid.uuid4())
     vfolder.group = None
     vfolder.host = "storage-host"
     vfolder.domain_name = "default"
@@ -205,7 +207,7 @@ def sample_endpoint_creator_spec(
         cluster_size=1,
         extra_mounts=[],
         created_user=sample_user.uuid,
-        project=uuid.uuid4(),
+        project=ProjectID(uuid.uuid4()),
         domain="default",
         resource_group="default",
     )

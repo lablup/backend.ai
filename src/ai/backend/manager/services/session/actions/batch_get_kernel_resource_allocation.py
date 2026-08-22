@@ -4,47 +4,23 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType, RBACElementType
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.types import KernelId
-from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
-from ai.backend.manager.actions.action.types import ActionTarget
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
+from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.bulk.result import BasePartialBulkActionResult, BulkEntityResult
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 
 
-@dataclass(frozen=True)
-class KernelResourceAllocationTarget(ActionTarget):
-    """Bulk-action target identifying a single kernel by ID."""
-
-    kernel_id: KernelId
-
-    @override
-    def to_rbac_element_ref(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.KERNEL,
-            element_id=str(self.kernel_id),
-        )
-
-
 @dataclass
-class BatchGetKernelResourceAllocationAction(BaseBulkAction[KernelResourceAllocationTarget]):
-    """Batch-aggregate resource allocations for one or more kernels.
+class BatchGetKernelResourceAllocationAction(BaseBulkAction):
+    """Aggregate the slot amounts recorded against the kernels the caller named.
 
-    Used by the GraphQL DataLoader backing ``KernelV2.resourceAllocation``; the
-    kernel ids originate from already-authorized kernel nodes.
+    A kernel runs under a session, so the session is what answers for the read; the ids are read back as the sessions they belong to.
     """
 
     kernel_ids: list[KernelId]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.KERNEL
 
     @override
     @classmethod
@@ -52,17 +28,27 @@ class BatchGetKernelResourceAllocationAction(BaseBulkAction[KernelResourceAlloca
         return ActionOperationType.SEARCH
 
     @override
-    def targets(self) -> Sequence[KernelResourceAllocationTarget]:
-        return [KernelResourceAllocationTarget(kernel_id=kid) for kid in self.kernel_ids]
+    @classmethod
+    def action_name(cls) -> str:
+        return "batch_get_kernel_resource_allocation"
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return [SessionID(_id) for _id in self.kernel_ids]
 
 
 @dataclass
-class BatchGetKernelResourceAllocationActionResult(BaseBulkActionResult):
+class BatchGetKernelResourceAllocationActionResult(BasePartialBulkActionResult):
     data: dict[KernelId, ResourceAllocationAggregate]
 
     @override
-    def element_refs(self) -> list[RBACElementRef]:
+    def entity_results(self) -> Sequence[BulkEntityResult]:
         return [
-            RBACElementRef(element_type=RBACElementType.KERNEL, element_id=str(kid))
-            for kid in self.data
+            BulkEntityResult(
+                entity_id=SessionID(_id),
+                status=OperationStatus.SUCCESS,
+                description="aggregated",
+                error_code=None,
+            )
+            for _id in self.data
         ]

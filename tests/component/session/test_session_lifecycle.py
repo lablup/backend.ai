@@ -5,6 +5,7 @@ import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
+from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
@@ -14,14 +15,15 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.exceptions import NotFoundError, ServerError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.session.request import (
     RestartSessionRequest,
 )
 from ai.backend.common.dto.manager.session.response import (
     GetStatusHistoryResponse,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import kernels
@@ -33,7 +35,7 @@ from .conftest import SessionSeedData, UserFixtureData
 
 def _build_kernel_values(
     *,
-    session_id: SessionId,
+    session_id: SessionID,
     unique: str,
     session_name: str,
     cluster_size: int,
@@ -41,7 +43,7 @@ def _build_kernel_values(
     group_id: uuid.UUID,
     user_uuid: uuid.UUID,
     access_key: str,
-    scaling_group: str,
+    resource_group: str,
     resource_group_id: ResourceGroupID,
     now: datetime,
 ) -> dict[str, Any]:
@@ -57,7 +59,7 @@ def _build_kernel_values(
         group_id=group_id,
         user_uuid=user_uuid,
         access_key=access_key,
-        scaling_group=scaling_group,
+        scaling_group=resource_group,
         resource_group_id=resource_group_id,
         status_info="",
         occupied_slots=ResourceSlot(),
@@ -76,12 +78,12 @@ async def degraded_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING_DEGRADED session with two kernels (one RUNNING, one ERROR)."""
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-degraded-{unique}"
     now = datetime.now(tzutc())
 
@@ -100,7 +102,7 @@ async def degraded_session_seed(
         group_id=group_fixture,
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
-        scaling_group=scaling_group_name,
+        resource_group=resource_group_name,
         resource_group_id=resource_group_id,
         now=now,
     )
@@ -119,7 +121,7 @@ async def degraded_session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
+                scaling_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING_DEGRADED,
                 status_info="",
@@ -172,14 +174,14 @@ async def full_lifecycle_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session with a full lifecycle status_history
     (PENDING → SCHEDULED → PREPARING → PULLING → CREATING → RUNNING).
     """
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-full-lifecycle-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -202,7 +204,7 @@ async def full_lifecycle_session_seed(
         group_id=group_fixture,
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
-        scaling_group=scaling_group_name,
+        resource_group=resource_group_name,
         resource_group_id=resource_group_id,
         now=now,
     )
@@ -221,7 +223,7 @@ async def full_lifecycle_session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
+                scaling_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
@@ -273,7 +275,7 @@ class TestSessionRestart:
         """Any restart attempt now returns 501 Not Implemented regardless of state."""
         with pytest.raises(ServerError) as exc_info:
             await admin_registry.session.restart(
-                session_seed.session_name,
+                session_seed.session_id,
                 RestartSessionRequest(),
             )
         assert exc_info.value.args[0] == 501
@@ -286,7 +288,7 @@ class TestSessionRestart:
         """Restart against a TERMINATED session still returns 501."""
         with pytest.raises(ServerError) as exc_info:
             await admin_registry.session.restart(
-                terminated_session_seed.session_name,
+                terminated_session_seed.session_id,
                 RestartSessionRequest(),
             )
         assert exc_info.value.args[0] == 501
@@ -298,7 +300,7 @@ class TestSessionRestart:
         """Restart against a missing session returns 501 (endpoint is a stub)."""
         with pytest.raises(ServerError) as exc_info:
             await admin_registry.session.restart(
-                "nonexistent-session-xyz-99999",
+                SessionID(uuid4()),
                 RestartSessionRequest(),
             )
         assert exc_info.value.args[0] == 501
@@ -319,7 +321,7 @@ class TestSessionStatusHistory:
         returned by the get_status_history endpoint.
         """
         result = await admin_registry.session.get_status_history(
-            session_seed.session_name,
+            session_seed.session_id,
         )
         assert isinstance(result, GetStatusHistoryResponse)
         history = result.root
@@ -341,7 +343,7 @@ class TestSessionStatusHistory:
         """
         with pytest.raises(NotFoundError):
             await admin_registry.session.get_status_history(
-                terminated_session_seed.session_name,
+                terminated_session_seed.session_id,
             )
 
     async def test_user_gets_own_session_status_history(
@@ -355,7 +357,7 @@ class TestSessionStatusHistory:
         non-admin users for sessions they own.
         """
         result = await user_registry.session.get_status_history(
-            user_session_seed.session_name,
+            user_session_seed.session_id,
         )
         assert isinstance(result, GetStatusHistoryResponse)
         history = result.root
@@ -374,7 +376,7 @@ class TestSessionStatusHistory:
         """
         with pytest.raises((NotFoundError, BackendAPIError)):
             await user_registry.session.get_status_history(
-                session_seed.session_name,
+                session_seed.session_id,
             )
 
     async def test_full_lifecycle_status_history(
@@ -391,7 +393,7 @@ class TestSessionStatusHistory:
         accumulates entries across all transitions.
         """
         result = await admin_registry.session.get_status_history(
-            full_lifecycle_session_seed.session_name,
+            full_lifecycle_session_seed.session_id,
         )
         assert isinstance(result, GetStatusHistoryResponse)
         history = result.root
@@ -418,7 +420,7 @@ class TestSessionStatusHistory:
         confirming that the transition from RUNNING to RUNNING_DEGRADED was tracked.
         """
         result = await admin_registry.session.get_status_history(
-            degraded_session_seed.session_name,
+            degraded_session_seed.session_id,
         )
         assert isinstance(result, GetStatusHistoryResponse)
         history = result.root

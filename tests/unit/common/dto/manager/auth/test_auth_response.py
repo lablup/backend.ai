@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.auth.response import (
     AuthorizeResponse,
@@ -21,7 +22,6 @@ from ai.backend.common.dto.manager.auth.types import (
     AuthSuccessResponse,
     AuthTokenType,
 )
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, SecretKey
 
 

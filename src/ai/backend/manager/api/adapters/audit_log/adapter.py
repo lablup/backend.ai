@@ -5,7 +5,9 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.audit_log.request import (
     AdminSearchAuditLogsInput,
     AuditLogFilter,
@@ -22,23 +24,24 @@ from ai.backend.common.dto.manager.v2.audit_log.types import (
     AuditLogStatus,
     OrderDirection,
 )
-from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.audit_log import AuditLogRow
+from ai.backend.manager.models.audit_log.searchers import AuditLogSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.audit_log.options import AuditLogConditions, AuditLogOrders
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
     combine_conditions_or,
     negate_conditions,
 )
 from ai.backend.manager.services.audit_log.actions.scoped_search import (
-    EntityAuditLogTarget,
+    AuditLogScopeItem,
+    EntityAuditLogScopeItem,
     ScopedSearchAuditLogsAction,
-    TriggeredByAuditLogTarget,
+    TriggeredByAuditLogScopeItem,
 )
 from ai.backend.manager.services.audit_log.actions.search import SearchAuditLogsAction
 
@@ -61,21 +64,22 @@ class AuditLogAdapter(BaseAdapter):
         """
         if not ids:
             return []
-        querier = BatchQuerier(
+        searcher = AuditLogSearcher(
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[AuditLogConditions.by_ids(ids)],
         )
-        action_result = await self._processors.audit_log.search.wait_for_complete(
-            SearchAuditLogsAction(querier=querier)
+        action_result = await self._processors.audit_log.global_search.run(
+            SearchAuditLogsAction(searcher=searcher)
         )
-        audit_log_map = {item.id: self._data_to_node(item) for item in action_result.data}
-        return [audit_log_map.get(audit_log_id) for audit_log_id in ids]
+        audit_log_map = {item.id: self._data_to_node(item) for item in action_result.items}
+        return [audit_log_map.get(AuditLogID(audit_log_id)) for audit_log_id in ids]
 
     async def admin_search(self, input: AdminSearchAuditLogsInput) -> SearchAuditLogsPayload:
         """Search audit logs with filters, ordering, and pagination."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            AuditLogSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_AUDIT_LOG_PAGINATION_SPEC,
@@ -86,11 +90,11 @@ class AuditLogAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.audit_log.search.wait_for_complete(
-            SearchAuditLogsAction(querier=querier)
+        action_result = await self._processors.audit_log.global_search.run(
+            SearchAuditLogsAction(searcher=searcher)
         )
         return SearchAuditLogsPayload(
-            items=[self._data_to_node(item) for item in action_result.data],
+            items=[self._data_to_node(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -102,7 +106,8 @@ class AuditLogAdapter(BaseAdapter):
         RBAC-authorized for."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            AuditLogSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_AUDIT_LOG_PAGINATION_SPEC,
@@ -113,32 +118,38 @@ class AuditLogAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        targets = self._scope_to_targets(input)
-        action_result = await self._processors.audit_log.scoped_search.wait_for_complete(
-            ScopedSearchAuditLogsAction(items=targets, querier=querier)
+        action_result = await self._processors.audit_log.scoped_search.run(
+            ScopedSearchAuditLogsAction(items=self._scope_items(input), searcher=searcher)
         )
         return SearchAuditLogsPayload(
-            items=[self._data_to_node(item) for item in action_result.data],
+            items=[self._data_to_node(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
 
     @staticmethod
-    def _scope_to_targets(input: ScopedSearchAuditLogsInput) -> list[SearchableActionTarget]:
-        targets: list[SearchableActionTarget] = []
-        if input.scope.entity:
-            for entity_scope in input.scope.entity:
-                targets.append(
-                    EntityAuditLogTarget(
-                        element_type=RBACElementType(entity_scope.entity_type.value),
-                        element_id=entity_scope.entity_id,
-                    )
+    def _scope_items(input: ScopedSearchAuditLogsInput) -> list[AuditLogScopeItem]:
+        """The scopes the request names; an entity id that is not one is refused here.
+
+        A scope is an entity — a session, a deployment, a user — so its id has to be one.
+        """
+        items: list[AuditLogScopeItem] = []
+        for entity_scope in input.scope.entity or []:
+            try:
+                entity_id = uuid.UUID(entity_scope.entity_id)
+            except ValueError as e:
+                raise InvalidAPIParameters(
+                    f"Audit log scope id {entity_scope.entity_id!r} is not an entity id"
+                ) from e
+            items.append(
+                EntityAuditLogScopeItem(
+                    owner=RuntimeEntityID(EntityType(entity_scope.entity_type.value), entity_id),
                 )
-        if input.scope.triggered_user:
-            for user_scope in input.scope.triggered_user:
-                targets.append(TriggeredByAuditLogTarget(user_id=user_scope.value))
-        return targets
+            )
+        for user_scope in input.scope.triggered_user or []:
+            items.append(TriggeredByAuditLogScopeItem(user_id=UserID(user_scope.value)))
+        return items
 
     def _convert_filter(self, f: AuditLogFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
@@ -244,7 +255,7 @@ class AuditLogAdapter(BaseAdapter):
             action_id=data.action_id,
             entity_type=data.entity_type,
             operation=data.operation,
-            entity_id=data.entity_id,
+            entity_id=data.target_entity_id,
             created_at=data.created_at,
             request_id=data.request_id,
             triggered_by=data.triggered_by,

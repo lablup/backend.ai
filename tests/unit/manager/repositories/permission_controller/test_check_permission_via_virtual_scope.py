@@ -14,14 +14,13 @@ from dataclasses import dataclass, field
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeRef, ScopeType
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.user import UserID
-from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
@@ -50,11 +49,11 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
@@ -72,7 +71,7 @@ from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
     AgentRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
 )
 
 _TARGET_ENTITY_TYPE = EntityType("vfolder")
@@ -359,7 +358,7 @@ class TestCheckPermissionViaVirtualScope:
     ) -> None:
         key = EntityPermissionCheckKey(
             user_id=chain.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
+            entity=VFolderUUID(chain.entity_id),
         )
         result = await db_source.check_single_entity_permission_via_virtual_scope(key, permission)
         assert result is expected
@@ -392,7 +391,7 @@ class TestCheckPermissionViaVirtualScope:
     ) -> None:
         key = EntityPermissionCheckKey(
             user_id=chain.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
+            entity=VFolderUUID(chain.entity_id),
         )
         resolved = await db_source.resolve_effective_permissions_via_virtual_scope([key])
         assert resolved[key] == expected
@@ -409,11 +408,11 @@ class TestCheckPermissionViaVirtualScope:
     ) -> None:
         reachable = EntityPermissionCheckKey(
             user_id=chain.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
+            entity=VFolderUUID(chain.entity_id),
         )
         unreachable = EntityPermissionCheckKey(
             user_id=chain.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=uuid.uuid4()),
+            entity=VFolderUUID(uuid.uuid4()),
         )
         result = await db_source.check_bulk_permission_via_virtual_scope(
             [reachable, unreachable], Permission.READ
@@ -437,7 +436,7 @@ class TestCheckPermissionViaVirtualScope:
     ) -> None:
         reachable = EntityPermissionCheckKey(
             user_id=chain.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
+            entity=VFolderUUID(chain.entity_id),
         )
         result = await db_source.check_bulk_permission_via_virtual_scope(
             [reachable], Permission.CREATE | Permission.UPDATE
@@ -456,7 +455,7 @@ class TestCheckPermissionViaVirtualScope:
     ) -> None:
         key = EntityPermissionCheckKey(
             user_id=UserID(uuid.uuid4()),
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
+            entity=VFolderUUID(chain.entity_id),
         )
         result = await db_source.check_single_entity_permission_via_virtual_scope(
             key, Permission.READ
@@ -612,7 +611,7 @@ class TestScopeMemberEnrollmentCascade:
 
         key = EntityPermissionCheckKey(
             user_id=ids.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=ids.entity_id),
+            entity=VFolderUUID(ids.entity_id),
         )
         result = await db_source.check_single_entity_permission_via_virtual_scope(
             key, Permission.READ
@@ -644,7 +643,7 @@ class TestScopeMemberEnrollmentCascade:
 
         key = EntityPermissionCheckKey(
             user_id=ids.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=ids.entity_id),
+            entity=VFolderUUID(ids.entity_id),
         )
         result = await db_source.check_single_entity_permission_via_virtual_scope(
             key, Permission.READ

@@ -22,8 +22,8 @@ from ai.backend.common.dto.manager.user import (
 )
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -430,7 +430,7 @@ class TestUserCreateAutoAssignRoles:
         project_id = uuid.uuid4()
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.insert(GroupRow.__table__).values(
+                sa.insert(ProjectRow.__table__).values(
                     id=project_id,
                     name=f"model-store-{secrets.token_hex(4)}",
                     description="Model Store",
@@ -473,7 +473,7 @@ class TestUserCreateAutoAssignRoles:
                 )
             )
             await conn.execute(
-                GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id)
+                ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == project_id)
             )
 
     @pytest.fixture()

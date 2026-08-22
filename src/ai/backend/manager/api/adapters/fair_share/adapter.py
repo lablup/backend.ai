@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.v2.fair_share.request import (
     BulkUpsertDomainFairShareWeightInput,
     BulkUpsertProjectFairShareWeightInput,
@@ -53,7 +54,6 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceWeightEntryInfo,
     UserFairShareOrderField,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -100,21 +100,19 @@ from ai.backend.manager.services.fair_share.actions import (
     GetDomainFairShareAction,
     GetProjectFairShareAction,
     GetUserFairShareAction,
+    GlobalSearchDomainFairSharesAction,
+    GlobalSearchProjectFairSharesAction,
+    GlobalSearchUserFairSharesAction,
     ProjectWeightInput,
-    SearchDomainFairSharesAction,
-    SearchProjectFairSharesAction,
     SearchRGDomainFairSharesAction,
     SearchRGProjectFairSharesAction,
     SearchRGUserFairSharesAction,
-    SearchUserFairSharesAction,
     UpsertDomainFairShareWeightAction,
     UpsertProjectFairShareWeightAction,
     UpsertUserFairShareWeightAction,
     UserWeightInput,
 )
-from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id_by_name import (
-    ResolveResourceGroupIDByNameAction,
-)
+from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
 
 
 def _domain_fair_share_pagination_spec() -> PaginationSpec:
@@ -154,12 +152,12 @@ class FairShareAdapter(BaseAdapter):
 
     async def get_domain(self, input: GetDomainFairShareInput) -> GetDomainFairSharePayload:
         """Get a single domain fair share record."""
-        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(input.resource_group))
+        resource_group_id_result = await self._processors.resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(input.resource_group))
         )
-        result = await self._processors.fair_share.get_domain_fair_share.wait_for_complete(
+        result = await self._processors.fair_share.get_domain_fair_share.run(
             GetDomainFairShareAction(
-                resource_group_id=resource_group_id_result.resource_group_id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 domain_name=input.domain_name,
             )
         )
@@ -185,8 +183,8 @@ class FairShareAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._processors.fair_share.search_domain_fair_shares.wait_for_complete(
-            SearchDomainFairSharesAction(
+        result = await self._processors.fair_share.search_domain_fair_shares.run(
+            GlobalSearchDomainFairSharesAction(
                 pagination=querier.pagination,
                 conditions=querier.conditions,
                 orders=querier.orders,
@@ -203,8 +201,8 @@ class FairShareAdapter(BaseAdapter):
         resource_group: str,
     ) -> SearchDomainFairSharesPayload:
         """Search domain fair shares within a resource group (entity-based, cursor/offset)."""
-        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(resource_group))
+        resource_group_id_result = await self._processors.resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(resource_group))
         )
         conditions = self._convert_domain_filter_rg(input.filter) if input.filter else []
         orders = self._convert_domain_orders_rg(input.order) if input.order else []
@@ -220,10 +218,11 @@ class FairShareAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._processors.fair_share.search_rg_domain_fair_shares.wait_for_complete(
+        result = await self._processors.fair_share.search_rg_domain_fair_shares.run(
             SearchRGDomainFairSharesAction(
+                resource_group_id=resource_group_id_result.entity_id(),
                 scope=DomainFairShareOperationScope(
-                    resource_group_id=resource_group_id_result.resource_group_id,
+                    resource_group_id=resource_group_id_result.entity_id(),
                 ),
                 querier=querier,
             )
@@ -238,17 +237,15 @@ class FairShareAdapter(BaseAdapter):
         input: UpsertDomainFairShareWeightInput,
     ) -> UpsertDomainFairShareWeightPayload:
         """Upsert domain fair share weight."""
-        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(input.resource_group_name))
+        resource_group_id_result = await self._processors.resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(input.resource_group_name))
         )
-        result = (
-            await self._processors.fair_share.upsert_domain_fair_share_weight.wait_for_complete(
-                UpsertDomainFairShareWeightAction(
-                    resource_group=input.resource_group_name,
-                    resource_group_id=resource_group_id_result.resource_group_id,
-                    domain_name=input.domain_name,
-                    weight=input.weight,
-                )
+        result = await self._processors.fair_share.upsert_domain_fair_share_weight.run(
+            UpsertDomainFairShareWeightAction(
+                resource_group=input.resource_group_name,
+                resource_group_id=resource_group_id_result.entity_id(),
+                domain_name=input.domain_name,
+                weight=input.weight,
             )
         )
         return UpsertDomainFairShareWeightPayload(
@@ -260,13 +257,13 @@ class FairShareAdapter(BaseAdapter):
         input: BulkUpsertDomainFairShareWeightInput,
     ) -> BulkUpsertDomainFairShareWeightPayload:
         """Bulk upsert domain fair share weights."""
-        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(input.resource_group_name))
+        resource_group_id_result = await self._processors.resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(input.resource_group_name))
         )
-        result = await self._processors.fair_share.bulk_upsert_domain_fair_share_weight.wait_for_complete(
+        result = await self._processors.fair_share.bulk_upsert_domain_fair_share_weight.run(
             BulkUpsertDomainFairShareWeightAction(
                 resource_group=input.resource_group_name,
-                resource_group_id=resource_group_id_result.resource_group_id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 inputs=[
                     DomainWeightInput(domain_name=e.domain_name, weight=e.weight)
                     for e in input.inputs
@@ -279,12 +276,12 @@ class FairShareAdapter(BaseAdapter):
 
     async def get_project(self, input: GetProjectFairShareInput) -> GetProjectFairSharePayload:
         """Get a single project fair share record."""
-        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(input.resource_group))
+        resource_group_id_result = await self._processors.resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(input.resource_group))
         )
-        result = await self._processors.fair_share.get_project_fair_share.wait_for_complete(
+        result = await self._processors.fair_share.get_project_fair_share.run(
             GetProjectFairShareAction(
-                resource_group_id=resource_group_id_result.resource_group_id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 project_id=input.project_id,
             )
         )
@@ -308,8 +305,8 @@ class FairShareAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._processors.fair_share.search_project_fair_shares.wait_for_complete(
-            SearchProjectFairSharesAction(
+        result = await self._processors.fair_share.search_project_fair_shares.run(
+            GlobalSearchProjectFairSharesAction(
                 pagination=querier.pagination,
                 conditions=querier.conditions,
                 orders=querier.orders,
@@ -327,8 +324,8 @@ class FairShareAdapter(BaseAdapter):
         domain_name: str,
     ) -> SearchProjectFairSharesPayload:
         """Search project fair shares within a resource group scope (entity-based, cursor/offset)."""
-        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(resource_group))
+        resource_group_id_result = await self._processors.resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(resource_group))
         )
         conditions = self._convert_project_filter_rg(input.filter) if input.filter else []
         orders = self._convert_project_orders_rg(input.order) if input.order else []
@@ -344,11 +341,12 @@ class FairShareAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._processors.fair_share.search_rg_project_fair_shares.wait_for_complete(
+        result = await self._processors.fair_share.search_rg_project_fair_shares.run(
             SearchRGProjectFairSharesAction(
+                resource_group_id=resource_group_id_result.entity_id(),
                 scope=ProjectFairShareOperationScope(
                     domain_name=domain_name,
-                    resource_group_id=resource_group_id_result.resource_group_id,
+                    resource_group_id=resource_group_id_result.entity_id(),
                 ),
                 querier=querier,
             )
@@ -363,18 +361,16 @@ class FairShareAdapter(BaseAdapter):
         input: UpsertProjectFairShareWeightInput,
     ) -> UpsertProjectFairShareWeightPayload:
         """Upsert project fair share weight."""
-        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(input.resource_group_name))
+        resource_group_id_result = await self._processors.resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(input.resource_group_name))
         )
-        result = (
-            await self._processors.fair_share.upsert_project_fair_share_weight.wait_for_complete(
-                UpsertProjectFairShareWeightAction(
-                    resource_group=input.resource_group_name,
-                    resource_group_id=resource_group_id_result.resource_group_id,
-                    project_id=input.project_id,
-                    domain_name=input.domain_name,
-                    weight=input.weight,
-                )
+        result = await self._processors.fair_share.upsert_project_fair_share_weight.run(
+            UpsertProjectFairShareWeightAction(
+                resource_group=input.resource_group_name,
+                resource_group_id=resource_group_id_result.entity_id(),
+                project_id=input.project_id,
+                domain_name=input.domain_name,
+                weight=input.weight,
             )
         )
         return UpsertProjectFairShareWeightPayload(
@@ -386,13 +382,13 @@ class FairShareAdapter(BaseAdapter):
         input: BulkUpsertProjectFairShareWeightInput,
     ) -> BulkUpsertProjectFairShareWeightPayload:
         """Bulk upsert project fair share weights."""
-        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(input.resource_group_name))
+        resource_group_id_result = await self._processors.resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(input.resource_group_name))
         )
-        result = await self._processors.fair_share.bulk_upsert_project_fair_share_weight.wait_for_complete(
+        result = await self._processors.fair_share.bulk_upsert_project_fair_share_weight.run(
             BulkUpsertProjectFairShareWeightAction(
                 resource_group=input.resource_group_name,
-                resource_group_id=resource_group_id_result.resource_group_id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 inputs=[
                     ProjectWeightInput(
                         project_id=e.project_id,
@@ -409,12 +405,12 @@ class FairShareAdapter(BaseAdapter):
 
     async def get_user(self, input: GetUserFairShareInput) -> GetUserFairSharePayload:
         """Get a single user fair share record."""
-        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(input.resource_group))
+        resource_group_id_result = await self._processors.resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(input.resource_group))
         )
-        result = await self._processors.fair_share.get_user_fair_share.wait_for_complete(
+        result = await self._processors.fair_share.get_user_fair_share.run(
             GetUserFairShareAction(
-                resource_group_id=resource_group_id_result.resource_group_id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 project_id=input.project_id,
                 user_uuid=input.user_uuid,
             )
@@ -437,8 +433,8 @@ class FairShareAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._processors.fair_share.search_user_fair_shares.wait_for_complete(
-            SearchUserFairSharesAction(
+        result = await self._processors.fair_share.search_user_fair_shares.run(
+            GlobalSearchUserFairSharesAction(
                 pagination=querier.pagination,
                 conditions=querier.conditions,
                 orders=querier.orders,
@@ -457,8 +453,8 @@ class FairShareAdapter(BaseAdapter):
         project_id: UUID,
     ) -> SearchUserFairSharesPayload:
         """Search user fair shares within a resource group scope (entity-based, cursor/offset)."""
-        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(resource_group))
+        resource_group_id_result = await self._processors.resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(resource_group))
         )
         conditions = self._convert_user_filter_rg(input.filter) if input.filter else []
         orders = self._convert_user_orders_rg(input.order) if input.order else []
@@ -474,12 +470,13 @@ class FairShareAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._processors.fair_share.search_rg_user_fair_shares.wait_for_complete(
+        result = await self._processors.fair_share.search_rg_user_fair_shares.run(
             SearchRGUserFairSharesAction(
+                resource_group_id=resource_group_id_result.entity_id(),
                 scope=UserFairShareOperationScope(
                     domain_name=domain_name,
                     project_id=project_id,
-                    resource_group_id=resource_group_id_result.resource_group_id,
+                    resource_group_id=resource_group_id_result.entity_id(),
                 ),
                 querier=querier,
             )
@@ -494,13 +491,13 @@ class FairShareAdapter(BaseAdapter):
         input: UpsertUserFairShareWeightInput,
     ) -> UpsertUserFairShareWeightPayload:
         """Upsert user fair share weight."""
-        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(input.resource_group_name))
+        resource_group_id_result = await self._processors.resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(input.resource_group_name))
         )
-        result = await self._processors.fair_share.upsert_user_fair_share_weight.wait_for_complete(
+        result = await self._processors.fair_share.upsert_user_fair_share_weight.run(
             UpsertUserFairShareWeightAction(
                 resource_group=input.resource_group_name,
-                resource_group_id=resource_group_id_result.resource_group_id,
+                resource_group_id=resource_group_id_result.entity_id(),
                 project_id=input.project_id,
                 user_uuid=input.user_uuid,
                 domain_name=input.domain_name,
@@ -514,24 +511,22 @@ class FairShareAdapter(BaseAdapter):
         input: BulkUpsertUserFairShareWeightInput,
     ) -> BulkUpsertUserFairShareWeightPayload:
         """Bulk upsert user fair share weights."""
-        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(input.resource_group_name))
+        resource_group_id_result = await self._processors.resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(input.resource_group_name))
         )
-        result = (
-            await self._processors.fair_share.bulk_upsert_user_fair_share_weight.wait_for_complete(
-                BulkUpsertUserFairShareWeightAction(
-                    resource_group=input.resource_group_name,
-                    resource_group_id=resource_group_id_result.resource_group_id,
-                    inputs=[
-                        UserWeightInput(
-                            user_uuid=e.user_uuid,
-                            project_id=e.project_id,
-                            domain_name=e.domain_name,
-                            weight=e.weight,
-                        )
-                        for e in input.inputs
-                    ],
-                )
+        result = await self._processors.fair_share.bulk_upsert_user_fair_share_weight.run(
+            BulkUpsertUserFairShareWeightAction(
+                resource_group=input.resource_group_name,
+                resource_group_id=resource_group_id_result.entity_id(),
+                inputs=[
+                    UserWeightInput(
+                        user_uuid=e.user_uuid,
+                        project_id=e.project_id,
+                        domain_name=e.domain_name,
+                        weight=e.weight,
+                    )
+                    for e in input.inputs
+                ],
             )
         )
         return BulkUpsertUserFairShareWeightPayload(upserted_count=result.upserted_count)

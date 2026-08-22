@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import (
     ModelRevisionData,
@@ -17,8 +16,9 @@ class GetRevisionByIdAction(ModelRevisionBaseAction):
     revision_id: DeploymentRevisionID
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.revision_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_revision_by_id"
 
     @override
     @classmethod
@@ -27,9 +27,5 @@ class GetRevisionByIdAction(ModelRevisionBaseAction):
 
 
 @dataclass
-class GetRevisionByIdActionResult(BaseActionResult):
+class GetRevisionByIdActionResult:
     data: ModelRevisionData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)

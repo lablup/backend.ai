@@ -16,19 +16,13 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import AgentId, ImageCanonical, ImageID, SlotName
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
@@ -69,10 +63,6 @@ from ai.backend.manager.services.image.actions.forget_image import (
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
     GetImageInstalledAgentsAction,
 )
-from ai.backend.manager.services.image.actions.modify_image import (
-    ModifyImageAction,
-    ModifyImageActionUnknownImageReferenceError,
-)
 from ai.backend.manager.services.image.actions.preload_image import PreloadImageAction
 from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImageByIdAction,
@@ -87,11 +77,13 @@ from ai.backend.manager.services.image.actions.set_image_resource_limit import (
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
 )
-from ai.backend.manager.services.image.processors import ImageProcessors
+from ai.backend.manager.services.image.actions.update_image import (
+    UpdateImageAction,
+    UpdateImageActionUnknownImageReferenceError,
+)
 from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.image.types import ImageRefData
 from ai.backend.manager.types import OptionalState, TriState
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 
 class ImageServiceBaseFixtures:
@@ -129,21 +121,6 @@ class ImageServiceBaseFixtures:
         )
 
     @pytest.fixture
-    def processors(self, image_service: ImageService) -> ImageProcessors:
-        """Create ImageProcessors with mock ImageService."""
-        mock_scope = MagicMock(spec=ScopeActionRBACValidator)
-        mock_scope.validate = AsyncMock()
-        mock_single_entity = MagicMock(spec=SingleEntityActionRBACValidator)
-        mock_single_entity.validate = AsyncMock()
-        mock_bulk = MagicMock(spec=BulkActionRBACValidator)
-        mock_bulk.validate = AsyncMock()
-        validators = ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=mock_scope, single_entity=mock_single_entity, bulk=mock_bulk),
-        )
-        return ImageProcessors(image_service, [], validators)
-
-    @pytest.fixture
     def container_registry_id(self) -> uuid.UUID:
         """Container registry ID for test fixtures."""
         return uuid.uuid4()
@@ -157,7 +134,7 @@ class ImageServiceBaseFixtures:
     def container_registry_data(self, container_registry_id: uuid.UUID) -> ContainerRegistryData:
         """Sample container registry data."""
         return ContainerRegistryData(
-            id=container_registry_id,
+            id=ContainerRegistryID(container_registry_id),
             url="https://registry.example.com",
             registry_name="registry.example.com",
             type=ContainerRegistryType.DOCKER,
@@ -243,7 +220,7 @@ class TestAliasImage(ImageServiceBaseFixtures):
 
     async def test_alias_image_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_id: uuid.UUID,
         image_alias_data: ImageAliasData,
@@ -258,7 +235,7 @@ class TestAliasImage(ImageServiceBaseFixtures):
             alias="python",
         )
 
-        result = await processors.alias_image.wait_for_complete(action)
+        result = await image_service.alias_image(action)
 
         assert result.image_id == image_id
         assert result.image_alias == image_alias_data
@@ -268,7 +245,7 @@ class TestAliasImage(ImageServiceBaseFixtures):
 
     async def test_alias_image_not_found_raises_error(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
     ) -> None:
         """Alias image with non-existent image should raise ImageNotFound."""
@@ -283,7 +260,7 @@ class TestAliasImage(ImageServiceBaseFixtures):
         )
 
         with pytest.raises(ImageNotFound):
-            await processors.alias_image.wait_for_complete(action)
+            await image_service.alias_image(action)
 
 
 class TestDealiasImage(ImageServiceBaseFixtures):
@@ -291,7 +268,7 @@ class TestDealiasImage(ImageServiceBaseFixtures):
 
     async def test_dealias_image_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_id: uuid.UUID,
         image_alias_data: ImageAliasData,
@@ -303,7 +280,7 @@ class TestDealiasImage(ImageServiceBaseFixtures):
 
         action = DealiasImageAction(alias=image_alias_data.alias)
 
-        result = await processors.dealias_image.wait_for_complete(action)
+        result = await image_service.dealias_image(action)
 
         assert result.image_id == image_id
         assert result.image_alias == image_alias_data
@@ -311,7 +288,7 @@ class TestDealiasImage(ImageServiceBaseFixtures):
 
     async def test_dealias_image_not_found_raises_error(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
     ) -> None:
         """Dealias non-existent alias should raise ImageAliasNotFound."""
@@ -322,7 +299,7 @@ class TestDealiasImage(ImageServiceBaseFixtures):
         action = DealiasImageAction(alias="non-existent-alias")
 
         with pytest.raises(ImageAliasNotFound):
-            await processors.dealias_image.wait_for_complete(action)
+            await image_service.dealias_image(action)
 
 
 class TestForgetImage(ImageServiceBaseFixtures):
@@ -330,7 +307,7 @@ class TestForgetImage(ImageServiceBaseFixtures):
 
     async def test_forget_image_as_superadmin_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
         superadmin_user_data: UserData,
@@ -345,14 +322,14 @@ class TestForgetImage(ImageServiceBaseFixtures):
         )
 
         with with_user(superadmin_user_data):
-            result = await processors.forget_image.wait_for_complete(action)
+            result = await image_service.forget_image(action)
 
         assert result.image.status == ImageStatus.DELETED
         mock_image_repository.soft_delete_image.assert_called_once()
 
     async def test_forget_image_as_user_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
         regular_user_data: UserData,
@@ -369,7 +346,7 @@ class TestForgetImage(ImageServiceBaseFixtures):
         )
 
         with with_user(regular_user_data):
-            result = await processors.forget_image.wait_for_complete(action)
+            result = await image_service.forget_image(action)
 
         assert result.image.status == ImageStatus.DELETED
         mock_image_repository.resolve_image.assert_called_once()
@@ -377,7 +354,7 @@ class TestForgetImage(ImageServiceBaseFixtures):
 
     async def test_forget_image_as_user_forbidden(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
         regular_user_data: UserData,
@@ -393,11 +370,11 @@ class TestForgetImage(ImageServiceBaseFixtures):
 
         with with_user(regular_user_data):
             with pytest.raises(ImageAccessForbiddenError):
-                await processors.forget_image.wait_for_complete(action)
+                await image_service.forget_image(action)
 
     async def test_forget_image_not_found(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         superadmin_user_data: UserData,
     ) -> None:
@@ -411,7 +388,7 @@ class TestForgetImage(ImageServiceBaseFixtures):
 
         with with_user(superadmin_user_data):
             with pytest.raises(ImageNotFound):
-                await processors.forget_image.wait_for_complete(action)
+                await image_service.forget_image(action)
 
 
 class TestForgetImageById(ImageServiceBaseFixtures):
@@ -419,7 +396,7 @@ class TestForgetImageById(ImageServiceBaseFixtures):
 
     async def test_forget_image_by_id_as_superadmin_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
         superadmin_user_data: UserData,
@@ -431,14 +408,14 @@ class TestForgetImageById(ImageServiceBaseFixtures):
         action = ForgetImageByIdAction(image_id=image_data.id)
 
         with with_user(superadmin_user_data):
-            result = await processors.forget_image_by_id.wait_for_complete(action)
+            result = await image_service.forget_image_by_id(action)
 
         assert result.image.status == ImageStatus.DELETED
         mock_image_repository.soft_delete_image_by_id.assert_called_once_with(image_data.id)
 
     async def test_forget_image_by_id_as_user_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
         regular_user_data: UserData,
@@ -451,7 +428,7 @@ class TestForgetImageById(ImageServiceBaseFixtures):
         action = ForgetImageByIdAction(image_id=image_data.id)
 
         with with_user(regular_user_data):
-            result = await processors.forget_image_by_id.wait_for_complete(action)
+            result = await image_service.forget_image_by_id(action)
 
         assert result.image.status == ImageStatus.DELETED
         mock_image_repository.validate_image_ownership.assert_called_once()
@@ -459,7 +436,7 @@ class TestForgetImageById(ImageServiceBaseFixtures):
 
     async def test_forget_image_by_id_as_user_forbidden(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
         regular_user_data: UserData,
@@ -471,11 +448,11 @@ class TestForgetImageById(ImageServiceBaseFixtures):
 
         with with_user(regular_user_data):
             with pytest.raises(ImageAccessForbiddenError):
-                await processors.forget_image_by_id.wait_for_complete(action)
+                await image_service.forget_image_by_id(action)
 
     async def test_forget_image_by_id_not_found(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         superadmin_user_data: UserData,
     ) -> None:
@@ -486,7 +463,7 @@ class TestForgetImageById(ImageServiceBaseFixtures):
 
         with with_user(superadmin_user_data):
             with pytest.raises(ImageNotFound):
-                await processors.forget_image_by_id.wait_for_complete(action)
+                await image_service.forget_image_by_id(action)
 
 
 class TestModifyImage(ImageServiceBaseFixtures):
@@ -494,7 +471,7 @@ class TestModifyImage(ImageServiceBaseFixtures):
 
     async def test_modify_image_update_one_column(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
     ) -> None:
@@ -503,7 +480,7 @@ class TestModifyImage(ImageServiceBaseFixtures):
         mock_image_repository.resolve_image = AsyncMock(return_value=image_data)
         mock_image_repository.update_image_properties = AsyncMock(return_value=updated_image)
 
-        action = ModifyImageAction(
+        action = UpdateImageAction(
             target=image_data.name,
             architecture=image_data.architecture,
             updater_spec=ImageUpdaterSpec(
@@ -511,14 +488,14 @@ class TestModifyImage(ImageServiceBaseFixtures):
             ),
         )
 
-        result = await processors.modify_image.wait_for_complete(action)
+        result = await image_service.update_image(action)
 
         assert result.image.registry == "cr.backend.ai2"
         mock_image_repository.update_image_properties.assert_called_once()
 
     async def test_modify_image_nullify_column(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
     ) -> None:
@@ -527,7 +504,7 @@ class TestModifyImage(ImageServiceBaseFixtures):
         mock_image_repository.resolve_image = AsyncMock(return_value=image_data)
         mock_image_repository.update_image_properties = AsyncMock(return_value=updated_image)
 
-        action = ModifyImageAction(
+        action = UpdateImageAction(
             target=image_data.name,
             architecture=image_data.architecture,
             updater_spec=ImageUpdaterSpec(
@@ -535,13 +512,13 @@ class TestModifyImage(ImageServiceBaseFixtures):
             ),
         )
 
-        result = await processors.modify_image.wait_for_complete(action)
+        result = await image_service.update_image(action)
 
         assert result.image.accelerators is None
 
     async def test_modify_image_update_multiple_columns(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
     ) -> None:
@@ -566,7 +543,7 @@ class TestModifyImage(ImageServiceBaseFixtures):
         mock_image_repository.resolve_image = AsyncMock(return_value=image_data)
         mock_image_repository.update_image_properties = AsyncMock(return_value=updated_image)
 
-        action = ModifyImageAction(
+        action = UpdateImageAction(
             target=image_data.name,
             architecture=image_data.architecture,
             updater_spec=ImageUpdaterSpec(
@@ -578,7 +555,7 @@ class TestModifyImage(ImageServiceBaseFixtures):
             ),
         )
 
-        result = await processors.modify_image.wait_for_complete(action)
+        result = await image_service.update_image(action)
 
         assert result.image.type == ImageType.SERVICE
         assert result.image.registry == "cr.backend.ai2"
@@ -586,15 +563,15 @@ class TestModifyImage(ImageServiceBaseFixtures):
 
     async def test_modify_image_not_found(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
     ) -> None:
-        """Modify non-existent image should raise ModifyImageActionUnknownImageReferenceError."""
+        """Modify non-existent image should raise UpdateImageActionUnknownImageReferenceError."""
         mock_image_repository.resolve_image = AsyncMock(
             side_effect=UnknownImageReference("Image not found")
         )
 
-        action = ModifyImageAction(
+        action = UpdateImageAction(
             target="non-existent-image",
             architecture="x86_64",
             updater_spec=ImageUpdaterSpec(
@@ -602,8 +579,8 @@ class TestModifyImage(ImageServiceBaseFixtures):
             ),
         )
 
-        with pytest.raises(ModifyImageActionUnknownImageReferenceError):
-            await processors.modify_image.wait_for_complete(action)
+        with pytest.raises(UpdateImageActionUnknownImageReferenceError):
+            await image_service.update_image(action)
 
 
 class TestPurgeImageById(ImageServiceBaseFixtures):
@@ -611,7 +588,7 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
 
     async def test_purge_image_by_id_as_superadmin_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
         superadmin_user_data: UserData,
@@ -622,14 +599,14 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
         action = PurgeImageByIdAction(image_id=image_data.id)
 
         with with_user(superadmin_user_data):
-            result = await processors.purge_image_by_id.wait_for_complete(action)
+            result = await image_service.purge_image_by_id(action)
 
         assert result.image == image_data
         mock_image_repository.delete_image_with_aliases.assert_called_once_with(image_data.id)
 
     async def test_purge_image_by_id_as_user_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
         regular_user_data: UserData,
@@ -641,7 +618,7 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
         action = PurgeImageByIdAction(image_id=image_data.id)
 
         with with_user(regular_user_data):
-            result = await processors.purge_image_by_id.wait_for_complete(action)
+            result = await image_service.purge_image_by_id(action)
 
         assert result.image == image_data
         mock_image_repository.validate_image_ownership.assert_called_once()
@@ -649,7 +626,7 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
 
     async def test_purge_image_by_id_as_user_forbidden(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
         regular_user_data: UserData,
@@ -661,11 +638,11 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
 
         with with_user(regular_user_data):
             with pytest.raises(ImageAccessForbiddenError):
-                await processors.purge_image_by_id.wait_for_complete(action)
+                await image_service.purge_image_by_id(action)
 
     async def test_purge_image_by_id_not_found(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         superadmin_user_data: UserData,
     ) -> None:
@@ -676,7 +653,7 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
 
         with with_user(superadmin_user_data):
             with pytest.raises(ImageNotFound):
-                await processors.purge_image_by_id.wait_for_complete(action)
+                await image_service.purge_image_by_id(action)
 
 
 class TestPurgeImages(ImageServiceBaseFixtures):
@@ -684,7 +661,7 @@ class TestPurgeImages(ImageServiceBaseFixtures):
 
     async def test_purge_images_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_agent_registry: MagicMock,
         mock_image_repository: MagicMock,
         image_data: ImageData,
@@ -721,7 +698,7 @@ class TestPurgeImages(ImageServiceBaseFixtures):
             noprune=True,
         )
 
-        result = await processors.purge_images.wait_for_complete(action)
+        result = await image_service.purge_images(action)
 
         assert result.total_reserved_bytes == image_data.size_bytes
         assert len(result.purged_images) == 1
@@ -731,7 +708,7 @@ class TestPurgeImages(ImageServiceBaseFixtures):
 
     async def test_purge_images_with_error(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_agent_registry: MagicMock,
         image_data: ImageData,
     ) -> None:
@@ -764,7 +741,7 @@ class TestPurgeImages(ImageServiceBaseFixtures):
             noprune=True,
         )
 
-        result = await processors.purge_images.wait_for_complete(action)
+        result = await image_service.purge_images(action)
 
         assert result.total_reserved_bytes == 0
         assert len(result.errors) == 1
@@ -776,7 +753,7 @@ class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
 
     async def test_untag_image_as_superadmin_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
         superadmin_user_data: UserData,
@@ -789,14 +766,14 @@ class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
         )
 
         with with_user(superadmin_user_data):
-            result = await processors.untag_image_from_registry.wait_for_complete(action)
+            result = await image_service.untag_image_from_registry(action)
 
         assert result.image == image_data
         mock_image_repository.untag_image_from_registry.assert_called_once_with(image_data.id)
 
     async def test_untag_image_as_user_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
         regular_user_data: UserData,
@@ -810,7 +787,7 @@ class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
         )
 
         with with_user(regular_user_data):
-            result = await processors.untag_image_from_registry.wait_for_complete(action)
+            result = await image_service.untag_image_from_registry(action)
 
         assert result.image == image_data
         mock_image_repository.validate_image_ownership.assert_called_once()
@@ -818,7 +795,7 @@ class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
 
     async def test_untag_image_as_user_forbidden(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
         regular_user_data: UserData,
@@ -832,11 +809,11 @@ class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
 
         with with_user(regular_user_data):
             with pytest.raises(ImageAccessForbiddenError):
-                await processors.untag_image_from_registry.wait_for_complete(action)
+                await image_service.untag_image_from_registry(action)
 
     async def test_untag_image_not_found(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         superadmin_user_data: UserData,
     ) -> None:
@@ -849,7 +826,7 @@ class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
 
         with with_user(superadmin_user_data):
             with pytest.raises(ImageNotFound):
-                await processors.untag_image_from_registry.wait_for_complete(action)
+                await image_service.untag_image_from_registry(action)
 
 
 class TestClearImageCustomResourceLimit(ImageServiceBaseFixtures):
@@ -857,7 +834,7 @@ class TestClearImageCustomResourceLimit(ImageServiceBaseFixtures):
 
     async def test_clear_image_custom_resource_limit_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
     ) -> None:
@@ -875,7 +852,7 @@ class TestClearImageCustomResourceLimit(ImageServiceBaseFixtures):
             architecture=image_data.architecture,
         )
 
-        result = await processors.clear_image_custom_resource_limit.wait_for_complete(action)
+        result = await image_service.clear_image_custom_resource_limit(action)
 
         assert result.image_data.resources.resources_data.get(SlotName("cuda.device")) is None
         mock_image_repository.clear_image_custom_resource_limit.assert_called_once_with(
@@ -884,7 +861,7 @@ class TestClearImageCustomResourceLimit(ImageServiceBaseFixtures):
 
     async def test_clear_image_custom_resource_limit_not_found(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
     ) -> None:
         """Clear resource limit for non-existent image should raise ImageNotFound."""
@@ -898,7 +875,7 @@ class TestClearImageCustomResourceLimit(ImageServiceBaseFixtures):
         )
 
         with pytest.raises(ImageNotFound):
-            await processors.clear_image_custom_resource_limit.wait_for_complete(action)
+            await image_service.clear_image_custom_resource_limit(action)
 
 
 class TestSearchImages(ImageServiceBaseFixtures):
@@ -906,7 +883,7 @@ class TestSearchImages(ImageServiceBaseFixtures):
 
     async def test_search_images_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
     ) -> None:
@@ -927,7 +904,7 @@ class TestSearchImages(ImageServiceBaseFixtures):
         )
         action = SearchImagesAction(querier=querier)
 
-        result = await processors.search_images.wait_for_complete(action)
+        result = await image_service.search_images(action)
 
         assert result.data == [image_data]
         assert result.total_count == 1
@@ -937,7 +914,7 @@ class TestSearchImages(ImageServiceBaseFixtures):
 
     async def test_search_images_empty_result(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
     ) -> None:
         """Search images should return empty list when no results found."""
@@ -957,14 +934,14 @@ class TestSearchImages(ImageServiceBaseFixtures):
         )
         action = SearchImagesAction(querier=querier)
 
-        result = await processors.search_images.wait_for_complete(action)
+        result = await image_service.search_images(action)
 
         assert result.data == []
         assert result.total_count == 0
 
     async def test_search_images_with_pagination(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
     ) -> None:
@@ -985,7 +962,7 @@ class TestSearchImages(ImageServiceBaseFixtures):
         )
         action = SearchImagesAction(querier=querier)
 
-        result = await processors.search_images.wait_for_complete(action)
+        result = await image_service.search_images(action)
 
         assert result.total_count == 25
         assert result.has_next_page is True
@@ -997,7 +974,7 @@ class TestAliasImageById(ImageServiceBaseFixtures):
 
     async def test_alias_image_by_id_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_id: ImageID,
         image_alias_data: ImageAliasData,
@@ -1010,7 +987,7 @@ class TestAliasImageById(ImageServiceBaseFixtures):
             alias="python",
         )
 
-        result = await processors.alias_image_by_id.wait_for_complete(action)
+        result = await image_service.alias_image_by_id(action)
 
         assert result.image_id == image_id
         assert result.image_alias == image_alias_data
@@ -1032,7 +1009,7 @@ class TestClearImageCustomResourceLimitById(ImageServiceBaseFixtures):
 
     async def test_clear_image_custom_resource_limit_by_id_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
     ) -> None:
@@ -1045,7 +1022,7 @@ class TestClearImageCustomResourceLimitById(ImageServiceBaseFixtures):
 
         action = ClearImageCustomResourceLimitByIdAction(image_id=image_data.id)
 
-        result = await processors.clear_image_custom_resource_limit_by_id.wait_for_complete(action)
+        result = await image_service.clear_image_custom_resource_limit_by_id(action)
 
         assert result.image_data.resources.resources_data.get(SlotName("cuda.device")) is None
         mock_image_repository.clear_image_resource_limits_by_id.assert_called_once_with(
@@ -1054,7 +1031,7 @@ class TestClearImageCustomResourceLimitById(ImageServiceBaseFixtures):
 
     async def test_clear_image_custom_resource_limit_by_id_not_found(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
     ) -> None:
         """Clear resource limit for non-existent image should raise ImageNotFound."""
@@ -1065,7 +1042,7 @@ class TestClearImageCustomResourceLimitById(ImageServiceBaseFixtures):
         action = ClearImageCustomResourceLimitByIdAction(image_id=ImageID(uuid.uuid4()))
 
         with pytest.raises(ImageNotFound):
-            await processors.clear_image_custom_resource_limit_by_id.wait_for_complete(action)
+            await image_service.clear_image_custom_resource_limit_by_id(action)
 
 
 class TestSetImageResourceLimitById(ImageServiceBaseFixtures):
@@ -1073,7 +1050,7 @@ class TestSetImageResourceLimitById(ImageServiceBaseFixtures):
 
     async def test_set_image_resource_limit_by_id_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
     ) -> None:
@@ -1096,7 +1073,7 @@ class TestSetImageResourceLimitById(ImageServiceBaseFixtures):
             resource_limit=resource_limit,
         )
 
-        result = await processors.set_image_resource_limit_by_id.wait_for_complete(action)
+        result = await image_service.set_image_resource_limit_by_id(action)
 
         assert result.image_data.resources.resources_data.get(SlotName("cpu")) is not None
         mock_image_repository.set_image_resource_limit_by_id.assert_called_once_with(
@@ -1105,7 +1082,7 @@ class TestSetImageResourceLimitById(ImageServiceBaseFixtures):
 
     async def test_set_image_resource_limit_by_id_not_found(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
     ) -> None:
         """Set resource limit for non-existent image should raise ImageNotFound."""
@@ -1123,7 +1100,7 @@ class TestSetImageResourceLimitById(ImageServiceBaseFixtures):
         )
 
         with pytest.raises(ImageNotFound):
-            await processors.set_image_resource_limit_by_id.wait_for_complete(action)
+            await image_service.set_image_resource_limit_by_id(action)
 
 
 class TestPreloadImage(ImageServiceBaseFixtures):
@@ -1131,7 +1108,7 @@ class TestPreloadImage(ImageServiceBaseFixtures):
 
     async def test_preload_image_raises_not_implemented(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         image_data: ImageData,
     ) -> None:
         """PreloadImageAction currently raises NotImplementedError."""
@@ -1141,21 +1118,21 @@ class TestPreloadImage(ImageServiceBaseFixtures):
         )
 
         with pytest.raises(NotImplementedError):
-            await processors.preload_image.wait_for_complete(action)
+            await image_service.preload_image(action)
 
     async def test_preload_image_empty_lists_raises_not_implemented(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
     ) -> None:
         """Empty image/agent lists still raises NotImplementedError."""
         action = PreloadImageAction(image_ids=[], agents=[])
 
         with pytest.raises(NotImplementedError):
-            await processors.preload_image.wait_for_complete(action)
+            await image_service.preload_image(action)
 
     async def test_preload_image_multiple_images_agents_raises_not_implemented(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
     ) -> None:
         """Multiple image/agent combinations raises NotImplementedError."""
         action = PreloadImageAction(
@@ -1164,7 +1141,7 @@ class TestPreloadImage(ImageServiceBaseFixtures):
         )
 
         with pytest.raises(NotImplementedError):
-            await processors.preload_image.wait_for_complete(action)
+            await image_service.preload_image(action)
 
 
 class TestScanImage(ImageServiceBaseFixtures):
@@ -1172,7 +1149,7 @@ class TestScanImage(ImageServiceBaseFixtures):
 
     async def test_scan_image_success(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
     ) -> None:
@@ -1186,7 +1163,7 @@ class TestScanImage(ImageServiceBaseFixtures):
             architecture=image_data.architecture,
         )
 
-        result = await processors.scan_image.wait_for_complete(action)
+        result = await image_service.scan_image(action)
 
         assert result.image == image_data
         assert result.errors == []
@@ -1196,7 +1173,7 @@ class TestScanImage(ImageServiceBaseFixtures):
 
     async def test_scan_image_with_errors(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
     ) -> None:
@@ -1211,14 +1188,14 @@ class TestScanImage(ImageServiceBaseFixtures):
             architecture=image_data.architecture,
         )
 
-        result = await processors.scan_image.wait_for_complete(action)
+        result = await image_service.scan_image(action)
 
         assert result.image == image_data
         assert result.errors == scan_errors
 
     async def test_scan_image_not_found(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
     ) -> None:
         """Scanning non-existent image raises ImageNotFound."""
@@ -1230,7 +1207,7 @@ class TestScanImage(ImageServiceBaseFixtures):
         )
 
         with pytest.raises(ImageNotFound):
-            await processors.scan_image.wait_for_complete(action)
+            await image_service.scan_image(action)
 
 
 class TestGetImageInstalledAgents(ImageServiceBaseFixtures):
@@ -1238,7 +1215,7 @@ class TestGetImageInstalledAgents(ImageServiceBaseFixtures):
 
     async def test_single_image_returns_installed_agents(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
     ) -> None:
@@ -1251,14 +1228,14 @@ class TestGetImageInstalledAgents(ImageServiceBaseFixtures):
 
         action = GetImageInstalledAgentsAction(image_ids=[image_data.id])
 
-        result = await processors.get_image_installed_agents.wait_for_complete(action)
+        result = await image_service.get_image_installed_agents(action)
 
         assert result.data[image_data.id] == {agent_id_1, agent_id_2}
         mock_image_repository.get_image_installed_agents.assert_called_once_with([image_data.id])
 
     async def test_image_with_no_agents_returns_empty_set(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
         image_data: ImageData,
     ) -> None:
@@ -1269,13 +1246,13 @@ class TestGetImageInstalledAgents(ImageServiceBaseFixtures):
 
         action = GetImageInstalledAgentsAction(image_ids=[image_data.id])
 
-        result = await processors.get_image_installed_agents.wait_for_complete(action)
+        result = await image_service.get_image_installed_agents(action)
 
         assert result.data[image_data.id] == set()
 
     async def test_nonexistent_image_returns_empty_result(
         self,
-        processors: ImageProcessors,
+        image_service: ImageService,
         mock_image_repository: MagicMock,
     ) -> None:
         """Non-existent image returns empty mapping."""
@@ -1283,6 +1260,6 @@ class TestGetImageInstalledAgents(ImageServiceBaseFixtures):
 
         action = GetImageInstalledAgentsAction(image_ids=[ImageID(uuid.uuid4())])
 
-        result = await processors.get_image_installed_agents.wait_for_complete(action)
+        result = await image_service.get_image_installed_agents(action)
 
         assert result.data == {}

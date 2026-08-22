@@ -1,18 +1,15 @@
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.service.handler import ServiceHandler
 from ai.backend.manager.api.rest.service.registry import register_service_routes
@@ -23,9 +20,7 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
-)
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
@@ -37,7 +32,6 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 
 @pytest.fixture()
@@ -47,11 +41,13 @@ def model_serving_processors(
     valkey_clients: ValkeyClients,
     config_provider: ManagerConfigProvider,
     background_task_manager: BackgroundTaskManager,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ModelServingProcessors:
     """Real ModelServingProcessors with real service and repository."""
     ms_repo = ModelServingRepository(database_engine)
     deployment_repo = DeploymentRepository(
         database_engine,
+        V2DBOpsProvider(database_engine),
         storage_manager,
         valkey_clients.stat,
         valkey_clients.live,
@@ -73,44 +69,21 @@ def model_serving_processors(
         scheduling_controller=AsyncMock(),
         route_controller=AsyncMock(),
     )
-    permission_controller_repo = PermissionControllerRepository(database_engine)
     return ModelServingProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
-                single_entity=SingleEntityActionRBACValidator(
-                    permission_controller_repo, MagicMock()
-                ),
-                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
-            ),
-        ),
+        processor_registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), service
     )
 
 
 @pytest.fixture()
 def auto_scaling_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ModelServingAutoScalingProcessors:
     """Real ModelServingAutoScalingProcessors with real AutoScalingService."""
     repo = ModelServingRepository(database_engine)
     service = AutoScalingService(repository=repo)
-    permission_controller_repo = PermissionControllerRepository(database_engine)
     return ModelServingAutoScalingProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
-                single_entity=SingleEntityActionRBACValidator(
-                    permission_controller_repo, MagicMock()
-                ),
-                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
-            ),
-        ),
+        processor_registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), service
     )
 
 
@@ -126,10 +99,12 @@ def deployment_processors(
     storage_manager: AsyncMock,
     valkey_clients: ValkeyClients,
     mock_appproxy_client_pool: MagicMock,
+    processor_registry: ProcessorRegistry[Any],
 ) -> DeploymentProcessors:
     """Real DeploymentProcessors with real DeploymentService and DeploymentRepository."""
     repo = DeploymentRepository(
         database_engine,
+        V2DBOpsProvider(database_engine),
         storage_manager,
         valkey_clients.stat,
         valkey_clients.live,
@@ -141,20 +116,8 @@ def deployment_processors(
         repo,
         appproxy_client_pool=mock_appproxy_client_pool,
     )
-    permission_controller_repo = PermissionControllerRepository(database_engine)
     return DeploymentProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
-                single_entity=SingleEntityActionRBACValidator(
-                    permission_controller_repo, MagicMock()
-                ),
-                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
-            ),
-        ),
+        processor_registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), service
     )
 
 

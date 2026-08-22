@@ -47,7 +47,7 @@ class SchedulingHistoryHandler:
 
         querier = self._adapter.build_session_history_querier(body.parsed)
 
-        action_result = await self._scheduling_history.search_session_history.wait_for_complete(
+        action_result = await self._scheduling_history.search_session_history.run(
             SearchSessionHistoryAction(querier=querier)
         )
 
@@ -73,7 +73,7 @@ class SchedulingHistoryHandler:
 
         querier = self._adapter.build_deployment_history_querier(body.parsed)
 
-        action_result = await self._scheduling_history.search_deployment_history.wait_for_complete(
+        action_result = await self._scheduling_history.search_deployment_history.run(
             SearchDeploymentHistoryAction(querier=querier)
         )
 
@@ -99,7 +99,7 @@ class SchedulingHistoryHandler:
 
         querier = self._adapter.build_route_history_querier(body.parsed)
 
-        action_result = await self._scheduling_history.search_route_history.wait_for_complete(
+        action_result = await self._scheduling_history.search_route_history.run(
             SearchRouteHistoryAction(querier=querier)
         )
 

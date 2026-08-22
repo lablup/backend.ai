@@ -22,8 +22,10 @@ from sqlalchemy.orm import (
     selectinload,
 )
 
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -53,8 +55,8 @@ from ai.backend.manager.data.kernel.types import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.agent import AgentRow
-    from ai.backend.manager.models.group import GroupRow
     from ai.backend.manager.models.image import ImageRow
+    from ai.backend.manager.models.project import ProjectRow
     from ai.backend.manager.models.session import SessionRow
     from ai.backend.manager.models.user import UserRow
 
@@ -217,10 +219,10 @@ class KernelRow(CreatedAtMixin, Base):
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False
     )
-    group_id: Mapped[uuid.UUID] = mapped_column(
-        "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
+    group_id: Mapped[ProjectID] = mapped_column(
+        "group_id", GUID(ProjectID), sa.ForeignKey("groups.id"), nullable=False
     )
-    user_uuid: Mapped[uuid.UUID] = mapped_column("user_uuid", GUID, nullable=False)
+    user_uuid: Mapped[UserID] = mapped_column("user_uuid", GUID(UserID), nullable=False)
     access_key: Mapped[str | None] = mapped_column(
         "access_key", sa.String(length=20), nullable=True
     )
@@ -436,7 +438,7 @@ class KernelRow(CreatedAtMixin, Base):
         foreign_keys="KernelRow.image_id",
     )
     agent_row: Mapped[AgentRow | None] = relationship("AgentRow")
-    group_row: Mapped[GroupRow] = relationship("GroupRow")
+    group_row: Mapped[ProjectRow] = relationship("ProjectRow")
     user_row: Mapped[UserRow] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
@@ -501,7 +503,7 @@ class KernelRow(CreatedAtMixin, Base):
 
         return await execute_with_retry(_query)
 
-    def delegate_ownership(self, user_uuid: uuid.UUID, access_key: AccessKey) -> None:
+    def delegate_ownership(self, user_uuid: UserID, access_key: AccessKey) -> None:
         self.user_uuid = user_uuid
         self.access_key = access_key
 
@@ -554,7 +556,7 @@ class KernelRow(CreatedAtMixin, Base):
                 cluster_hostname=self.cluster_hostname,
             ),
             resource=ResourceInfo(
-                scaling_group=self.scaling_group,
+                resource_group=self.scaling_group,
                 resource_group_id=self.resource_group_id,
                 agent=self.agent,
                 agent_addr=self.agent_addr,

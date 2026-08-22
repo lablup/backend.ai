@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 
+from sqlalchemy.orm import InstrumentedAttribute
+
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.errors.resource_slot import ResourceSlotTypeInUse
 from ai.backend.manager.models.resource_slot.row import (
@@ -14,12 +18,12 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.specs.purger import GlobalEntityPurger
+from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
 
 @dataclass
-class ResourceSlotTypePurger(GlobalEntityPurger[ResourceSlotTypeRow, ResourceSlotTypeData]):
+class ResourceSlotTypePurger(EntityPurger[ResourceSlotTypeRow, ResourceSlotTypeData]):
     """Purger for a resource slot type, keyed by its ``slot_name`` primary key.
 
     Every table that keeps the name as an FK is declared as a conflict check, so a
@@ -28,14 +32,19 @@ class ResourceSlotTypePurger(GlobalEntityPurger[ResourceSlotTypeRow, ResourceSlo
     """
 
     slot_name: str
+    slot_type_id: ResourceSlotTypeUUID
 
     @override
     def row_class(self) -> type[ResourceSlotTypeRow]:
         return ResourceSlotTypeRow
 
     @override
-    def pk_value(self) -> str:
-        return self.slot_name
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ResourceSlotTypeRow.uuid
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.slot_type_id
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:

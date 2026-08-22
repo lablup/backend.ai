@@ -8,7 +8,8 @@ from typing import override
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.identifier.action import ActionID
+from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData
@@ -31,8 +32,8 @@ class AuditLogRow(Base):
     __tablename__ = "audit_logs"
     __table_args__ = (sa.Index("ix_audit_logs_lookup", "lookup_kind", "lookup_key"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[AuditLogID] = mapped_column(
+        "id", GUID(AuditLogID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
 
     action_kind: Mapped[ActionKind | None] = mapped_column(
@@ -68,7 +69,7 @@ class AuditLogRow(Base):
     action_id: Mapped[uuid.UUID] = mapped_column("action_id", GUID, nullable=False)
     request_id: Mapped[str | None] = mapped_column("request_id", sa.String, nullable=True)
     triggered_by: Mapped[str | None] = mapped_column("triggered_by", sa.String, nullable=True)
-    acted_as: Mapped[uuid.UUID | None] = mapped_column("acted_as", GUID, nullable=True)
+    acted_as: Mapped[UserID | None] = mapped_column("acted_as", GUID(UserID), nullable=True)
     description: Mapped[str] = mapped_column("description", sa.String, nullable=False)
     duration: Mapped[timedelta | None] = mapped_column("duration", sa.Interval, nullable=True)
 
@@ -77,40 +78,6 @@ class AuditLogRow(Base):
         StrEnumType(OperationStatus),
         nullable=False,
     )
-
-    def __init__(
-        self,
-        entity_type: str,
-        operation: str,
-        action_name: str,
-        action_id: ActionID,
-        description: str,
-        created_at: datetime,
-        status: OperationStatus,
-        action_kind: ActionKind | None = None,
-        entity_id: str | uuid.UUID | None = None,
-        lookup_kind: str | None = None,
-        lookup_key: str | None = None,
-        request_id: str | None = None,
-        triggered_by: str | None = None,
-        acted_as: uuid.UUID | None = None,
-        duration: timedelta | None = None,
-    ) -> None:
-        self.entity_type = entity_type
-        self.operation = operation
-        self.action_id = action_id
-        self.action_kind = action_kind
-        self.action_name = action_name
-        self.entity_id = str(entity_id) if isinstance(entity_id, uuid.UUID) else entity_id
-        self.lookup_kind = lookup_kind
-        self.lookup_key = lookup_key
-        self.request_id = request_id
-        self.triggered_by = triggered_by
-        self.acted_as = acted_as
-        self.description = description
-        self.duration = duration
-        self.status = status
-        self.created_at = created_at
 
     @override
     def __str__(self) -> str:
@@ -140,7 +107,7 @@ class AuditLogRow(Base):
 
     def to_dataclass(self) -> AuditLogData:
         return AuditLogData(
-            id=self.id,
+            id=AuditLogID(self.id),
             action_id=self.action_id,
             action_kind=self.action_kind,
             action_name=self.action_name,
@@ -149,7 +116,7 @@ class AuditLogRow(Base):
             created_at=self.created_at,
             description=self.description,
             status=self.status,
-            entity_id=self.entity_id,
+            target_entity_id=self.entity_id,
             lookup_kind=self.lookup_kind,
             lookup_key=self.lookup_key,
             request_id=self.request_id,

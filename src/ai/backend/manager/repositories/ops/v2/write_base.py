@@ -1,22 +1,27 @@
 """Write primitives every v2 write concern shares.
 
 Row insert/delete/upsert with spec-declared check execution, integrity-error
-parsing and matching, membership recording/removal with the transitional
-dual-write, and the legacy type conversions. No public operation lives here —
-the per-concern write ops inherit these on top of :class:`~.base.V2OpsBase`.
+parsing and matching, and membership recording/removal with the transitional
+dual-write. No public operation lives here — the per-concern write ops inherit
+these on top of :class:`~.base.V2OpsBase`.
 """
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Collection, Mapping, Sequence
 from typing import Any, ClassVar, NoReturn
 
 import sqlalchemy as sa
 from asyncpg.exceptions import PostgresError
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import InstrumentedAttribute
 
-from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeRef, ScopeType
-from ai.backend.common.identifier.virtual_scope import VirtualScopeID
+from ai.backend.common.data.entity.types import (
+    EntityIdentifier,
+    EntityType,
+)
+from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
 from ai.backend.manager.errors.permission import VirtualScopeNotFound
 from ai.backend.manager.errors.repository import (
     CheckConstraintViolationError,
@@ -25,19 +30,98 @@ from ai.backend.manager.errors.repository import (
     NotNullViolationError,
     RepositoryIntegrityError,
     UniqueConstraintViolationError,
-    UnsupportedCompositePrimaryKeyError,
     UpsertEmptyResultError,
 )
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.specs.membership import ScopeMembershipEntry
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.specs.membership import EntityMembershipEntry
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
 
 
 class V2WriteOpsBase(V2OpsBase):
     """The shared write primitives, bound to a single session."""
+
+    async def _provision_entities(self, entities: Sequence[EntityIdentifier]) -> None:
+        """Put each entity into the RBAC graph: its virtual scope node, its self
+        entity-membership and its self scope-binding (permission_cap NULL). The reverse
+        of :meth:`_teardown_entity`. Idempotent: an existing node is a no-op."""
+        if not entities:
+            return
+        values = [{"scope_type": e.entity_type(), "scope_id": e} for e in entities]
+        insert_stmt = (
+            pg_insert(VirtualScopeRow)
+            .values(values)
+            .on_conflict_do_nothing(index_elements=["scope_type", "scope_id"])
+            .returning(
+                VirtualScopeRow.id,
+                VirtualScopeRow.scope_type,
+                VirtualScopeRow.scope_id,
+            )
+        )
+        inserted = (await self._sess.execute(insert_stmt)).all()
+        if not inserted:
+            return
+        membership_stmt = (
+            pg_insert(EntityMembershipRow)
+            .values([
+                {
+                    "virtual_scope_id": row.id,
+                    "entity_type": row.scope_type,
+                    "entity_id": row.scope_id,
+                    "permission_cap": None,
+                }
+                for row in inserted
+            ])
+            .on_conflict_do_nothing()
+        )
+        await self._sess.execute(membership_stmt)
+        binding_stmt = (
+            pg_insert(ScopeBindingRow)
+            .values([
+                {
+                    "virtual_scope_id": row.id,
+                    "scope_type": row.scope_type,
+                    "scope_id": row.scope_id,
+                    "permission_cap": None,
+                }
+                for row in inserted
+            ])
+            .on_conflict_do_nothing()
+        )
+        await self._sess.execute(binding_stmt)
+
+    async def _teardown_entity(self, entity: EntityIdentifier) -> None:
+        """Remove what the entity left in the RBAC graph: permissions granted on it,
+        its virtual scope node if it provisioned one, and its membership edges.
+
+        The permission delete keys on the id alone, which is a UUID and so already
+        names one entity; the type would only narrow it to what it already is.
+        """
+        await self._sess.execute(
+            sa.delete(PermissionRow).where(PermissionRow.scope_id == str(entity))
+        )
+        await self._sess.execute(
+            sa.delete(VirtualScopeRow).where(
+                VirtualScopeRow.scope_type == entity.entity_type(),
+                VirtualScopeRow.scope_id == entity,
+            )
+        )
+        await self._sess.execute(
+            sa.delete(ScopeBindingRow).where(
+                ScopeBindingRow.scope_type == entity.entity_type(),
+                ScopeBindingRow.scope_id == entity,
+            )
+        )
+        await self._sess.execute(
+            sa.delete(EntityMembershipRow).where(
+                EntityMembershipRow.entity_type == entity.entity_type(),
+                EntityMembershipRow.entity_id == entity,
+            )
+        )
 
     _SQLSTATE_TO_ERROR: ClassVar[Mapping[str, type[RepositoryIntegrityError]]] = {
         "23505": UniqueConstraintViolationError,
@@ -142,40 +226,60 @@ class V2WriteOpsBase(V2OpsBase):
         raise parsed
 
     async def _insert_row(self, row: Base, checks: Sequence[IntegrityErrorCheck]) -> None:
-        self._sess.add(row)
+        await self._insert_rows((row,), checks)
+
+    async def _insert_rows(
+        self, rows: Sequence[Base], checks: Sequence[IntegrityErrorCheck]
+    ) -> None:
+        """Flush rows in one batch, then read back whatever the database computed.
+
+        Each row is refreshed on its own: the values differ per row, and ``refresh``
+        is what keeps composite keys and the identity map right. Rows that left
+        nothing to SQL — every ordinary insert — are skipped, so this costs nothing
+        until a spec asks for it.
+        """
+        computed = [self._sql_valued_columns(row) for row in rows]
+        self._sess.add_all(rows)
         try:
             await self._sess.flush()
         except sa.exc.IntegrityError as e:
             self._match_integrity_error(self._parse_integrity_error(e), checks)
+        for row, names in zip(rows, computed, strict=True):
+            if names:
+                await self._sess.refresh(row, names)
+
+    def _sql_valued_columns(self, row: Base) -> list[str]:
+        """The columns the spec left to SQL, read before the insert.
+
+        A value given as an expression is computed by the database, so reading it back
+        needs a SELECT — and after the flush the attribute is expired, which in an
+        async session raises rather than loading.
+        """
+        return [
+            attr.key
+            for attr in sa.inspect(type(row)).column_attrs
+            if isinstance(getattr(row, attr.key, None), sa.sql.ColumnElement)
+        ]
 
     async def _update_row_returning[TRow: Base](
         self,
         row_class: type[TRow],
-        pk_value: Any,
+        id_column: InstrumentedAttribute[Any],
+        id_value: Any,
         values: dict[str, Any],
         checks: Sequence[IntegrityErrorCheck],
     ) -> TRow | None:
-        """Update one row by primary key and return it; ``None`` if no row matched.
+        """Update the row the id names and return it; ``None`` if no row matched.
 
         With nothing to set, reads the current row instead, so callers can tell
         "nothing to change" apart from "row not found".
         """
         table = row_class.__table__
-        pk_columns = list(table.primary_key.columns)
-        if len(pk_columns) != 1:
-            raise UnsupportedCompositePrimaryKeyError(
-                f"Updater only supports single-column primary keys (table: {table.name})",
-            )
         if not values:
-            existing = await self._sess.execute(
-                sa.select(row_class).where(pk_columns[0] == pk_value)
-            )
+            existing = await self._sess.execute(sa.select(row_class).where(id_column == id_value))
             return existing.scalar_one_or_none()
         stmt = (
-            sa.update(table)
-            .values(values)
-            .where(pk_columns[0] == pk_value)
-            .returning(*table.columns)
+            sa.update(table).values(values).where(id_column == id_value).returning(*table.columns)
         )
         # from_statement lets SQLAlchemy map the RETURNING columns onto the ORM class.
         select_stmt = sa.select(row_class).from_statement(stmt)
@@ -186,24 +290,20 @@ class V2WriteOpsBase(V2OpsBase):
         return result.scalar_one_or_none()
 
     async def _delete_row_returning[TRow: Base](
-        self, row_class: type[TRow], pk_value: Any
+        self, row_class: type[TRow], id_column: InstrumentedAttribute[Any], id_value: Any
     ) -> TRow | None:
         table = row_class.__table__
-        pk_columns = list(table.primary_key.columns)
-        if len(pk_columns) != 1:
-            raise UnsupportedCompositePrimaryKeyError(
-                f"Purger only supports single-column primary keys (table: {table.name})",
-            )
-        stmt = sa.delete(table).where(pk_columns[0] == pk_value).returning(*table.columns)
+        stmt = sa.delete(table).where(id_column == id_value).returning(*table.columns)
+        # from_statement lets SQLAlchemy map the RETURNING columns onto the ORM class.
+        # Calling the row class instead would go through its __init__, which many rows
+        # narrow to the caller-supplied columns — a server-generated one then arrives as
+        # an unexpected keyword and the purge fails on rows it can read back perfectly.
+        select_stmt = sa.select(row_class).from_statement(stmt)
         try:
-            result = await self._sess.execute(stmt)
+            result = await self._sess.execute(select_stmt)
         except sa.exc.IntegrityError as e:
             raise self._parse_integrity_error(e) from e
-        row_data = result.fetchone()
-        if row_data is None:
-            return None
-        row: TRow = row_class(**dict(row_data._mapping))
-        return row
+        return result.scalar_one_or_none()
 
     async def _upsert_row_returning[TRow: Base](
         self,
@@ -243,25 +343,25 @@ class V2WriteOpsBase(V2OpsBase):
         await self._sess.execute(stmt)
         await self._sess.flush()
 
-    async def _record_memberships(self, entries: Sequence[ScopeMembershipEntry]) -> None:
+    async def _record_memberships(self, entries: Sequence[EntityMembershipEntry]) -> None:
         """Record declared memberships in the parents' virtual scopes, idempotently;
         a declared parent without a virtual scope fails (resolve-or-fail)."""
         if not entries:
             return
-        scope_ids = await self._resolve_virtual_scope_ids([e.parent_scope for e in entries])
+        scope_ids = await self._resolve_virtual_scope_ids([e.parent for e in entries])
         await self._bulk_insert_ignore_conflicts(
             [
                 EntityMembershipRow(
-                    virtual_scope_id=scope_ids[entry.parent_scope],
-                    entity_type=entry.member.entity_type,
-                    entity_id=entry.member.entity_id,
+                    virtual_scope_id=scope_ids[(entry.parent.entity_type(), entry.parent)],
+                    entity_type=entry.member.entity_type(),
+                    entity_id=entry.member,
                     permission_cap=None,
                 )
                 for entry in entries
             ],
         )
 
-    async def _remove_memberships(self, members: Sequence[EntityRef]) -> None:
+    async def _remove_memberships(self, members: Sequence[EntityIdentifier]) -> None:
         """Remove every membership the members hold, so a purge cannot leave
         orphan registrations behind."""
         if not members:
@@ -269,14 +369,14 @@ class V2WriteOpsBase(V2OpsBase):
         await self._sess.execute(
             sa.delete(EntityMembershipRow).where(
                 sa.tuple_(EntityMembershipRow.entity_type, EntityMembershipRow.entity_id).in_([
-                    (m.entity_type, m.entity_id) for m in members
+                    (m.entity_type(), m) for m in members
                 ])
             )
         )
 
     async def _resolve_virtual_scope_ids(
-        self, scopes: Sequence[ScopeRef]
-    ) -> dict[ScopeRef, VirtualScopeID]:
+        self, entities: Sequence[EntityIdentifier]
+    ) -> dict[tuple[EntityType, uuid.UUID], VirtualScopeID]:
         """Resolve-or-fail, never get-or-create: a declared parent without a virtual
         scope raises :class:`VirtualScopeNotFound` naming every missing scope."""
         stmt = sa.select(
@@ -285,19 +385,17 @@ class V2WriteOpsBase(V2OpsBase):
             VirtualScopeRow.id,
         ).where(
             sa.tuple_(VirtualScopeRow.scope_type, VirtualScopeRow.scope_id).in_([
-                (s.scope_type, s.scope_id) for s in scopes
+                (e.entity_type(), e) for e in entities
             ])
         )
         resolved = {
-            ScopeRef(
-                scope_type=ScopeType(EntityType(row.scope_type)), scope_id=row.scope_id
-            ): row.id
+            (EntityType(row.scope_type), row.scope_id): row.id
             for row in (await self._sess.execute(stmt)).all()
         }
-        missing = [s for s in scopes if s not in resolved]
+        missing = [e for e in entities if (e.entity_type(), e) not in resolved]
         if missing:
             raise VirtualScopeNotFound(
-                "No virtual scope for scopes: "
-                + ", ".join(f"{s.scope_type}:{s.scope_id}" for s in missing)
+                "No virtual scope for entities: "
+                + ", ".join(f"{e.entity_type()}:{e}" for e in missing)
             )
         return resolved

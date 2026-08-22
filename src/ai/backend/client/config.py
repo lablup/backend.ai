@@ -226,7 +226,7 @@ class APIConfig:
         self._domain = (
             domain if domain is not None else get_env("DOMAIN", self.DEFAULTS["domain"], clean=str)
         )
-        self._group = (
+        self._project = (
             group if group is not None else get_env("GROUP", self.DEFAULTS["group"], clean=str)
         )
         self._storage_proxy_address_map = (
@@ -321,7 +321,7 @@ class APIConfig:
     @property
     def group(self) -> str:
         """The configured group."""
-        return self._group
+        return self._project
 
     @property
     def storage_proxy_address_map(self) -> Mapping[str, str]:

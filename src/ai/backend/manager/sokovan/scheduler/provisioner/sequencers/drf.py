@@ -3,8 +3,8 @@ from collections.abc import Sequence
 from decimal import Decimal
 from typing import override
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.views.sokovan.agent import ResourceGroupResource
 from ai.backend.manager.views.sokovan.snapshot import ResourceAllocation, SystemSnapshot
 from ai.backend.manager.views.sokovan.workload import SessionWorkload

@@ -30,7 +30,7 @@ class ExistenceCheck[T]:
     """
 
     column: sa.orm.attributes.InstrumentedAttribute[T]
-    """The column to check (e.g., ScalingGroupRow.name)."""
+    """The column to check (e.g., ResourceGroupRow.name)."""
 
     value: T
     """The value to check for existence."""

@@ -1,11 +1,11 @@
 from typing import override
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.entity.types import EntityRef
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.identifier.user import UserID
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
-from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
+from ai.backend.manager.actions.v2.single_entity.trigger import (
+    SingleEntityActionTriggerMeta,
+)
 from ai.backend.manager.actions.v2.single_entity.validator.base import SingleEntityActionValidator
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.permission.virtual_scope import EntityPermissionCheckKey
@@ -30,7 +30,7 @@ class VirtualScopeSingleEntityActionRBACValidator(SingleEntityActionValidator):
         self._config_provider = config_provider
 
     @override
-    async def validate(self, action: BaseSingleEntityAction, meta: BaseActionTriggerMeta) -> None:
+    async def validate(self, meta: SingleEntityActionTriggerMeta) -> None:
         if not self._config_provider.config.manager.rbac.enforcement_enabled:
             return
 
@@ -42,17 +42,14 @@ class VirtualScopeSingleEntityActionRBACValidator(SingleEntityActionValidator):
 
         key = EntityPermissionCheckKey(
             user_id=UserID(user.user_id),
-            entity=EntityRef(
-                entity_type=action.entity_type(),
-                entity_id=action.entity_id(),
-            ),
+            entity=meta.entity,
         )
-        permission = action.operation_type().to_permission()
+        permission = meta.operation_type.to_permission()
         allowed = await self._repository.check_single_entity_permission_via_virtual_scope(
             key, permission
         )
         if not allowed:
             raise NotEnoughPermission(
                 f"User {user.user_id} lacks permission {permission!r} "
-                f"on {action.entity_type()} {action.entity_id()}"
+                f"on {meta.entity.entity_type()} {meta.entity}"
             )

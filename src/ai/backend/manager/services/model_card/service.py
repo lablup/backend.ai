@@ -19,10 +19,6 @@ from ai.backend.manager.services.model_card.actions.bulk_delete import (
     BulkDeleteModelCardAction,
     BulkDeleteModelCardActionResult,
 )
-from ai.backend.manager.services.model_card.actions.create import (
-    CreateModelCardAction,
-    CreateModelCardActionResult,
-)
 from ai.backend.manager.services.model_card.actions.delete import (
     DeleteModelCardAction,
     DeleteModelCardActionResult,
@@ -30,14 +26,6 @@ from ai.backend.manager.services.model_card.actions.delete import (
 from ai.backend.manager.services.model_card.actions.scan import (
     ScanProjectModelCardsAction,
     ScanProjectModelCardsActionResult,
-)
-from ai.backend.manager.services.model_card.actions.search import (
-    SearchModelCardsAction,
-    SearchModelCardsActionResult,
-)
-from ai.backend.manager.services.model_card.actions.search_in_project import (
-    SearchModelCardsInProjectAction,
-    SearchModelCardsInProjectActionResult,
 )
 from ai.backend.manager.services.model_card.actions.update import (
     UpdateModelCardAction,
@@ -63,12 +51,8 @@ class ModelCardService:
         self._repository = repository
         self._storage_manager = storage_manager
 
-    async def create(self, action: CreateModelCardAction) -> CreateModelCardActionResult:
-        data = await self._repository.create(action.creator)
-        return CreateModelCardActionResult(model_card=data)
-
     async def update(self, action: UpdateModelCardAction) -> UpdateModelCardActionResult:
-        action.updater.pk_value = action.id
+        action.updater.pk_value = action.model_card_id
         data = await self._repository.update(action.updater)
         return UpdateModelCardActionResult(model_card=data)
 
@@ -81,26 +65,6 @@ class ModelCardService:
     ) -> BulkDeleteModelCardActionResult:
         data = await self._repository.bulk_delete(action.purgers, action.options)
         return BulkDeleteModelCardActionResult(data=data)
-
-    async def search(self, action: SearchModelCardsAction) -> SearchModelCardsActionResult:
-        result = await self._repository.search(action.querier)
-        return SearchModelCardsActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def search_in_project(
-        self, action: SearchModelCardsInProjectAction
-    ) -> SearchModelCardsInProjectActionResult:
-        result = await self._repository.search_in_project(action.querier, action.scope)
-        return SearchModelCardsInProjectActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
 
     async def available_presets(
         self, action: AvailablePresetsAction

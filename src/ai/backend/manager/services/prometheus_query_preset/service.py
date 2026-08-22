@@ -3,6 +3,7 @@ from typing import cast
 
 from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.prometheus.preset import (
     LabelMatcher,
@@ -13,30 +14,21 @@ from ai.backend.manager.data.prometheus_query_preset import (
     ExecutePresetOptions,
     PrometheusQueryPresetData,
 )
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
-)
-from ai.backend.manager.repositories.prometheus_query_preset.creators import (
-    PrometheusQueryPresetCreatorSpec,
 )
 from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
     PrometheusQueryPresetUpdaterSpec,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions import (
     CreatePresetAction,
-    CreatePresetActionResult,
-    DeletePresetAction,
-    DeletePresetActionResult,
     ExecutePresetAction,
     ExecutePresetActionResult,
-    GetPresetAction,
-    GetPresetActionResult,
-    ModifyPresetAction,
-    ModifyPresetActionResult,
     PreviewPresetAction,
     PreviewPresetActionResult,
-    SearchPresetsAction,
-    SearchPresetsActionResult,
+    UpdatePresetAction,
+    UpdatePresetActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -47,6 +39,7 @@ class PrometheusQueryPresetService:
     _prometheus_client: PrometheusClient
     _default_timewindow: str
     _template_renderer: PromQLTemplateRenderer
+    _ops_repository: OpsRepository[PrometheusQueryPresetData]
 
     def __init__(
         self,
@@ -54,42 +47,29 @@ class PrometheusQueryPresetService:
         prometheus_client: PrometheusClient,
         default_timewindow: str,
         template_renderer: PromQLTemplateRenderer,
+        ops_repository: OpsRepository[PrometheusQueryPresetData],
     ) -> None:
         self._repository = repository
         self._prometheus_client = prometheus_client
         self._default_timewindow = default_timewindow
         self._template_renderer = template_renderer
+        self._ops_repository = ops_repository
 
-    async def create_preset(self, action: CreatePresetAction) -> CreatePresetActionResult:
-        spec = cast(PrometheusQueryPresetCreatorSpec, action.creator.spec)
-        self._template_renderer.validate(spec.query_template)
-        preset_data = await self._repository.create(action.creator)
-        return CreatePresetActionResult(preset=preset_data)
-
-    async def get_preset(self, action: GetPresetAction) -> GetPresetActionResult:
-        preset_data = await self._repository.get_by_id(action.preset_id)
-        return GetPresetActionResult(preset=preset_data)
-
-    async def search_presets(self, action: SearchPresetsAction) -> SearchPresetsActionResult:
-        result = await self._repository.search(action.querier)
-        return SearchPresetsActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
+    async def create_preset(
+        self, action: CreatePresetAction
+    ) -> CreatedEntityOpsResult[PrometheusQueryPresetData]:
+        self._template_renderer.validate(action.creator.query_template)
+        return CreatedEntityOpsResult(
+            data=await self._ops_repository.create_global_entity(action.to_creator())
         )
 
-    async def modify_preset(self, action: ModifyPresetAction) -> ModifyPresetActionResult:
+    async def update_preset(self, action: UpdatePresetAction) -> UpdatePresetActionResult:
         spec = cast(PrometheusQueryPresetUpdaterSpec, action.updater.spec)
         template = spec.query_template.optional_value()
         if template is not None:
             self._template_renderer.validate(template)
         preset_data = await self._repository.update(action.updater)
-        return ModifyPresetActionResult(preset=preset_data)
-
-    async def delete_preset(self, action: DeletePresetAction) -> DeletePresetActionResult:
-        await self._repository.delete(action.preset_id)
-        return DeletePresetActionResult(preset_id=action.preset_id)
+        return UpdatePresetActionResult(preset=preset_data)
 
     def _validate_labels(
         self,

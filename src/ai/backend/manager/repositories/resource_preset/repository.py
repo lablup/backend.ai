@@ -139,7 +139,7 @@ class ResourcePresetRepository:
         Modifies an existing resource preset.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
-        preset = await self._db_source.modify_preset(updater)
+        preset = await self._db_source.update_preset(updater)
         with suppress_with_log(
             [Exception], message="Failed to invalidate cache after preset modification"
         ):
@@ -166,24 +166,26 @@ class ResourcePresetRepository:
         return preset
 
     @resource_preset_repository_resilience.apply()
-    async def list_presets(self, scaling_group_name: str | None = None) -> list[ResourcePresetData]:
+    async def list_presets(
+        self, resource_group_name: str | None = None
+    ) -> list[ResourcePresetData]:
         """
         Lists all resource presets.
         If scaling_group_name is provided, returns presets for that scaling group and global presets.
         """
         # Try cache first
         with suppress_with_log([Exception], message="Failed to get preset list from cache"):
-            presets = await self._cache_source.get_preset_list(scaling_group_name)
+            presets = await self._cache_source.get_preset_list(resource_group_name)
             if presets is not None:
                 return presets
 
         # Fallback to DB
         await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
-        presets = await self._db_source.list_presets(scaling_group_name)
+        presets = await self._db_source.list_presets(resource_group_name)
 
         # Cache the result
         with suppress_with_log([Exception], message="Failed to cache preset list"):
-            await self._cache_source.set_preset_list(presets, scaling_group_name)
+            await self._cache_source.set_preset_list(presets, resource_group_name)
 
         return presets
 
@@ -203,7 +205,7 @@ class ResourcePresetRepository:
         group_name: str,
         domain_name: str,
         resource_policy: Mapping[str, Any],
-        scaling_group: str | None = None,
+        resource_group: str | None = None,
     ) -> CheckPresetsResult:
         """
         Check resource presets availability and resource limits.
@@ -215,7 +217,7 @@ class ResourcePresetRepository:
         # Try to get from cache first
         with suppress_with_log([Exception], message="Failed to get check presets data from cache"):
             cached_data = await self._cache_source.get_check_presets_data(
-                access_key, group_name, domain_name, scaling_group
+                access_key, group_name, domain_name, resource_group
             )
             if cached_data:
                 log.info(
@@ -242,7 +244,7 @@ class ResourcePresetRepository:
             domain_name,
             resource_policy,
             known_slot_types,
-            scaling_group,
+            resource_group,
         )
 
         # Process the data and build response
@@ -268,8 +270,8 @@ class ResourcePresetRepository:
             group_limits=group_limits,
             group_using=group_occupied,
             group_remaining=group_remaining,
-            scaling_group_remaining=db_data.keypair_data.scaling_group_remaining,
-            scaling_groups=db_data.per_sgroup_data,
+            resource_group_remaining=db_data.keypair_data.resource_group_remaining,
+            resource_groups=db_data.per_sgroup_data,
         )
 
         # Cache the result
@@ -279,7 +281,7 @@ class ResourcePresetRepository:
                 access_key,
                 group_name,
                 domain_name,
-                scaling_group,
+                resource_group,
                 cache_data,
             )
 

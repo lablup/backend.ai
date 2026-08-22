@@ -21,12 +21,13 @@ import uuid
 from typing import Any
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.dto.manager.infra import (
     CheckPresetsRequest,
     CheckPresetsResponse,
     ListPresetsResponse,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.repositories.base.creator import Creator
@@ -43,9 +44,9 @@ from ai.backend.manager.services.resource_preset.actions.delete_preset import (
 from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
 )
-from ai.backend.manager.services.resource_preset.actions.modify_preset import (
-    ModifyResourcePresetAction,
-    ModifyResourcePresetActionResult,
+from ai.backend.manager.services.resource_preset.actions.update_preset import (
+    UpdateResourcePresetAction,
+    UpdateResourcePresetActionResult,
 )
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.types import OptionalState
@@ -67,7 +68,7 @@ class TestPresetCRUD:
         name: str | None = None,
         resource_slots: ResourceSlot | None = None,
         shared_memory: str | None = None,
-        scaling_group_name: str | None = None,
+        resource_group_name: str | None = None,
     ) -> ResourcePresetData:
         """Create a preset through the processor and return the data."""
         if name is None:
@@ -81,25 +82,25 @@ class TestPresetCRUD:
                     name=name,
                     resource_slots=resource_slots,
                     shared_memory=shared_memory,
-                    scaling_group_name=scaling_group_name,
+                    resource_group_name=resource_group_name,
                 )
             )
         )
-        result = await processors.create_preset.wait_for_complete(action)
+        result = await processors.create_preset.run(action)
         return result.resource_preset
 
     async def _list_presets_via_processor(
         self,
         processors: ResourcePresetProcessors,
         access_key: str,
-        scaling_group: str | None = None,
+        resource_group: str | None = None,
     ) -> list[Any]:
         """List presets through the processor layer."""
         action = ListResourcePresetsAction(
             access_key=access_key,
-            scaling_group=scaling_group,
+            resource_group=resource_group,
         )
-        result = await processors.list_presets.wait_for_complete(action)
+        result = await processors.list_presets.run(action)
         return result.presets
 
     # ------------------------------------------------------------------
@@ -204,20 +205,17 @@ class TestPresetCRUD:
             name="crud-modify-s5-orig",
         )
 
-        modify_action = ModifyResourcePresetAction(
+        modify_action = UpdateResourcePresetAction(
+            preset_id=ResourcePresetID(preset.id),
             updater=Updater(
                 spec=ResourcePresetUpdaterSpec(
                     name=OptionalState.update("crud-modify-s5-new"),
                 ),
                 pk_value=preset.id,
             ),
-            id=preset.id,
-            name=None,
         )
-        modify_result = await resource_preset_processors.modify_preset.wait_for_complete(
-            modify_action
-        )
-        assert isinstance(modify_result, ModifyResourcePresetActionResult)
+        modify_result = await resource_preset_processors.update_preset.run(modify_action)
+        assert isinstance(modify_result, UpdateResourcePresetActionResult)
         assert modify_result.resource_preset.name == "crud-modify-s5-new"
 
         # Verify via SDK
@@ -239,7 +237,8 @@ class TestPresetCRUD:
             resource_slots=ResourceSlot({"cpu": "2", "mem": "2147483648"}),
         )
 
-        modify_action = ModifyResourcePresetAction(
+        modify_action = UpdateResourcePresetAction(
+            preset_id=ResourcePresetID(preset.id),
             updater=Updater(
                 spec=ResourcePresetUpdaterSpec(
                     resource_slots=OptionalState.update(
@@ -248,12 +247,8 @@ class TestPresetCRUD:
                 ),
                 pk_value=preset.id,
             ),
-            id=preset.id,
-            name=None,
         )
-        modify_result = await resource_preset_processors.modify_preset.wait_for_complete(
-            modify_action
-        )
+        modify_result = await resource_preset_processors.update_preset.run(modify_action)
         assert modify_result.resource_preset.resource_slots["cpu"] is not None
 
         # Verify via SDK
@@ -277,13 +272,8 @@ class TestPresetCRUD:
             name="crud-delete-s7",
         )
 
-        delete_action = DeleteResourcePresetAction(
-            id=preset.id,
-            name=None,
-        )
-        delete_result = await resource_preset_processors.delete_preset.wait_for_complete(
-            delete_action
-        )
+        delete_action = DeleteResourcePresetAction(preset_id=ResourcePresetID(preset.id))
+        delete_result = await resource_preset_processors.delete_preset.run(delete_action)
         assert isinstance(delete_result, DeleteResourcePresetActionResult)
         assert delete_result.resource_preset.name == "crud-delete-s7"
 
@@ -299,18 +289,13 @@ class TestPresetCRUD:
         database_fixture: None,
     ) -> None:
         """S-8: Delete preset by name → removed from list."""
-        await self._create_preset(
+        preset = await self._create_preset(
             resource_preset_processors,
             name="crud-delete-s8",
         )
 
-        delete_action = DeleteResourcePresetAction(
-            id=None,
-            name="crud-delete-s8",
-        )
-        delete_result = await resource_preset_processors.delete_preset.wait_for_complete(
-            delete_action
-        )
+        delete_action = DeleteResourcePresetAction(preset_id=ResourcePresetID(preset.id))
+        delete_result = await resource_preset_processors.delete_preset.run(delete_action)
         assert delete_result.resource_preset.name == "crud-delete-s8"
 
         # Verify removal via SDK
@@ -350,11 +335,11 @@ class TestCheckPresets:
                     name=name,
                     resource_slots=resource_slots,
                     shared_memory=None,
-                    scaling_group_name=None,
+                    resource_group_name=None,
                 )
             )
         )
-        result = await processors.create_preset.wait_for_complete(action)
+        result = await processors.create_preset.run(action)
         return result.resource_preset
 
     # ------------------------------------------------------------------
@@ -435,7 +420,7 @@ class TestCheckPresets:
         )
         assert isinstance(result.group_limits, dict)
         assert isinstance(result.group_using, dict)
-        assert isinstance(result.group_remaining, dict)
+        assert isinstance(result.scaling_group_remaining, dict)
 
     async def test_s5_check_presets_scaling_group_data(
         self,
@@ -455,7 +440,7 @@ class TestCheckPresets:
         resource_preset_processors: ResourcePresetProcessors,
         admin_registry: BackendAIClientRegistry,
         group_name_fixture: str,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         database_fixture: None,
     ) -> None:
         """S-6: check_presets with scaling_group filter returns only that SG."""
@@ -467,14 +452,14 @@ class TestCheckPresets:
         result = await admin_registry.infra.check_presets(
             CheckPresetsRequest(
                 group=group_name_fixture,
-                scaling_group=scaling_group_name,
+                scaling_group=resource_group_name,
             )
         )
         assert isinstance(result, CheckPresetsResponse)
         assert isinstance(result.presets, list)
-        # When filtered, scaling_groups should contain only the specified SG
+        # When filtered, resource_groups should contain only the specified SG
         if result.scaling_groups:
-            assert scaling_group_name in result.scaling_groups
+            assert resource_group_name in result.scaling_groups
             assert len(result.scaling_groups) == 1
 
     async def test_s7_check_presets_no_sessions_zero_usage(

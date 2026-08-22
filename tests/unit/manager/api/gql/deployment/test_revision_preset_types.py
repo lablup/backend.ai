@@ -13,6 +13,8 @@ from ai.backend.common.config import (
     PresetModelDefinition,
     PresetModelServiceConfig,
 )
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
@@ -34,8 +36,6 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     PresetModelDefinitionInfoDTO,
     PresetModelServiceConfigInfoDTO,
 )
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     _model_definition_to_dto,
 )

@@ -8,7 +8,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     MetricArgs,
@@ -19,22 +19,24 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Creator, Upserter
-
-from .db_source import ResourceUsageHistoryDBSource
-from .types import (
+from ai.backend.manager.data.resource_usage_history.types import (
     DomainUsageBucketData,
+    KernelUsageRecordData,
+    ProjectUsageBucketData,
+    UserUsageBucketData,
+)
+from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Creator, Upserter
+from ai.backend.manager.repositories.resource_usage_history.types import (
     DomainUsageBucketOperationScope,
     DomainUsageBucketSearchResult,
-    KernelUsageRecordData,
     KernelUsageRecordSearchResult,
-    ProjectUsageBucketData,
     ProjectUsageBucketOperationScope,
     ProjectUsageBucketSearchResult,
-    UserUsageBucketData,
     UserUsageBucketOperationScope,
     UserUsageBucketSearchResult,
 )
+
+from .db_source import ResourceUsageHistoryDBSource
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.fair_share import UsageBucketAggregationResult

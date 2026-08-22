@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
@@ -23,7 +23,7 @@ from ai.backend.manager.data.fair_share import (
     UserFairShareData,
     UserFairShareSearchResult,
 )
-from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
+from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -42,12 +42,12 @@ from ai.backend.manager.services.fair_share import (
     GetDomainFairShareAction,
     GetProjectFairShareAction,
     GetUserFairShareAction,
-    SearchDomainFairSharesAction,
-    SearchProjectFairSharesAction,
+    GlobalSearchDomainFairSharesAction,
+    GlobalSearchProjectFairSharesAction,
+    GlobalSearchUserFairSharesAction,
     SearchRGDomainFairSharesAction,
     SearchRGProjectFairSharesAction,
     SearchRGUserFairSharesAction,
-    SearchUserFairSharesAction,
 )
 from ai.backend.manager.services.fair_share.actions import (
     UpsertDomainFairShareWeightAction,
@@ -172,7 +172,7 @@ class TestGetDomainFairShare:
         now = datetime.now(UTC)
         today = now.date()
         # Repository creates default data using custom scaling group spec
-        custom_spec = FairShareScalingGroupSpec(
+        custom_spec = FairShareResourceGroupSpec(
             default_weight=Decimal("3.5"),
             half_life_days=10,
             lookback_days=90,
@@ -243,7 +243,7 @@ class TestSearchDomainFairShares:
         )
         mock_repository.search_domain_fair_shares = AsyncMock(return_value=mock_result)
 
-        action = SearchDomainFairSharesAction(
+        action = GlobalSearchDomainFairSharesAction(
             pagination=OffsetPagination(offset=0, limit=10),
             conditions=[],
             orders=[],
@@ -270,7 +270,7 @@ class TestSearchDomainFairShares:
         mock_repository.search_domain_fair_shares = AsyncMock(return_value=mock_result)
 
         pagination = OffsetPagination(offset=0, limit=20)
-        action = SearchDomainFairSharesAction(
+        action = GlobalSearchDomainFairSharesAction(
             pagination=pagination,
             conditions=[],
             orders=[],
@@ -396,7 +396,7 @@ class TestGetProjectFairShare:
         now = datetime.now(UTC)
         today = now.date()
         # Repository creates default data using custom scaling group spec
-        custom_spec = FairShareScalingGroupSpec(
+        custom_spec = FairShareResourceGroupSpec(
             default_weight=Decimal("3.5"),
             half_life_days=10,
             lookback_days=90,
@@ -468,7 +468,7 @@ class TestSearchProjectFairShares:
         )
         mock_repository.search_project_fair_shares = AsyncMock(return_value=mock_result)
 
-        action = SearchProjectFairSharesAction(
+        action = GlobalSearchProjectFairSharesAction(
             pagination=OffsetPagination(offset=0, limit=10),
             conditions=[],
             orders=[],
@@ -495,7 +495,7 @@ class TestSearchProjectFairShares:
         mock_repository.search_project_fair_shares = AsyncMock(return_value=mock_result)
 
         pagination = OffsetPagination(offset=0, limit=20)
-        action = SearchProjectFairSharesAction(
+        action = GlobalSearchProjectFairSharesAction(
             pagination=pagination,
             conditions=[],
             orders=[],
@@ -632,7 +632,7 @@ class TestGetUserFairShare:
         now = datetime.now(UTC)
         today = now.date()
         # Repository creates default data using custom scaling group spec
-        custom_spec = FairShareScalingGroupSpec(
+        custom_spec = FairShareResourceGroupSpec(
             default_weight=Decimal("3.5"),
             half_life_days=10,
             lookback_days=90,
@@ -707,7 +707,7 @@ class TestSearchUserFairShares:
         )
         mock_repository.search_user_fair_shares = AsyncMock(return_value=mock_result)
 
-        action = SearchUserFairSharesAction(
+        action = GlobalSearchUserFairSharesAction(
             pagination=OffsetPagination(offset=0, limit=10),
             conditions=[],
             orders=[],
@@ -734,7 +734,7 @@ class TestSearchUserFairShares:
         mock_repository.search_user_fair_shares = AsyncMock(return_value=mock_result)
 
         pagination = OffsetPagination(offset=0, limit=20)
-        action = SearchUserFairSharesAction(
+        action = GlobalSearchUserFairSharesAction(
             pagination=pagination,
             conditions=[],
             orders=[],
@@ -815,7 +815,9 @@ class TestSearchDomainFairShareEntities:
             conditions=[],
             orders=[],
         )
-        action = SearchRGDomainFairSharesAction(scope=scope, querier=querier)
+        action = SearchRGDomainFairSharesAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()), scope=scope, querier=querier
+        )
         result = await service.search_rg_domain_fair_shares(action)
 
         # Both domains should be included
@@ -867,7 +869,9 @@ class TestSearchDomainFairShareEntities:
             conditions=[],
             orders=[],
         )
-        action = SearchRGDomainFairSharesAction(scope=scope, querier=querier)
+        action = SearchRGDomainFairSharesAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()), scope=scope, querier=querier
+        )
         result = await service.search_rg_domain_fair_shares(action)
 
         # Domain without record has weight set to default_weight
@@ -882,7 +886,7 @@ class TestSearchDomainFairShareEntities:
     ) -> None:
         """Default values match scaling group settings."""
         # Custom scaling group spec
-        custom_spec = FairShareScalingGroupSpec(
+        custom_spec = FairShareResourceGroupSpec(
             default_weight=Decimal("2.5"),
             half_life_days=7,
             lookback_days=60,
@@ -923,7 +927,9 @@ class TestSearchDomainFairShareEntities:
             conditions=[],
             orders=[],
         )
-        action = SearchRGDomainFairSharesAction(scope=scope, querier=querier)
+        action = SearchRGDomainFairSharesAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()), scope=scope, querier=querier
+        )
         result = await service.search_rg_domain_fair_shares(action)
 
         default = result.items[0]
@@ -1007,7 +1013,9 @@ class TestSearchProjectFairShareEntities:
             conditions=[],
             orders=[],
         )
-        action = SearchRGProjectFairSharesAction(scope=scope, querier=querier)
+        action = SearchRGProjectFairSharesAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()), scope=scope, querier=querier
+        )
         result = await service.search_rg_project_fair_shares(action)
 
         assert result.total_count == 2
@@ -1092,7 +1100,9 @@ class TestSearchUserFairShareEntities:
             conditions=[],
             orders=[],
         )
-        action = SearchRGUserFairSharesAction(scope=scope, querier=querier)
+        action = SearchRGUserFairSharesAction(
+            resource_group_id=ResourceGroupID(uuid.uuid4()), scope=scope, querier=querier
+        )
         result = await service.search_rg_user_fair_shares(action)
 
         assert result.total_count == 2

@@ -3,14 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.manager_admin import MANAGER_ADMIN_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
-
-from .base import ManagerAdminAction
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
 
 @dataclass
-class UpdateManagerStatusAction(ManagerAdminAction):
+class UpdateManagerStatusAction(BaseGlobalAction):
     """Action to update the manager status."""
 
     status: str
@@ -18,18 +18,20 @@ class UpdateManagerStatusAction(ManagerAdminAction):
 
     @override
     @classmethod
+    def entity_type(cls) -> EntityType:
+        return MANAGER_ADMIN_ENTITY_TYPE
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_manager_status"
 
 
 @dataclass
-class UpdateManagerStatusActionResult(BaseActionResult):
+class UpdateManagerStatusActionResult:
     """Result of updating manager status."""
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

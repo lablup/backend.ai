@@ -10,12 +10,12 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.dto.manager.v2.domain.response import DomainNode
 from ai.backend.common.dto.manager.v2.domain.types import (
     DomainFairShareScopeDTO,
     DomainUsageScopeDTO,
 )
-from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,

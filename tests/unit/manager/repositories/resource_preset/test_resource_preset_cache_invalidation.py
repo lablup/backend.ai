@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot, ValkeyTarget
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
@@ -23,12 +24,19 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow, association_groups_users
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow, association_groups_users
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import (
+    ResourceGroupOpts,
+    ResourceGroupRow,
+    sgroups_for_domains,
+    sgroups_for_groups,
+    sgroups_for_keypairs,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -37,13 +45,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupOpts,
-    ScalingGroupRow,
-    sgroups_for_domains,
-    sgroups_for_groups,
-    sgroups_for_keypairs,
-)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -68,7 +69,7 @@ class TestResourcePresetCacheInvalidation:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -76,7 +77,7 @@ class TestResourcePresetCacheInvalidation:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -109,15 +110,15 @@ class TestResourcePresetCacheInvalidation:
         group_name = f"test-group-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            scaling_group = ScalingGroupRow(
+            resource_group = ResourceGroupRow(
                 name=group_name,
                 description="Test scaling group for preset",
                 is_active=True,
                 driver="static",
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
-            db_sess.add(scaling_group)
+            db_sess.add(resource_group)
             await db_sess.flush()
 
         yield group_name
@@ -133,7 +134,7 @@ class TestResourcePresetCacheInvalidation:
                 name=f"test-preset-{uuid.uuid4().hex[:8]}",
                 resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
                 shared_memory="1 GiB",
-                scaling_group_name=test_scaling_group_name,
+                resource_group_name=test_scaling_group_name,
             )
         )
         yield creator
@@ -192,19 +193,19 @@ class TestResourcePresetCacheInvalidation:
         cache_source = resource_preset_repository._cache_source
         # Create some cache entries before creating preset
         dummy_preset = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="dummy-preset",
             resource_slots=ResourceSlot({"cpu": "1", "mem": "1G"}),
             shared_memory=int(BinarySize.from_str("512M")),
-            scaling_group_name=None,
+            resource_group_name=None,
         )
         await cache_source.set_preset(dummy_preset)
-        await cache_source.set_preset_list([dummy_preset], scaling_group=None)
+        await cache_source.set_preset_list([dummy_preset], resource_group=None)
 
         # Verify cache entries exist
         cached_preset = await cache_source.get_preset_by_id(dummy_preset.id)
         assert cached_preset is not None
-        cached_list = await cache_source.get_preset_list(scaling_group=None)
+        cached_list = await cache_source.get_preset_list(resource_group=None)
         assert cached_list is not None
 
         # Create a new preset - this should invalidate all caches
@@ -217,7 +218,7 @@ class TestResourcePresetCacheInvalidation:
         cached_preset_after = await cache_source.get_preset_by_id(dummy_preset.id)
         assert cached_preset_after is None
 
-        cached_list_after = await cache_source.get_preset_list(scaling_group=None)
+        cached_list_after = await cache_source.get_preset_list(resource_group=None)
         assert cached_list_after is None
 
     async def test_invalidate_all_presets_deletes_all_keys(
@@ -228,18 +229,18 @@ class TestResourcePresetCacheInvalidation:
         cache_source = resource_preset_repository._cache_source
         # Create multiple cache entries of different types
         preset1 = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="preset-1",
             resource_slots=ResourceSlot({"cpu": "2", "mem": "2G"}),
             shared_memory=int(BinarySize.from_str("1G")),
-            scaling_group_name=None,
+            resource_group_name=None,
         )
         preset2 = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="preset-2",
             resource_slots=ResourceSlot({"cpu": "4", "mem": "4G"}),
             shared_memory=int(BinarySize.from_str("2G")),
-            scaling_group_name="test-group",
+            resource_group_name="test-group",
         )
 
         # Cache by ID and name
@@ -247,8 +248,8 @@ class TestResourcePresetCacheInvalidation:
         await cache_source.set_preset(preset2)
 
         # Cache lists
-        await cache_source.set_preset_list([preset1], scaling_group=None)
-        await cache_source.set_preset_list([preset2], scaling_group="test-group")
+        await cache_source.set_preset_list([preset1], resource_group=None)
+        await cache_source.set_preset_list([preset2], resource_group="test-group")
 
         # Cache check data (simulating check_presets cache)
         test_check_data = b'{"allowed": true}'
@@ -257,20 +258,20 @@ class TestResourcePresetCacheInvalidation:
             access_key=test_access_key,
             group="test-group",
             domain="test-domain",
-            scaling_group=None,
+            resource_group=None,
             data=test_check_data,
         )
 
         # Verify caches exist
         assert await cache_source.get_preset_by_id(preset1.id) is not None
         assert await cache_source.get_preset_by_name(preset1.name) is not None
-        assert await cache_source.get_preset_list(scaling_group=None) is not None
+        assert await cache_source.get_preset_list(resource_group=None) is not None
         assert (
             await cache_source.get_check_presets_data(
                 access_key=test_access_key,
                 group="test-group",
                 domain="test-domain",
-                scaling_group=None,
+                resource_group=None,
             )
             is not None
         )
@@ -283,14 +284,14 @@ class TestResourcePresetCacheInvalidation:
         assert await cache_source.get_preset_by_id(preset2.id) is None
         assert await cache_source.get_preset_by_name(preset1.name) is None
         assert await cache_source.get_preset_by_name(preset2.name) is None
-        assert await cache_source.get_preset_list(scaling_group=None) is None
-        assert await cache_source.get_preset_list(scaling_group="test-group") is None
+        assert await cache_source.get_preset_list(resource_group=None) is None
+        assert await cache_source.get_preset_list(resource_group="test-group") is None
         assert (
             await cache_source.get_check_presets_data(
                 access_key=test_access_key,
                 group="test-group",
                 domain="test-domain",
-                scaling_group=None,
+                resource_group=None,
             )
             is None
         )

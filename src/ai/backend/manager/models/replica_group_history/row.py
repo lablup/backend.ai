@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.common.identifier.replica_group_history import ReplicaGroupHistoryID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupHandlerCategory,
     ReplicaGroupHistoryData,

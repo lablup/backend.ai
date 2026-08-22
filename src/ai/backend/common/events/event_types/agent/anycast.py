@@ -4,13 +4,13 @@ from typing import override
 from pydantic import Field
 
 from ai.backend.common.data.agent.types import AgentInfo
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
     EventDomain,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
     AgentId,
     ImageCanonical,

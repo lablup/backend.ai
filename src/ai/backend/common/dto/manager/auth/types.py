@@ -7,8 +7,8 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Self
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, BackendAISchema, SecretKey
 
 __all__ = (

@@ -27,6 +27,28 @@ The default is the first row; drop to db objects only when the operation genuine
 cannot be expressed as specs, and skip the repository entirely when nothing but a
 pass-through would remain.
 
+## What each spec carries, per operation
+
+| Operation | Spec | What it carries |
+|---|---|---|
+| get | `DataQuerier` | row class, pk, `to_data` |
+| lookup | `DataLookup` | row class, key conditions, `to_data` |
+| search | `Searcher` | select, options, `to_data` |
+| create | `GlobalEntityCreator` | the row alone |
+| | `EntityCreator` | also provisions its scope and memberships |
+| | `RoleManagedEntityCreator` | entity plus preset roles |
+| update | `DataUpdater` | row class, pk, values, `to_data` |
+| upsert | `EntityUpserter` | conflict keys, scope kept provisioned |
+| purge | `GlobalEntityPurger` | symmetric with create |
+| | `EntityPurger` | tears the scope down with the row |
+
+- The create / purge / upsert methods are split by what the write registers, so a
+  scoped spec cannot flow through a registration-free path.
+- There is no `delete`: which column marks a row deleted is domain knowledge, so a
+  delete action carries a `DataUpdater` and runs the update path.
+- `OpsRepository` turns a missing row into `EntityNotFoundError` rather than `None` —
+  that seam is the only thing it adds over ops.
+
 ## Gradual migration to the ops provider
 
 `DBOpsProvider` in `ops/base/provider.py` is the standard path. db_source is gradually migrating to ops —

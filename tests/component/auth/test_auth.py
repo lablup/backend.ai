@@ -19,6 +19,7 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import AuthenticationError, InvalidRequestError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
     GetRoleRequest,
@@ -40,16 +41,15 @@ from ai.backend.common.dto.manager.auth.response import (
     VerifyAuthResponse,
 )
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
-from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import DomainRow, domains
-from ai.backend.manager.models.group import GroupRow, association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.project import ProjectRow, association_groups_users
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -134,7 +134,7 @@ async def signup_default_project(
     data = _SignupDefaultProjectData(project_id=ProjectID(uuid.uuid4()), cleanup_emails=[])
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=data.project_id,
                 name="default",
                 description="Default project for signup binding test",
@@ -175,7 +175,12 @@ async def signup_default_project(
             ),
         )
         for email in data.cleanup_emails:
-            await conn.execute(keypairs.delete().where(keypairs.c.user_id == email))
+            await conn.execute(
+                keypairs.delete().where(
+                    keypairs.c.user
+                    == sa.select(users.c.uuid).where(users.c.email == email).scalar_subquery()
+                )
+            )
             await conn.execute(users.delete().where(users.c.email == email))
         await conn.execute(
             VirtualScopeRow.__table__.delete().where(
@@ -184,7 +189,7 @@ async def signup_default_project(
             )
         )
         await conn.execute(
-            GroupRow.__table__.delete().where(GroupRow.__table__.c.id == data.project_id),
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == data.project_id),
         )
 
 
@@ -237,10 +242,10 @@ async def expired_password_user(
         )
         await conn.execute(
             sa.insert(keypairs).values(
-                user_id=email,
                 access_key=data.access_key,
                 secret_key=data.secret_key,
                 is_active=True,
+                is_default=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
                 num_queries=0,
@@ -308,7 +313,7 @@ async def cross_domain_fixture(
             )
         )
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description=f"Cross-domain test group {group_name}",
@@ -367,10 +372,10 @@ async def cross_domain_fixture(
         )
         await conn.execute(
             sa.insert(keypairs).values(
-                user_id=admin_email,
                 access_key=admin_data.keypair.access_key,
                 secret_key=admin_data.keypair.secret_key,
                 is_active=True,
+                is_default=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
                 num_queries=0,
@@ -410,10 +415,10 @@ async def cross_domain_fixture(
         )
         await conn.execute(
             sa.insert(keypairs).values(
-                user_id=user_email,
                 access_key=user_data.keypair.access_key,
                 secret_key=user_data.keypair.secret_key,
                 is_active=True,
+                is_default=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
                 num_queries=0,
@@ -463,7 +468,9 @@ async def cross_domain_fixture(
                 VirtualScopeRow.__table__.c.scope_id == group_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )
         await conn.execute(domains.delete().where(domains.c.name == domain_name))
 
 
@@ -1066,7 +1073,12 @@ class TestSignup:
 
         # Cleanup: remove the signup-created user and keypair
         async with db_engine.begin() as conn:
-            await conn.execute(keypairs.delete().where(keypairs.c.user_id == email))
+            await conn.execute(
+                keypairs.delete().where(
+                    keypairs.c.user
+                    == sa.select(users.c.uuid).where(users.c.email == email).scalar_subquery()
+                )
+            )
             await conn.execute(users.delete().where(users.c.email == email))
 
     async def test_signup_binds_user_to_default_project_via_ase(

@@ -70,7 +70,7 @@ class ProjectHasActiveEndpointsError(BackendAIError, web.HTTPConflict):
         )
 
 
-class ScalingGroupNotFound(ObjectNotFound):
+class ResourceGroupNotFound(ObjectNotFound):
     object_name = "scaling group"
 
     @override
@@ -98,7 +98,7 @@ class UnresolvableResourceGroup(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class DefaultScalingGroupAlreadyExists(BackendAIError, web.HTTPBadRequest):
+class DefaultResourceGroupAlreadyExists(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/default-scaling-group-already-exists"
     error_title = "Another resource group is already the default."
 
@@ -111,7 +111,7 @@ class DefaultScalingGroupAlreadyExists(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class ScalingGroupSessionTypeNotAllowed(BackendAIError, web.HTTPUnprocessableEntity):
+class ResourceGroupSessionTypeNotAllowed(BackendAIError, web.HTTPUnprocessableEntity):
     error_type = "https://api.backend.ai/probs/scaling-group-session-type-not-allowed"
     error_title = "Scaling group does not allow this session type."
 
@@ -124,7 +124,7 @@ class ScalingGroupSessionTypeNotAllowed(BackendAIError, web.HTTPUnprocessableEnt
         )
 
 
-class ScalingGroupDeletionFailure(BackendAIError, web.HTTPInternalServerError):
+class ResourceGroupDeletionFailure(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/scaling-group-deletion-failure"
     error_title = "Failed to delete scaling group."
 
@@ -217,7 +217,7 @@ class DomainDataProcessingError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class ScalingGroupProxyTargetNotFound(ObjectNotFound):
+class ResourceGroupProxyTargetNotFound(ObjectNotFound):
     object_name = "scaling group proxy target"
 
     @override
@@ -522,7 +522,7 @@ class InvalidPresetQuery(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class NoAvailableScalingGroup(BackendAIError, web.HTTPBadRequest):
+class NoAvailableResourceGroup(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/no-available-scaling-group"
     error_title = "No scaling groups available for this session."
 

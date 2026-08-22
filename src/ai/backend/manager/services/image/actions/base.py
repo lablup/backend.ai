@@ -1,34 +1,28 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseAction
-from ai.backend.manager.actions.action.single_entity import (
-    BaseSingleEntityAction,
-    BaseSingleEntityActionResult,
-)
-from ai.backend.manager.actions.action.types import FieldData
+from ai.backend.common.data.entity.image import IMAGE_ENTITY_TYPE, ImageID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 
 
 @dataclass
-class ImageAction(BaseAction):
+class ImageAction(BaseGlobalAction):
+    """Base for an operation that names no single image."""
+
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.IMAGE
+        return IMAGE_ENTITY_TYPE
 
 
 @dataclass
 class ImageSingleEntityAction(BaseSingleEntityAction):
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.IMAGE
+    """Base for an operation on one image."""
+
+    image_id: ImageID
 
     @override
-    def field_data(self) -> FieldData | None:
-        return None
-
-
-class ImageSingleEntityActionResult(BaseSingleEntityActionResult):
-    pass
+    def entity_id(self) -> EntityIdentifier:
+        return self.image_id

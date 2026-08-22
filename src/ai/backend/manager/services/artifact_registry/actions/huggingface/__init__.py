@@ -3,7 +3,10 @@ from .delete import DeleteHuggingFaceRegistryAction, DeleteHuggingFaceRegistryAc
 from .get import GetHuggingFaceRegistryAction, GetHuggingFaceRegistryActionResult
 from .get_multi import GetHuggingFaceRegistriesAction, GetHuggingFaceRegistriesActionResult
 from .list import ListHuggingFaceRegistryAction, ListHuggingFaceRegistryActionResult
-from .search import SearchHuggingFaceRegistriesAction, SearchHuggingFaceRegistriesActionResult
+from .search import (
+    SearchHuggingFaceRegistriesAction,
+    SearchHuggingFaceRegistriesActionResult,
+)
 from .update import UpdateHuggingFaceRegistryAction, UpdateHuggingFaceRegistryActionResult
 
 __all__ = [

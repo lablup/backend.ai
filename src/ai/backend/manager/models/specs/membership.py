@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai.backend.common.data.entity.types import EntityRef, ScopeRef
+from ai.backend.common.data.entity.types import EntityIdentifier
 
 
 @dataclass(frozen=True)
-class ScopeMembershipEntry:
-    """A member row under its parent scope."""
+class EntityMembershipEntry:
+    """A member entity under the entity it joins."""
 
-    member: EntityRef
-    parent_scope: ScopeRef
+    member: EntityIdentifier
+    parent: EntityIdentifier

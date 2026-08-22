@@ -22,25 +22,25 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import (
+    ResourceGroupID,
+    ResourceGroupName,
+)
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import (
     RBACElementType,
 )
 from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
-from ai.backend.common.identifier.architecture import ArchName
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import (
-    ResourceGroupID,
-    ResourceGroupName,
-)
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.identifier.session_group import SessionGroupID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    ArchName,
     ClusterMode,
     KernelId,
     PreemptionMode,
@@ -61,18 +61,17 @@ from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePoli
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
     ImageInfo,
-    ScalingGroupNetworkInfo,
+    ResourceGroupNetworkInfo,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.data.session.types import SchedulingResult, SessionInfo, SessionStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
-from ai.backend.manager.errors.resource import DomainNotFound, ScalingGroupNotFound
+from ai.backend.manager.errors.resource import DomainNotFound, ResourceGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow, domains, query_domain_dotfiles
-from ai.backend.manager.models.group import GroupRow, query_group_dotfiles
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import (
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -80,6 +79,8 @@ from ai.backend.manager.models.kernel import (
 )
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.project import ProjectRow, query_group_dotfiles
+from ai.backend.manager.models.resource_group import ResourceGroupRow, query_allowed_sgroups
 from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
     KeyPairResourcePolicyRow,
@@ -89,7 +90,6 @@ from ai.backend.manager.models.resource_slot import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow, query_allowed_sgroups
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import (
     PRIVATE_SESSION_TYPES,
@@ -126,7 +126,7 @@ from ai.backend.manager.repositories.scheduler.types.resource_group import Resou
 from ai.backend.manager.repositories.scheduler.types.scheduling import SchedulingFetch
 from ai.backend.manager.repositories.scheduler.types.session import PendingSessions
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
-    AllowedScalingGroup,
+    AllowedResourceGroup,
     ComputeScheduleFetch,
     SessionSpecFetch,
     UserEnqueueFetch,
@@ -217,7 +217,7 @@ def _to_slot_quota(slots: ResourceSlot) -> dict[ResourceSlotName, Decimal]:
 
 
 @dataclass(frozen=True)
-class _ScalingGroupWithSlotInventory:
+class _ResourceGroupWithSlotInventory:
     """Resource group bundled with the slot names served by its agents.
 
     ``served_slot_names`` is a membership set (reject requests for slots
@@ -225,7 +225,7 @@ class _ScalingGroupWithSlotInventory:
     registry (:class:`SlotTypeInfo`).
     """
 
-    rg_row: ScalingGroupRow
+    rg_row: ResourceGroupRow
     served_slot_names: frozenset[ResourceSlotName]
 
 
@@ -321,7 +321,7 @@ class ScheduleDBSource:
         self,
         db_sess: SASession,
         resource_group_id: ResourceGroupID,
-    ) -> _ScalingGroupWithSlotInventory:
+    ) -> _ResourceGroupWithSlotInventory:
         """Load a resource group together with its per-RG slot inventory.
 
         The inventory is an aggregate (which slot kinds the group's
@@ -333,11 +333,11 @@ class ScheduleDBSource:
         """
         rg_row = (
             await db_sess.scalars(
-                sa.select(ScalingGroupRow).where(ScalingGroupRow.id == resource_group_id)
+                sa.select(ResourceGroupRow).where(ResourceGroupRow.id == resource_group_id)
             )
         ).one_or_none()
         if rg_row is None:
-            raise ScalingGroupNotFound(f"Resource group {resource_group_id} not found")
+            raise ResourceGroupNotFound(f"Resource group {resource_group_id} not found")
 
         ar = AgentResourceRow.__table__
         inventory_rows = (
@@ -352,7 +352,7 @@ class ScheduleDBSource:
                 )
             )
         ).all()
-        return _ScalingGroupWithSlotInventory(
+        return _ResourceGroupWithSlotInventory(
             rg_row=rg_row,
             served_slot_names=frozenset(ResourceSlotName(row.slot_name) for row in inventory_rows),
         )
@@ -383,15 +383,15 @@ class ScheduleDBSource:
         """
         rg_result = await db_sess.execute(
             sa.select(
-                ScalingGroupRow.id,
-                ScalingGroupRow.name,
-                ScalingGroupRow.scheduler,
-                ScalingGroupRow.scheduler_opts,
-            ).where(ScalingGroupRow.id == resource_group_id)
+                ResourceGroupRow.id,
+                ResourceGroupRow.name,
+                ResourceGroupRow.scheduler,
+                ResourceGroupRow.scheduler_opts,
+            ).where(ResourceGroupRow.id == resource_group_id)
         )
         rg_row = rg_result.one_or_none()
         if not rg_row:
-            raise ScalingGroupNotFound(str(resource_group_id))
+            raise ResourceGroupNotFound(str(resource_group_id))
 
         return ResourceGroupFetch(
             meta=ResourceGroupMeta(
@@ -846,9 +846,9 @@ class ScheduleDBSource:
 
         project_result = await db_sess.execute(
             sa.select(
-                GroupRow.id,
-                GroupRow.total_resource_slots,
-            ).where(GroupRow.id.in_(pending_sessions.project_ids))
+                ProjectRow.id,
+                ProjectRow.total_resource_slots,
+            ).where(ProjectRow.id.in_(pending_sessions.project_ids))
         )
 
         for row in project_result:
@@ -1679,7 +1679,7 @@ class ScheduleDBSource:
     async def get_all_resource_groups(self) -> list[ResourceGroupID]:
         """Get ids of all defined resource groups."""
         async with self._db.begin_readonly_session_read_committed() as session:
-            query = sa.select(ScalingGroupRow.id)
+            query = sa.select(ResourceGroupRow.id)
             result = await session.execute(query)
             return [row.id for row in result.fetchall()]
 
@@ -1772,10 +1772,10 @@ class ScheduleDBSource:
                     SessionRow.creation_id,
                     SessionRow.access_key,
                     SessionRow.created_at,
-                    ScalingGroupRow.scheduler_opts,
+                    ResourceGroupRow.scheduler_opts,
                 )
                 .select_from(SessionRow)
-                .join(ScalingGroupRow, SessionRow.resource_group_id == ScalingGroupRow.id)
+                .join(ResourceGroupRow, SessionRow.resource_group_id == ResourceGroupRow.id)
                 .where(
                     SessionRow.id.in_(session_ids),
                     SessionRow.status == SessionStatus.PENDING,
@@ -1985,14 +1985,14 @@ class ScheduleDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             rg_row = (
                 await db_sess.scalars(
-                    sa.select(ScalingGroupRow).where(ScalingGroupRow.id == resource_group_id)
+                    sa.select(ResourceGroupRow).where(ResourceGroupRow.id == resource_group_id)
                 )
             ).one_or_none()
             if rg_row is None:
-                raise ScalingGroupNotFound(f"Resource group {resource_group_id} not found")
+                raise ResourceGroupNotFound(f"Resource group {resource_group_id} not found")
             resource_group = ResourceGroupEnqueueInfo(
                 defaults=rg_row.default_session_options,
-                network=ScalingGroupNetworkInfo(
+                network=ResourceGroupNetworkInfo(
                     use_host_network=rg_row.use_host_network,
                     wsproxy_addr=rg_row.wsproxy_addr,
                 ),
@@ -2036,7 +2036,7 @@ class ScheduleDBSource:
     ) -> ResourceGroupEnqueueInfo:
         """Enqueue-time information of the target resource group; defaults
         when the draft has no resource group yet."""
-        network_info: ScalingGroupNetworkInfo | None = None
+        network_info: ResourceGroupNetworkInfo | None = None
         rg_defaults = None
         resource_group_allow_fractional = False
         served_slot_names: frozenset[ResourceSlotName] = frozenset()
@@ -2046,7 +2046,7 @@ class ScheduleDBSource:
             )
             rg_row = rg_bundle.rg_row
             served_slot_names = rg_bundle.served_slot_names
-            network_info = ScalingGroupNetworkInfo(
+            network_info = ResourceGroupNetworkInfo(
                 use_host_network=rg_row.use_host_network,
                 wsproxy_addr=rg_row.wsproxy_addr,
             )
@@ -2225,7 +2225,7 @@ class ScheduleDBSource:
     ) -> ResourceGroupID:
         """Return the first resource group from the owner's allowlist."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            allowed_rgs = await self._query_allowed_scaling_groups(
+            allowed_rgs = await self._query_allowed_resource_groups(
                 db_sess, domain_name, project_id, access_key
             )
         if not allowed_rgs:
@@ -2245,7 +2245,7 @@ class ScheduleDBSource:
         accessibility rejection, so this method neither validates nor raises.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            allowed_rgs = await self._query_allowed_scaling_groups(
+            allowed_rgs = await self._query_allowed_resource_groups(
                 db_sess, domain_name, project_id, access_key
             )
         return frozenset(rg.id for rg in allowed_rgs)
@@ -2253,10 +2253,10 @@ class ScheduleDBSource:
     async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             resource_group_id = await db_sess.scalar(
-                sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == name)
+                sa.select(ResourceGroupRow.id).where(ResourceGroupRow.name == name)
             )
         if resource_group_id is None:
-            raise ScalingGroupNotFound(name)
+            raise ResourceGroupNotFound(name)
         return ResourceGroupID(resource_group_id)
 
     async def get_resource_group_name_by_id(
@@ -2264,10 +2264,10 @@ class ScheduleDBSource:
     ) -> ResourceGroupName:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             resource_group_name = await db_sess.scalar(
-                sa.select(ScalingGroupRow.name).where(ScalingGroupRow.id == resource_group_id)
+                sa.select(ResourceGroupRow.name).where(ResourceGroupRow.id == resource_group_id)
             )
         if resource_group_name is None:
-            raise ScalingGroupNotFound(f"Resource group not found (id:{resource_group_id})")
+            raise ResourceGroupNotFound(f"Resource group not found (id:{resource_group_id})")
         return ResourceGroupName(resource_group_name)
 
     async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
@@ -2368,13 +2368,13 @@ class ScheduleDBSource:
             supplementary_gids=user_row.container_gids or [],
         )
 
-    async def _query_allowed_scaling_groups(
+    async def _query_allowed_resource_groups(
         self,
         db_sess: SASession,
         domain_name: str,
         group_id: ProjectID,
         access_key: str,
-    ) -> list[AllowedScalingGroup]:
+    ) -> list[AllowedResourceGroup]:
         """
         Query allowed resource groups for the given user/group.
 
@@ -2397,7 +2397,7 @@ class ScheduleDBSource:
         )
 
         return [
-            AllowedScalingGroup(
+            AllowedResourceGroup(
                 id=ResourceGroupID(sg.id),
                 name=ResourceGroupName(sg.name),
                 is_private=not sg.is_public,  # Convert is_public to is_private
@@ -3720,7 +3720,7 @@ class ScheduleDBSource:
                     kernel_id=row.kernel_id,
                     agent_id=row.agent,
                     agent_addr=row.agent_addr,
-                    scaling_group=row.scaling_group,
+                    resource_group=row.scaling_group,
                     image=row.image,
                     image_id=row.image_id,
                     architecture=row.architecture,
@@ -4293,7 +4293,7 @@ class ScheduleDBSource:
                     kernel_id=row.kernel_id,
                     agent_id=row.agent,
                     agent_addr=row.agent_addr,
-                    scaling_group=row.scaling_group,
+                    resource_group=row.scaling_group,
                     image=row.image,
                     image_id=row.image_id,
                     architecture=row.architecture,
@@ -4425,7 +4425,7 @@ class ScheduleDBSource:
                     kernel_id=row.id,
                     agent_id=row.agent,
                     agent_addr=row.agent_addr,
-                    scaling_group=row.scaling_group,
+                    resource_group=row.scaling_group,
                     image=row.image,
                     image_id=row.image_id,
                     architecture=row.architecture,
@@ -4587,7 +4587,7 @@ class ScheduleDBSource:
                     kernel_id=row.id,
                     agent_id=row.agent,
                     agent_addr=row.agent_addr,
-                    scaling_group=row.scaling_group,
+                    resource_group=row.scaling_group,
                     image=row.image,
                     image_id=row.image_id,
                     architecture=row.architecture,

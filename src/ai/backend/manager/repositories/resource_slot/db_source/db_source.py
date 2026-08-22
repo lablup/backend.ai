@@ -78,18 +78,6 @@ class ResourceSlotDBSource:
             return list(result.scalars().all())
 
     # ==================== agent_resources Read ====================
-
-    async def get_agent_resources(self, agent_id: str) -> list[AgentResourceRow]:
-        # Returns all slot capacity/usage rows for one agent, ordered by slot_name for consistency.
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = (
-                sa.select(AgentResourceRow)
-                .where(AgentResourceRow.agent_id == agent_id)
-                .order_by(AgentResourceRow.slot_name)
-            )
-            result = await db_sess.execute(stmt)
-            return list(result.scalars().all())
-
     async def get_agent_resource_by_slot(self, agent_id: str, slot_name: str) -> AgentResourceRow:
         """Get a single slot capacity/usage row for a specific agent+slot combination.
 
@@ -133,18 +121,6 @@ class ResourceSlotDBSource:
             )
 
     # ==================== resource_allocations Read ====================
-
-    async def get_kernel_allocations(self, kernel_id: uuid.UUID) -> list[ResourceAllocationRow]:
-        # Returns all per-slot requested/used allocation rows for one kernel (container).
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = (
-                sa.select(ResourceAllocationRow)
-                .where(ResourceAllocationRow.kernel_id == kernel_id)
-                .order_by(ResourceAllocationRow.slot_name)
-            )
-            result = await db_sess.execute(stmt)
-            return list(result.scalars().all())
-
     async def get_kernel_allocation_by_slot(
         self, kernel_id: uuid.UUID, slot_name: str
     ) -> ResourceAllocationRow:

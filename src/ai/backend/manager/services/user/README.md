@@ -87,10 +87,10 @@ action = CreateUserAction(
 
 #### Basic Information Updates
 ```python
-from ai.backend.manager.services.user.actions.modify_user import ModifyUserAction, UserModifier
+from ai.backend.manager.services.user.actions.update_user import UpdateUserAction, UserModifier
 from ai.backend.manager.types import OptionalState
 
-action = ModifyUserAction(
+action = UpdateUserAction(
     email="user@example.com",
     modifier=UserModifier(
         full_name=OptionalState.update("Updated Name"),
@@ -101,7 +101,7 @@ action = ModifyUserAction(
 
 #### Role and Permission Changes
 ```python
-action = ModifyUserAction(
+action = UpdateUserAction(
     email="user@example.com",
     modifier=UserModifier(
         role=OptionalState.update(UserRole.ADMIN),
@@ -112,7 +112,7 @@ action = ModifyUserAction(
 
 #### Security Settings
 ```python
-action = ModifyUserAction(
+action = UpdateUserAction(
     email="user@example.com",
     modifier=UserModifier(
         totp_activated=OptionalState.update(True),

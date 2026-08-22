@@ -13,6 +13,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.resource.request import (
     CheckPresetsRequest,
     ListPresetsQuery,
@@ -44,8 +45,8 @@ from ai.backend.manager.services.agent.actions.watcher_agent_stop import Watcher
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
 )
-from ai.backend.manager.services.group.actions.usage_per_month import UsagePerMonthAction
-from ai.backend.manager.services.group.actions.usage_per_period import UsagePerPeriodAction
+from ai.backend.manager.services.project.actions.usage_per_month import UsagePerMonthAction
+from ai.backend.manager.services.project.actions.usage_per_period import UsagePerPeriodAction
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
 )
@@ -60,7 +61,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.container_registry.processors import (
         ContainerRegistryProcessors,
     )
-    from ai.backend.manager.services.group.processors import GroupProcessors
+    from ai.backend.manager.services.project.processors import ProjectProcessors
     from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
     from ai.backend.manager.services.user.processors import UserProcessors
 
@@ -75,13 +76,13 @@ class ResourceHandler:
         *,
         resource_preset: ResourcePresetProcessors,
         agent: AgentProcessors,
-        group: GroupProcessors,
+        project: ProjectProcessors,
         user: UserProcessors,
         container_registry: ContainerRegistryProcessors,
     ) -> None:
         self._resource_preset = resource_preset
         self._agent = agent
-        self._group = group
+        self._project = project
         self._user = user
         self._container_registry = container_registry
 
@@ -96,10 +97,10 @@ class ResourceHandler:
     ) -> APIResponse:
         log.info("LIST_PRESETS (ak:{})", ctx.access_key)
         params = query.parsed
-        result = await self._resource_preset.list_presets.wait_for_complete(
+        result = await self._resource_preset.list_presets.run(
             ListResourcePresetsAction(
                 access_key=ctx.access_key,
-                scaling_group=params.scaling_group,
+                resource_group=params.scaling_group,
             )
         )
         return APIResponse.build(HTTPStatus.OK, ListPresetsResponse(presets=result.presets))
@@ -122,19 +123,19 @@ class ResourceHandler:
             params.group,
             params.scaling_group,
         )
-        result = await self._resource_preset.check_presets.wait_for_complete(
+        result = await self._resource_preset.check_presets.run(
             CheckResourcePresetsAction(
                 access_key=AccessKey(ctx.access_key),
                 resource_policy=resource_policy,
                 domain_name=ctx.user_domain,
                 user_id=ctx.user_uuid,
                 group=params.group,
-                scaling_group=params.scaling_group,
+                resource_group=params.scaling_group,
             )
         )
-        scaling_groups_json: dict[str, Any] = {}
-        for sgname, sg_data in result.scaling_groups.items():
-            scaling_groups_json[sgname] = {
+        resource_groups_json: dict[str, Any] = {}
+        for sgname, sg_data in result.resource_groups.items():
+            resource_groups_json[sgname] = {
                 ResourceSlotState.OCCUPIED: quantities_to_dict(sg_data[ResourceSlotState.OCCUPIED]),
                 ResourceSlotState.AVAILABLE: quantities_to_dict(
                     sg_data[ResourceSlotState.AVAILABLE]
@@ -148,8 +149,8 @@ class ResourceHandler:
             group_limits=quantities_to_dict(result.group_limits),
             group_using=quantities_to_dict(result.group_using),
             group_remaining=quantities_to_dict(result.group_remaining),
-            scaling_group_remaining=quantities_to_dict(result.scaling_group_remaining),
-            scaling_groups=scaling_groups_json,
+            scaling_group_remaining=quantities_to_dict(result.resource_group_remaining),
+            scaling_groups=resource_groups_json,
         )
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -177,7 +178,7 @@ class ResourceHandler:
             ",".join(str(gid) for gid in params.group_ids) if params.group_ids else "",
             params.month,
         )
-        result = await self._group.usage_per_month.wait_for_complete(
+        result = await self._project.usage_per_month.run(
             UsagePerMonthAction(
                 group_ids=params.group_ids,
                 month=params.month,
@@ -195,7 +196,7 @@ class ResourceHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        result = await self._group.usage_per_period.wait_for_complete(
+        result = await self._project.usage_per_period.run(
             UsagePerPeriodAction(
                 project_id=params.project_id,
                 start_date=params.start_date,
@@ -210,8 +211,8 @@ class ResourceHandler:
 
     async def user_month_stats(self, ctx: UserContext) -> APIResponse:
         log.info("USER_LAST_MONTH_STATS (ak:{}, u:{})", ctx.access_key, ctx.user_uuid)
-        result = await self._user.user_month_stats.wait_for_complete(
-            UserMonthStatsAction(user_id=ctx.user_uuid)
+        result = await self._user.user_month_stats.run(
+            UserMonthStatsAction(user_id=UserID(ctx.user_uuid))
         )
         return APIResponse.build(HTTPStatus.OK, RawListResponse(root=result.stats))
 
@@ -221,7 +222,7 @@ class ResourceHandler:
 
     async def admin_month_stats(self, ctx: UserContext) -> APIResponse:
         log.info("ADMIN_LAST_MONTH_STATS ()")
-        result = await self._user.admin_month_stats.wait_for_complete(AdminMonthStatsAction())
+        result = await self._user.admin_month_stats.run(AdminMonthStatsAction())
         return APIResponse.build(HTTPStatus.OK, RawListResponse(root=result.stats))
 
     # ------------------------------------------------------------------
@@ -293,7 +294,7 @@ class ResourceHandler:
     # ------------------------------------------------------------------
 
     async def get_container_registries(self, ctx: UserContext) -> APIResponse:
-        result = await self._container_registry.get_container_registries.wait_for_complete(
+        result = await self._container_registry.get_container_registries.run(
             GetContainerRegistriesAction()
         )
         return APIResponse.build(HTTPStatus.OK, ContainerRegistriesResponse(root=result.registries))

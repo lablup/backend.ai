@@ -61,26 +61,26 @@ class ResourcePresetCacheSource:
         )
 
     async def get_preset_list(
-        self, scaling_group: str | None = None
+        self, resource_group: str | None = None
     ) -> list[ResourcePresetData] | None:
         """
         Get cached preset list for a scaling group.
         """
-        data = await self._valkey_stat.get_resource_preset_list(scaling_group)
+        data = await self._valkey_stat.get_resource_preset_list(resource_group)
         if data:
             items = load_json(data)
             return [ResourcePresetData.from_cache(item) for item in items]
         return None
 
     async def set_preset_list(
-        self, presets: list[ResourcePresetData], scaling_group: str | None = None
+        self, presets: list[ResourcePresetData], resource_group: str | None = None
     ) -> None:
         """
         Cache a list of presets for a scaling group.
         """
         serialized = dump_json([p.to_cache() for p in presets])
         await self._valkey_stat.set_resource_preset_list(
-            scaling_group, serialized, expire_sec=CACHE_TTL
+            resource_group, serialized, expire_sec=CACHE_TTL
         )
 
     async def get_check_presets_data(
@@ -88,14 +88,14 @@ class ResourcePresetCacheSource:
         access_key: AccessKey,
         group: str,
         domain: str,
-        scaling_group: str | None = None,
+        resource_group: str | None = None,
     ) -> bytes | None:
         """
         Get cached check presets data as JSON string.
         Returns the raw JSON string to avoid complex deserialization.
         """
         return await self._valkey_stat.get_resource_preset_check_data(
-            str(access_key), group, domain, scaling_group
+            str(access_key), group, domain, resource_group
         )
 
     async def set_check_presets_data(
@@ -103,7 +103,7 @@ class ResourcePresetCacheSource:
         access_key: AccessKey,
         group: str,
         domain: str,
-        scaling_group: str | None,
+        resource_group: str | None,
         data: bytes,
     ) -> None:
         """
@@ -111,7 +111,7 @@ class ResourcePresetCacheSource:
         Takes pre-serialized JSON string to avoid double serialization.
         """
         await self._valkey_stat.set_resource_preset_check_data(
-            str(access_key), group, domain, scaling_group, data, expire_sec=CACHE_TTL
+            str(access_key), group, domain, resource_group, data, expire_sec=CACHE_TTL
         )
 
     async def invalidate_preset(

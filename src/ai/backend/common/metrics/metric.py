@@ -360,14 +360,7 @@ class ActionMetricObserver:
         self._action_count = Counter(
             name="backendai_action_count",
             documentation="Total number of actions",
-            labelnames=[
-                "entity_type",
-                "operation_type",
-                "status",
-                "domain",
-                "operation",
-                "error_detail",
-            ],
+            labelnames=["operation_type", "status"],
         )
         self._action_entity_count = Counter(
             name="backendai_action_entity_count",
@@ -389,14 +382,7 @@ class ActionMetricObserver:
         self._action_duration_sec = Histogram(
             name="backendai_action_duration_sec",
             documentation="Duration of actions in seconds",
-            labelnames=[
-                "entity_type",
-                "operation_type",
-                "status",
-                "domain",
-                "operation",
-                "error_detail",
-            ],
+            labelnames=["operation_type", "status"],
             buckets=[0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30],
         )
 
@@ -409,28 +395,19 @@ class ActionMetricObserver:
     def observe_action(
         self,
         *,
-        entity_type: EntityType,
         operation_type: str,
         status: str,
         duration: float,
-        error_code: ErrorCode | None,
     ) -> None:
-        self._action_count.labels(
-            entity_type=entity_type,
-            operation_type=operation_type,
-            status=status,
-            domain=error_code.domain if error_code else "",
-            operation=error_code.operation if error_code else "",
-            error_detail=error_code.error_detail if error_code else "",
-        ).inc()
-        self._action_duration_sec.labels(
-            entity_type=entity_type,
-            operation_type=operation_type,
-            status=status,
-            domain=error_code.domain if error_code else "",
-            operation=error_code.operation if error_code else "",
-            error_detail=error_code.error_detail if error_code else "",
-        ).observe(duration)
+        """Count one run and how long it took.
+
+        Names no entity and no error: a run may reach several kinds at once, and which
+        entity failed and why is what :meth:`observe_action_entity` counts.
+        """
+        self._action_count.labels(operation_type=operation_type, status=status).inc()
+        self._action_duration_sec.labels(operation_type=operation_type, status=status).observe(
+            duration
+        )
 
     def observe_lookup(
         self,

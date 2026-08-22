@@ -5,10 +5,10 @@ import logging
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.common.identifier.session_group import SessionGroupID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import ReplicaGroupRolloutSpec
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
@@ -48,7 +48,7 @@ class ReplicaGroupRow(LifecycleTimestampsMixin, Base):
     )
     deployment_id: Mapped[DeploymentID] = mapped_column(
         "deployment_id",
-        GUID,
+        GUID(DeploymentID),
         sa.ForeignKey("endpoints.id", ondelete="CASCADE"),
         nullable=False,
     )

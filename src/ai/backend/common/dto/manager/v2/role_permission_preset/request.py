@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.dto.manager.query import DateTimeFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import (
@@ -15,7 +16,6 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry,
     RolePermissionPresetOrderField,
 )
-from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
 
 __all__ = (
     "BulkAddRolePermissionPresetsInput",

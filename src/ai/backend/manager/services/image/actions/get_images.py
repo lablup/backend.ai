@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.types import ImageID
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import (
     ImageIdentifier,
@@ -18,8 +17,9 @@ class GetImageByIdAction(ImageAction):
     image_status: list[ImageStatus] | None
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_image_by_id"
 
     @override
     @classmethod
@@ -28,12 +28,8 @@ class GetImageByIdAction(ImageAction):
 
 
 @dataclass
-class GetImageByIdActionResult(BaseActionResult):
+class GetImageByIdActionResult:
     image_with_agent_install_status: ImageWithAgentInstallStatus
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.image_with_agent_install_status.image.id)
 
 
 @dataclass
@@ -42,8 +38,9 @@ class GetImageByIdentifierAction(ImageAction):
     image_status: list[ImageStatus] | None
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_image_by_identifier"
 
     @override
     @classmethod
@@ -52,12 +49,8 @@ class GetImageByIdentifierAction(ImageAction):
 
 
 @dataclass
-class GetImageByIdentifierActionResult(BaseActionResult):
+class GetImageByIdentifierActionResult:
     image_with_agent_install_status: ImageWithAgentInstallStatus
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.image_with_agent_install_status.image.id)
 
 
 @dataclass
@@ -70,8 +63,9 @@ class GetImagesByCanonicalsAction(ImageAction):
     image_status: list[ImageStatus] | None
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_images_by_canonicals"
 
     @override
     @classmethod
@@ -81,9 +75,5 @@ class GetImagesByCanonicalsAction(ImageAction):
 
 @dataclass
 # TODO: Refactor dataclass with BatchActionResult
-class GetImagesByCanonicalsActionResult(BaseActionResult):
+class GetImagesByCanonicalsActionResult:
     images_with_agent_install_status: list[ImageWithAgentInstallStatus]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

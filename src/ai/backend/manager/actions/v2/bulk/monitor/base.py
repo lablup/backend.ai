@@ -1,8 +1,7 @@
 from abc import ABC
 
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
-from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.result import BulkActionProcessResult
+from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 
 __all__ = ("BulkActionMonitor",)
 
@@ -15,8 +14,8 @@ class BulkActionMonitor(ABC):
     the outcome carried in :class:`BulkActionProcessResult`.
     """
 
-    async def prepare(self, action: BaseBulkAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, meta: BulkActionTriggerMeta) -> None:
         raise NotImplementedError("Subclasses must implement the prepare method")
 
-    async def done(self, action: BaseBulkAction, result: BulkActionProcessResult) -> None:
+    async def done(self, meta: BulkActionTriggerMeta, result: BulkActionProcessResult) -> None:
         raise NotImplementedError("Subclasses must implement the done method")

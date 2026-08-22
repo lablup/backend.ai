@@ -17,18 +17,21 @@ from dateutil.tz import tzutc
 from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.replica import ReplicaID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.session_group import SessionGroupID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.schema.deployment import BlueGreenSpec, IntOrPercent, RollingUpdateSpec
 from ai.backend.common.types import (
     AccessKey,
@@ -68,17 +71,18 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -91,7 +95,6 @@ from ai.backend.manager.models.resource_slot.row import (
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import (
     SessionResult,
     SessionRow,
@@ -126,6 +129,7 @@ from ai.backend.manager.repositories.deployment.updaters import (
     RouteUpdaterSpec,
 )
 from ai.backend.manager.repositories.deployment.upserters import DeploymentPolicyUpserterSpec
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -202,8 +206,8 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
-                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                ResourceGroupRow,
+                ResourcePresetRow,  # ResourceGroupRow relationship dependency
                 AgentRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
@@ -212,7 +216,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -282,7 +286,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 id=test_scaling_group_id,
                 name=sgroup_name,
                 description="Test scaling group",
@@ -290,7 +294,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             db_sess.add(sgroup)
             await db_sess.commit()
@@ -438,7 +442,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -461,15 +465,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Get user email for user_id field
-            user_result = await db_sess.execute(
-                sa.select(UserRow.email).where(UserRow.uuid == test_user_uuid)
-            )
-            user_email = user_result.scalar_one()
-
             keypair = KeyPairRow(
                 access_key=access_key,
                 secret_key="dummy-secret",
-                user_id=user_email,
                 user=test_user_uuid,
                 is_active=True,
                 resource_policy=test_keypair_resource_policy_name,
@@ -669,7 +667,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         async with db_with_cleanup.begin_session() as db_sess:
             # Create container registry for image FK
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://test-registry.example.com",
                 registry_name="test-registry",
                 type=ContainerRegistryType.DOCKER,
@@ -796,6 +794,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -907,7 +906,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             registry_id = uuid.uuid4()
             image_id = uuid.uuid4()
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://multi-test-registry.example.com",
                 registry_name="multi-test-registry",
                 type=ContainerRegistryType.DOCKER,
@@ -1099,8 +1098,8 @@ class TestGetDefaultArchitectureFromScalingGroup:
         async with with_tables(
             database_connection,
             [
-                ScalingGroupRow,
-                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                ResourceGroupRow,
+                ResourcePresetRow,  # ResourceGroupRow relationship dependency
                 AgentRow,
             ],
         ):
@@ -1115,14 +1114,14 @@ class TestGetDefaultArchitectureFromScalingGroup:
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             db_sess.add(sgroup)
             await db_sess.commit()
@@ -1138,14 +1137,14 @@ class TestGetDefaultArchitectureFromScalingGroup:
         sgroup_name = f"other-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 name=sgroup_name,
                 description="Other scaling group",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             db_sess.add(sgroup)
             await db_sess.commit()
@@ -1165,6 +1164,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -1174,7 +1174,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
     async def _create_agent(
         self,
         db: ExtendedAsyncSAEngine,
-        scaling_group: str,
+        resource_group: str,
         architecture: str,
         *,
         status: AgentStatus = AgentStatus.ALIVE,
@@ -1185,14 +1185,14 @@ class TestGetDefaultArchitectureFromScalingGroup:
         agent_id = AgentId(f"i-{suffix or uuid.uuid4().hex[:8]}")
         async with db.begin_session() as db_sess:
             resource_group_id = await db_sess.scalar(
-                sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == scaling_group)
+                sa.select(ResourceGroupRow.id).where(ResourceGroupRow.name == resource_group)
             )
             agent = AgentRow(
                 id=agent_id,
                 status=status,
                 status_changed=datetime.now(tzutc()),
                 region="local",
-                scaling_group=scaling_group,
+                scaling_group=resource_group,
                 resource_group_id=resource_group_id,
                 schedulable=schedulable,
                 available_slots=ResourceSlot({"cpu": Decimal("8.0"), "mem": Decimal("16384")}),
@@ -1343,7 +1343,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
         agents_mixed_architecture: list[AgentId],
     ) -> None:
         """Test that the most common architecture among active agents is returned."""
-        result = await deployment_repository.get_default_architecture_from_scaling_group(
+        result = await deployment_repository.get_default_architecture_from_resource_group(
             test_scaling_group_name
         )
 
@@ -1356,7 +1356,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
         test_scaling_group_name: str,
     ) -> None:
         """Test that None is returned when no active agents exist."""
-        result = await deployment_repository.get_default_architecture_from_scaling_group(
+        result = await deployment_repository.get_default_architecture_from_resource_group(
             test_scaling_group_name
         )
 
@@ -1369,7 +1369,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
         single_aarch64_agent: AgentId,
     ) -> None:
         """Test that single agent's architecture is returned correctly."""
-        result = await deployment_repository.get_default_architecture_from_scaling_group(
+        result = await deployment_repository.get_default_architecture_from_resource_group(
             test_scaling_group_name
         )
 
@@ -1382,7 +1382,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
         alive_x86_and_lost_aarch64_agents: list[AgentId],
     ) -> None:
         """Test that non-ALIVE agents are excluded from consideration."""
-        result = await deployment_repository.get_default_architecture_from_scaling_group(
+        result = await deployment_repository.get_default_architecture_from_resource_group(
             test_scaling_group_name
         )
 
@@ -1396,7 +1396,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
         schedulable_x86_and_non_schedulable_aarch64_agents: list[AgentId],
     ) -> None:
         """Test that non-schedulable agents are excluded from consideration."""
-        result = await deployment_repository.get_default_architecture_from_scaling_group(
+        result = await deployment_repository.get_default_architecture_from_resource_group(
             test_scaling_group_name
         )
 
@@ -1410,7 +1410,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
         agents_in_different_scaling_groups: list[AgentId],
     ) -> None:
         """Test that agents from other scaling groups are excluded."""
-        result = await deployment_repository.get_default_architecture_from_scaling_group(
+        result = await deployment_repository.get_default_architecture_from_resource_group(
             test_scaling_group_name
         )
 
@@ -1422,7 +1422,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
         deployment_repository: DeploymentRepository,
     ) -> None:
         """Test that None is returned for non-existent scaling group."""
-        result = await deployment_repository.get_default_architecture_from_scaling_group(
+        result = await deployment_repository.get_default_architecture_from_resource_group(
             "nonexistent-scaling-group"
         )
 
@@ -1442,8 +1442,8 @@ class TestDeploymentRevisionOperations:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
-                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                ResourceGroupRow,
+                ResourcePresetRow,  # ResourceGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,  # KeyPairRow relationship dependency
@@ -1451,7 +1451,7 @@ class TestDeploymentRevisionOperations:
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,  # UserRow.default_keypair relationship target
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -1512,14 +1512,14 @@ class TestDeploymentRevisionOperations:
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             db_sess.add(sgroup)
             await db_sess.commit()
@@ -1607,7 +1607,7 @@ class TestDeploymentRevisionOperations:
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -1627,7 +1627,7 @@ class TestDeploymentRevisionOperations:
         registry_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://test-registry.example.com",
                 registry_name=f"test-registry-{registry_id.hex[:8]}",
                 type=ContainerRegistryType.DOCKER,
@@ -1742,6 +1742,7 @@ class TestDeploymentRevisionOperations:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -2225,14 +2226,14 @@ class TestDeploymentPolicyOperations:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
-                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                ResourceGroupRow,
+                ResourcePresetRow,  # ResourceGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 EndpointRow,
                 ReplicaGroupRow,
@@ -2274,14 +2275,14 @@ class TestDeploymentPolicyOperations:
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             db_sess.add(sgroup)
             await db_sess.commit()
@@ -2369,7 +2370,7 @@ class TestDeploymentPolicyOperations:
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -2424,6 +2425,7 @@ class TestDeploymentPolicyOperations:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -2563,14 +2565,14 @@ class TestSearchDeploymentPolicies:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 ResourcePresetRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 EndpointRow,
                 ReplicaGroupRow,
@@ -2607,14 +2609,14 @@ class TestSearchDeploymentPolicies:
     ) -> str:
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             db_sess.add(sgroup)
             await db_sess.commit()
@@ -2690,7 +2692,7 @@ class TestSearchDeploymentPolicies:
     ) -> uuid.UUID:
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -2788,6 +2790,7 @@ class TestSearchDeploymentPolicies:
         valkey_schedule = MagicMock()
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -2949,14 +2952,14 @@ class TestRouteOperations:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
-                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                ResourceGroupRow,
+                ResourcePresetRow,  # ResourceGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 EndpointRow,
                 ReplicaGroupRow,
@@ -2999,14 +3002,14 @@ class TestRouteOperations:
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             db_sess.add(sgroup)
             await db_sess.commit()
@@ -3094,7 +3097,7 @@ class TestRouteOperations:
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.domain_name,
@@ -3149,6 +3152,7 @@ class TestRouteOperations:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -3347,7 +3351,7 @@ class TestDeploymentRepositoryDuplicateName:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 ResourcePresetRow,
                 AgentRow,
                 UserResourcePolicyRow,
@@ -3357,7 +3361,7 @@ class TestDeploymentRepositoryDuplicateName:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -3395,7 +3399,7 @@ class TestDeploymentRepositoryDuplicateName:
         registry_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://test-registry.example.com",
                 registry_name=f"test-registry-{registry_id.hex[:8]}",
                 type=ContainerRegistryType.DOCKER,
@@ -3447,17 +3451,17 @@ class TestDeploymentRepositoryDuplicateName:
     async def test_scaling_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> ScalingGroupRow:
+    ) -> ResourceGroupRow:
         """Create test scaling group."""
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 name=f"test-sgroup-{uuid.uuid4().hex[:8]}",
                 description="Test scaling group",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             db_sess.add(sgroup)
             await db_sess.commit()
@@ -3486,10 +3490,10 @@ class TestDeploymentRepositoryDuplicateName:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
         default_project_policy: ProjectResourcePolicyRow,
-    ) -> GroupRow:
+    ) -> ProjectRow:
         """Create test group (project)."""
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=uuid.uuid4(),
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.name,
@@ -3508,10 +3512,10 @@ class TestDeploymentRepositoryDuplicateName:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
         default_project_policy: ProjectResourcePolicyRow,
-    ) -> GroupRow:
+    ) -> ProjectRow:
         """Create a different group (project) for cross-project tests."""
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=uuid.uuid4(),
                 name=f"different-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.name,
@@ -3581,6 +3585,7 @@ class TestDeploymentRepositoryDuplicateName:
         mock_valkey_schedule = MagicMock()
         return DeploymentRepository(
             db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
             storage_manager=mock_storage_manager,
             valkey_stat=mock_valkey_stat,
             valkey_live=mock_valkey_live,
@@ -3591,8 +3596,8 @@ class TestDeploymentRepositoryDuplicateName:
         self,
         name: str,
         domain: DomainRow,
-        group: GroupRow,
-        scaling_group: ScalingGroupRow,
+        group: ProjectRow,
+        resource_group: ResourceGroupRow,
         user: UserRow,
         image_id: uuid.UUID | None = None,
     ) -> RBACEntityCreator[EndpointRow]:
@@ -3603,7 +3608,7 @@ class TestDeploymentRepositoryDuplicateName:
                 name=name,
                 domain=domain.name,
                 project_id=group.id,
-                resource_group=scaling_group.name,
+                resource_group=resource_group.name,
                 created_user_id=user_id,
                 session_owner_id=user_id,
                 revision_history_limit=10,
@@ -3626,8 +3631,8 @@ class TestDeploymentRepositoryDuplicateName:
         self,
         deployment_repository: DeploymentRepository,
         test_domain: DomainRow,
-        test_group: GroupRow,
-        test_scaling_group: ScalingGroupRow,
+        test_group: ProjectRow,
+        test_scaling_group: ResourceGroupRow,
         test_user: UserRow,
         test_image_id: uuid.UUID,
     ) -> None:
@@ -3637,7 +3642,7 @@ class TestDeploymentRepositoryDuplicateName:
             name="existing-endpoint",
             domain=test_domain,
             group=test_group,
-            scaling_group=test_scaling_group,
+            resource_group=test_scaling_group,
             user=test_user,
             image_id=test_image_id,
         )
@@ -3648,7 +3653,7 @@ class TestDeploymentRepositoryDuplicateName:
             name="different-endpoint-name",
             domain=test_domain,
             group=test_group,
-            scaling_group=test_scaling_group,
+            resource_group=test_scaling_group,
             user=test_user,
             image_id=test_image_id,
         )
@@ -3662,9 +3667,9 @@ class TestDeploymentRepositoryDuplicateName:
         self,
         deployment_repository: DeploymentRepository,
         test_domain: DomainRow,
-        test_group: GroupRow,
-        different_group: GroupRow,
-        test_scaling_group: ScalingGroupRow,
+        test_group: ProjectRow,
+        different_group: ProjectRow,
+        test_scaling_group: ResourceGroupRow,
         test_user: UserRow,
         test_image_id: uuid.UUID,
     ) -> None:
@@ -3674,7 +3679,7 @@ class TestDeploymentRepositoryDuplicateName:
             name="same-name-endpoint",
             domain=test_domain,
             group=test_group,
-            scaling_group=test_scaling_group,
+            resource_group=test_scaling_group,
             user=test_user,
             image_id=test_image_id,
         )
@@ -3685,7 +3690,7 @@ class TestDeploymentRepositoryDuplicateName:
             name="same-name-endpoint",
             domain=test_domain,
             group=different_group,
-            scaling_group=test_scaling_group,
+            resource_group=test_scaling_group,
             user=test_user,
             image_id=test_image_id,
         )
@@ -3700,8 +3705,8 @@ class TestDeploymentRepositoryDuplicateName:
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
-        test_group: GroupRow,
-        test_scaling_group: ScalingGroupRow,
+        test_group: ProjectRow,
+        test_scaling_group: ResourceGroupRow,
         test_user: UserRow,
         test_image_id: uuid.UUID,
     ) -> None:
@@ -3711,7 +3716,7 @@ class TestDeploymentRepositoryDuplicateName:
             name="reusable-endpoint",
             domain=test_domain,
             group=test_group,
-            scaling_group=test_scaling_group,
+            resource_group=test_scaling_group,
             user=test_user,
             image_id=test_image_id,
         )
@@ -3730,7 +3735,7 @@ class TestDeploymentRepositoryDuplicateName:
             name="reusable-endpoint",
             domain=test_domain,
             group=test_group,
-            scaling_group=test_scaling_group,
+            resource_group=test_scaling_group,
             user=test_user,
             image_id=test_image_id,
         )
@@ -3745,8 +3750,8 @@ class TestDeploymentRepositoryDuplicateName:
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
-        test_group: GroupRow,
-        test_scaling_group: ScalingGroupRow,
+        test_group: ProjectRow,
+        test_scaling_group: ResourceGroupRow,
         test_user: UserRow,
         test_image_id: uuid.UUID,
     ) -> None:
@@ -3754,7 +3759,7 @@ class TestDeploymentRepositoryDuplicateName:
             name=f"placement-{uuid.uuid4().hex[:8]}",
             domain=test_domain,
             group=test_group,
-            scaling_group=test_scaling_group,
+            resource_group=test_scaling_group,
             user=test_user,
             image_id=test_image_id,
         )
@@ -3784,8 +3789,8 @@ class TestDeploymentRepositoryDuplicateName:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
-        test_group: GroupRow,
-        test_scaling_group: ScalingGroupRow,
+        test_group: ProjectRow,
+        test_scaling_group: ResourceGroupRow,
     ) -> tuple[uuid.UUID, uuid.UUID]:
         """Seed two endpoints sharing (name, domain, project) — one CREATED and
         one already in DESTROYING — bypassing the application-level uniqueness
@@ -3859,8 +3864,8 @@ class TestDeploymentRepositoryDuplicateName:
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
-        test_group: GroupRow,
-        test_scaling_group: ScalingGroupRow,
+        test_group: ProjectRow,
+        test_scaling_group: ResourceGroupRow,
     ) -> None:
         """``activate_revision`` records the deploy intent on the endpoint.
 
@@ -3932,8 +3937,8 @@ class TestDeploymentRepositoryDuplicateName:
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
-        test_group: GroupRow,
-        test_scaling_group: ScalingGroupRow,
+        test_group: ProjectRow,
+        test_scaling_group: ResourceGroupRow,
     ) -> None:
         """``clear_deploying_revision`` wipes the deploy intent: the endpoint's
         ``deploying_revision_id`` / ``target_replica_group_id`` / ``sub_step`` and
@@ -3996,8 +4001,8 @@ class TestDeploymentRepositoryDuplicateName:
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
-        test_group: GroupRow,
-        test_scaling_group: ScalingGroupRow,
+        test_group: ProjectRow,
+        test_scaling_group: ResourceGroupRow,
     ) -> None:
         """Destroying an endpoint also wipes its access tokens in the same
         transaction so the destroyed endpoint cannot be re-authenticated.
@@ -4037,8 +4042,8 @@ class TestDeploymentRepositoryDuplicateName:
                     lifecycle_stage=EndpointLifecycle.CREATED,
                 ),
             ])
-            target_token_ids = [uuid.uuid4(), uuid.uuid4()]
-            sibling_token_id = uuid.uuid4()
+            target_token_ids = [DeploymentTokenID(uuid.uuid4()), DeploymentTokenID(uuid.uuid4())]
+            sibling_token_id = DeploymentTokenID(uuid.uuid4())
             db_sess.add_all([
                 EndpointTokenRow(
                     id=target_token_ids[0],
@@ -4046,7 +4051,7 @@ class TestDeploymentRepositoryDuplicateName:
                     endpoint=endpoint_id,
                     domain=test_domain.name,
                     project=test_group.id,
-                    session_owner=user_id,
+                    session_owner=UserID(user_id),
                 ),
                 EndpointTokenRow(
                     id=target_token_ids[1],
@@ -4054,7 +4059,7 @@ class TestDeploymentRepositoryDuplicateName:
                     endpoint=endpoint_id,
                     domain=test_domain.name,
                     project=test_group.id,
-                    session_owner=user_id,
+                    session_owner=UserID(user_id),
                 ),
                 EndpointTokenRow(
                     id=sibling_token_id,
@@ -4062,7 +4067,7 @@ class TestDeploymentRepositoryDuplicateName:
                     endpoint=sibling_id,
                     domain=test_domain.name,
                     project=test_group.id,
-                    session_owner=user_id,
+                    session_owner=UserID(user_id),
                 ),
             ])
             await db_sess.commit()

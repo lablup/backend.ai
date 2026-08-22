@@ -172,7 +172,7 @@ class ManagerHandler:
         log.info("MANAGER.FETCH_MANAGER_STATUS ()")
         try:
             action = FetchManagerStatusAction()
-            result = await self._manager_admin.fetch_status.wait_for_complete(action)
+            result = await self._manager_admin.fetch_status.run(action)
             nodes = [
                 {
                     "id": result.manager_id,
@@ -215,7 +215,7 @@ class ManagerHandler:
             status=params.status,
             force_kill=params.force_kill,
         )
-        await self._manager_admin.update_status.wait_for_complete(action)
+        await self._manager_admin.update_status.run(action)
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
@@ -224,7 +224,7 @@ class ManagerHandler:
 
     async def get_announcement(self) -> APIResponse:
         action = GetAnnouncementAction()
-        result = await self._manager_admin.get_announcement.wait_for_complete(action)
+        result = await self._manager_admin.get_announcement.run(action)
         resp = AnnouncementResponse(enabled=result.enabled, message=result.message)
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -242,7 +242,7 @@ class ManagerHandler:
             enabled=params.enabled,
             message=params.message,
         )
-        await self._manager_admin.update_announcement.wait_for_complete(action)
+        await self._manager_admin.update_announcement.run(action)
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
@@ -269,7 +269,7 @@ class ManagerHandler:
                 agent_ids=args,
                 schedulable=schedulable,
             )
-            await self._manager_admin.perform_scheduler_ops.wait_for_complete(action)
+            await self._manager_admin.perform_scheduler_ops.run(action)
         else:
             raise GenericBadRequest("Unknown scheduler operation")
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
@@ -294,7 +294,7 @@ class ManagerHandler:
 
     async def get_manager_status_for_prom(self) -> web.StreamResponse:
         action = GetDbCxnStatusAction()
-        result = await self._manager_admin.get_db_cxn_status.wait_for_complete(action)
+        result = await self._manager_admin.get_db_cxn_status.run(action)
         status = result.cxn_infos
 
         total_cxn_metrics: list[SQLAlchemyConnectionMetric] = []

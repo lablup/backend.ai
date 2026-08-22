@@ -23,6 +23,8 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common import validators as tx
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.exception import SessionWithInvalidStateError
 from ai.backend.common.types import (
@@ -45,11 +47,11 @@ from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.idle import ReportInfo
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac import ScopeType, SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.session import (
@@ -76,7 +78,7 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.vfolder import get_permission_ctx as get_vfolder_permission_ctx
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
-from ai.backend.manager.services.session.actions.modify_session import ModifySessionAction
+from ai.backend.manager.services.session.actions.update_session import UpdateSessionAction
 from ai.backend.manager.types import OptionalState
 
 from .base import (
@@ -126,7 +128,7 @@ _queryfilter_fieldspec: FieldSpecType = {
     "project_id": ("group_id", None),
     "user_id": ("user_uuid", None),
     "full_name": (ORMFieldItem(UserRow.full_name), None),
-    "group_name": (ORMFieldItem(GroupRow.name), None),
+    "group_name": (ORMFieldItem(ProjectRow.name), None),
     "user_email": (ORMFieldItem(UserRow.email), None),
     "access_key": ("access_key", None),
     "scaling_group": ("scaling_group_name", None),
@@ -375,7 +377,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             # ownership
             domain_name=row.domain_name,
             project_id=row.group_id,
-            user_id=row.user_uuid,
+            user_id=UserID(row.user_uuid),
             access_key=row.access_key,
             owner=UserNode.from_row(ctx, row.user),
             # status
@@ -436,7 +438,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             # ownership
             domain_name=session_data.domain_name,
             project_id=session_data.group_id,
-            user_id=session_data.user_uuid,
+            user_id=UserID(session_data.user_uuid),
             access_key=session_data.access_key,
             owner=UserNode.from_dataclass(ctx, session_data.owner),
             # status
@@ -455,7 +457,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             result=session_data.result.name,
             # resources
             agent_ids=session_data.agent_ids,
-            scaling_group=session_data.scaling_group_name,
+            scaling_group=session_data.resource_group_name,
             vfolder_mounts=vfolder_mounts,
             occupied_slots=session_data.occupying_slots,
             requested_slots=session_data.requested_slots,
@@ -919,9 +921,9 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):  # type: ignore[mis
         if name:
             _validate_name_input(name)
 
-        result = await graph_ctx.processors.session.modify_session.wait_for_complete(
-            ModifySessionAction(
-                session_id=session_id,
+        result = await graph_ctx.processors.session.update_session.run(
+            UpdateSessionAction(
+                session_id=SessionID(session_id),
                 updater=Updater(
                     spec=SessionUpdaterSpec(
                         name=OptionalState[str].from_graphql(name),
@@ -1269,8 +1271,8 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         elif isinstance(status, str):
             status_list = [SessionStatus[s] for s in status.split(",")]
         j = (
-            # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
-            sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id)
+            # joins with ProjectRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
+            sa.join(SessionRow, ProjectRow, SessionRow.group_id == ProjectRow.id)
             .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
             .join(KernelRow, SessionRow.id == KernelRow.session_id)
         )
@@ -1310,15 +1312,15 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         elif isinstance(status, str):
             status_list = [SessionStatus[s] for s in status.split(",")]
         j = (
-            # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
-            sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
+            # joins with ProjectRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
+            sa.join(SessionRow, ProjectRow, SessionRow.group_id == ProjectRow.id).join(
                 UserRow, SessionRow.user_uuid == UserRow.uuid
             )
         )
         query = (
             sa.select(
                 SessionRow,
-                agg_to_array(GroupRow.name).label("group_name"),
+                agg_to_array(ProjectRow.name).label("group_name"),
                 UserRow.email,
                 UserRow.full_name,
             )
@@ -1359,13 +1361,13 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         access_key: str | None = None,
     ) -> Sequence[ComputeSession | None]:
-        j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
+        j = sa.join(SessionRow, ProjectRow, SessionRow.group_id == ProjectRow.id).join(
             UserRow, SessionRow.user_uuid == UserRow.uuid
         )
         query = (
             sa.select(
                 SessionRow,
-                GroupRow.name.label("group_name"),
+                ProjectRow.name.label("group_name"),
                 UserRow.email,
                 UserRow.full_name,
             )

@@ -1,10 +1,16 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from typing import Any
 
 import pytest
 
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE
+from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_FIELD_TYPE
+from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.storage_namespace import STORAGE_NAMESPACE_ENTITY_TYPE
+from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import FieldGroupMeta, GroupMeta
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.object_storage.handler import ObjectStorageHandler
 from ai.backend.manager.api.rest.object_storage.registry import register_object_storage_routes
@@ -14,17 +20,22 @@ from ai.backend.manager.api.rest.vfs_storage.handler import VFSStorageHandler
 from ai.backend.manager.api.rest.vfs_storage.registry import register_vfs_storage_routes
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
+from ai.backend.manager.services.artifact.revision.actions.lookup_owner import (
+    LookupArtifactRevisionOwnerAction,
+    LookupBulkArtifactRevisionOwnerAction,
+)
 from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
 from ai.backend.manager.services.object_storage.service import ObjectStorageService
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
-from ai.backend.manager.services.storage_namespace.service import StorageNamespaceService
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
+from ai.backend.testutils.processors import ops_processor_group
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -37,6 +48,7 @@ def object_storage_processors(
     database_engine: ExtendedAsyncSAEngine,
     storage_manager: StorageSessionManager,
     config_provider: ManagerConfigProvider,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ObjectStorageProcessors:
     artifact_repository = ArtifactRepository(database_engine)
     object_storage_repository = ObjectStorageRepository(database_engine)
@@ -49,7 +61,14 @@ def object_storage_processors(
         config_provider=config_provider,
     )
     return ObjectStorageProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        processor_registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
+            FieldGroupMeta(ARTIFACT_REVISION_FIELD_TYPE),
+            ArtifactRevisionData,
+            LookupArtifactRevisionOwnerAction,
+            LookupBulkArtifactRevisionOwnerAction,
+        ),
+        service,
     )
 
 
@@ -57,12 +76,8 @@ def object_storage_processors(
 def storage_namespace_processors(
     database_engine: ExtendedAsyncSAEngine,
 ) -> StorageNamespaceProcessors:
-    storage_namespace_repository = StorageNamespaceRepository(database_engine)
-    service = StorageNamespaceService(
-        storage_namespace_repository=storage_namespace_repository,
-    )
     return StorageNamespaceProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        group=ops_processor_group(database_engine, GroupMeta(STORAGE_NAMESPACE_ENTITY_TYPE))
     )
 
 
@@ -70,6 +85,7 @@ def storage_namespace_processors(
 def vfs_storage_processors(
     database_engine: ExtendedAsyncSAEngine,
     storage_manager: StorageSessionManager,
+    processor_registry: ProcessorRegistry[Any],
 ) -> VFSStorageProcessors:
     vfs_storage_repository = VFSStorageRepository(database_engine)
     service = VFSStorageService(
@@ -77,7 +93,7 @@ def vfs_storage_processors(
         storage_manager=storage_manager,
     )
     return VFSStorageProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        processor_registry.group(GroupMeta(VFS_STORAGE_ENTITY_TYPE)), service
     )
 
 

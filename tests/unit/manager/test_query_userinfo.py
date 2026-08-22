@@ -14,8 +14,8 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -28,15 +28,16 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -45,7 +46,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -58,7 +58,7 @@ from ai.backend.testutils.db import TableOrORM, with_tables
 
 ALL_ROWS: list[TableOrORM] = [
     DomainRow,
-    ScalingGroupRow,
+    ResourceGroupRow,
     UserResourcePolicyRow,
     ProjectResourcePolicyRow,
     KeyPairResourcePolicyRow,
@@ -66,7 +66,7 @@ ALL_ROWS: list[TableOrORM] = [
     UserRoleRow,
     UserRow,
     KeyPairRow,
-    GroupRow,
+    ProjectRow,
     AssociationScopesEntitiesRow,
     VirtualScopeRow,
     EntityMembershipRow,
@@ -204,7 +204,6 @@ class TestQueryUserinfo:
             await sess.flush()
             sess.add(
                 KeyPairRow(
-                    user_id=user_email,
                     access_key=access_key,
                     secret_key="secret",
                     user=user_uuid,
@@ -213,7 +212,7 @@ class TestQueryUserinfo:
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=group_name,
                     domain_name=domain_name,
@@ -272,7 +271,7 @@ class TestQueryUserinfo:
         name = f"other-group-{uuid.uuid4().hex[:8]}"
         async with db.begin_session() as sess:
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=uuid.uuid4(),
                     name=name,
                     domain_name=seed.domain_name,
@@ -331,7 +330,6 @@ class TestQueryUserinfo:
             await sess.flush()
             sess.add(
                 KeyPairRow(
-                    user_id=user_email,
                     access_key=ak,
                     secret_key="secret",
                     user=user_uuid,
@@ -365,7 +363,6 @@ class TestQueryUserinfo:
             await sess.flush()
             sess.add(
                 KeyPairRow(
-                    user_id=admin_email,
                     access_key=admin_ak,
                     secret_key="secret",
                     user=admin_uuid,
@@ -606,7 +603,6 @@ class TestQueryUserinfoFromSession:
             await sess.flush()
             sess.add(
                 KeyPairRow(
-                    user_id=user_email,
                     access_key=access_key,
                     secret_key="secret",
                     user=user_uuid,
@@ -615,7 +611,7 @@ class TestQueryUserinfoFromSession:
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=group_name,
                     domain_name=domain_name,

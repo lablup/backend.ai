@@ -19,7 +19,6 @@ from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.models.keypair import (
     KeyPairRow,
     keypairs,
-    prepare_new_keypair,
 )
 
 from .session import ComputeSession
@@ -39,12 +38,15 @@ __all__ = (
     "UserInfo",
 )
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import agg_to_array
+from ai.backend.manager.services.user.actions.keypair_ops import AdminCreateKeypairAction
+from ai.backend.manager.services.user.actions.lookup import LookupUserAction
 
 from .base import (
     Item,
@@ -53,7 +55,6 @@ from .base import (
     batch_result,
     set_if_set,
     simple_db_mutate,
-    simple_db_mutate_returning_item,
 )
 
 
@@ -166,7 +167,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     ) -> KeyPair:
         return cls(
             id=row.access_key,
-            user_id=row.user_id,
+            user_id=row._mapping.get("email"),
             full_name=row._mapping.get("full_name"),
             access_key=row.access_key,
             secret_key=row.secret_key,
@@ -305,7 +306,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
     ) -> int:
         from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-        from ai.backend.manager.models.group.row import groups
+        from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
         from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
@@ -319,7 +320,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if email is not None:
-            query = query.where(keypairs.c.user_id == email)
+            query = query.where(users.c.email == email)
         if is_active is not None:
             query = query.where(keypairs.c.is_active == is_active)
         if filter is not None:
@@ -343,7 +344,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         order: str | None = None,
     ) -> Sequence[KeyPair]:
         from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-        from ai.backend.manager.models.group.row import groups
+        from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
         from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
@@ -368,7 +369,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if email is not None:
-            query = query.where(keypairs.c.user_id == email)
+            query = query.where(users.c.email == email)
         if is_active is not None:
             query = query.where(keypairs.c.is_active == is_active)
         if filter is not None:
@@ -396,7 +397,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         is_active: bool | None = None,
     ) -> Sequence[Sequence[KeyPair | None]]:
         from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-        from ai.backend.manager.models.group.row import groups
+        from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
         from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
@@ -414,7 +415,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
                 agg_to_array(groups.c.name).label("groups_name"),
             )
             .select_from(j)
-            .where(keypairs.c.user_id.in_(user_ids))
+            .where(keypairs.c.user.in_(user_ids))
             .group_by(*keypairs.c, users.c.email, users.c.full_name)
         )
         if domain_name is not None:
@@ -428,7 +429,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
                 query,
                 cls,
                 user_ids,
-                lambda row: row.user_id,
+                lambda row: row.user,
             )
 
     @classmethod
@@ -440,7 +441,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
     ) -> Sequence[KeyPair | None]:
         from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-        from ai.backend.manager.models.group.row import groups
+        from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
         from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
@@ -527,15 +528,15 @@ class CreateKeyPair(graphene.Mutation):  # type: ignore[misc]
         user_id: str,
         props: KeyPairInput,
     ) -> CreateKeyPair:
-        from ai.backend.manager.models.user.row import users
-
+        """``user_id`` is the owner's email, which the action names by uuid."""
         graph_ctx: GraphQueryContext = info.context
-        data = prepare_new_keypair(user_id, props.to_creator())
-        insert_query = sa.insert(keypairs).values(
-            **data,
-            user=sa.select(users.c.uuid).where(users.c.email == user_id).as_scalar(),
+        owner = await graph_ctx.processors.user.lookup.run(LookupUserAction(email=user_id))
+        result = await graph_ctx.processors.user.admin_create_keypair.run(
+            AdminCreateKeypairAction(user_id=UserID(owner.entity_id()), creator=props.to_creator())
         )
-        return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=KeyPair)
+        keypair = KeyPair.from_data(result.generated_data.keypair)
+        keypair.user_id = user_id
+        return cls(ok=True, msg="success", keypair=keypair)
 
 
 class ModifyKeyPair(graphene.Mutation):  # type: ignore[misc]

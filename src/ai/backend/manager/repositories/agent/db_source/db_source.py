@@ -8,8 +8,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.exception import AgentNotFound
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import (
@@ -23,13 +23,13 @@ from ai.backend.manager.data.agent.types import (
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.errors.agent import AgentHasConflictingSessions
-from ai.backend.manager.errors.resource import ScalingGroupNotFound, UnresolvableResourceGroup
+from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
 from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.models.agent import AgentRow, agents
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 from ai.backend.manager.repositories.base import BulkUpserter, execute_bulk_upserter
@@ -121,28 +121,28 @@ class AgentDBSource:
     async def _insert_new_agent(
         self, session: AsyncSession, upsert_data: AgentHeartbeatUpsert
     ) -> None:
-        resource_group_name = upsert_data.metadata.scaling_group
+        resource_group_name = upsert_data.metadata.resource_group
         group_filter: sa.ColumnElement[bool]
         group_order: sa.ColumnElement[Any]
         if resource_group_name is not None:
             group_filter = sa.or_(
-                ScalingGroupRow.name == resource_group_name,
-                ScalingGroupRow.is_default,
+                ResourceGroupRow.name == resource_group_name,
+                ResourceGroupRow.is_default,
             )
-            group_order = sa.case((ScalingGroupRow.name == resource_group_name, 0), else_=1)
+            group_order = sa.case((ResourceGroupRow.name == resource_group_name, 0), else_=1)
         else:
-            group_filter = ScalingGroupRow.is_default.is_(True)
-            group_order = sa.asc(ScalingGroupRow.name)
+            group_filter = ResourceGroupRow.is_default.is_(True)
+            group_order = sa.asc(ResourceGroupRow.name)
         group_select = (
             sa.select(
                 *[
                     sa.literal(value, type_=agents.c[key].type).label(key)
                     for key, value in upsert_data.insert_fields.items()
                 ],
-                ScalingGroupRow.name.label("scaling_group"),
-                ScalingGroupRow.id.label("resource_group_id"),
+                ResourceGroupRow.name.label("scaling_group"),
+                ResourceGroupRow.id.label("resource_group_id"),
             )
-            .select_from(ScalingGroupRow)
+            .select_from(ResourceGroupRow)
             .where(group_filter)
             .order_by(group_order)
             .limit(1)
@@ -219,10 +219,10 @@ class AgentDBSource:
         )
         async with self._db.begin_session_read_committed() as session:
             resource_group_name = await session.scalar(
-                sa.select(ScalingGroupRow.name).where(ScalingGroupRow.id == resource_group_id)
+                sa.select(ResourceGroupRow.name).where(ResourceGroupRow.id == resource_group_id)
             )
             if resource_group_name is None:
-                raise ScalingGroupNotFound(str(resource_group_id))
+                raise ResourceGroupNotFound(str(resource_group_id))
 
             rows = (
                 (

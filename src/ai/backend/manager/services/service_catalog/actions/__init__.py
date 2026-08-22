@@ -1,8 +1,3 @@
-from .base import ServiceCatalogAction
-from .search import SearchServiceCatalogsAction, SearchServiceCatalogsActionResult
+from .search import SearchServiceCatalogsAction
 
-__all__ = (
-    "ServiceCatalogAction",
-    "SearchServiceCatalogsAction",
-    "SearchServiceCatalogsActionResult",
-)
+__all__ = ("SearchServiceCatalogsAction",)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai.backend.common.identifier.scope import ScopeID
+from ai.backend.common.data.entity.types import ScopeID
 
 
 @dataclass(frozen=True)

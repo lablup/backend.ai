@@ -33,9 +33,9 @@ def _register_image_cli_orm_cluster() -> None:
     from ai.backend.manager.models.rbac_models.association_scopes_entities import (
         AssociationScopesEntitiesRow,
     )
-    from ai.backend.manager.models.scaling_group.row import ScalingGroupForProjectRow
+    from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
 
-    _ = (AgentRow, AssociationScopesEntitiesRow, ScalingGroupForProjectRow)
+    _ = (AgentRow, AssociationScopesEntitiesRow, ResourceGroupForProjectRow)
 
 
 async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) -> None:

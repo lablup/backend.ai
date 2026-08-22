@@ -13,8 +13,7 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityData
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, EntityType
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupActionResult
 from ai.backend.manager.actions.v2.ops.result import (
@@ -28,14 +27,23 @@ from ai.backend.manager.actions.v2.ops.result import (
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.errors.repository import EntityNotFoundError
 
+_ENTITY_TYPE = EntityType("preset")
+
+
+class _PresetID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
 
 @dataclass
 class _PresetData(EntityData):
-    id: uuid.UUID
+    id: _PresetID
     name: str
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.id
 
 
@@ -46,8 +54,8 @@ class _NameKeyedData(EntityData):
     name: str
 
     @override
-    def entity_id(self) -> EntityID:
-        return uuid.uuid5(uuid.NAMESPACE_OID, self.name)
+    def entity_id(self) -> EntityIdentifier:
+        return _PresetID(uuid.uuid5(uuid.NAMESPACE_OID, self.name))
 
 
 @dataclass
@@ -58,7 +66,7 @@ class _PlainData:
 
 
 def test_create_result_names_the_entity_its_data_reports() -> None:
-    entity_id = uuid.uuid4()
+    entity_id = _PresetID(uuid.uuid4())
 
     result = CreatedEntityOpsResult(data=_PresetData(id=entity_id, name="default"))
 
@@ -67,7 +75,7 @@ def test_create_result_names_the_entity_its_data_reports() -> None:
 
 def test_create_result_satisfies_the_scope_result_contract() -> None:
     # ``create`` targets a scope, so its result runs under the scope processor.
-    entity_id = uuid.uuid4()
+    entity_id = _PresetID(uuid.uuid4())
     result: BaseScopeActionResult = CreatedEntityOpsResult(
         data=_PresetData(id=entity_id, name="default")
     )
@@ -85,21 +93,15 @@ def test_create_result_works_for_a_name_keyed_domain() -> None:
 
 
 def test_lookup_result_reports_the_id_its_key_resolved_to() -> None:
-    entity_id = uuid.uuid4()
+    entity_id = _PresetID(uuid.uuid4())
 
-    result: BaseLookupActionResult = LookupOpsResult(data=_PresetData(id=entity_id, name="default"))
+    result: BaseLookupActionResult = LookupOpsResult(resolved_entity_id=entity_id)
 
-    assert result.resolved_entity_id() == entity_id
-
-
-def test_lookup_result_works_for_a_name_keyed_domain() -> None:
-    result = LookupOpsResult(data=_NameKeyedData(name="default"))
-
-    assert result.resolved_entity_id() == uuid.uuid5(uuid.NAMESPACE_OID, "default")
+    assert result.entity_id() == entity_id
 
 
 def test_bulk_result_answers_for_every_entity_named() -> None:
-    ok, broken = uuid.uuid4(), uuid.uuid4()
+    ok, broken = _PresetID(uuid.uuid4()), _PresetID(uuid.uuid4())
 
     result = BulkOpsResult(
         successes={ok: _PresetData(id=ok, name="a")},
@@ -114,7 +116,7 @@ def test_bulk_result_answers_for_every_entity_named() -> None:
 
 def test_bulk_result_needs_nothing_from_its_data_type() -> None:
     # The ids are the ones the caller passed in, so `EntityData` is not required.
-    entity_id = uuid.uuid4()
+    entity_id = _PresetID(uuid.uuid4())
 
     result = BulkOpsResult(successes={entity_id: _PlainData(name="a")}, errors={})
 
@@ -133,7 +135,10 @@ def test_entity_result_carries_only_its_data() -> None:
 
 
 def test_entities_result_names_every_entity_a_many_row_write_touched() -> None:
-    first, second = _PresetData(id=uuid.uuid4(), name="a"), _PresetData(id=uuid.uuid4(), name="b")
+    first, second = (
+        _PresetData(id=_PresetID(uuid.uuid4()), name="a"),
+        _PresetData(id=_PresetID(uuid.uuid4()), name="b"),
+    )
 
     result = EntitiesOpsResult(items=[first, second])
 
@@ -145,7 +150,10 @@ def test_entities_result_names_nothing_when_the_write_matched_nothing() -> None:
 
 
 def test_scoped_batch_result_names_every_entity_on_the_page() -> None:
-    first, second = _PresetData(id=uuid.uuid4(), name="a"), _PresetData(id=uuid.uuid4(), name="b")
+    first, second = (
+        _PresetData(id=_PresetID(uuid.uuid4()), name="a"),
+        _PresetData(id=_PresetID(uuid.uuid4()), name="b"),
+    )
 
     result = ScopedBatchOpsResult(
         items=[first, second],

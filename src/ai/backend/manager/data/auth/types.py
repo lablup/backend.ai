@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from ipaddress import IPv4Network, IPv6Network
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, ReadableCIDR, SecretKey
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.resource.types import (

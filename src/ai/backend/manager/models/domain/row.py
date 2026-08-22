@@ -14,15 +14,14 @@ from typing import (
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.scope import ScopeID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.types import ScopeID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.domain.types import DomainData
@@ -50,7 +49,7 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.models.rbac.context import ClientContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
+    from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -65,23 +64,6 @@ __all__: Sequence[str] = (
 )
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
-
-
-def row_to_data(row: DomainRow | Row[Any]) -> DomainData:
-    return DomainData(
-        id=row.id,
-        name=row.name,
-        description=row.description,
-        is_active=row.is_active,
-        is_default=row.is_default,
-        created_at=row.created_at,
-        updated_at=row.updated_at,
-        total_resource_slots=row.total_resource_slots,
-        allowed_vfolder_hosts=row.allowed_vfolder_hosts,
-        allowed_docker_registries=row.allowed_docker_registries,
-        integration_name=row.integration_id,  # DB column is integration_id
-        dotfiles=row.dotfiles,
-    )
 
 
 class DomainRow(LifecycleTimestampsMixin, Base):
@@ -101,7 +83,7 @@ class DomainRow(LifecycleTimestampsMixin, Base):
     )
     id: Mapped[DomainID] = mapped_column(
         "id",
-        GUID,
+        GUID(DomainID),
         nullable=False,
         unique=True,
         server_default=sa.text("uuid_generate_v4()"),
@@ -131,8 +113,8 @@ class DomainRow(LifecycleTimestampsMixin, Base):
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
     )
 
-    sgroup_for_domains_rows: Mapped[list[ScalingGroupForDomainRow]] = relationship(
-        "ScalingGroupForDomainRow",
+    sgroup_for_domains_rows: Mapped[list[ResourceGroupForDomainRow]] = relationship(
+        "ResourceGroupForDomainRow",
     )
 
     @classmethod
@@ -144,7 +126,20 @@ class DomainRow(LifecycleTimestampsMixin, Base):
         return cls.name
 
     def to_data(self) -> DomainData:
-        return row_to_data(self)
+        return DomainData(
+            id=self.id,
+            name=self.name,
+            description=self.description,
+            is_active=self.is_active,
+            is_default=self.is_default,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+            total_resource_slots=self.total_resource_slots,
+            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
+            allowed_docker_registries=self.allowed_docker_registries,
+            integration_name=self.integration_id,  # DB column is integration_id
+            dotfiles=self.dotfiles,
+        )
 
 
 # NOTE: Deprecated legacy table reference for backward compatibility.

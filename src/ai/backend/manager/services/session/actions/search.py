@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.session.base import SessionScopeAction
+from ai.backend.manager.services.session.base import (
+    SessionScopeAction,
+    SessionScopeActionResult,
+)
 
 
 @dataclass
@@ -22,40 +24,26 @@ class SearchSessionsAction(SessionScopeAction):
     """
 
     querier: BatchQuerier
-    user_id: uuid.UUID
+    user_id: UserID
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id),)
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_sessions"
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
-    @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.USER
-
-    @override
-    def scope_id(self) -> str:
-        return str(self.user_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.USER,
-            element_id=str(self.user_id),
-        )
-
 
 @dataclass
-class SearchSessionsActionResult(BaseActionResult):
+class SearchSessionsActionResult(SessionScopeActionResult):
     data: list[SessionData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

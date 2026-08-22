@@ -7,14 +7,14 @@ from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import DBOperationFailed
 from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.group import association_groups_users as agus
-from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.project import association_groups_users as agus
+from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.session_template import SessionTemplateRow, TemplateType
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
@@ -46,7 +46,7 @@ class TemplateDBSource:
         """Resolve owner UUID for template operations against a pre-resolved project.
 
         The caller is responsible for resolving the project name to ``requesting_project_id``
-        (e.g. via ``GroupRepository.project_id_by_name_in_domain``); this method handles
+        (e.g. via ``ProjectRepository.project_id_by_name_in_domain``); this method handles
         on-behalf-of access-key delegation, domain validation, and role-based authorization.
         """
         async with self._db.begin_readonly() as conn:

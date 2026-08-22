@@ -15,7 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE, ResourceGroupID
 from ai.backend.common.data.entity.types import (
     EntityRef,
     ScopeRef,
@@ -24,7 +24,7 @@ from ai.backend.common.data.entity.types import (
 from ai.backend.common.data.entity.types import (
     EntityType as VirtualScopeEntityType,
 )
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.common.data.permission.types import (
     EntityType,
     Permission,
@@ -39,8 +39,6 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.permission import VirtualScopeNotFound
@@ -51,8 +49,8 @@ from ai.backend.manager.errors.repository import (
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -64,12 +62,12 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -115,7 +113,7 @@ _ORM_CLUSTER = (
     ObjectPermissionRow,
     PermissionRow,
     RoleRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
     UserResourcePolicyRow,
     UserRoleRow,
     UserRow,
@@ -2020,13 +2018,13 @@ async def scope_name_seed(
         [
             # FK dependency order: parents before children
             DomainRow,
-            ScalingGroupRow,
+            ResourceGroupRow,
             UserResourcePolicyRow,
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
             UserRow,
             KeyPairRow,
-            GroupRow,
+            ProjectRow,
         ],
     ):
         unique = uuid.uuid4().hex[:8]
@@ -2041,7 +2039,7 @@ async def scope_name_seed(
         async with database_connection.begin_session() as db_sess:
             db_sess.add_all([
                 DomainRow(name=domain_name, id=domain_id),
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=resource_group_id,
                     name=resource_group_name,
                     driver="static",
@@ -2063,7 +2061,7 @@ async def scope_name_seed(
             ])
             await db_sess.flush()
             db_sess.add_all([
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=project_name,
                     domain_name=domain_name,

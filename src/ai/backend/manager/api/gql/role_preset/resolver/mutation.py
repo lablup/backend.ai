@@ -6,7 +6,7 @@ from uuid import UUID
 
 from strawberry import Info
 
-from ai.backend.common.identifier.role_preset import RolePresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,

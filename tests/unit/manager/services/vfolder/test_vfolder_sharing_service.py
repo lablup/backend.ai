@@ -10,6 +10,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
@@ -163,7 +165,7 @@ class TestShareVFolderAction:
 
         action = ShareVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             permission=VFolderMountPermission.READ_WRITE,
             emails=emails,
@@ -188,7 +190,7 @@ class TestShareVFolderAction:
 
         action = ShareVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             permission=VFolderMountPermission.READ_WRITE,
             emails=["a@test.com"],
@@ -210,7 +212,7 @@ class TestShareVFolderAction:
 
         action = ShareVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             permission=VFolderMountPermission.READ_WRITE,
             emails=["a@test.com"],
@@ -232,7 +234,7 @@ class TestShareVFolderAction:
 
         action = ShareVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             permission=VFolderMountPermission.READ_WRITE,
             emails=["a@test.com"],
@@ -265,7 +267,7 @@ class TestUnshareVFolderAction:
 
         action = UnshareVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             emails=emails,
         )
@@ -288,7 +290,7 @@ class TestUnshareVFolderAction:
 
         action = UnshareVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             emails=["a@test.com"],
         )
@@ -325,7 +327,7 @@ class TestListSharedVFoldersAction:
             ]
         )
 
-        action = ListSharedVFoldersAction(vfolder_id=vfolder_uuid)
+        action = ListSharedVFoldersAction(vfolder_uuid=VFolderUUID(vfolder_uuid))
         result = await sharing_service.list_shared_vfolders(action)
 
         assert len(result.shared) == 1
@@ -343,7 +345,7 @@ class TestListSharedVFoldersAction:
     ) -> None:
         mock_vfolder_repo.list_shared_vfolder_permissions = AsyncMock(return_value=[])
 
-        action = ListSharedVFoldersAction(vfolder_id=vfolder_uuid)
+        action = ListSharedVFoldersAction(vfolder_uuid=VFolderUUID(vfolder_uuid))
         await sharing_service.list_shared_vfolders(action)
 
         mock_vfolder_repo.list_shared_vfolder_permissions.assert_called_once_with(vfolder_uuid)
@@ -355,7 +357,7 @@ class TestListSharedVFoldersAction:
     ) -> None:
         mock_vfolder_repo.list_shared_vfolder_permissions = AsyncMock(return_value=[])
 
-        action = ListSharedVFoldersAction(vfolder_id=None)
+        action = ListSharedVFoldersAction(vfolder_uuid=VFolderUUID(uuid.uuid4()))
         result = await sharing_service.list_shared_vfolders(action)
 
         assert result.shared == []
@@ -377,7 +379,7 @@ class TestUpdateVFolderSharingStatusAction:
         mock_vfolder_repo.update_vfolder_sharing_status = AsyncMock()
 
         action = UpdateVFolderSharingStatusAction(
-            vfolder_id=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             to_update=[(user_id, VFolderMountPermission.READ_WRITE)],
             to_delete=[],
         )
@@ -397,7 +399,7 @@ class TestUpdateVFolderSharingStatusAction:
         mock_vfolder_repo.update_vfolder_sharing_status = AsyncMock()
 
         action = UpdateVFolderSharingStatusAction(
-            vfolder_id=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             to_update=[],
             to_delete=user_ids,
         )
@@ -418,7 +420,7 @@ class TestUpdateVFolderSharingStatusAction:
         mock_vfolder_repo.update_vfolder_sharing_status = AsyncMock()
 
         action = UpdateVFolderSharingStatusAction(
-            vfolder_id=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             to_update=[(update_user, VFolderMountPermission.READ_WRITE)],
             to_delete=[delete_user],
         )
@@ -461,7 +463,7 @@ class TestInviteVFolderAction:
         action = InviteVFolderAction(
             keypair_resource_policy={},
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             mount_permission=VFolderMountPermission.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
@@ -486,7 +488,7 @@ class TestInviteVFolderAction:
         action = InviteVFolderAction(
             keypair_resource_policy={},
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             mount_permission=VFolderMountPermission.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
@@ -512,7 +514,7 @@ class TestInviteVFolderAction:
         action = InviteVFolderAction(
             keypair_resource_policy={},
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             mount_permission=VFolderMountPermission.READ_ONLY,
             invitee_emails=["nobody@test.com"],
         )
@@ -541,7 +543,7 @@ class TestInviteVFolderAction:
         action = InviteVFolderAction(
             keypair_resource_policy={},
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             mount_permission=VFolderMountPermission.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
@@ -571,7 +573,7 @@ class TestInviteVFolderAction:
         action = InviteVFolderAction(
             keypair_resource_policy={},
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             mount_permission=VFolderMountPermission.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
@@ -612,7 +614,7 @@ class TestAcceptInvitationAction:
         mock_vfolder_repo.create_vfolder_permission = AsyncMock()
         mock_vfolder_repo.update_invitation_state = AsyncMock()
 
-        action = AcceptInvitationAction(invitation_id=invitation_id)
+        action = AcceptInvitationAction(invitation_id=VFolderInvitationID(invitation_id))
         result = await invite_service.accept_invitation(action)
 
         assert result.invitation_id == invitation_id
@@ -628,7 +630,7 @@ class TestAcceptInvitationAction:
     ) -> None:
         mock_vfolder_repo.get_invitation_by_id = AsyncMock(return_value=None)
 
-        action = AcceptInvitationAction(invitation_id=uuid.uuid4())
+        action = AcceptInvitationAction(invitation_id=VFolderInvitationID(uuid.uuid4()))
 
         with pytest.raises(VFolderInvitationNotFound):
             await invite_service.accept_invitation(action)
@@ -655,7 +657,7 @@ class TestAcceptInvitationAction:
         )
         mock_vfolder_repo.count_vfolder_with_name_for_user = AsyncMock(return_value=1)
 
-        action = AcceptInvitationAction(invitation_id=invitation_id)
+        action = AcceptInvitationAction(invitation_id=VFolderInvitationID(invitation_id))
 
         with pytest.raises(VFolderAlreadyExists):
             await invite_service.accept_invitation(action)
@@ -684,7 +686,7 @@ class TestRejectInvitationAction:
         mock_vfolder_repo.update_invitation_state = AsyncMock()
 
         action = RejectInvitationAction(
-            invitation_id=invitation_id,
+            invitation_id=VFolderInvitationID(invitation_id),
             requester_user_uuid=invitee_uuid,
         )
         result = await invite_service.reject_invitation(action)
@@ -711,7 +713,7 @@ class TestRejectInvitationAction:
         mock_vfolder_repo.update_invitation_state = AsyncMock()
 
         action = RejectInvitationAction(
-            invitation_id=invitation_id,
+            invitation_id=VFolderInvitationID(invitation_id),
             requester_user_uuid=inviter_uuid,
         )
         result = await invite_service.reject_invitation(action)
@@ -734,7 +736,7 @@ class TestRejectInvitationAction:
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="thirdparty@test.com")
 
         action = RejectInvitationAction(
-            invitation_id=uuid.uuid4(),
+            invitation_id=VFolderInvitationID(uuid.uuid4()),
             requester_user_uuid=uuid.uuid4(),
         )
 
@@ -749,7 +751,7 @@ class TestRejectInvitationAction:
         mock_vfolder_repo.get_invitation_by_id = AsyncMock(return_value=None)
 
         action = RejectInvitationAction(
-            invitation_id=uuid.uuid4(),
+            invitation_id=VFolderInvitationID(uuid.uuid4()),
             requester_user_uuid=uuid.uuid4(),
         )
 
@@ -775,7 +777,7 @@ class TestUpdateInvitationAction:
         mock_vfolder_repo.update_invitation_permission = AsyncMock()
 
         action = UpdateInvitationAction(
-            invitation_id=invitation_id,
+            invitation_id=VFolderInvitationID(invitation_id),
             requester_user_uuid=inviter_uuid,
             mount_permission=VFolderMountPermission.READ_WRITE,
         )
@@ -794,7 +796,7 @@ class TestUpdateInvitationAction:
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value=None)
 
         action = UpdateInvitationAction(
-            invitation_id=uuid.uuid4(),
+            invitation_id=VFolderInvitationID(uuid.uuid4()),
             requester_user_uuid=uuid.uuid4(),
             mount_permission=VFolderMountPermission.READ_WRITE,
         )
@@ -836,7 +838,7 @@ class TestListInvitationAction:
             return_value=[(invitation_data, vfolder_data)]
         )
 
-        action = ListInvitationAction(requester_user_uuid=requester_uuid)
+        action = ListInvitationAction(user_uuid=requester_uuid)
         result = await invite_service.list_invitation(action)
 
         assert len(result.info) == 1
@@ -855,7 +857,7 @@ class TestListInvitationAction:
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="user@test.com")
         mock_vfolder_repo.get_pending_invitations_for_user = AsyncMock(return_value=[])
 
-        action = ListInvitationAction(requester_user_uuid=uuid.uuid4())
+        action = ListInvitationAction(user_uuid=uuid.uuid4())
         result = await invite_service.list_invitation(action)
 
         assert result.info == []
@@ -869,7 +871,7 @@ class TestListInvitationAction:
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="user@test.com")
         mock_vfolder_repo.get_pending_invitations_for_user = AsyncMock(return_value=[])
 
-        action = ListInvitationAction(requester_user_uuid=requester_uuid)
+        action = ListInvitationAction(user_uuid=requester_uuid)
         await invite_service.list_invitation(action)
 
         mock_vfolder_repo.get_pending_invitations_for_user.assert_called_once_with("user@test.com")
@@ -898,7 +900,7 @@ class TestLeaveInvitedVFolderAction:
         mock_vfolder_repo.delete_vfolder_permission = AsyncMock()
 
         action = LeaveInvitedVFolderAction(
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             requester_user_uuid=requester_uuid,
         )
         result = await invite_service.leave_invited_vfolder(action)
@@ -923,7 +925,7 @@ class TestLeaveInvitedVFolderAction:
         )
 
         action = LeaveInvitedVFolderAction(
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             requester_user_uuid=requester_uuid,
         )
 
@@ -950,7 +952,7 @@ class TestLeaveInvitedVFolderAction:
         mock_vfolder_repo.delete_vfolder_permission = AsyncMock()
 
         action = LeaveInvitedVFolderAction(
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             requester_user_uuid=admin_uuid,
             shared_user_uuid=shared_user_uuid,
         )
@@ -978,7 +980,7 @@ class TestLeaveInvitedVFolderAction:
         mock_vfolder_repo.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
 
         action = LeaveInvitedVFolderAction(
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             requester_user_uuid=requester_uuid,
             shared_user_uuid=other_uuid,
         )
@@ -1004,7 +1006,7 @@ class TestRevokeInvitedVFolderAction:
         mock_vfolder_repo.delete_vfolder_permission = AsyncMock()
 
         action = RevokeInvitedVFolderAction(
-            vfolder_id=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             shared_user_id=shared_user_uuid,
         )
         result = await invite_service.revoke_invited_vfolder(action)
@@ -1033,7 +1035,7 @@ class TestUpdateInvitedVFolderMountPermissionAction:
         mock_vfolder_repo.update_invited_vfolder_mount_permission = AsyncMock()
 
         action = UpdateInvitedVFolderMountPermissionAction(
-            vfolder_id=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             user_id=user_id,
             permission=VFolderMountPermission.RW_DELETE,
         )
@@ -1113,7 +1115,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         return InviteVFolderAction(
             keypair_resource_policy={},
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             mount_permission=VFolderMountPermission.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
@@ -1151,7 +1153,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         mock_vfolder_repo.count_vfolder_with_name_for_user = AsyncMock(return_value=0)
         mock_vfolder_repo.create_vfolder_permission = AsyncMock()
         mock_vfolder_repo.update_invitation_state = AsyncMock()
-        return AcceptInvitationAction(invitation_id=invitation_uuid)
+        return AcceptInvitationAction(invitation_id=VFolderInvitationID(invitation_uuid))
 
     async def test_invitee_with_empty_email_can_accept_invitation(
         self,
@@ -1183,7 +1185,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="")
         mock_vfolder_repo.update_invitation_state = AsyncMock()
         return RejectInvitationAction(
-            invitation_id=invitation_uuid,
+            invitation_id=VFolderInvitationID(invitation_uuid),
             requester_user_uuid=invitee_uuid,
         )
 
@@ -1212,7 +1214,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="")
         mock_vfolder_repo.update_invitation_permission = AsyncMock()
         return UpdateInvitationAction(
-            invitation_id=invitation_uuid,
+            invitation_id=VFolderInvitationID(invitation_uuid),
             requester_user_uuid=uuid.uuid4(),
             mount_permission=VFolderMountPermission.READ_WRITE,
         )
@@ -1240,7 +1242,7 @@ class TestEmptyEmailAccountInvitationScenarios:
     ) -> ListInvitationAction:
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="")
         mock_vfolder_repo.get_pending_invitations_for_user = AsyncMock(return_value=[])
-        return ListInvitationAction(requester_user_uuid=uuid.uuid4())
+        return ListInvitationAction(user_uuid=uuid.uuid4())
 
     async def test_user_with_empty_email_can_list_received_invitations(
         self,
@@ -1264,7 +1266,7 @@ class TestEmptyEmailAccountInvitationScenarios:
     ) -> ListSentInvitationsAction:
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="")
         mock_vfolder_repo.get_sent_invitations_for_user = AsyncMock(return_value=[])
-        return ListSentInvitationsAction(requester_user_uuid=uuid.uuid4())
+        return ListSentInvitationsAction(user_uuid=uuid.uuid4())
 
     async def test_user_with_empty_email_can_list_sent_invitations(
         self,
@@ -1298,7 +1300,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         mock_vfolder_repo.delete_vfolder_permission = AsyncMock()
         return LeaveInvitedVFolderAction(
             requester_user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             shared_user_uuid=None,
         )
 

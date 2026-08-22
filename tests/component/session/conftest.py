@@ -14,9 +14,25 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_group import (
+    RESOURCE_GROUP_ENTITY_TYPE,
+    ResourceGroupID,
+    ResourceGroupName,
+)
+from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.common.plugin.monitor import ErrorPluginContext
-from ai.backend.common.types import AgentId, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import AgentId, ResourceSlot, SessionTypes
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    ConcernMeta,
+    GroupMeta,
+)
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 
@@ -37,8 +53,13 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
+from ai.backend.manager.services.session.resource_allocation.processors import (
+    ResourceAllocationProcessors,
+)
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -58,7 +79,7 @@ class UserFixtureData:
 
 @dataclass
 class SessionSeedData:
-    session_id: SessionId
+    session_id: SessionID
     session_name: str
     kernel_id: uuid.UUID
     access_key: str
@@ -90,6 +111,7 @@ async def session_processors(
     error_monitor: ErrorPluginContext,
     appproxy_client_pool: AsyncMock,
     scheduling_controller_mock: AsyncMock,
+    processor_registry: ProcessorRegistry[Any],
 ) -> SessionProcessors:
     """Real SessionProcessors with real SessionService and SessionRepository."""
     args = SessionServiceArgs(
@@ -106,23 +128,30 @@ async def session_processors(
         user_repository=AsyncMock(),
     )
     service = SessionService(args)
+    groups = processor_registry.concern(ConcernMeta("resource_allocation"))
     return SessionProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
+        processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        ResourceAllocationProcessors(
+            groups.group(GroupMeta(USER_ENTITY_TYPE)),
+            groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
+            groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
+            groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+            groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            AsyncMock(),
         ),
+        service,
     )
 
 
 @pytest.fixture()
-def agent_processors_mock() -> AgentProcessors:
+def agent_processors_mock(processor_registry: ProcessorRegistry[Any]) -> AgentProcessors:
     """AgentProcessors with a mocked AgentService."""
     return AgentProcessors(
-        service=AsyncMock(),
-        action_monitors=[],
-        validators=ActionValidators(
+        processor_registry.group(GroupMeta(AGENT_ENTITY_TYPE)),
+        AsyncMock(),
+        [],
+        ActionValidators(
             virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
             rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
         ),
@@ -130,16 +159,9 @@ def agent_processors_mock() -> AgentProcessors:
 
 
 @pytest.fixture()
-def vfolder_processors_mock() -> VFolderProcessors:
+def vfolder_processors_mock(processor_registry: ProcessorRegistry[Any]) -> VFolderProcessors:
     """VFolderProcessors with a mocked VFolderService."""
-    return VFolderProcessors(
-        service=AsyncMock(),
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
-        ),
-    )
+    return VFolderProcessors(processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), AsyncMock())
 
 
 @pytest.fixture()
@@ -150,11 +172,19 @@ def server_module_registries(
     session_processors: SessionProcessors,
     agent_processors_mock: AgentProcessors,
     vfolder_processors_mock: VFolderProcessors,
+    processor_registry: ProcessorRegistry[Any],
 ) -> list[RouteRegistry]:
     """Load only the modules required for session component tests."""
     return [
         register_session_routes(
             SessionHandler(
+                project=ProjectProcessors(
+                    processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), AsyncMock()
+                ),
+                user=UserProcessors(
+                    processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+                    AsyncMock(),
+                ),
                 auth=auth_processors,
                 session=session_processors,
                 agent=agent_processors_mock,
@@ -169,7 +199,7 @@ def server_module_registries(
 @pytest.fixture()
 async def agent_fixture(
     db_engine: SAEngine,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[AgentId]:
     """Insert a test agent record and yield its ID."""
@@ -179,7 +209,7 @@ async def agent_fixture(
             sa.insert(AgentRow).values(
                 id=agent_id,
                 region="local",
-                scaling_group=scaling_group_name,
+                scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 available_slots=ResourceSlot(),
                 occupied_slots=ResourceSlot(),
@@ -199,7 +229,7 @@ async def session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
     agent_fixture: AgentId,
 ) -> AsyncIterator[SessionSeedData]:
@@ -211,7 +241,7 @@ async def session_seed(
     the SDK v2 SessionClient.
     """
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-session-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -235,7 +265,7 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
+                scaling_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
@@ -261,7 +291,7 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_name,
+                scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 agent=agent_fixture,
                 status=KernelStatus.RUNNING,
@@ -298,7 +328,7 @@ async def terminated_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a TERMINATED session with container_log in the kernel.
@@ -307,7 +337,7 @@ async def terminated_session_seed(
     for terminated sessions (no agent RPC needed).
     """
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-terminated-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -332,7 +362,7 @@ async def terminated_session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
+                scaling_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.TERMINATED,
                 status_info="user-requested",
@@ -359,7 +389,7 @@ async def terminated_session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_name,
+                scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=KernelStatus.TERMINATED,
                 status_info="user-requested",
@@ -397,12 +427,12 @@ async def user_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     regular_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session owned by the regular user."""
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-user-session-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -426,7 +456,7 @@ async def user_session_seed(
                 group_id=group_fixture,
                 user_uuid=regular_user_fixture.user_uuid,
                 access_key=regular_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
+                scaling_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
@@ -452,7 +482,7 @@ async def user_session_seed(
                 group_id=group_fixture,
                 user_uuid=regular_user_fixture.user_uuid,
                 access_key=regular_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_name,
+                scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",

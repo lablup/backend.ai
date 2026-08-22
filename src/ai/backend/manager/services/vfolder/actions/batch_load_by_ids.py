@@ -4,14 +4,13 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.vfolder.types import VFolderData
-from ai.backend.manager.services.vfolder.actions.base import VFolderAction
+from ai.backend.manager.services.vfolder.actions.base import VFolderGlobalAction
 
 
 @dataclass
-class BatchLoadVFoldersByIdsAction(VFolderAction):
+class GlobalBatchLoadVFoldersAction(VFolderGlobalAction):
     """Batch fetch vfolders by IDs.
 
     Used by GraphQL field resolvers (DataLoader) to load vfolders that are
@@ -27,25 +26,22 @@ class BatchLoadVFoldersByIdsAction(VFolderAction):
     ids: list[uuid.UUID]
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-    @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_batch_load_vfolders"
+
 
 @dataclass
-class BatchLoadVFoldersByIdsActionResult(BaseActionResult):
-    """Result of :class:`BatchLoadVFoldersByIdsAction`.
+class GlobalBatchLoadVFoldersActionResult:
+    """Result of :class:`GlobalBatchLoadVFoldersAction`.
 
     ``data`` is the same length and order as the input ids; entries that
     were not found are ``None``.
     """
 
     data: list[VFolderData | None]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

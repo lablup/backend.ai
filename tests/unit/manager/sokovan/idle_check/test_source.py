@@ -7,7 +7,7 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.repositories.idle_checker.types import (

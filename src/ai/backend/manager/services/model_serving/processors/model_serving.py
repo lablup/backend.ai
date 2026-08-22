@@ -1,9 +1,7 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
     ClearErrorActionResult,
@@ -40,13 +38,13 @@ from ai.backend.manager.services.model_serving.actions.list_model_service import
     ListModelServiceAction,
     ListModelServiceActionResult,
 )
-from ai.backend.manager.services.model_serving.actions.modify_endpoint import (
-    ModifyEndpointAction,
-    ModifyEndpointActionResult,
-)
 from ai.backend.manager.services.model_serving.actions.search_services import (
     SearchServicesAction,
     SearchServicesActionResult,
+)
+from ai.backend.manager.services.model_serving.actions.update_endpoint import (
+    UpdateEndpointAction,
+    UpdateEndpointActionResult,
 )
 from ai.backend.manager.services.model_serving.actions.update_route import (
     UpdateRouteAction,
@@ -62,8 +60,8 @@ from ai.backend.manager.services.model_serving.services.model_serving import (
 
 
 class ModelServingProcessors:
-    list_model_service: ActionProcessor[ListModelServiceAction, ListModelServiceActionResult]
-    search_services: ActionProcessor[SearchServicesAction, SearchServicesActionResult]
+    list_model_service: ScopeActionProcessor[ListModelServiceAction, ListModelServiceActionResult]
+    search_services: ScopeActionProcessor[SearchServicesAction, SearchServicesActionResult]
 
     # Single entity actions (with RBAC)
     get_model_service_info: SingleEntityActionProcessor[
@@ -72,65 +70,43 @@ class ModelServingProcessors:
     delete_model_service: SingleEntityActionProcessor[
         DeleteModelServiceAction, DeleteModelServiceActionResult
     ]
-    modify_endpoint: SingleEntityActionProcessor[ModifyEndpointAction, ModifyEndpointActionResult]
+    update_endpoint: SingleEntityActionProcessor[UpdateEndpointAction, UpdateEndpointActionResult]
     update_route: SingleEntityActionProcessor[UpdateRouteAction, UpdateRouteActionResult]
     delete_route: SingleEntityActionProcessor[DeleteRouteAction, DeleteRouteActionResult]
 
     # Internal/system actions (no RBAC)
-    dry_run_model_service: ActionProcessor[DryRunModelServiceAction, DryRunModelServiceActionResult]
-    list_errors: ActionProcessor[ListErrorsAction, ListErrorsActionResult]
-    clear_error: ActionProcessor[ClearErrorAction, ClearErrorActionResult]
-    force_sync: ActionProcessor[ForceSyncAction, ForceSyncActionResult]
-    generate_token: ActionProcessor[GenerateTokenAction, GenerateTokenActionResult]
-    validate_model_service: ActionProcessor[
+    dry_run_model_service: ScopeActionProcessor[
+        DryRunModelServiceAction, DryRunModelServiceActionResult
+    ]
+    list_errors: SingleEntityActionProcessor[ListErrorsAction, ListErrorsActionResult]
+    clear_error: SingleEntityActionProcessor[ClearErrorAction, ClearErrorActionResult]
+    force_sync: SingleEntityActionProcessor[ForceSyncAction, ForceSyncActionResult]
+    generate_token: SingleEntityActionProcessor[GenerateTokenAction, GenerateTokenActionResult]
+    validate_model_service: ScopeActionProcessor[
         ValidateModelServiceAction, ValidateModelServiceActionResult
     ]
 
     def __init__(
-        self,
-        service: ModelServingService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
+        self, group: ProcessorGroup[ModelDeploymentData], service: ModelServingService
     ) -> None:
-        self.list_model_service = ActionProcessor(service.list_serve, action_monitors)
-        self.search_services = ActionProcessor(service.search_services, action_monitors)
+        self.list_model_service = group.scope(ListModelServiceAction, service.list_serve)
+        self.search_services = group.scope(SearchServicesAction, service.search_services)
 
         # Single entity actions with RBAC validator
-        self.get_model_service_info = SingleEntityActionProcessor(
-            service.get_model_service_info,
-            action_monitors,
-            validators=[validators.rbac.single_entity],
+        self.get_model_service_info = group.single_entity(
+            GetModelServiceInfoAction, service.get_model_service_info
         )
-        self.delete_model_service = SingleEntityActionProcessor(
-            service.delete, action_monitors, validators=[validators.rbac.single_entity]
-        )
-        # modify_endpoint is invoked only from gql_legacy — non-enforcing validator.
-        # Mocked test fixtures do not provide a legacy_rbac, so isinstance
-        # guards against MagicMock attribute access returning a truthy mock.
-        legacy_rbac = validators.legacy_rbac
-        legacy_single_entity_validator: SingleEntityActionValidator = (
-            legacy_rbac.single_entity
-            if isinstance(legacy_rbac, LegacyRBACValidators)
-            else validators.rbac.single_entity
-        )
-        self.modify_endpoint = SingleEntityActionProcessor(
-            service.modify_endpoint,
-            action_monitors,
-            validators=[legacy_single_entity_validator],
-        )
-        self.update_route = SingleEntityActionProcessor(
-            service.update_route, action_monitors, validators=[validators.rbac.single_entity]
-        )
-        self.delete_route = SingleEntityActionProcessor(
-            service.delete_route, action_monitors, validators=[validators.rbac.single_entity]
-        )
+        self.delete_model_service = group.single_entity(DeleteModelServiceAction, service.delete)
+        self.update_endpoint = group.single_entity(UpdateEndpointAction, service.update_endpoint)
+        self.update_route = group.single_entity(UpdateRouteAction, service.update_route)
+        self.delete_route = group.single_entity(DeleteRouteAction, service.delete_route)
 
         # Internal/system actions without RBAC
-        self.dry_run_model_service = ActionProcessor(service.dry_run, action_monitors)
-        self.list_errors = ActionProcessor(service.list_errors, action_monitors)
-        self.clear_error = ActionProcessor(service.clear_error, action_monitors)
-        self.force_sync = ActionProcessor(service.force_sync_with_app_proxy, action_monitors)
-        self.generate_token = ActionProcessor(service.generate_token, action_monitors)
-        self.validate_model_service = ActionProcessor(
-            service.validate_model_service, action_monitors
+        self.dry_run_model_service = group.scope(DryRunModelServiceAction, service.dry_run)
+        self.list_errors = group.single_entity(ListErrorsAction, service.list_errors)
+        self.clear_error = group.single_entity(ClearErrorAction, service.clear_error)
+        self.force_sync = group.single_entity(ForceSyncAction, service.force_sync_with_app_proxy)
+        self.generate_token = group.single_entity(GenerateTokenAction, service.generate_token)
+        self.validate_model_service = group.scope(
+            ValidateModelServiceAction, service.validate_model_service
         )

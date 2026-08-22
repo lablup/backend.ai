@@ -20,14 +20,6 @@ from ai.backend.manager.services.runtime_variant_preset.actions.create import (
     CreateRuntimeVariantPresetAction,
     CreateRuntimeVariantPresetActionResult,
 )
-from ai.backend.manager.services.runtime_variant_preset.actions.delete import (
-    DeleteRuntimeVariantPresetAction,
-    DeleteRuntimeVariantPresetActionResult,
-)
-from ai.backend.manager.services.runtime_variant_preset.actions.search import (
-    SearchRuntimeVariantPresetsAction,
-    SearchRuntimeVariantPresetsActionResult,
-)
 from ai.backend.manager.services.runtime_variant_preset.actions.update import (
     UpdateRuntimeVariantPresetAction,
     UpdateRuntimeVariantPresetActionResult,
@@ -37,6 +29,12 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class RuntimeVariantPresetService:
+    """The two preset writes that read before they write.
+
+    Everything else runs straight against ops — the rank draw and the value-type check
+    are what keep these two here.
+    """
+
     _repository: RuntimeVariantPresetRepository
 
     def __init__(self, repository: RuntimeVariantPresetRepository) -> None:
@@ -68,22 +66,3 @@ class RuntimeVariantPresetService:
         action.updater.pk_value = action.id
         data = await self._repository.update(action.updater)
         return UpdateRuntimeVariantPresetActionResult(preset=data)
-
-    async def delete(
-        self, action: DeleteRuntimeVariantPresetAction
-    ) -> DeleteRuntimeVariantPresetActionResult:
-        data = await self._repository.delete(action.id)
-        return DeleteRuntimeVariantPresetActionResult(preset=data)
-
-    async def search(
-        self, action: SearchRuntimeVariantPresetsAction
-    ) -> SearchRuntimeVariantPresetsActionResult:
-        items, total_count, has_next_page, has_previous_page = await self._repository.search(
-            action.querier
-        )
-        return SearchRuntimeVariantPresetsActionResult(
-            items=items,
-            total_count=total_count,
-            has_next_page=has_next_page,
-            has_previous_page=has_previous_page,
-        )

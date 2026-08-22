@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.events.event_types.kernel.types import (
     KernelCreationInfo,
     ServicePortInfo,
@@ -12,7 +13,6 @@ from ai.backend.common.events.event_types.kernel.types import (
     UsedDevices,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     BinarySize,
     ContainerId,

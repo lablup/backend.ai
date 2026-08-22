@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
     BulkDeleteAutoScalingRulesInput,
     CreateAutoScalingRuleInput,
@@ -65,7 +66,6 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     UpsertDeploymentPolicyPayload,
 )
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInfo
-from ai.backend.common.identifier.deployment import DeploymentID
 
 _PATH = "/v2/deployments"
 

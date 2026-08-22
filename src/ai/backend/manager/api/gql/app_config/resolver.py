@@ -30,7 +30,7 @@ async def my_app_configs(
     info: Info[StrawberryGQLContext],
     config_names: list[str],
 ) -> list[AppConfigGQL]:
-    payload = await info.context.adapters.app_config.my_get_app_configs(
+    payload = await info.context.adapters.app_config.my_app_configs(
         MyGetAppConfigsInput(config_names=config_names)
     )
     return [AppConfigGQL.from_pydantic(node) for node in payload.app_configs]
@@ -50,7 +50,7 @@ async def public_app_configs(
     info: Info[StrawberryGQLContext],
     config_names: list[str],
 ) -> list[AppConfigGQL]:
-    payload = await info.context.adapters.app_config.public_get_app_configs(
+    payload = await info.context.adapters.app_config.public_app_configs(
         PublicGetAppConfigsInput(config_names=config_names)
     )
     return [AppConfigGQL.from_pydantic(node) for node in payload.app_configs]

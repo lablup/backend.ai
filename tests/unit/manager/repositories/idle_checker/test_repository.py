@@ -8,6 +8,11 @@ from datetime import UTC, datetime
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -15,11 +20,6 @@ from ai.backend.common.data.idle_checker.types import (
     SessionLifetimeSpec,
 )
 from ai.backend.common.data.permission.types import ScopeType
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.session import SessionID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
     ClusterMode,
     ResourceSlot,
@@ -31,17 +31,17 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.idle_checker import IdleCheckerNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
+from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -64,8 +64,8 @@ class ScopeFixture:
     domain_name: str
     domain_id: DomainID
     project_id: uuid.UUID
-    scaling_group_name: str
-    scaling_group_id: ResourceGroupID
+    resource_group_name: str
+    resource_group_id: ResourceGroupID
 
 
 @dataclass(frozen=True)
@@ -93,7 +93,7 @@ class JudgmentRows:
 
 def _expired_check_scope_rows(
     scope: ScopeFixture,
-) -> tuple[ProjectResourcePolicyRow, DomainRow, GroupRow, ScalingGroupRow]:
+) -> tuple[ProjectResourcePolicyRow, DomainRow, ProjectRow, ResourceGroupRow]:
     return (
         ProjectResourcePolicyRow(
             name=f"{scope.domain_name}-policy",
@@ -107,7 +107,7 @@ def _expired_check_scope_rows(
             description=None,
             is_active=True,
         ),
-        GroupRow(
+        ProjectRow(
             id=scope.project_id,
             name=f"{scope.domain_name}-project",
             description=None,
@@ -115,9 +115,9 @@ def _expired_check_scope_rows(
             domain_name=scope.domain_name,
             resource_policy=f"{scope.domain_name}-policy",
         ),
-        ScalingGroupRow(
-            id=scope.scaling_group_id,
-            name=scope.scaling_group_name,
+        ResourceGroupRow(
+            id=scope.resource_group_id,
+            name=scope.resource_group_name,
             description=None,
             is_active=True,
             is_public=True,
@@ -145,7 +145,7 @@ def _expired_check_session_row(
         cluster_size=1,
         domain_name=scope.domain_name,
         domain_id=scope.domain_id,
-        resource_group_id=scope.scaling_group_id,
+        resource_group_id=scope.resource_group_id,
         group_id=scope.project_id,
         user_uuid=user_uuid if user_uuid is not None else uuid.uuid4(),
         access_key=None,
@@ -166,7 +166,7 @@ def _expired_check_session_row(
         environ=None,
         bootstrap_script=None,
         use_host_network=False,
-        scaling_group_name=scope.scaling_group_name,
+        scaling_group_name=scope.resource_group_name,
     )
 
 
@@ -189,8 +189,8 @@ def _expired_check_scope_fixture(prefix: str) -> ScopeFixture:
         domain_name=f"{prefix}-domain",
         domain_id=DomainID(uuid.uuid4()),
         project_id=uuid.uuid4(),
-        scaling_group_name=f"{prefix}-sgroup",
-        scaling_group_id=ResourceGroupID(uuid.uuid4()),
+        resource_group_name=f"{prefix}-sgroup",
+        resource_group_id=ResourceGroupID(uuid.uuid4()),
     )
 
 
@@ -207,8 +207,8 @@ class TestFetchJudgmentBatch:
                 DomainRow,
                 UserResourcePolicyRow,
                 UserRow,
-                GroupRow,
-                ScalingGroupRow,
+                ProjectRow,
+                ResourceGroupRow,
                 SessionRow,
                 IdleCheckerRow,
                 IdleCheckerBindingRow,
@@ -860,8 +860,8 @@ class TestFetchExpiredIdleChecks:
                 DomainRow,
                 UserResourcePolicyRow,
                 UserRow,
-                GroupRow,
-                ScalingGroupRow,
+                ProjectRow,
+                ResourceGroupRow,
                 SessionRow,
                 IdleCheckerRow,
                 SessionIdleCheckRow,
@@ -1047,8 +1047,8 @@ class TestSessionIdleCheckExclusion:
                 DomainRow,
                 UserResourcePolicyRow,
                 UserRow,
-                GroupRow,
-                ScalingGroupRow,
+                ProjectRow,
+                ResourceGroupRow,
                 SessionRow,
                 IdleCheckerRow,
                 SessionIdleCheckRow,
@@ -1539,8 +1539,8 @@ class TestUserScopeAssignments:
                 DomainRow,
                 UserResourcePolicyRow,
                 UserRow,
-                GroupRow,
-                ScalingGroupRow,
+                ProjectRow,
+                ResourceGroupRow,
                 SessionRow,
                 IdleCheckerRow,
                 IdleCheckerBindingRow,

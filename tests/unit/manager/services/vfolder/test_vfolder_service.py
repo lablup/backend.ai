@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import yarl
 
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, VFolderID, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
     ValidatedVFolderInfo,
@@ -123,8 +123,13 @@ class TestVFolderServicePurge:
         )
 
     @pytest.fixture
-    def sample_action(self, sample_purger: RBACEntityPurger[VFolderRow]) -> PurgeVFolderAction:
-        return PurgeVFolderAction(purger=sample_purger)
+    def sample_action(
+        self, sample_vfolder_uuid: uuid.UUID, sample_purger: RBACEntityPurger[VFolderRow]
+    ) -> PurgeVFolderAction:
+        return PurgeVFolderAction(
+            vfolder_uuid=VFolderUUID(sample_vfolder_uuid),
+            purger=sample_purger,
+        )
 
     async def test_purge_vfolder_success(
         self,
@@ -227,7 +232,7 @@ class TestVFolderFileServiceCreateArchiveDownload:
     def sample_action(self, sample_vfolder_uuid: uuid.UUID) -> CreateArchiveDownloadSessionAction:
         return CreateArchiveDownloadSessionAction(
             keypair_resource_policy={"default": {}},
-            vfolder_uuid=sample_vfolder_uuid,
+            vfolder_uuid=VFolderUUID(sample_vfolder_uuid),
             files=self.SAMPLE_FILES,
         )
 
@@ -290,7 +295,7 @@ class TestVFolderFileServiceCreateArchiveDownload:
         """Test that custom filename is forwarded to storage proxy client."""
         action_with_filename = CreateArchiveDownloadSessionAction(
             keypair_resource_policy={"default": {}},
-            vfolder_uuid=sample_vfolder_uuid,
+            vfolder_uuid=VFolderUUID(sample_vfolder_uuid),
             files=self.SAMPLE_FILES,
             filename="my-export.zip",
         )
@@ -353,7 +358,7 @@ class TestVFolderServiceGetFolderUsage:
 
     @pytest.fixture
     def sample_action(self, sample_vfolder_uuid: uuid.UUID) -> GetVFolderUsageAction:
-        return GetVFolderUsageAction(vfolder_uuid=sample_vfolder_uuid)
+        return GetVFolderUsageAction(vfolder_uuid=VFolderUUID(sample_vfolder_uuid))
 
     async def test_managed_vfolder_returns_storage_proxy_measurements(
         self,

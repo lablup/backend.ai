@@ -208,7 +208,7 @@ class TestDeleteConfigResponse:
         assert resp.result == "ok"
 
 
-# --- scaling_group responses (BaseResponseModel — structured JSON) ---
+# --- resource_group responses (BaseResponseModel — structured JSON) ---
 
 
 class TestListScalingGroupsResponse:

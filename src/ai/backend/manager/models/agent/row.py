@@ -20,8 +20,8 @@ from sqlalchemy.orm import (
 from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common.auth import PublicKey
-from ai.backend.common.identifier.agent import AgentUUID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.data.agent.types import (
     AgentData,
@@ -30,7 +30,7 @@ from ai.backend.manager.data.agent.types import (
 )
 from ai.backend.manager.data.permission.permission_defs import (
     AgentPermission,
-    ScalingGroupPermission,
+    ResourceGroupPermission,
 )
 from ai.backend.manager.models.base import (
     GUID,
@@ -143,11 +143,12 @@ class AgentRow(Base):
 
     def to_data(self) -> AgentData:
         return AgentData(
+            uuid=self.uuid,
             id=AgentId(self.id),
             status=self.status,
             status_changed=self.status_changed,
             region=self.region,
-            scaling_group=self.scaling_group,
+            resource_group=self.scaling_group,
             schedulable=self.schedulable,
             available_slots=self.available_slots,
             cached_occupied_slots=self.occupied_slots,
@@ -295,9 +296,9 @@ MEMBER_PERMISSIONS: frozenset[AgentPermission] = frozenset([
 
 @dataclass
 class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow, AgentId]):
-    from ai.backend.manager.models.scaling_group import ScalingGroupPermissionContext
+    from ai.backend.manager.models.resource_group import ResourceGroupPermissionContext
 
-    sgroup_permission_ctx: ScalingGroupPermissionContext | None = None
+    sgroup_permission_ctx: ResourceGroupPermissionContext | None = None
 
     @property
     def query_condition(self) -> WhereClauseType | None:
@@ -325,7 +326,7 @@ class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow
         return cond
 
     def apply_sgroup_permission_ctx(
-        self, sgroup_permission_ctx: ScalingGroupPermissionContext
+        self, sgroup_permission_ctx: ResourceGroupPermissionContext
     ) -> None:
         self.sgroup_permission_ctx = sgroup_permission_ctx
 
@@ -352,7 +353,10 @@ class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow
         if self.sgroup_permission_ctx is not None:
             sgroup_permission_map = self.sgroup_permission_ctx.sgroup_to_permissions_map
             sgroup_perms = sgroup_permission_map.get(agent_row.scaling_group)
-            if sgroup_perms is None or ScalingGroupPermission.AGENT_PERMISSIONS not in sgroup_perms:
+            if (
+                sgroup_perms is None
+                or ResourceGroupPermission.AGENT_PERMISSIONS not in sgroup_perms
+            ):
                 permissions = set()
 
         return frozenset(permissions)
@@ -396,25 +400,25 @@ class AgentPermissionContextBuilder(
         scope: DomainScope,
     ) -> AgentPermissionContext:
         from ai.backend.manager.models.domain import DomainRow
-        from ai.backend.manager.models.scaling_group import (
-            ScalingGroupForDomainRow,
-            ScalingGroupRow,
+        from ai.backend.manager.models.resource_group import (
+            ResourceGroupForDomainRow,
+            ResourceGroupRow,
         )
 
         permissions = await self.calculate_permission(ctx, scope)
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
 
         _stmt = (
-            sa.select(ScalingGroupForDomainRow)
+            sa.select(ResourceGroupForDomainRow)
             .where(
-                ScalingGroupForDomainRow.domain_id
+                ResourceGroupForDomainRow.domain_id
                 == sa.select(DomainRow.id)
                 .where(DomainRow.name == scope.domain_name)
                 .scalar_subquery()
             )
             .options(
-                joinedload(ScalingGroupForDomainRow.sgroup_row).options(
-                    selectinload(ScalingGroupRow.agents)
+                joinedload(ResourceGroupForDomainRow.sgroup_row).options(
+                    selectinload(ResourceGroupRow.agents)
                 )
             )
         )
@@ -430,20 +434,20 @@ class AgentPermissionContextBuilder(
         ctx: ClientContext,
         scope: ProjectScope,
     ) -> AgentPermissionContext:
-        from ai.backend.manager.models.scaling_group import (
-            ScalingGroupForProjectRow,
-            ScalingGroupRow,
+        from ai.backend.manager.models.resource_group import (
+            ResourceGroupForProjectRow,
+            ResourceGroupRow,
         )
 
         permissions = await self.calculate_permission(ctx, scope)
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
 
         _stmt = (
-            sa.select(ScalingGroupForProjectRow)
-            .where(ScalingGroupForProjectRow.group == scope.project_id)
+            sa.select(ResourceGroupForProjectRow)
+            .where(ResourceGroupForProjectRow.group == scope.project_id)
             .options(
-                joinedload(ScalingGroupForProjectRow.sgroup_row).options(
-                    selectinload(ScalingGroupRow.agents)
+                joinedload(ResourceGroupForProjectRow.sgroup_row).options(
+                    selectinload(ResourceGroupRow.agents)
                 )
             )
         )
@@ -459,9 +463,9 @@ class AgentPermissionContextBuilder(
         ctx: ClientContext,
         scope: UserScope,
     ) -> AgentPermissionContext:
-        from ai.backend.manager.models.scaling_group import (
-            ScalingGroupForKeypairsRow,
-            ScalingGroupRow,
+        from ai.backend.manager.models.resource_group import (
+            ResourceGroupForKeypairsRow,
+            ResourceGroupRow,
         )
 
         permissions = await self.calculate_permission(ctx, scope)
@@ -476,11 +480,11 @@ class AgentPermissionContextBuilder(
         access_keys = cast(list[AccessKey], [r.access_key for r in kp_rows])
 
         _stmt = (
-            sa.select(ScalingGroupForKeypairsRow)
-            .where(ScalingGroupForKeypairsRow.access_key.in_(access_keys))
+            sa.select(ResourceGroupForKeypairsRow)
+            .where(ResourceGroupForKeypairsRow.access_key.in_(access_keys))
             .options(
-                joinedload(ScalingGroupForKeypairsRow.sgroup_row).options(
-                    selectinload(ScalingGroupRow.agents)
+                joinedload(ResourceGroupForKeypairsRow.sgroup_row).options(
+                    selectinload(ResourceGroupRow.agents)
                 )
             )
         )
@@ -532,11 +536,11 @@ async def get_permission_ctx(
     target_scope: ScopeType,
     requested_permission: AgentPermission,
 ) -> AgentPermissionContext:
-    from ai.backend.manager.models.scaling_group import ScalingGroupPermissionContextBuilder
+    from ai.backend.manager.models.resource_group import ResourceGroupPermissionContextBuilder
 
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
-        sgroup_perm_ctx = await ScalingGroupPermissionContextBuilder(db_session).build(
-            ctx, target_scope, ScalingGroupPermission.AGENT_PERMISSIONS
+        sgroup_perm_ctx = await ResourceGroupPermissionContextBuilder(db_session).build(
+            ctx, target_scope, ResourceGroupPermission.AGENT_PERMISSIONS
         )
 
         builder = AgentPermissionContextBuilder(db_session)

@@ -11,6 +11,11 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.deployment.types import (
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
@@ -75,9 +80,6 @@ from ai.backend.common.dto.manager.v2.session.response import (
     UpdateSessionPayload,
 )
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum, SessionStatusFilter
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.identifier.session import SessionID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -287,6 +289,7 @@ class SessionAdapter(BaseAdapter):
             )
 
         action = EnqueueSessionAction(
+            project_id=ProjectID(group_id),
             session_name=input.session_name,
             session_type=SessionTypes(input.session_type.value),
             image_id=input.image_id,
@@ -328,7 +331,7 @@ class SessionAdapter(BaseAdapter):
             batch=batch_spec,
             tag=input.tag,
             callback_url=input.callback_url,
-            user_id=user_id,
+            user_id=UserID(user_id),
             user_role=UserRole(user_role),
             access_key=AccessKey(access_key),
             domain_name=domain_name,
@@ -336,7 +339,7 @@ class SessionAdapter(BaseAdapter):
             owner_id=input.owner_id,
         )
 
-        result = await self._processors.session.enqueue_session.wait_for_complete(action)
+        result = await self._processors.session.enqueue_session.run(action)
         return EnqueueSessionPayload(
             session=self._session_data_to_node(result.session_data),
         )
@@ -382,7 +385,7 @@ class SessionAdapter(BaseAdapter):
                 else None
             ),
         )
-        result = await self._processors.session.compute_schedule.wait_for_complete(action)
+        result = await self._processors.session.compute_schedule.run(action)
         return ComputeSchedulePayload(
             results=[
                 self._compute_schedule_kernel_result_to_info(kernel_result)
@@ -431,8 +434,8 @@ class SessionAdapter(BaseAdapter):
 
     async def get(self, session_id: SessionId) -> SessionNode:
         """Get a single session by ID with RBAC validation."""
-        action_result = await self._processors.session.get_session.wait_for_complete(
-            GetSessionAction(session_id=session_id)
+        action_result = await self._processors.session.get_session.run(
+            GetSessionAction(session_id=SessionID(session_id))
         )
         return self._session_data_to_node(action_result.session_data)
 
@@ -451,8 +454,8 @@ class SessionAdapter(BaseAdapter):
             pagination=NoPagination(),
             conditions=[SessionConditions.by_ids(session_ids)],
         )
-        action_result = await self._processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=querier, user_id=self._require_user_id())
+        action_result = await self._processors.session.search_sessions.run(
+            SearchSessionsAction(querier=querier, user_id=UserID(self._require_user_id()))
         )
         session_map: dict[SessionId, SessionNode] = {
             SessionId(data.id): self._session_data_to_node(data) for data in action_result.data
@@ -472,8 +475,8 @@ class SessionAdapter(BaseAdapter):
             pagination=NoPagination(),
             conditions=[KernelConditions.by_ids(kernel_ids)],
         )
-        action_result = await self._processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=querier, user_id=self._require_user_id())
+        action_result = await self._processors.session.search_kernels.run(
+            SearchKernelsAction(querier=querier, user_id=UserID(self._require_user_id()))
         )
         kernel_map: dict[KernelId, KernelNode] = {
             info.id: self._kernel_info_to_node(info) for info in action_result.data
@@ -513,10 +516,8 @@ class SessionAdapter(BaseAdapter):
         """
         if not session_ids:
             return []
-        action_result = (
-            await self._processors.session.batch_get_session_resource_allocation.wait_for_complete(
-                BatchGetSessionResourceAllocationAction(session_ids=list(session_ids))
-            )
+        action_result = await self._processors.session.batch_get_session_resource_allocation.run(
+            BatchGetSessionResourceAllocationAction(session_ids=list(session_ids))
         )
         return [
             self._aggregate_to_allocation_dto(action_result.data.get(sid)) for sid in session_ids
@@ -531,10 +532,8 @@ class SessionAdapter(BaseAdapter):
         """
         if not kernel_ids:
             return []
-        action_result = (
-            await self._processors.session.batch_get_kernel_resource_allocation.wait_for_complete(
-                BatchGetKernelResourceAllocationAction(kernel_ids=list(kernel_ids))
-            )
+        action_result = await self._processors.session.batch_get_kernel_resource_allocation.run(
+            BatchGetKernelResourceAllocationAction(kernel_ids=list(kernel_ids))
         )
         return [
             self._aggregate_to_allocation_dto(action_result.data.get(kid)) for kid in kernel_ids
@@ -563,8 +562,8 @@ class SessionAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        action_result = await self._processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=querier, user_id=self._require_user_id())
+        action_result = await self._processors.session.search_sessions.run(
+            SearchSessionsAction(querier=querier, user_id=UserID(self._require_user_id()))
         )
 
         return AdminSearchSessionsPayload(
@@ -596,8 +595,8 @@ class SessionAdapter(BaseAdapter):
             base_conditions=[scope_condition],
         )
 
-        action_result = await self._processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=querier, user_id=self._require_user_id())
+        action_result = await self._processors.session.search_sessions.run(
+            SearchSessionsAction(querier=querier, user_id=UserID(self._require_user_id()))
         )
 
         return AdminSearchSessionsPayload(
@@ -631,8 +630,8 @@ class SessionAdapter(BaseAdapter):
             offset=input.offset,
             base_conditions=[_by_user_uuid],
         )
-        action_result = await self._processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=querier, user_id=user.user_id)
+        action_result = await self._processors.session.search_sessions.run(
+            SearchSessionsAction(querier=querier, user_id=UserID(user.user_id))
         )
         return AdminSearchSessionsPayload(
             items=[self._session_data_to_node(item) for item in action_result.data],
@@ -660,7 +659,7 @@ class SessionAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.session.search_sessions_in_project.wait_for_complete(
+        action_result = await self._processors.session.search_sessions_in_project.run(
             SearchSessionsInProjectAction(scope=scope, querier=querier)
         )
         return AdminSearchSessionsPayload(
@@ -692,8 +691,8 @@ class SessionAdapter(BaseAdapter):
             offset=input.offset,
             base_conditions=[_by_project_id],
         )
-        action_result = await self._processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=querier, user_id=self._require_user_id())
+        action_result = await self._processors.session.search_sessions.run(
+            SearchSessionsAction(querier=querier, user_id=UserID(self._require_user_id()))
         )
         return AdminSearchSessionsPayload(
             items=[self._session_data_to_node(item) for item in action_result.data],
@@ -823,8 +822,8 @@ class SessionAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        action_result = await self._processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=querier, user_id=self._require_user_id())
+        action_result = await self._processors.session.search_kernels.run(
+            SearchKernelsAction(querier=querier, user_id=UserID(self._require_user_id()))
         )
 
         return AdminSearchKernelsPayload(
@@ -856,8 +855,8 @@ class SessionAdapter(BaseAdapter):
             base_conditions=[scope_condition],
         )
 
-        action_result = await self._processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=querier, user_id=self._require_user_id())
+        action_result = await self._processors.session.search_kernels.run(
+            SearchKernelsAction(querier=querier, user_id=UserID(self._require_user_id()))
         )
 
         return AdminSearchKernelsPayload(
@@ -889,8 +888,8 @@ class SessionAdapter(BaseAdapter):
             base_conditions=[scope_condition],
         )
 
-        action_result = await self._processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=querier, user_id=self._require_user_id())
+        action_result = await self._processors.session.search_kernels.run(
+            SearchKernelsAction(querier=querier, user_id=UserID(self._require_user_id()))
         )
 
         return AdminSearchKernelsPayload(
@@ -982,7 +981,7 @@ class SessionAdapter(BaseAdapter):
             session_ids=[SessionId(sid) for sid in input.session_ids],
             forced=input.forced,
         )
-        result = await self._processors.session.terminate_sessions.wait_for_complete(action)
+        result = await self._processors.session.terminate_sessions.run(action)
         return TerminateSessionsPayload(
             cancelled=result.cancelled,
             terminating=result.terminating,
@@ -1015,14 +1014,14 @@ class SessionAdapter(BaseAdapter):
     ) -> StartSessionServicePayload:
         """Start an app service in a session."""
         action = StartServiceAction(
-            session_id=session_id,
+            session_id=SessionID(session_id),
             service=input.service,
             login_session_token=input.login_session_token,
             port=input.port,
             arguments=json.dumps(input.arguments) if input.arguments else None,
             envs=json.dumps(input.envs) if input.envs else None,
         )
-        result = await self._processors.session.start_service.wait_for_complete(action)
+        result = await self._processors.session.start_service.run(action)
         return StartSessionServicePayload(token=result.token, wsproxy_addr=result.wsproxy_addr)
 
     async def shutdown_service(
@@ -1033,11 +1032,12 @@ class SessionAdapter(BaseAdapter):
     ) -> None:
         """Shut down a service in a session."""
         action = ShutdownServiceAction(
+            session_id=SessionID(session_id),
             session_name=str(session_id),
             owner_access_key=AccessKey(access_key),
             service_name=input.service,
         )
-        await self._processors.session.shutdown_service.wait_for_complete(action)
+        await self._processors.session.shutdown_service.run(action)
 
     # -------------------------------------------------------------------------
     # Logs
@@ -1051,11 +1051,12 @@ class SessionAdapter(BaseAdapter):
     ) -> SessionLogsPayload:
         """Get container logs for a session."""
         action = GetContainerLogsAction(
+            session_id=SessionID(session_id),
             session_name=str(session_id),
             owner_access_key=AccessKey(access_key),
             kernel_id=KernelId(kernel_id) if kernel_id else None,
         )
-        result = await self._processors.session.get_container_logs.wait_for_complete(action)
+        result = await self._processors.session.get_container_logs.run(action)
         logs_text = result.result.get("result", {}).get("logs", "")
         return SessionLogsPayload(logs=logs_text)
 
@@ -1072,11 +1073,12 @@ class SessionAdapter(BaseAdapter):
         """Update session fields (currently supports rename only)."""
         if input.name is not None:
             action = RenameSessionAction(
+                session_id=SessionID(session_id),
                 session_name=str(session_id),
                 new_name=input.name,
                 owner_access_key=AccessKey(access_key),
             )
-            result = await self._processors.session.rename_session.wait_for_complete(action)
+            result = await self._processors.session.rename_session.run(action)
             return UpdateSessionPayload(session=self._session_data_to_node(result.session_data))
         # If no fields to update, just return the current session
         session_node = await self.get(SessionId(session_id))
@@ -1114,7 +1116,7 @@ class SessionAdapter(BaseAdapter):
             id=data.id,
             image_ids=data.image_ids,
             domain_name=data.domain_name,
-            user_id=data.user_uuid,
+            user_id=UserID(data.user_uuid),
             project_id=data.group_id,
             metadata=SessionMetadataInfoGQLDTO(
                 creation_id=data.creation_id or "",
@@ -1130,7 +1132,7 @@ class SessionAdapter(BaseAdapter):
             ),
             resource=SessionResourceInfoGQLDTO(
                 allocation=ResourceAllocationGQLDTO(requested=requested, used=occupied),
-                resource_group_name=data.scaling_group_name,
+                resource_group_name=data.resource_group_name,
             ),
             lifecycle=SessionLifecycleInfoGQLDTO(
                 status=_fold_session_status(data.status),
@@ -1195,7 +1197,7 @@ class SessionAdapter(BaseAdapter):
                 session_type=info.session.session_type.value,
             ),
             user_info=KernelUserInfoGQLDTO(
-                user_id=info.user_permission.user_uuid,
+                user_id=UserID(info.user_permission.user_uuid),
                 access_key=info.user_permission.access_key,
                 domain_name=info.user_permission.domain_name,
                 group_id=info.user_permission.group_id,
@@ -1212,7 +1214,7 @@ class SessionAdapter(BaseAdapter):
             ),
             resource=KernelResourceInfoGQLDTO(
                 agent_id=info.resource.agent,
-                resource_group_name=info.resource.scaling_group,
+                resource_group_name=info.resource.resource_group,
                 container_id=info.resource.container_id,
                 allocation=ResourceAllocationGQLDTO(requested=requested, used=occupied),
                 shares=shares,

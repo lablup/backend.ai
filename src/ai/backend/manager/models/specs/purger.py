@@ -1,6 +1,6 @@
 """Delete specs of the v2 lineage.
 
-The family roots below are deliberately unrelated — no common ABC. See AGENTS.md
+The roots below are deliberately unrelated — no common ABC. See AGENTS.md
 in this package before typing anything against more than one of them.
 """
 
@@ -8,48 +8,27 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.orm import InstrumentedAttribute
 
-from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.types import ConflictCheck
 
 
-class GlobalEntityPurger[TRow: Base, TData](ABC):
-    """Delete spec of a global entity; no scope to tear down."""
-
-    @abstractmethod
-    def row_class(self) -> type[TRow]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def pk_value(self) -> UUID | str | int:
-        raise NotImplementedError
-
-    @abstractmethod
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def to_data(self, row: TRow) -> TData:
-        raise NotImplementedError
-
-
 class EntityPurger[TRow: Base, TData](ABC):
-    """Delete spec of an entity: purging the row tears its scope down with it
-    (the virtual scope node, the edges it left elsewhere, and any permissions
-    granted on it), symmetrically with the entity create.
+    """Delete spec of one entity named by id.
 
-    ``scope_of()`` takes no row: the scope's identity is known from the purge
-    target itself, and the spec carries whatever fields name it — the scope id
-    is not necessarily the row's primary key.
+    Removing the row removes what it left in the RBAC graph. Declared separately from
+    ``pk_value()`` because a primary key is not always the entity id.
     """
 
     @abstractmethod
-    def scope_of(self) -> ScopeRef:
-        """The scope being torn down."""
+    def entity_id(self) -> EntityIdentifier:
+        """The id of the entity this row is."""
         raise NotImplementedError
 
     @abstractmethod
@@ -57,7 +36,8 @@ class EntityPurger[TRow: Base, TData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def pk_value(self) -> UUID | str | int:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        """Return the column carrying the entity id, which the delete keys on."""
         raise NotImplementedError
 
     @abstractmethod
@@ -69,7 +49,7 @@ class EntityPurger[TRow: Base, TData](ABC):
         raise NotImplementedError
 
 
-class FieldEntityPurger[TRow: Base, TData](ABC):
+class FieldPurger[TRow: Base, TData: FieldData](ABC):
     """Delete spec of a field row — authorized through its owner, like an update
     to the owning entity; no scope to tear down."""
 
@@ -78,7 +58,13 @@ class FieldEntityPurger[TRow: Base, TData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def pk_value(self) -> UUID | str | int:
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        """Return the column carrying the field id, which the delete keys on."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def target_id_value(self) -> UUID:
+        """Return the id of the field row to delete."""
         raise NotImplementedError
 
     @abstractmethod
@@ -94,7 +80,7 @@ class DataBatchPurger[TRow: Base, TData](ABC):
     """Delete spec for every row a subquery selects, converting each deleted row
     to data so the operation can report what it actually removed.
 
-    Carries no scope teardown: reserve it for global- and field-family rows
+    Carries no scope teardown: reserve it for rows that provision no scope
     until a batch purge that tears scopes down exists.
     """
 

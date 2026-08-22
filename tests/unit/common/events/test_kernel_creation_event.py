@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.events.event_types.kernel.anycast import (
     KernelPreparingAnycastEvent,
     KernelStartedAnycastEvent,
@@ -15,7 +16,6 @@ from ai.backend.common.events.event_types.kernel.types import (
     UsedDevice,
     UsedDevices,
 )
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     ContainerId,
     DeviceId,

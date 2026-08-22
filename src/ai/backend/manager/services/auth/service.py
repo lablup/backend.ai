@@ -16,9 +16,9 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionInner,
     LoginSessionTokenData,
 )
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters, UserResourcePolicyNotFound
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import AccessKey, SecretKey, SSHPrivateKey, SSHPublicKey
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -26,6 +26,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
+from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.defs import DEFAULT_PROJECT_NAME
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
@@ -40,6 +41,7 @@ from ai.backend.manager.errors.common import (
     ObjectNotFound,
     RejectedByHook,
 )
+from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import (
     generate_ssh_keypair,
@@ -53,7 +55,7 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
-from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
@@ -145,7 +147,7 @@ class AuthService:
     _valkey_session_client: ValkeySessionClient
     _user_resource_policy_repository: UserResourcePolicyRepository
     _user_repository: UserRepository
-    _group_repository: GroupRepository
+    _group_repository: ProjectRepository
     _ssh_key_validator: SSHKeyValidator
 
     def __init__(
@@ -156,7 +158,7 @@ class AuthService:
         valkey_session_client: ValkeySessionClient,
         user_resource_policy_repository: UserResourcePolicyRepository,
         user_repository: UserRepository,
-        group_repository: GroupRepository,
+        group_repository: ProjectRepository,
         ssh_key_validator: SSHKeyValidator,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx
@@ -193,6 +195,26 @@ class AuthService:
             group_role=group_role,
         )
 
+    def _keypair_hook_payload(self, keypair: KeyPairData) -> dict[str, object]:
+        """The keypair columns POST_AUTHORIZE hands to its plugins."""
+        return {
+            "access_key": keypair.access_key,
+            "secret_key": keypair.secret_key,
+            "is_active": keypair.is_active,
+            "is_admin": keypair.is_admin,
+            "created_at": keypair.created_at,
+            "modified_at": keypair.modified_at,
+            "last_used": keypair.last_used,
+            "rate_limit": keypair.rate_limit,
+            "num_queries": keypair.num_queries,
+            "ssh_public_key": keypair.ssh_public_key,
+            "ssh_private_key": keypair.ssh_private_key,
+            "user": keypair.user_id,
+            "resource_policy": keypair.resource_policy_name,
+            "dotfiles": keypair.dotfiles,
+            "bootstrap_script": keypair.bootstrap_script,
+        }
+
     async def authorize(self, action: AuthorizeAction) -> AuthorizeActionResult:
         if action.type != AuthTokenType.KEYPAIR:
             raise InvalidAPIParameters("Unsupported authorization type")
@@ -204,10 +226,10 @@ class AuthService:
             post_result = await self._post_check(action, user, active_sessions, auth_config)
             if isinstance(post_result, AuthorizeActionResult):
                 return post_result
-            keypair_row, live_sessions = post_result
+            keypair, live_sessions = post_result
 
             return await self._create_login_session(
-                action, user, keypair_row, live_sessions, auth_config, login_client_type_id
+                action, user, keypair, live_sessions, auth_config, login_client_type_id
             )
         except (
             AuthorizationFailed,
@@ -264,7 +286,7 @@ class AuthService:
         user: RowMapping,
         active_sessions: list[ActiveSessionInfo],
         auth_config: AuthConfig,
-    ) -> tuple[Any, list[ActiveSessionInfo]] | AuthorizeActionResult:
+    ) -> tuple[KeyPairData, list[ActiveSessionInfo]] | AuthorizeActionResult:
         """Step 2: User status checks, keypair lookup, POST_AUTHORIZE hook, Valkey cross-check."""
         if user.status == UserStatus.BEFORE_VERIFICATION:
             raise AuthorizationFailed("This account needs email verification.")
@@ -272,14 +294,19 @@ class AuthService:
             raise AuthorizationFailed("User credential mismatch.")
         await self._check_password_age(user, auth_config)
 
-        user_row = await self._auth_repository.get_user_row_by_uuid(user.uuid)
-        default_keypair_row = user_row.get_default_keypair_row()
-        if default_keypair_row is None:
-            raise AuthorizationFailed("No API keypairs found.")
+        try:
+            default_keypair = await self._auth_repository.default_keypair(user.uuid)
+        except KeyPairNotFound as e:
+            raise AuthorizationFailed("No API keypairs found.") from e
 
         hook_result = await self._hook_plugin_ctx.dispatch(
             "POST_AUTHORIZE",
-            (action.request, action.hook_params, user, default_keypair_row.mapping),
+            (
+                action.request,
+                action.hook_params,
+                user,
+                self._keypair_hook_payload(default_keypair),
+            ),
             return_when=FIRST_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -300,7 +327,7 @@ class AuthService:
                     session_info.session_token, LoginAttemptResult.EXPIRED
                 )
 
-        return default_keypair_row, live_sessions
+        return default_keypair, live_sessions
 
     def _enforce_max_concurrent_logins(
         self,
@@ -342,7 +369,7 @@ class AuthService:
         self,
         action: AuthorizeAction,
         user: RowMapping,
-        keypair_row: Any,
+        keypair: KeyPairData,
         live_sessions: list[ActiveSessionInfo],
         auth_config: AuthConfig,
         login_client_type_id: uuid.UUID | None,
@@ -375,7 +402,7 @@ class AuthService:
         # Create-before-destroy: evict old sessions only after the new one is persisted.
         session_result = await self._auth_repository.create_login_session(
             user_id=user.uuid,
-            access_key=keypair_row.access_key,
+            access_key=keypair.access_key,
             domain_name=action.domain_name,
             login_client_type_id=login_client_type_id,
         )
@@ -394,8 +421,8 @@ class AuthService:
                 authenticated=True,
                 token=LoginSessionTokenData(
                     type="keypair",
-                    access_key=keypair_row.access_key,
-                    secret_key=keypair_row.secret_key,
+                    access_key=keypair.access_key,
+                    secret_key=keypair.secret_key,
                     role=user.role,
                     status=user.status,
                 ),
@@ -410,8 +437,8 @@ class AuthService:
         return AuthorizeActionResult(
             stream_response=None,
             authorization_result=AuthorizationResult(
-                access_key=AccessKey(keypair_row.access_key),
-                secret_key=SecretKey(keypair_row.secret_key),
+                access_key=AccessKey(keypair.access_key),
+                secret_key=SecretKey(keypair.secret_key),
                 user_id=UserID(user.uuid),
                 role=UserRole(user.role),
                 status=user.status,

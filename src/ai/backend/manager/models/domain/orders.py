@@ -7,7 +7,7 @@ from typing import Any
 import sqlalchemy as sa
 
 from ai.backend.manager.models.clauses import QueryOrder
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.user import UserRow
 
 from .row import DomainRow
@@ -51,14 +51,14 @@ class DomainOrders:
         """Scalar subquery with MIN for 1:N relationship (Domain → Project)."""
         return (
             sa.select(sa.func.min(column))
-            .where(GroupRow.domain_name == DomainRow.name)
+            .where(ProjectRow.domain_name == DomainRow.name)
             .correlate(DomainRow)
             .scalar_subquery()
         )
 
     @staticmethod
     def by_project_name(ascending: bool = True) -> QueryOrder:
-        subq = DomainOrders._scalar_project_min(GroupRow.name)
+        subq = DomainOrders._scalar_project_min(ProjectRow.name)
         return subq.asc() if ascending else subq.desc()
 
     # ==================== User Nested Orders ====================

@@ -11,11 +11,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
     NewDeploymentCreator,
@@ -32,7 +32,7 @@ from ai.backend.manager.repositories.deployment.creators.deployment import (
     DeploymentCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
-    DeploymentRevisionPresetRepository,
+    DeploymentPresetRepository,
 )
 from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentController,
@@ -69,7 +69,7 @@ class TestDeploymentFromPreset:
 
     @pytest.fixture
     def mock_preset_repository(self, preset_data: DeploymentRevisionPresetData) -> MagicMock:
-        repository = MagicMock(spec=DeploymentRevisionPresetRepository)
+        repository = MagicMock(spec=DeploymentPresetRepository)
         repository.get_by_id = AsyncMock(return_value=preset_data)
         return repository
 

@@ -23,8 +23,18 @@ from decimal import Decimal
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.resource_usage_history.types import (
+    DomainUsageBucketData,
+    KernelUsageRecordData,
+    ProjectUsageBucketData,
+    UserUsageBucketData,
+)
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -58,10 +68,14 @@ class KernelUsageRecordRow(Base):
     )
 
     # Foreign keys (no FK constraints - referenced entities can be deleted)
-    kernel_id: Mapped[uuid.UUID] = mapped_column("kernel_id", GUID, nullable=False, index=True)
-    session_id: Mapped[uuid.UUID] = mapped_column("session_id", GUID, nullable=False)
-    user_uuid: Mapped[uuid.UUID] = mapped_column("user_uuid", GUID, nullable=False, index=True)
-    project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)
+    kernel_id: Mapped[KernelID] = mapped_column(
+        "kernel_id", GUID(KernelID), nullable=False, index=True
+    )
+    session_id: Mapped[SessionID] = mapped_column("session_id", GUID(SessionID), nullable=False)
+    user_uuid: Mapped[UserID] = mapped_column("user_uuid", GUID(UserID), nullable=False, index=True)
+    project_id: Mapped[ProjectID] = mapped_column(
+        "project_id", GUID(ProjectID), nullable=False, index=True
+    )
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
     )
@@ -92,6 +106,21 @@ class KernelUsageRecordRow(Base):
         sa.Index("ix_kernel_usage_rg_id_period", "resource_group_id", "period_start"),
         sa.Index("ix_kernel_usage_user_period", "user_uuid", "period_start"),
     )
+
+    def to_data(self) -> KernelUsageRecordData:
+        return KernelUsageRecordData(
+            id=self.id,
+            kernel_id=self.kernel_id,
+            session_id=self.session_id,
+            user_uuid=self.user_uuid,
+            project_id=self.project_id,
+            domain_name=self.domain_name,
+            resource_group=self.resource_group,
+            resource_group_id=self.resource_group_id,
+            period_start=self.period_start,
+            period_end=self.period_end,
+            resource_usage=self.resource_usage,
+        )
 
 
 class DomainUsageBucketRow(LifecycleTimestampsMixin, Base):
@@ -150,6 +179,21 @@ class DomainUsageBucketRow(LifecycleTimestampsMixin, Base):
         sa.Index("ix_domain_usage_bucket_lookup", "domain_name", "resource_group", "period_start"),
     )
 
+    def to_data(self) -> DomainUsageBucketData:
+        return DomainUsageBucketData(
+            id=self.id,
+            domain_name=self.domain_name,
+            resource_group=self.resource_group,
+            resource_group_id=self.resource_group_id,
+            period_start=self.period_start,
+            period_end=self.period_end,
+            decay_unit_days=self.decay_unit_days,
+            resource_usage=self.resource_usage,
+            capacity_snapshot=self.capacity_snapshot,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
+
 
 class ProjectUsageBucketRow(LifecycleTimestampsMixin, Base):
     """Per-project period-based resource usage aggregation.
@@ -163,7 +207,9 @@ class ProjectUsageBucketRow(LifecycleTimestampsMixin, Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)
+    project_id: Mapped[ProjectID] = mapped_column(
+        "project_id", GUID(ProjectID), nullable=False, index=True
+    )
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
     )
@@ -208,6 +254,22 @@ class ProjectUsageBucketRow(LifecycleTimestampsMixin, Base):
         sa.Index("ix_project_usage_bucket_lookup", "project_id", "resource_group", "period_start"),
     )
 
+    def to_data(self) -> ProjectUsageBucketData:
+        return ProjectUsageBucketData(
+            id=self.id,
+            project_id=self.project_id,
+            domain_name=self.domain_name,
+            resource_group=self.resource_group,
+            resource_group_id=self.resource_group_id,
+            period_start=self.period_start,
+            period_end=self.period_end,
+            decay_unit_days=self.decay_unit_days,
+            resource_usage=self.resource_usage,
+            capacity_snapshot=self.capacity_snapshot,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
+
 
 class UserUsageBucketRow(LifecycleTimestampsMixin, Base):
     """Per-user period-based resource usage aggregation (computation cache).
@@ -226,8 +288,10 @@ class UserUsageBucketRow(LifecycleTimestampsMixin, Base):
     )
 
     # User identification (user_uuid + project_id + domain_name combination)
-    user_uuid: Mapped[uuid.UUID] = mapped_column("user_uuid", GUID, nullable=False, index=True)
-    project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)
+    user_uuid: Mapped[UserID] = mapped_column("user_uuid", GUID(UserID), nullable=False, index=True)
+    project_id: Mapped[ProjectID] = mapped_column(
+        "project_id", GUID(ProjectID), nullable=False, index=True
+    )
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
     )
@@ -278,6 +342,23 @@ class UserUsageBucketRow(LifecycleTimestampsMixin, Base):
             "period_start",
         ),
     )
+
+    def to_data(self) -> UserUsageBucketData:
+        return UserUsageBucketData(
+            id=self.id,
+            user_uuid=self.user_uuid,
+            project_id=self.project_id,
+            domain_name=self.domain_name,
+            resource_group=self.resource_group,
+            resource_group_id=self.resource_group_id,
+            period_start=self.period_start,
+            period_end=self.period_end,
+            decay_unit_days=self.decay_unit_days,
+            resource_usage=self.resource_usage,
+            capacity_snapshot=self.capacity_snapshot,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
 
 class UsageBucketEntryRow(Base):

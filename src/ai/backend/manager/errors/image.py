@@ -163,7 +163,7 @@ class AliasImageActionDBError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class ModifyImageActionValueError(BackendAIError, web.HTTPBadRequest):
+class UpdateImageActionValueError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-parameters"
     error_title = "Invalid parameters for image modification."
 

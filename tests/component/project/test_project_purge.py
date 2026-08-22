@@ -23,7 +23,7 @@ from ai.backend.manager.data.permission.types import (
     Permission,
     ScopeType,
 )
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -54,7 +54,7 @@ async def project_with_rbac_rows(
 
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=project_id,
                 name=f"rbac-purge-{unique}",
                 description="Test project for RBAC purge cleanup",
@@ -177,7 +177,9 @@ async def project_with_rbac_rows(
                 VirtualScopeRow.__table__.c.scope_id == project_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == project_id)
+        )
 
 
 class TestProjectPurgeRBACCleanup:
@@ -197,7 +199,9 @@ class TestProjectPurgeRBACCleanup:
 
         async with db_engine.connect() as conn:
             group_row = await conn.scalar(
-                sa.select(sa.func.count()).select_from(GroupRow).where(GroupRow.id == project_id)
+                sa.select(sa.func.count())
+                .select_from(ProjectRow)
+                .where(ProjectRow.id == project_id)
             )
             ase_after = await conn.scalar(
                 sa.select(sa.func.count())

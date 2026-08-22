@@ -3,34 +3,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.runtime_variant import RUNTIME_VARIANT_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.runtime_variant.actions.base import RuntimeVariantAction
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.runtime_variant.searchers import RuntimeVariantSearcher
 
 
 @dataclass
-class SearchRuntimeVariantsAction(RuntimeVariantAction):
-    querier: BatchQuerier
+class SearchRuntimeVariantsAction(SearchGlobalOpsAction[RuntimeVariantRow, RuntimeVariantData]):
+    """Page through the runtime variant catalog."""
+
+    searcher: RuntimeVariantSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def entity_type(cls) -> EntityType:
+        return RUNTIME_VARIANT_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-@dataclass
-class SearchRuntimeVariantsActionResult(BaseActionResult):
-    items: list[RuntimeVariantData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_runtime_variants"
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def to_searcher(self) -> RuntimeVariantSearcher:
+        return self.searcher

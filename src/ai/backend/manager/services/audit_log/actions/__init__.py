@@ -1,9 +1,7 @@
-from .create import CreateAuditLogAction, CreateAuditLogActionResult
-from .search import SearchAuditLogsAction, SearchAuditLogsActionResult
+from .scoped_search import ScopedSearchAuditLogsAction
+from .search import SearchAuditLogsAction
 
 __all__ = [
-    "CreateAuditLogAction",
-    "CreateAuditLogActionResult",
+    "ScopedSearchAuditLogsAction",
     "SearchAuditLogsAction",
-    "SearchAuditLogsActionResult",
 ]

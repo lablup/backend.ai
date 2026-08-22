@@ -1,9 +1,7 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.types import RuleId
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
 
@@ -14,23 +12,15 @@ class DeleteEndpointAutoScalingRuleAction(ModelServiceAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.DEPLOYMENT_AUTO_SCALING_RULE
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
-    @override
-    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.DELETE
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "delete_endpoint_auto_scaling_rule"
+
 
 @dataclass
-class DeleteEndpointAutoScalingRuleActionResult(BaseActionResult):
+class DeleteEndpointAutoScalingRuleActionResult:
     success: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

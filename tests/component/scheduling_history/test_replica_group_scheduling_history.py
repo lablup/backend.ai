@@ -20,6 +20,7 @@ import pytest
 
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     AdminSearchReplicaGroupHistoriesInput,
@@ -36,7 +37,6 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     ReplicaGroupHistoryOrderField,
     ReplicaGroupHistoryScopeDTO,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
 
 if TYPE_CHECKING:
     from tests.component.scheduling_history.conftest import ReplicaGroupHistorySeed

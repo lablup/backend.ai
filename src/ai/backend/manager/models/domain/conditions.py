@@ -7,20 +7,20 @@ from datetime import datetime
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
     make_nested_string_in_factory,
     make_string_in_factory,
 )
-from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow, ResourceGroupRow
 from ai.backend.manager.models.user import UserRow
 
 from .row import DomainRow
@@ -32,6 +32,22 @@ class DomainConditions:
     """Query conditions for filtering domains."""
 
     # ==================== ID Filters ====================
+
+    @staticmethod
+    def by_resource_group_name(name: str) -> QueryCondition:
+        """Match the domains a resource group is associated with."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.id.in_(
+                sa.select(ResourceGroupForDomainRow.domain_id).where(
+                    ResourceGroupForDomainRow.resource_group_id
+                    == sa.select(ResourceGroupRow.id)
+                    .where(ResourceGroupRow.name == name)
+                    .scalar_subquery()
+                )
+            )
+
+        return inner
 
     @staticmethod
     def by_ids(ids: Collection[DomainID]) -> QueryCondition:
@@ -274,11 +290,11 @@ class DomainConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.exists(
                 sa.select(1)
-                .where(ScalingGroupForDomainRow.domain_id == DomainRow.id)
+                .where(ResourceGroupForDomainRow.domain_id == DomainRow.id)
                 .where(
-                    ScalingGroupForDomainRow.resource_group_id
-                    == sa.select(ScalingGroupRow.id)
-                    .where(ScalingGroupRow.name == resource_group)
+                    ResourceGroupForDomainRow.resource_group_id
+                    == sa.select(ResourceGroupRow.id)
+                    .where(ResourceGroupRow.name == resource_group)
                     .scalar_subquery()
                 )
             )
@@ -327,8 +343,8 @@ class DomainConditions:
     def _exists_project(
         *project_conditions: sa.sql.expression.ColumnElement[bool],
     ) -> sa.sql.expression.ColumnElement[bool]:
-        """EXISTS subquery: Domain → Project (via FK GroupRow.domain_name)."""
-        subq = sa.select(sa.literal(1)).where(GroupRow.domain_name == DomainRow.name)
+        """EXISTS subquery: Domain → Project (via FK ProjectRow.domain_name)."""
+        subq = sa.select(sa.literal(1)).where(ProjectRow.domain_name == DomainRow.name)
         for cond in project_conditions:
             subq = subq.where(cond)
         return sa.exists(subq)
@@ -337,9 +353,9 @@ class DomainConditions:
     def by_project_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                cond = GroupRow.name.ilike(f"%{spec.value}%")
+                cond = ProjectRow.name.ilike(f"%{spec.value}%")
             else:
-                cond = GroupRow.name.like(f"%{spec.value}%")
+                cond = ProjectRow.name.like(f"%{spec.value}%")
             if spec.negated:
                 cond = sa.not_(cond)
             return DomainConditions._exists_project(cond)
@@ -350,9 +366,9 @@ class DomainConditions:
     def by_project_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                cond = sa.func.lower(GroupRow.name) == spec.value.lower()
+                cond = sa.func.lower(ProjectRow.name) == spec.value.lower()
             else:
-                cond = GroupRow.name == spec.value
+                cond = ProjectRow.name == spec.value
             if spec.negated:
                 cond = sa.not_(cond)
             return DomainConditions._exists_project(cond)
@@ -363,9 +379,9 @@ class DomainConditions:
     def by_project_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                cond = GroupRow.name.ilike(f"{spec.value}%")
+                cond = ProjectRow.name.ilike(f"{spec.value}%")
             else:
-                cond = GroupRow.name.like(f"{spec.value}%")
+                cond = ProjectRow.name.like(f"{spec.value}%")
             if spec.negated:
                 cond = sa.not_(cond)
             return DomainConditions._exists_project(cond)
@@ -376,9 +392,9 @@ class DomainConditions:
     def by_project_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                cond = GroupRow.name.ilike(f"%{spec.value}")
+                cond = ProjectRow.name.ilike(f"%{spec.value}")
             else:
-                cond = GroupRow.name.like(f"%{spec.value}")
+                cond = ProjectRow.name.like(f"%{spec.value}")
             if spec.negated:
                 cond = sa.not_(cond)
             return DomainConditions._exists_project(cond)
@@ -386,13 +402,15 @@ class DomainConditions:
         return inner
 
     by_project_name_in = staticmethod(
-        make_nested_string_in_factory(GroupRow.name, lambda c: DomainConditions._exists_project(c))
+        make_nested_string_in_factory(
+            ProjectRow.name, lambda c: DomainConditions._exists_project(c)
+        )
     )
 
     @staticmethod
     def by_project_is_active(is_active: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainConditions._exists_project(GroupRow.is_active == is_active)
+            return DomainConditions._exists_project(ProjectRow.is_active == is_active)
 
         return inner
 
@@ -401,7 +419,7 @@ class DomainConditions:
         """Combine multiple project conditions into single EXISTS subquery."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subq = sa.select(sa.literal(1)).where(GroupRow.domain_name == DomainRow.name)
+            subq = sa.select(sa.literal(1)).where(ProjectRow.domain_name == DomainRow.name)
             for cond in project_conditions:
                 subq = subq.where(cond())
             return sa.exists(subq)

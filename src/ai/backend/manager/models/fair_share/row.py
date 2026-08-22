@@ -15,7 +15,9 @@ from decimal import Decimal
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
@@ -298,7 +300,9 @@ class ProjectFairShareRow(LifecycleTimestampsMixin, Base):
         GUID(ResourceGroupID),
         nullable=False,
     )
-    project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)
+    project_id: Mapped[ProjectID] = mapped_column(
+        "project_id", GUID(ProjectID), nullable=False, index=True
+    )
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
     )
@@ -483,8 +487,10 @@ class UserFairShareRow(LifecycleTimestampsMixin, Base):
         GUID(ResourceGroupID),
         nullable=False,
     )
-    user_uuid: Mapped[uuid.UUID] = mapped_column("user_uuid", GUID, nullable=False, index=True)
-    project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)
+    user_uuid: Mapped[UserID] = mapped_column("user_uuid", GUID(UserID), nullable=False, index=True)
+    project_id: Mapped[ProjectID] = mapped_column(
+        "project_id", GUID(ProjectID), nullable=False, index=True
+    )
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
     )

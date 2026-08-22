@@ -99,6 +99,7 @@ from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyS
 from ai.backend.common.config import ModelConfig, ModelDefinition
 from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.common.data.agent.types import AgentInfo
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.image.types import InstalledImageInfo, ScannedImage
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
@@ -179,7 +180,6 @@ from ai.backend.common.exception import (
     ConfigurationError,
     VolumeMountFailed,
 )
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.json import (
     dump_json,
     dump_json_str,

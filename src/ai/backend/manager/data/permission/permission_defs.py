@@ -54,7 +54,7 @@ class ComputeSessionPermission(BasePermission):
     CONVERT_TO_IMAGE = enum.auto()
 
 
-class ScalingGroupPermission(BasePermission):
+class ResourceGroupPermission(BasePermission):
     # super-admin only
     ASSOCIATE_WITH_SCOPES = enum.auto()
     ASSIGN_AGENTS = enum.auto()

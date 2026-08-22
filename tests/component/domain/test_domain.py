@@ -24,7 +24,7 @@ from ai.backend.common.dto.manager.domain import (
     UpdateDomainResponse,
 )
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.project import groups
 
 DomainFactory = Callable[..., Coroutine[Any, Any, CreateDomainResponse]]
 

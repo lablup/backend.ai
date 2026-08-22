@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import override
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession

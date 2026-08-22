@@ -7,7 +7,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 
@@ -36,12 +35,3 @@ class RuntimeVariantPresetRepository:
 
     async def update(self, updater: Updater[RuntimeVariantPresetRow]) -> RuntimeVariantPresetData:
         return await self._db_source.update(updater)
-
-    async def delete(self, preset_id: UUID) -> RuntimeVariantPresetData:
-        return await self._db_source.delete(preset_id)
-
-    async def search(
-        self,
-        querier: BatchQuerier,
-    ) -> tuple[list[RuntimeVariantPresetData], int, bool, bool]:
-        return await self._db_source.search(querier)

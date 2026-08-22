@@ -14,6 +14,7 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -26,7 +27,6 @@ from ai.backend.common.data.permission.types import (
     RelationType,
     ScopeType,
 )
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
@@ -46,8 +46,8 @@ from ai.backend.manager.api.rest.v2.idle_checker_assignment.registry import (
     register_v2_idle_checker_assignment_routes,
 )
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -185,7 +185,7 @@ async def assignment_seed(
         )
         await db_sess.flush()
         db_sess.add(
-            GroupRow(
+            ProjectRow(
                 id=project_id,
                 name=f"icb-project-{project_id.hex[:8]}",
                 domain_name=domain_name,
@@ -194,7 +194,7 @@ async def assignment_seed(
             )
         )
         db_sess.add(
-            GroupRow(
+            ProjectRow(
                 id=other_project_id,
                 name=f"icb-project-{other_project_id.hex[:8]}",
                 domain_name=domain_name,
@@ -287,8 +287,8 @@ async def assignment_seed(
             IdleCheckerRow.__table__.delete().where(IdleCheckerRow.__table__.c.id == checker_id)
         )
         await conn.execute(
-            GroupRow.__table__.delete().where(
-                GroupRow.__table__.c.id.in_([project_id, other_project_id])
+            ProjectRow.__table__.delete().where(
+                ProjectRow.__table__.c.id.in_([project_id, other_project_id])
             )
         )
         await conn.execute(

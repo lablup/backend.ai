@@ -19,6 +19,13 @@ Applies to every generated artifact — docs, code comments, BEPs, PR descriptio
 - Prefer tables and lists over prose.
 - Code examples show the interface/contract only, not internal implementation.
 - State a rule once at its highest scope (see above); link instead of repeating.
+- No asides. Write the rule and the fact, nothing around them.
+- Never restate the previous sentence in different words.
+- Leave out how an individual value is composed and why a choice reads as natural.
+- Do not coin a term to group things. Name what is there and say how many. A term
+  invented for one document spreads before anyone agrees it is the right one.
+- A comment or docstring stops at three lines. Anything longer is background: put it
+  in `KNOWLEDGE.md` and point at it.
 
 ## Document index
 

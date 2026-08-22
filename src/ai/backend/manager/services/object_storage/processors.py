@@ -1,18 +1,23 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
+from __future__ import annotations
+
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+)
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    SingleEntityActionProcessor,
+)
+from ai.backend.manager.data.artifact.types import ArtifactRevisionData
+from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.services.object_storage.actions.create import (
     CreateObjectStorageAction,
-    CreateObjectStorageActionResult,
 )
-from ai.backend.manager.services.object_storage.actions.delete import (
-    DeleteObjectStorageAction,
-    DeleteObjectStorageActionResult,
-)
-from ai.backend.manager.services.object_storage.actions.get import (
-    GetObjectStorageAction,
-    GetObjectStorageActionResult,
-)
+from ai.backend.manager.services.object_storage.actions.get import GetObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
     GetDownloadPresignedURLActionResult,
@@ -21,52 +26,56 @@ from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url
     GetUploadPresignedURLAction,
     GetUploadPresignedURLActionResult,
 )
-from ai.backend.manager.services.object_storage.actions.list import (
-    ListObjectStorageAction,
-    ListObjectStorageActionResult,
-)
+from ai.backend.manager.services.object_storage.actions.list import ListObjectStorageAction
+from ai.backend.manager.services.object_storage.actions.purge import PurgeObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.search import (
     SearchObjectStoragesAction,
-    SearchObjectStoragesActionResult,
 )
 from ai.backend.manager.services.object_storage.actions.update import (
     UpdateObjectStorageAction,
-    UpdateObjectStorageActionResult,
 )
 from ai.backend.manager.services.object_storage.service import ObjectStorageService
 
 
 class ObjectStorageProcessors:
-    create: ActionProcessor[CreateObjectStorageAction, CreateObjectStorageActionResult]
-    update: ActionProcessor[UpdateObjectStorageAction, UpdateObjectStorageActionResult]
-    delete: ActionProcessor[DeleteObjectStorageAction, DeleteObjectStorageActionResult]
-    get: ActionProcessor[GetObjectStorageAction, GetObjectStorageActionResult]
-    list_storages: ActionProcessor[ListObjectStorageAction, ListObjectStorageActionResult]
-    get_presigned_download_url: ActionProcessor[
+    """The registry CRUD runs against ops; only the presigned-URL paths keep a service."""
+
+    global_create: GlobalActionProcessor[
+        CreateObjectStorageAction, CreatedEntityOpsResult[ObjectStorageData]
+    ]
+    update: SingleEntityActionProcessor[
+        UpdateObjectStorageAction, EntityOpsResult[ObjectStorageData]
+    ]
+    purge: SingleEntityActionProcessor[PurgeObjectStorageAction, EntityOpsResult[ObjectStorageData]]
+    get: SingleEntityActionProcessor[GetObjectStorageAction, EntityOpsResult[ObjectStorageData]]
+    global_list_storages: GlobalActionProcessor[
+        ListObjectStorageAction, BatchOpsResult[ObjectStorageData]
+    ]
+    global_search_object_storages: GlobalActionProcessor[
+        SearchObjectStoragesAction, BatchOpsResult[ObjectStorageData]
+    ]
+    get_presigned_download_url: SingleFieldActionProcessor[
         GetDownloadPresignedURLAction, GetDownloadPresignedURLActionResult
     ]
-    get_presigned_upload_url: ActionProcessor[
+    get_presigned_upload_url: SingleFieldActionProcessor[
         GetUploadPresignedURLAction, GetUploadPresignedURLActionResult
-    ]
-    search_object_storages: ActionProcessor[
-        SearchObjectStoragesAction, SearchObjectStoragesActionResult
     ]
 
     def __init__(
         self,
+        group: ProcessorGroup[ObjectStorageData],
+        revision: LookupFieldGroup[ArtifactRevisionData],
         service: ObjectStorageService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
     ) -> None:
-        self.create = ActionProcessor(service.create, action_monitors)
-        self.update = ActionProcessor(service.update, action_monitors)
-        self.delete = ActionProcessor(service.delete, action_monitors)
-        self.get = ActionProcessor(service.get, action_monitors)
-        self.list_storages = ActionProcessor(service.list, action_monitors)
-        self.get_presigned_download_url = ActionProcessor(
-            service.get_presigned_download_url, action_monitors
+        self.global_create = group.global_create_ops(CreateObjectStorageAction)
+        self.update = group.single_update_ops(UpdateObjectStorageAction)
+        self.purge = group.entity_purge_ops(PurgeObjectStorageAction)
+        self.get = group.single_get_ops(GetObjectStorageAction)
+        self.global_list_storages = group.global_search_ops(ListObjectStorageAction)
+        self.global_search_object_storages = group.global_search_ops(SearchObjectStoragesAction)
+        self.get_presigned_download_url = revision.single_field(
+            GetDownloadPresignedURLAction, service.get_presigned_download_url
         )
-        self.get_presigned_upload_url = ActionProcessor(
-            service.get_presigned_upload_url, action_monitors
+        self.get_presigned_upload_url = revision.single_field(
+            GetUploadPresignedURLAction, service.get_presigned_upload_url
         )
-        self.search_object_storages = ActionProcessor(service.search, action_monitors)

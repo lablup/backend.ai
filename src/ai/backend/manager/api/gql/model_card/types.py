@@ -208,16 +208,32 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
     metadata: ModelCardMetadataGQL = gql_field(
         description="Model metadata including authorship, classification, framework info, and licensing extracted from model-definition.yaml."
     )
-    min_resource: list[ModelCardResourceSlotEntryGQL] | None = gql_field(
-        description="Minimum resource requirements for serving this model. Each entry maps a resource slot (e.g. 'cpu', 'cuda.shares') to its minimum required quantity. Used to filter compatible deployment revision presets via `available_presets`.",
-        default=None,
-    )
     readme: str | None = gql_field(
         description="README content from the model VFolder, typically containing usage instructions and model documentation."
     )
     access_level: ModelCardAccessLevelGQL = gql_field(
         description="Access level of the model card (public or internal)."
     )
+
+    @gql_field(  # type: ignore[misc]
+        description=(
+            "Minimum resource requirements for serving this model. Each entry maps a "
+            "resource slot (e.g. 'cpu', 'cuda.shares') to its minimum required quantity. "
+            "Used to filter compatible deployment revision presets via `available_presets`. "
+            "Read on demand: the requirements are their own table, so a query that does "
+            "not select this field does not read it."
+        )
+    )
+    async def min_resource(
+        self, info: Info[StrawberryGQLContext]
+    ) -> list[ModelCardResourceSlotEntryGQL] | None:
+        card_id = UUID(str(self.id))
+        by_card = await info.context.adapters.model_card.min_resources([card_id])
+        entries = by_card.get(card_id)
+        if not entries:
+            return None
+        return [ModelCardResourceSlotEntryGQL.from_pydantic(e) for e in entries]
+
     created_at: datetime = gql_field(description="Timestamp when this model card was registered.")
     updated_at: datetime | None = gql_field(
         description="Timestamp of the last modification to this model card."

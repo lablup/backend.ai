@@ -4,9 +4,10 @@ import enum
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.types import CIStrEnum, ImageCanonical, ImageID, SlotName
 
 type Resources = dict[SlotName, dict[str, Any]]
@@ -64,7 +65,7 @@ class ResourceLimit:
 
 
 @dataclass
-class ImageData:
+class ImageData(EntityData):
     id: ImageID = field(compare=False)
     name: ImageCanonical
     project: str | None
@@ -85,6 +86,10 @@ class ImageData:
     tags: list[ImageTagEntry]
     status: ImageStatus
     last_used_at: datetime | None = field(default=None, compare=False)
+
+    @override
+    def entity_id(self) -> ImageID:
+        return self.id
 
 
 @dataclass

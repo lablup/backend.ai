@@ -1,4 +1,4 @@
-"""Tests for GroupDBSource.assign_users_to_project()"""
+"""Tests for ProjectDBSource.assign_users_to_project()"""
 
 from __future__ import annotations
 
@@ -8,27 +8,28 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -36,7 +37,6 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -44,15 +44,15 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
-from ai.backend.manager.repositories.group.db_source import GroupDBSource
-from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
+from ai.backend.manager.repositories.project.db_source import ProjectDBSource
+from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
 class TestAssignUsersToProject:
-    """Tests for GroupDBSource.assign_users_to_project"""
+    """Tests for ProjectDBSource.assign_users_to_project"""
 
     @pytest.fixture
     def test_password_info(self) -> PasswordInfo:
@@ -73,7 +73,7 @@ class TestAssignUsersToProject:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -81,7 +81,7 @@ class TestAssignUsersToProject:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AssociationScopesEntitiesRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -185,7 +185,7 @@ class TestAssignUsersToProject:
                 )
             )
             session.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=f"test-project-{project_id.hex[:8]}",
                     description="Test project",
@@ -296,15 +296,15 @@ class TestAssignUsersToProject:
     def group_db_source(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> GroupDBSource:
-        return GroupDBSource(db=db_with_cleanup)
+    ) -> ProjectDBSource:
+        return ProjectDBSource(db=db_with_cleanup)
 
     # --- Test cases ---
 
     async def test_assign_users_success(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
@@ -332,7 +332,7 @@ class TestAssignUsersToProject:
 
     async def test_assign_empty_list_returns_empty(
         self,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
     ) -> None:
@@ -343,7 +343,7 @@ class TestAssignUsersToProject:
     async def test_assign_filters_already_assigned_users(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
@@ -374,7 +374,7 @@ class TestAssignUsersToProject:
 
     async def test_assign_filters_cross_domain_users(
         self,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
@@ -390,7 +390,7 @@ class TestAssignUsersToProject:
 
     async def test_assign_filters_nonexistent_users(
         self,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
     ) -> None:
@@ -401,7 +401,7 @@ class TestAssignUsersToProject:
 
     async def test_assign_all_invalid_returns_empty(
         self,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
         cross_domain_user: UserID,
@@ -417,7 +417,7 @@ class TestAssignUsersToProject:
     async def test_assign_creates_user_role_rows(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
@@ -440,7 +440,7 @@ class TestAssignUsersToProject:
     async def test_assign_creates_scope_entity_rows(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
@@ -463,7 +463,7 @@ class TestAssignUsersToProject:
     async def test_assign_does_not_bind_project_into_user_scope(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
@@ -508,7 +508,7 @@ class TestAssignUsersToProject:
 
 
 class TestUnassignUsersFromProject:
-    """Tests for GroupDBSource.unassign_users_from_project"""
+    """Tests for ProjectDBSource.unassign_users_from_project"""
 
     @pytest.fixture
     def test_password_info(self) -> PasswordInfo:
@@ -528,7 +528,7 @@ class TestUnassignUsersFromProject:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -536,7 +536,7 @@ class TestUnassignUsersFromProject:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AssociationScopesEntitiesRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -616,7 +616,7 @@ class TestUnassignUsersFromProject:
                 )
             )
             session.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=f"test-project-{project_id.hex[:8]}",
                     description="Test project",
@@ -735,15 +735,15 @@ class TestUnassignUsersFromProject:
     def group_db_source(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> GroupDBSource:
-        return GroupDBSource(db=db_with_cleanup)
+    ) -> ProjectDBSource:
+        return ProjectDBSource(db=db_with_cleanup)
 
     # --- Test cases ---
 
     async def test_unassign_returns_unassigned_users(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         project_with_role_registered: ProjectID,
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
@@ -761,7 +761,7 @@ class TestUnassignUsersFromProject:
     async def test_unassign_deletes_scope_entity_rows(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         project_with_role_registered: ProjectID,
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
@@ -787,7 +787,7 @@ class TestUnassignUsersFromProject:
 
     async def test_unassign_nonexistent_user_reports_failure(
         self,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         project_with_role_registered: ProjectID,
     ) -> None:
         """Non-existent user UUID is reported as failure."""

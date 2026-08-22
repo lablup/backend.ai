@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.scale_modifier import ModelDeploymentAutoScalingRuleModifier
 from ai.backend.manager.data.deployment.types import (
@@ -19,8 +18,9 @@ class UpdateAutoScalingRuleAction(AutoScalingRuleBaseAction):
     modifier: ModelDeploymentAutoScalingRuleModifier
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.auto_scaling_rule_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_auto_scaling_rule"
 
     @override
     @classmethod
@@ -29,9 +29,5 @@ class UpdateAutoScalingRuleAction(AutoScalingRuleBaseAction):
 
 
 @dataclass
-class UpdateAutoScalingRuleActionResult(BaseActionResult):
+class UpdateAutoScalingRuleActionResult:
     data: ModelDeploymentAutoScalingRuleData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)

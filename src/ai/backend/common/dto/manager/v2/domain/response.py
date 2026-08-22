@@ -10,8 +10,8 @@ from datetime import datetime
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import BackendAISchema
 

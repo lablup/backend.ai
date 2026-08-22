@@ -9,10 +9,11 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
-from ai.backend.manager.data.app_config_allow_list.types import (
+from ai.backend.manager.data.app_config.types import (
     AppConfigAllowListData,
+    AppConfigDefinitionData,
 )
 from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
 from ai.backend.manager.errors.repository import (
@@ -29,38 +30,35 @@ from ai.backend.manager.models.app_config_allow_list.orders import AppConfigAllo
 from ai.backend.manager.models.app_config_allow_list.purgers import (
     AppConfigAllowListPurger,
 )
+from ai.backend.manager.models.app_config_allow_list.queriers import (
+    AppConfigAllowListQuerier,
+)
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
+from ai.backend.manager.models.app_config_allow_list.searchers import (
+    AppConfigAllowListSearcher,
+)
+from ai.backend.manager.models.app_config_allow_list.updaters import (
+    AppConfigAllowListUpdater,
+)
+from ai.backend.manager.models.app_config_definition.creators import (
+    AppConfigDefinitionCreator,
+)
+from ai.backend.manager.models.app_config_definition.purgers import (
+    AppConfigDefinitionPurger,
+)
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.specs.pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
     OffsetPagination,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.app_config_allow_list.queriers import (
-    AppConfigAllowListQuerier,
-)
-from ai.backend.manager.repositories.app_config_allow_list.searchers import (
-    AppConfigAllowListSearcher,
-)
-from ai.backend.manager.repositories.app_config_allow_list.updaters import (
-    AppConfigAllowListUpdater,
-)
-from ai.backend.manager.repositories.app_config_definition.creators import (
-    AppConfigDefinitionCreatorSpec,
-)
-from ai.backend.manager.repositories.app_config_definition.purgers import (
-    AppConfigDefinitionPurgerSpec,
-)
-from ai.backend.manager.repositories.app_config_definition.repository import (
-    AppConfigDefinitionRepository,
-)
-from ai.backend.manager.repositories.base import (
-    Creator,
-    Purger,
-)
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import OptionalState
@@ -75,7 +73,16 @@ async def database(
     # fragments hanging off the allow-list (cascade tests need them).
     async with with_tables(
         database_connection,
-        [AppConfigDefinitionRow, AppConfigAllowListRow, AppConfigFragmentRow],
+        [
+            VirtualScopeRow,
+            EntityMembershipRow,
+            ScopeBindingRow,
+            RoleRow,
+            PermissionRow,
+            AppConfigDefinitionRow,
+            AppConfigAllowListRow,
+            AppConfigFragmentRow,
+        ],
     ):
         yield database_connection
 
@@ -86,14 +93,18 @@ def repository(database: ExtendedAsyncSAEngine) -> OpsRepository[AppConfigAllowL
 
 
 @pytest.fixture
-def definition_repository(database: ExtendedAsyncSAEngine) -> AppConfigDefinitionRepository:
-    return AppConfigDefinitionRepository(DBOpsProvider(database))
+def definition_repository(
+    database: ExtendedAsyncSAEngine,
+) -> OpsRepository[AppConfigDefinitionData]:
+    return OpsRepository(V2DBOpsProvider(database))
 
 
-async def _register(definition_repository: AppConfigDefinitionRepository, config_name: str) -> None:
+async def _register(
+    definition_repository: OpsRepository[AppConfigDefinitionData], config_name: str
+) -> None:
     """Seed the FK parent: register a config_name in app_config_definitions."""
-    await definition_repository.create(
-        Creator(spec=AppConfigDefinitionCreatorSpec(config_name=config_name))
+    await definition_repository.create_global_entity(
+        AppConfigDefinitionCreator(config_name=config_name)
     )
 
 
@@ -115,7 +126,7 @@ def _missing_id() -> AppConfigAllowListID:
 @pytest.fixture
 async def existing_entry(
     repository: OpsRepository[AppConfigAllowListData],
-    definition_repository: AppConfigDefinitionRepository,
+    definition_repository: OpsRepository[AppConfigDefinitionData],
 ) -> AppConfigAllowListData:
     await _register(definition_repository, "theme")
     return await _create_entry(repository, "theme", AppConfigScopeType.PUBLIC)
@@ -124,7 +135,7 @@ async def existing_entry(
 @pytest.fixture
 async def seeded_entries(
     repository: OpsRepository[AppConfigAllowListData],
-    definition_repository: AppConfigDefinitionRepository,
+    definition_repository: OpsRepository[AppConfigDefinitionData],
 ) -> list[AppConfigAllowListData]:
     for config_name in ("theme", "menu"):
         await _register(definition_repository, config_name)
@@ -142,7 +153,7 @@ class TestCreateAndGet:
     async def test_create_then_get_by_id(
         self,
         repository: OpsRepository[AppConfigAllowListData],
-        definition_repository: AppConfigDefinitionRepository,
+        definition_repository: OpsRepository[AppConfigDefinitionData],
     ) -> None:
         await _register(definition_repository, "theme")
         created = await _create_entry(repository, "theme", AppConfigScopeType.PUBLIC)
@@ -186,7 +197,7 @@ class TestRankAssignment:
     async def test_rank_defaults_by_scope_type(
         self,
         repository: OpsRepository[AppConfigAllowListData],
-        definition_repository: AppConfigDefinitionRepository,
+        definition_repository: OpsRepository[AppConfigDefinitionData],
         scope_type: AppConfigScopeType,
         expected_rank: int,
     ) -> None:
@@ -197,7 +208,7 @@ class TestRankAssignment:
     async def test_explicit_rank_overrides_default(
         self,
         repository: OpsRepository[AppConfigAllowListData],
-        definition_repository: AppConfigDefinitionRepository,
+        definition_repository: OpsRepository[AppConfigDefinitionData],
     ) -> None:
         await _register(definition_repository, "theme")
         created = await _create_entry(repository, "theme", AppConfigScopeType.DOMAIN, rank=250)
@@ -243,7 +254,7 @@ class TestPurge:
         repository: OpsRepository[AppConfigAllowListData],
         existing_entry: AppConfigAllowListData,
     ) -> None:
-        purged = await repository.purge_global_entity(
+        purged = await repository.purge_entity(
             AppConfigAllowListPurger(allow_list_id=existing_entry.id)
         )
         assert purged.id == existing_entry.id
@@ -254,9 +265,7 @@ class TestPurge:
         self, repository: OpsRepository[AppConfigAllowListData]
     ) -> None:
         with pytest.raises(EntityNotFoundError):
-            await repository.purge_global_entity(
-                AppConfigAllowListPurger(allow_list_id=_missing_id())
-            )
+            await repository.purge_entity(AppConfigAllowListPurger(allow_list_id=_missing_id()))
 
     async def test_purge_cascades_to_fragments(
         self,
@@ -276,9 +285,7 @@ class TestPurge:
             )
             await db_sess.flush()
 
-        await repository.purge_global_entity(
-            AppConfigAllowListPurger(allow_list_id=existing_entry.id)
-        )
+        await repository.purge_entity(AppConfigAllowListPurger(allow_list_id=existing_entry.id))
 
         async with database.begin_readonly_session() as db_sess:
             remaining = await db_sess.scalar(
@@ -290,11 +297,11 @@ class TestPurge:
         self,
         database: ExtendedAsyncSAEngine,
         repository: OpsRepository[AppConfigAllowListData],
-        definition_repository: AppConfigDefinitionRepository,
+        definition_repository: OpsRepository[AppConfigDefinitionData],
     ) -> None:
         # Deleting the definition cascades to its allow-list entry and its fragment.
-        definition = await definition_repository.create(
-            Creator(spec=AppConfigDefinitionCreatorSpec(config_name="theme"))
+        definition = await definition_repository.create_global_entity(
+            AppConfigDefinitionCreator(config_name="theme")
         )
         entry = await _create_entry(repository, "theme", AppConfigScopeType.PUBLIC)
         async with database.begin_session() as db_sess:
@@ -308,8 +315,8 @@ class TestPurge:
             )
             await db_sess.flush()
 
-        await definition_repository.purge(
-            Purger(spec=AppConfigDefinitionPurgerSpec(definition_id=definition.id))
+        await definition_repository.purge_entity(
+            AppConfigDefinitionPurger(definition_id=definition.id)
         )
 
         async with database.begin_readonly_session() as db_sess:

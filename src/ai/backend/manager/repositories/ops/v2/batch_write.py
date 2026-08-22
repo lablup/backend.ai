@@ -54,8 +54,8 @@ class V2BatchWriteOps(V2WriteOpsBase):
         """Delete every row the spec selects within ``scopes``; at least one is
         required. Scope conditions are injected into the selecting subquery.
 
-        Carries no membership work: reserve it for global- and field-family
-        entities until a scoped-family batch purge that deregisters exists.
+        Carries no membership work: reserve it for rows that register none until a
+        batch purge that deregisters exists.
         """
         if not scopes:
             raise EmptyOperationScopeError(

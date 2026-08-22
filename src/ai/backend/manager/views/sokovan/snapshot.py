@@ -9,10 +9,10 @@ from decimal import Decimal
 from functools import cached_property
 from typing import override
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,

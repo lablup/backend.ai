@@ -8,13 +8,13 @@ import pytest
 from typeguard import TypeCheckError
 
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.exception import (
     BackendAISchemaValidationFailed,
     InvalidResourceSlotQuantity,
     UnknownResourceSlotType,
 )
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     REDIS_PASSWORD_MASK,
     BinarySize,

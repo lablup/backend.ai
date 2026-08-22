@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-import uuid
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import AsyncIterator, Collection, Iterable, Mapping, Sequence
@@ -22,25 +21,21 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_SCOPE_TYPE
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
-from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeRef, ScopeType
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE
+from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeID, ScopeRef, ScopeType
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
 from ai.backend.common.data.permission.types import (
     Permission,
     RBACElementType,
 )
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import RBACTypeConversionError, UnreachableError
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.role_preset import RolePresetID
-from ai.backend.common.identifier.scope import ScopeID
-from ai.backend.common.identifier.user import UserID
-from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairSecrets
+from ai.backend.manager.data.keypair.types import KeyPairSecrets
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -61,8 +56,8 @@ from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -72,7 +67,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.user import UserRow, UserStatus
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
@@ -174,7 +169,7 @@ class FullUserCreation:
     domain_id: DomainID
     project_ids: Collection[ProjectID]
     keypair_resource_policy: str
-    keypair_rate_limit: int
+    keypair_rate_limit: int | None = None
     keypair_secrets: KeyPairSecrets | None = None
 
 
@@ -288,8 +283,8 @@ class RBACWriteOps(WriteOps):
     _scope_rows: ClassVar[Mapping[ScopeType, type[ScopeSource]]] = {
         CONTAINER_REGISTRY_SCOPE_TYPE: ContainerRegistryRow,
         DOMAIN_SCOPE_TYPE: DomainRow,
-        PROJECT_SCOPE_TYPE: GroupRow,
-        RESOURCE_GROUP_SCOPE_TYPE: ScalingGroupRow,
+        PROJECT_SCOPE_TYPE: ProjectRow,
+        RESOURCE_GROUP_SCOPE_TYPE: ResourceGroupRow,
         USER_SCOPE_TYPE: UserRow,
     }
 
@@ -362,17 +357,6 @@ class RBACWriteOps(WriteOps):
                 f"Rendered role name exceeds {MAX_ROLE_NAME_LENGTH} characters: {rendered!r}"
             )
         return rendered
-
-    def validate_role_name_template(self, template: str) -> None:
-        """Validate a preset's ``role_name_template`` by rendering it against
-        representative dummy values, so syntax errors and undefined variables
-        are rejected before the preset is stored."""
-        dummy = ScopeTemplateValue(
-            id=uuid.UUID(int=0),
-            name="name",
-            type="user",
-        )
-        self._render_role_name(template, dummy)
 
     # -- Spec-based idempotent inserts --------------------------------------------
 
@@ -1010,20 +994,16 @@ class RBACWriteOps(WriteOps):
         user_id = UserID(user_row.uuid)
         await self.assign_roles_to_user(user_id, creation_result.auto_grant_role_ids)
 
-        keypair_creator = KeyPairCreator(
-            is_active=user_row.status == UserStatus.ACTIVE,
-            is_admin=user_row.role in (UserRole.SUPERADMIN, UserRole.ADMIN),
-            resource_policy=full_creation.keypair_resource_policy,
-            rate_limit=full_creation.keypair_rate_limit,
-        )
         kp_result = await self.create_scoped(
             RBACEntityCreator(
                 spec=KeyPairCreatorSpec(
-                    creator=keypair_creator,
-                    generated_data=full_creation.keypair_secrets or generate_keypair_data(),
+                    secrets=full_creation.keypair_secrets or generate_keypair_data(),
                     user_id=user_row.uuid,
-                    email=user_row.email,
+                    is_active=user_row.status == UserStatus.ACTIVE,
+                    is_admin=user_row.role in (UserRole.SUPERADMIN, UserRole.ADMIN),
                     is_default=True,
+                    resource_policy=full_creation.keypair_resource_policy,
+                    rate_limit=full_creation.keypair_rate_limit,
                 ),
                 element_type=RBACElementType.KEYPAIR,
                 scope_ref=RBACElementRef(RBACElementType.USER, str(user_row.uuid)),
@@ -1062,11 +1042,11 @@ class RBACWriteOps(WriteOps):
         """``project_ids`` narrowed to the domain's real projects, plus the domain's
         model-store projects that every user joins."""
         stmt = (
-            sa.select(GroupRow.id)
-            .join(DomainRow, DomainRow.name == GroupRow.domain_name)
+            sa.select(ProjectRow.id)
+            .join(DomainRow, DomainRow.name == ProjectRow.domain_name)
             .where(
                 DomainRow.id == domain_id,
-                sa.or_(GroupRow.id.in_(project_ids), GroupRow.type == ProjectType.MODEL_STORE),
+                sa.or_(ProjectRow.id.in_(project_ids), ProjectRow.type == ProjectType.MODEL_STORE),
             )
         )
         return [ProjectID(row) for row in (await self._sess.scalars(stmt)).all()]
