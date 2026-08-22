@@ -14,7 +14,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
-from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.types import ConflictCheck
 
@@ -49,7 +49,7 @@ class EntityPurger[TRow: Base, TData](ABC):
         raise NotImplementedError
 
 
-class FieldPurger[TRow: Base, TData](ABC):
+class FieldPurger[TRow: Base, TData: FieldData](ABC):
     """Delete spec of a field row — authorized through its owner, like an update
     to the owning entity; no scope to tear down."""
 

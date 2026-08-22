@@ -22,7 +22,7 @@ from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
-from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
@@ -983,7 +983,7 @@ class ModelDeploymentAutoScalingRuleData:
 
 
 @dataclass
-class ModelDeploymentAccessTokenData:
+class ModelDeploymentAccessTokenData(FieldData):
     id: UUID
     token: str
     expires_at: datetime | None

@@ -13,6 +13,7 @@ from ai.backend.common.data.entity.types import (
     EntityData,
     EntityIdentifier,
     EntityType,
+    FieldData,
     FieldIdentifier,
 )
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
@@ -150,7 +151,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.create_global_entity(creator)
 
-    async def create_global_entity_with_fields[TEntityData: EntityData, TFieldData](
+    async def create_global_entity_with_fields[TEntityData: EntityData, TFieldData: FieldData](
         self,
         creator: GlobalEntityCreator[Any, TEntityData],
         field_creators: Sequence[FieldCreator[Any, Any, TFieldData]],
@@ -171,7 +172,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.create_entity(creator)
 
-    async def create_entity_with_fields[TEntityData: EntityData, TFieldData](
+    async def create_entity_with_fields[TEntityData: EntityData, TFieldData: FieldData](
         self,
         creator: EntityCreator[Any, TEntityData],
         field_creators: Sequence[FieldCreator[Any, Any, TFieldData]],
@@ -194,7 +195,9 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.create_role_managed_entity(creator)
 
-    async def create_field(self, owner_id: Any, creator: FieldCreator[Any, Any, TData]) -> TData:
+    async def create_field[TFieldData: FieldData](
+        self, owner_id: Any, creator: FieldCreator[Any, Any, TFieldData]
+    ) -> TFieldData:
         """Insert one field row under its owner's identifier."""
         async with self._ops.write_ops() as w:
             return await w.create_field(owner_id, creator)
@@ -220,47 +223,54 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_create_role_managed_entities(creators)
 
-    async def atomic_create_field_entities(
-        self, owner_id: Any, creators: Sequence[FieldCreator[Any, Any, TData]]
-    ) -> list[TData]:
+    async def atomic_create_field_entities[TFieldData: FieldData](
+        self, owner_id: Any, creators: Sequence[FieldCreator[Any, Any, TFieldData]]
+    ) -> list[TFieldData]:
         """Insert several field rows sharing one owner, atomically."""
         async with self._ops.write_ops() as w:
             return await w.atomic_create_field_entities(owner_id, creators)
 
-    async def create_dangling_field(
-        self, entity_type: EntityType, creator: DanglingFieldCreator[Any, TData]
-    ) -> TData:
+    async def create_dangling_field[TFieldData: FieldData](
+        self, entity_type: EntityType, creator: DanglingFieldCreator[Any, TFieldData]
+    ) -> TFieldData:
         async with self._ops.write_ops() as w:
             return await w.create_dangling_field(entity_type, creator)
 
-    async def atomic_create_fields[TOwnerID: EntityIdentifier](
-        self, creations: Sequence[FieldToCreate[TOwnerID, Any, TData]]
-    ) -> list[TData]:
+    async def atomic_create_fields[TOwnerID: EntityIdentifier, TFieldData: FieldData](
+        self, creations: Sequence[FieldToCreate[TOwnerID, Any, TFieldData]]
+    ) -> list[TFieldData]:
         """Insert field rows atomically, each under the owner named beside it."""
         async with self._ops.write_ops() as w:
             return await w.atomic_create_fields(creations)
 
-    async def atomic_create_fields_with_nested[TOwnerID: EntityIdentifier, TNestedData](
+    async def atomic_create_fields_with_nested[
+        TOwnerID: EntityIdentifier,
+        TFieldData: FieldData,
+        TNestedData: FieldData,
+    ](
         self,
-        creations: Sequence[FieldToCreate[TOwnerID, Any, TData]],
+        creations: Sequence[FieldToCreate[TOwnerID, Any, TFieldData]],
         nested_creators: Sequence[NestedFieldCreator[Any, Any, TNestedData]],
-    ) -> list[TData]:
+    ) -> list[TFieldData]:
         """Insert field rows and the rows each of them owns, in one transaction."""
         async with self._ops.write_ops() as w:
             return await w.atomic_create_fields_with_nested(creations, nested_creators)
 
-    async def atomic_create_dangling_fields(
-        self, entity_type: EntityType, creators: Sequence[DanglingFieldCreator[Any, TData]]
-    ) -> list[TData]:
+    async def atomic_create_dangling_fields[TFieldData: FieldData](
+        self, entity_type: EntityType, creators: Sequence[DanglingFieldCreator[Any, TFieldData]]
+    ) -> list[TFieldData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_create_dangling_fields(entity_type, creators)
 
-    async def atomic_create_dangling_fields_with_nested[TFieldData](
+    async def atomic_create_dangling_fields_with_nested[
+        TFieldData: FieldData,
+        TNestedData: FieldData,
+    ](
         self,
         entity_type: EntityType,
-        creators: Sequence[DanglingFieldCreator[Any, TData]],
-        field_creators: Sequence[NestedFieldCreator[Any, Any, TFieldData]],
-    ) -> list[TData]:
+        creators: Sequence[DanglingFieldCreator[Any, TFieldData]],
+        field_creators: Sequence[NestedFieldCreator[Any, Any, TNestedData]],
+    ) -> list[TFieldData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_create_dangling_fields_with_nested(
                 entity_type, creators, field_creators
@@ -276,7 +286,9 @@ class OpsRepository[TData]:
                 )
             return data
 
-    async def purge_field_entity(self, purger: FieldPurger[Any, TData]) -> TData:
+    async def purge_field_entity[TFieldData: FieldData](
+        self, purger: FieldPurger[Any, TFieldData]
+    ) -> TFieldData:
         """Hard-delete one field row; authorized through the owner, no membership work."""
         async with self._ops.write_ops() as w:
             data = await w.purge_field_entity(purger)
@@ -293,9 +305,9 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.partial_bulk_purge_entities(purgers)
 
-    async def partial_bulk_purge_field_entities(
-        self, purgers: Mapping[FieldIdentifier, FieldPurger[Any, TData]]
-    ) -> BulkFieldOpsResult[TData]:
+    async def partial_bulk_purge_field_entities[TFieldData: FieldData](
+        self, purgers: Mapping[FieldIdentifier, FieldPurger[Any, TFieldData]]
+    ) -> BulkFieldOpsResult[TFieldData]:
         """Hard-delete each named field row independently; authorized through the owner."""
         async with self._ops.write_ops() as w:
             return await w.partial_bulk_purge_field_entities(purgers)
@@ -323,9 +335,9 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_upsert_entities(upserters)
 
-    async def upsert_field_entity(
-        self, owner_id: Any, upserter: FieldUpserter[Any, Any, TData]
-    ) -> TData:
+    async def upsert_field_entity[TFieldData: FieldData](
+        self, owner_id: Any, upserter: FieldUpserter[Any, Any, TFieldData]
+    ) -> TFieldData:
         """Insert or update a field row on conflict, under its owner. Never absent."""
         async with self._ops.write_ops() as w:
             return await w.upsert_field_entity(owner_id, upserter)

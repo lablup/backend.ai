@@ -10,7 +10,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, FieldIdentifier
+from ai.backend.common.data.entity.types import (
+    EntityIdentifier,
+    EntityType,
+    FieldData,
+    FieldIdentifier,
+)
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.role_template import RoleTemplateSource
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -118,7 +123,7 @@ class RoleManagedEntityCreator[TRow: Base, TData](RoleTemplateSource[TRow], ABC)
 
 
 @dataclass(frozen=True)
-class FieldToCreate[TOwnerID: EntityIdentifier, TRow: Base, TData]:
+class FieldToCreate[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData]:
     """One field row to insert, under the owner named beside it.
 
     Carried together so a batch may reach several owners at once without the two
@@ -129,7 +134,7 @@ class FieldToCreate[TOwnerID: EntityIdentifier, TRow: Base, TData]:
     creator: FieldCreator[TOwnerID, TRow, TData]
 
 
-class FieldRowCreator[TRow: Base, TData](ABC):
+class FieldRowCreator[TRow: Base, TData: FieldData](ABC):
     """What every insert spec of a field row has, whoever owns it."""
 
     @abstractmethod
@@ -149,7 +154,7 @@ class FieldRowCreator[TRow: Base, TData](ABC):
         raise NotImplementedError
 
 
-class FieldCreator[TOwnerID: EntityIdentifier, TRow: Base, TData](
+class FieldCreator[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
     FieldRowCreator[TRow, TData], ABC
 ):
     """Insert spec of a field row — a row owned by another entity.
@@ -165,7 +170,7 @@ class FieldCreator[TOwnerID: EntityIdentifier, TRow: Base, TData](
         raise NotImplementedError
 
 
-class DanglingFieldCreator[TRow: Base, TData](FieldRowCreator[TRow, TData], ABC):
+class DanglingFieldCreator[TRow: Base, TData: FieldData](FieldRowCreator[TRow, TData], ABC):
     """Insert spec of a field row written without an owner to build under.
 
     The row names an entity type and no id: the operation being recorded named a kind but
@@ -179,7 +184,7 @@ class DanglingFieldCreator[TRow: Base, TData](FieldRowCreator[TRow, TData], ABC)
         raise NotImplementedError
 
 
-class NestedFieldCreator[TOwnerID: FieldIdentifier, TRow: Base, TData](ABC):
+class NestedFieldCreator[TOwnerID: FieldIdentifier, TRow: Base, TData: FieldData](ABC):
     """Insert spec of a field row another field row owns.
 
     What :class:`FieldCreator` is to an entity, this is to a field: built only from the

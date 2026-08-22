@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import EntityType, FieldData
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.creator import DanglingFieldCreator, NestedFieldCreator
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
@@ -18,7 +18,7 @@ from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 class V2DanglingFieldWriteOps(V2WriteOpsBase):
     """Sidecar writes, bound to a single session."""
 
-    async def create_dangling_field[TRow: Base, TData](
+    async def create_dangling_field[TRow: Base, TData: FieldData](
         self, entity_type: EntityType, creator: DanglingFieldCreator[TRow, TData]
     ) -> TData:
         """Insert one row that names a kind and no owner."""
@@ -26,7 +26,7 @@ class V2DanglingFieldWriteOps(V2WriteOpsBase):
         await self._insert_row(row, creator.integrity_error_checks())
         return creator.to_data(row)
 
-    async def atomic_create_dangling_fields[TRow: Base, TData](
+    async def atomic_create_dangling_fields[TRow: Base, TData: FieldData](
         self, entity_type: EntityType, creators: Sequence[DanglingFieldCreator[TRow, TData]]
     ) -> list[TData]:
         """Insert such rows atomically in a single flush."""
@@ -39,9 +39,9 @@ class V2DanglingFieldWriteOps(V2WriteOpsBase):
 
     async def atomic_create_dangling_fields_with_nested[
         TRow: Base,
-        TData,
+        TData: FieldData,
         TFieldRow: Base,
-        TFieldData,
+        TFieldData: FieldData,
     ](
         self,
         entity_type: EntityType,

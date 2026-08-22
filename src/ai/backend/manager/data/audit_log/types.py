@@ -47,7 +47,7 @@ class AuditLogListResult:
 
 
 @dataclass(frozen=True)
-class AuditLogScopeData:
+class AuditLogScopeData(FieldData):
     """One scope an audited run covered."""
 
     audit_log_id: AuditLogID

@@ -35,6 +35,7 @@ from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
     EntityType,
+    FieldData,
     FieldIdentifier,
     FieldType,
     ScopeType,
@@ -743,7 +744,15 @@ class _SidecarID(FieldIdentifier):
     """The id of a row that rides beside the graph."""
 
 
-class _Sidecar(DanglingFieldCreator[EntityLifecycleTestRow, _EntityData]):
+@dataclass(frozen=True)
+class _SidecarData(FieldData):
+    """What a sidecar write returns. No entity id: the row joins no graph."""
+
+    id: UUID
+    name: str
+
+
+class _Sidecar(DanglingFieldCreator[EntityLifecycleTestRow, _SidecarData]):
     """A row that rides beside the graph: no node, no owner."""
 
     def __init__(self, name: str) -> None:
@@ -762,8 +771,8 @@ class _Sidecar(DanglingFieldCreator[EntityLifecycleTestRow, _EntityData]):
         return EntityLifecycleTestRow(name=self.name)
 
     @override
-    def to_data(self, row: EntityLifecycleTestRow) -> _EntityData:
-        return _EntityData(id=row.id, name=row.name, note=row.note)
+    def to_data(self, row: EntityLifecycleTestRow) -> _SidecarData:
+        return _SidecarData(id=row.id, name=row.name)
 
 
 class TestSidecarCreate:

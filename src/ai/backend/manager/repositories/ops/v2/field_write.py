@@ -7,7 +7,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.base import Base
@@ -20,7 +20,7 @@ from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 class V2FieldWriteOps(V2WriteOpsBase):
     """Field writes, bound to a single session."""
 
-    async def create_field[TOwnerID: EntityIdentifier, TRow: Base, TData](
+    async def create_field[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
         self, owner_id: TOwnerID, creator: FieldCreator[TOwnerID, TRow, TData]
     ) -> TData:
         """Insert one field row under its owner's settled identifier."""
@@ -28,7 +28,7 @@ class V2FieldWriteOps(V2WriteOpsBase):
         await self._insert_row(row, creator.integrity_error_checks())
         return creator.to_data(row)
 
-    async def atomic_create_fields[TOwnerID: EntityIdentifier, TRow: Base, TData](
+    async def atomic_create_fields[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
         self, creations: Sequence[FieldToCreate[TOwnerID, TRow, TData]]
     ) -> list[TData]:
         """Insert field rows atomically, each under the owner named beside it."""
@@ -41,9 +41,9 @@ class V2FieldWriteOps(V2WriteOpsBase):
     async def atomic_create_fields_with_nested[
         TOwnerID: EntityIdentifier,
         TRow: Base,
-        TData,
+        TData: FieldData,
         TNestedRow: Base,
-        TNestedData,
+        TNestedData: FieldData,
     ](
         self,
         creations: Sequence[FieldToCreate[TOwnerID, TRow, TData]],
@@ -70,7 +70,11 @@ class V2FieldWriteOps(V2WriteOpsBase):
             )
         return [c.creator.to_data(row) for c, row in zip(creations, rows, strict=True)]
 
-    async def atomic_create_field_entities[TOwnerID: EntityIdentifier, TRow: Base, TData](
+    async def atomic_create_field_entities[
+        TOwnerID: EntityIdentifier,
+        TRow: Base,
+        TData: FieldData,
+    ](
         self, owner_id: TOwnerID, creators: Sequence[FieldCreator[TOwnerID, TRow, TData]]
     ) -> list[TData]:
         """Insert field rows sharing one owner, atomically in a single flush."""
@@ -81,7 +85,7 @@ class V2FieldWriteOps(V2WriteOpsBase):
         await self._insert_rows(rows, creators[0].integrity_error_checks())
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
-    async def purge_field_entity[TRow: Base, TData](
+    async def purge_field_entity[TRow: Base, TData: FieldData](
         self, purger: FieldPurger[TRow, TData]
     ) -> TData | None:
         """Delete one field row; ``None`` if already gone. The delete is
@@ -94,7 +98,7 @@ class V2FieldWriteOps(V2WriteOpsBase):
             return None
         return purger.to_data(row)
 
-    async def partial_bulk_purge_field_entities[TRow: Base, TData](
+    async def partial_bulk_purge_field_entities[TRow: Base, TData: FieldData](
         self, purgers: Mapping[FieldIdentifier, FieldPurger[TRow, TData]]
     ) -> BulkFieldOpsResult[TData]:
         """Delete each named field row independently in its own savepoint; a
@@ -115,7 +119,7 @@ class V2FieldWriteOps(V2WriteOpsBase):
                 errors[field_id] = e
         return BulkFieldOpsResult(successes=successes, errors=errors)
 
-    async def upsert_field_entity[TOwnerID: EntityIdentifier, TRow: Base, TData](
+    async def upsert_field_entity[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
         self, owner_id: TOwnerID, upserter: FieldUpserter[TOwnerID, TRow, TData]
     ) -> TData:
         """Insert or update a field row on conflict, under the owner's settled

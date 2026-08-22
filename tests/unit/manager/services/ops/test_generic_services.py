@@ -478,7 +478,7 @@ class _PresetGlobalPurger(EntityPurger[RolePresetRow, _PresetData]):
 
 
 @dataclass
-class _PresetFieldPurger(FieldPurger[RolePresetRow, _PresetData]):
+class _PresetFieldPurger(FieldPurger[RolePresetRow, _PresetFieldData]):
     target: uuid.UUID
 
     @override
@@ -498,8 +498,8 @@ class _PresetFieldPurger(FieldPurger[RolePresetRow, _PresetData]):
         return ()
 
     @override
-    def to_data(self, row: RolePresetRow) -> _PresetData:
-        return _PresetData(id=row.id, name=row.name)
+    def to_data(self, row: RolePresetRow) -> _PresetFieldData:
+        return _PresetFieldData(id=_FieldID(row.id), owner=_EntityID(row.id))
 
 
 @dataclass
@@ -536,7 +536,7 @@ class _PresetGlobalUpserter(GlobalEntityUpserter[RolePresetRow, _PresetData]):
 
 
 @dataclass
-class _PresetFieldUpserter(FieldUpserter[_EntityID, RolePresetRow, _PresetData]):
+class _PresetFieldUpserter(FieldUpserter[_EntityID, RolePresetRow, _PresetFieldData]):
     target: uuid.UUID
 
     @override
@@ -560,8 +560,8 @@ class _PresetFieldUpserter(FieldUpserter[_EntityID, RolePresetRow, _PresetData])
         return {"name": "default"}
 
     @override
-    def to_data(self, row: RolePresetRow) -> _PresetData:
-        return _PresetData(id=row.id, name=row.name)
+    def to_data(self, row: RolePresetRow) -> _PresetFieldData:
+        return _PresetFieldData(id=_FieldID(row.id), owner=_EntityID(row.id))
 
 
 @dataclass
@@ -969,23 +969,25 @@ class _BulkCreateFieldAction(
 
 
 @dataclass
-class _BulkPurgeFieldAction(FieldPartialBulkPurgeOpsAction[_FieldID, RolePresetRow, _PresetData]):
+class _BulkPurgeFieldAction(
+    FieldPartialBulkPurgeOpsAction[_FieldID, RolePresetRow, _PresetFieldData]
+):
     purgers: dict[_FieldID, _PresetFieldPurger]
 
     @override
-    def to_purgers(self) -> Mapping[_FieldID, FieldPurger[RolePresetRow, _PresetData]]:
+    def to_purgers(self) -> Mapping[_FieldID, FieldPurger[RolePresetRow, _PresetFieldData]]:
         return self.purgers
 
 
 @dataclass
 class _FieldUpsertAction(
-    BaseSingleEntityAction, FieldUpsertOpsAction[_EntityID, RolePresetRow, _PresetData]
+    BaseSingleEntityAction, FieldUpsertOpsAction[_EntityID, RolePresetRow, _PresetFieldData]
 ):
     owner: uuid.UUID
     upserter: _PresetFieldUpserter
 
     @override
-    def to_upserter(self) -> FieldUpserter[_EntityID, RolePresetRow, _PresetData]:
+    def to_upserter(self) -> FieldUpserter[_EntityID, RolePresetRow, _PresetFieldData]:
         return self.upserter
 
     @override
@@ -1529,7 +1531,9 @@ async def test_global_partial_bulk_purge_answers_for_every_named_entity(
 async def test_field_partial_bulk_purge_answers_for_every_named_entity(
     repository: MagicMock, field_stored: _PresetFieldData
 ) -> None:
-    service: FieldPartialBulkPurgeService[_PresetData] = FieldPartialBulkPurgeService(repository)
+    service: FieldPartialBulkPurgeService[_PresetFieldData] = FieldPartialBulkPurgeService(
+        repository
+    )
     field_id = _FieldID(uuid.uuid4())
     purgers = {field_id: _PresetFieldPurger(target=field_id)}
     repository.partial_bulk_purge_field_entities.return_value = BulkFieldOpsResult(
@@ -1543,15 +1547,16 @@ async def test_field_partial_bulk_purge_answers_for_every_named_entity(
 
 
 async def test_field_upsert_forwards_owner_and_upserter(
-    repository: MagicMock, stored: _PresetData
+    repository: MagicMock, field_stored: _PresetFieldData
 ) -> None:
-    service: FieldUpsertService[_PresetData] = FieldUpsertService(repository)
+    service: FieldUpsertService[_PresetFieldData] = FieldUpsertService(repository)
     owner = uuid.uuid4()
-    upserter = _PresetFieldUpserter(target=stored.id)
+    upserter = _PresetFieldUpserter(target=field_stored.id)
+    repository.upsert_field_entity.return_value = field_stored
 
     result = await service.execute(_FieldUpsertAction(owner=owner, upserter=upserter))
 
-    assert result.data == stored
+    assert result.data == field_stored
     repository.upsert_field_entity.assert_awaited_once_with(owner, upserter)
 
 

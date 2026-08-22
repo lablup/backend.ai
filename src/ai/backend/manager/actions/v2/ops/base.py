@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from typing import Any, override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.common.data.entity.types import EntityIdentifier as OwnerEntityID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
@@ -176,9 +176,12 @@ class GlobalEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class GlobalEntityWithFieldsCreateOpsAction[TRow: Base, TData, TFieldRow: Base, TFieldData](
-    OpsBackendAction
-):
+class GlobalEntityWithFieldsCreateOpsAction[
+    TRow: Base,
+    TData,
+    TFieldRow: Base,
+    TFieldData: FieldData,
+](OpsBackendAction):
     """Carries a global insert spec together with the field specs it owns.
 
     One action so the two writes share a transaction: split apart, the parent could
@@ -206,7 +209,7 @@ class EntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class EntityWithFieldsCreateOpsAction[TRow: Base, TData, TFieldRow: Base, TFieldData](
+class EntityWithFieldsCreateOpsAction[TRow: Base, TData, TFieldRow: Base, TFieldData: FieldData](
     OpsBackendAction
 ):
     """Carries an entity insert spec together with the field specs it owns.
@@ -236,7 +239,7 @@ class RoleManagedEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class FieldCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](OpsBackendAction):
+class FieldCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](OpsBackendAction):
     """Carries the field insert spec plus the owner's identifier.
 
     The owner id is declared here rather than leaning on the shape's
@@ -284,7 +287,9 @@ class RoleManagedEntityAtomicCreateOpsAction[TRow: Base, TData](OpsBackendAction
         raise NotImplementedError
 
 
-class FieldAtomicCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](OpsBackendAction):
+class FieldAtomicCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](
+    OpsBackendAction
+):
     """A create of several field rows sharing one owner, atomically."""
 
     @abstractmethod
@@ -307,7 +312,7 @@ class EntityPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class FieldPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
+class FieldPurgeOpsAction[TRow: Base, TData: FieldData](OpsBackendAction):
     """Carries the field delete spec; authorized through the owner the
     shape names, like an update to the owning entity."""
 
@@ -337,7 +342,7 @@ class EntityPartialBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class FieldPartialBulkPurgeOpsAction[TFieldID: FieldIdentifier, TRow: Base, TData](
+class FieldPartialBulkPurgeOpsAction[TFieldID: FieldIdentifier, TRow: Base, TData: FieldData](
     OpsBackendAction
 ):
     """A hard delete of field rows the caller named, each answered for separately;
@@ -387,7 +392,7 @@ class EntityAtomicUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class FieldUpsertOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](OpsBackendAction):
+class FieldUpsertOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](OpsBackendAction):
     """A create-or-update of a field row under its owner's settled identifier."""
 
     @abstractmethod
@@ -561,7 +566,7 @@ class CreateGlobalOpsAction[TRow: Base, TData](
         return ActionOperationType.CREATE
 
 
-class CreateGlobalWithFieldsOpsAction[TRow: Base, TData, TFieldRow: Base, TFieldData](
+class CreateGlobalWithFieldsOpsAction[TRow: Base, TData, TFieldRow: Base, TFieldData: FieldData](
     BaseGlobalAction,
     GlobalEntityWithFieldsCreateOpsAction[TRow, TData, TFieldRow, TFieldData],
     ABC,
@@ -589,7 +594,7 @@ class CreateEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.CREATE
 
 
-class CreateEntityWithFieldsOpsAction[TRow: Base, TData, TFieldRow: Base, TFieldData](
+class CreateEntityWithFieldsOpsAction[TRow: Base, TData, TFieldRow: Base, TFieldData: FieldData](
     BaseScopeAction,
     EntityWithFieldsCreateOpsAction[TRow, TData, TFieldRow, TFieldData],
     ABC,
@@ -617,7 +622,7 @@ class CreateRoleManagedEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.CREATE
 
 
-class CreateFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](
+class CreateFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](
     BaseSingleEntityAction, FieldCreateOpsAction[TOwnerID, TRow, TData], ABC
 ):
     """An insert of a field row, authorized against its owner.
@@ -665,7 +670,7 @@ class AtomicCreateRoleManagedEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.CREATE
 
 
-class AtomicCreateFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](
+class AtomicCreateFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](
     BaseSingleEntityAction, FieldAtomicCreateOpsAction[TOwnerID, TRow, TData], ABC
 ):
     """An atomic insert of several field rows, authorized against their one owner."""
@@ -757,7 +762,7 @@ class AtomicUpsertEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.UPSERT
 
 
-class UpsertFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](
+class UpsertFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](
     BaseSingleEntityAction, FieldUpsertOpsAction[TOwnerID, TRow, TData], ABC
 ):
     """A create-or-update of a field row, authorized against its owner."""

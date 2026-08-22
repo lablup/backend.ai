@@ -4,7 +4,7 @@ pairings: the ops package must not import the field bases, or the two form a cyc
 from abc import ABC
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
 from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
@@ -26,9 +26,12 @@ __all__ = (
 )
 
 
-class GetFieldOpsAction[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier, TRow: Base, TData](
-    BaseSingleFieldAction[TFieldID, TOwnerID], GetOpsAction[TRow, TData], ABC
-):
+class GetFieldOpsAction[
+    TFieldID: FieldIdentifier,
+    TOwnerID: EntityIdentifier,
+    TRow: Base,
+    TData: FieldData,
+](BaseSingleFieldAction[TFieldID, TOwnerID], GetOpsAction[TRow, TData], ABC):
     """A read of one field row, authorized against the entity owning it."""
 
     @override
@@ -41,7 +44,7 @@ class UpdateFieldOpsAction[
     TFieldID: FieldIdentifier,
     TOwnerID: EntityIdentifier,
     TRow: Base,
-    TData,
+    TData: FieldData,
 ](BaseSingleFieldAction[TFieldID, TOwnerID], UpdateOpsAction[TRow, TData], ABC):
     """A write to one field row, authorized against the entity owning it."""
 
@@ -55,7 +58,7 @@ class DeleteFieldOpsAction[
     TFieldID: FieldIdentifier,
     TOwnerID: EntityIdentifier,
     TRow: Base,
-    TData,
+    TData: FieldData,
 ](BaseSingleFieldAction[TFieldID, TOwnerID], UpdateOpsAction[TRow, TData], ABC):
     """A soft delete of one field row; the updater writes the lifecycle column alone."""
 
@@ -69,7 +72,7 @@ class RestoreFieldOpsAction[
     TFieldID: FieldIdentifier,
     TOwnerID: EntityIdentifier,
     TRow: Base,
-    TData,
+    TData: FieldData,
 ](BaseSingleFieldAction[TFieldID, TOwnerID], UpdateOpsAction[TRow, TData], ABC):
     """The reverse transition of a field row's soft delete."""
 
@@ -79,9 +82,12 @@ class RestoreFieldOpsAction[
         return ActionOperationType.UPDATE
 
 
-class PurgeFieldOpsAction[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier, TRow: Base, TData](
-    BaseSingleFieldAction[TFieldID, TOwnerID], FieldPurgeOpsAction[TRow, TData], ABC
-):
+class PurgeFieldOpsAction[
+    TFieldID: FieldIdentifier,
+    TOwnerID: EntityIdentifier,
+    TRow: Base,
+    TData: FieldData,
+](BaseSingleFieldAction[TFieldID, TOwnerID], FieldPurgeOpsAction[TRow, TData], ABC):
     """A hard delete of a field row, authorized against its owner."""
 
     @override
@@ -94,7 +100,7 @@ class PartialBulkPurgeFieldOpsAction[
     TFieldID: FieldIdentifier,
     TOwnerID: EntityIdentifier,
     TRow: Base,
-    TData,
+    TData: FieldData,
 ](
     BaseBulkFieldAction[TFieldID, TOwnerID],
     FieldPartialBulkPurgeOpsAction[TFieldID, TRow, TData],

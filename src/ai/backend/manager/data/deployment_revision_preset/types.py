@@ -8,13 +8,13 @@ from ai.backend.common.config import PresetModelDefinition
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
-from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.entity.types import EntityData, FieldData
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 
 
 @dataclass(frozen=True)
-class ResourceSlotEntryData:
+class ResourceSlotEntryData(FieldData):
     resource_type: str
     quantity: str
 

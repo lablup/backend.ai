@@ -460,7 +460,7 @@ class EntityPurgeService[TData]:
         return EntityOpsResult(data=await self._repository.purge_entity(action.to_purger()))
 
 
-class FieldPurgeService[TData]:
+class FieldPurgeService[TData: FieldData]:
     """Hard-deletes the field row the action's purger describes; no membership work."""
 
     _repository: OpsRepository[TData]
@@ -502,7 +502,7 @@ class EntityPartialBulkPurgeService[TData]:
         return BulkOpsResult(successes=result.successes, errors=result.errors)
 
 
-class FieldPartialBulkPurgeService[TData]:
+class FieldPartialBulkPurgeService[TData: FieldData]:
     """Hard-deletes each field row the action named, answering for every one."""
 
     _repository: OpsRepository[TData]
@@ -577,7 +577,7 @@ class EntityAtomicUpsertService[TData: EntityData]:
         )
 
 
-class FieldUpsertService[TData]:
+class FieldUpsertService[TData: FieldData]:
     """Inserts or updates a field row on conflict, under the action's owner."""
 
     _repository: OpsRepository[TData]
