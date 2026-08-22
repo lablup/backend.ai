@@ -203,7 +203,12 @@ class UserService:
 
         This is the UUID-based internal implementation used by bulk_purge_users().
         The existing purge_user() method is email-based.
+
+        Raises ``UserNotFound`` for a user that is not there; a bulk run records that
+        as one item's failure.
         """
+        await self._user_repository.get_user_by_uuid(user_uuid)
+
         # Check for active vfolder mounts
         if await self._user_repository.check_user_vfolder_mounted_to_active_kernels(user_uuid):
             raise UserPurgeFailure(

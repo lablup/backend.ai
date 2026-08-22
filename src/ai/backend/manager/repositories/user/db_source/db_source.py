@@ -461,11 +461,13 @@ class UserDBSource:
             await conn.execute(
                 sa.update(keypairs).values(is_active=False).where(keypairs.c.user == user_uuid)
             )
-            await conn.execute(
+            result = await conn.execute(
                 sa.update(users)
                 .values(status=UserStatus.DELETED, status_info="admin-requested")
                 .where(users.c.uuid == user_uuid)
             )
+            if result.rowcount == 0:
+                raise UserNotFound(f"User with UUID {user_uuid} not found.")
 
     async def soft_delete_user_validated(self, email: str) -> None:
         """
