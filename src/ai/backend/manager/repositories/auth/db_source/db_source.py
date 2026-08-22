@@ -36,10 +36,11 @@ from ai.backend.manager.errors.auth import (
     LoginSessionNotFoundError,
 )
 from ai.backend.manager.errors.common import InternalServerError
-from ai.backend.manager.errors.user import UserCreationBadRequest
+from ai.backend.manager.errors.user import KeyPairNotFound, UserCreationBadRequest
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -538,22 +539,22 @@ class AuthDBSource:
         )
 
     @auth_db_source_resilience.apply()
-    async def fetch_default_keypair(self, user_uuid: UUID) -> KeyPairData | None:
+    async def fetch_default_keypair(self, user_uuid: UUID) -> KeyPairData:
         """Read the keypair a user authorizes with.
 
-        The one marked default, or else the oldest active one. ``None`` when the user
-        holds no active keypair.
+        Every user holding keypairs has one marked, so no mark is a fault rather than
+        an answer. An admin creating a keypair for them is the way back.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             if not await db_session.scalar(sa.select(sa.exists().where(UserRow.uuid == user_uuid))):
                 raise UserNotFound(extra_data=user_uuid)
-            row = await db_session.scalar(
-                sa.select(KeyPairRow)
-                .where((KeyPairRow.user == user_uuid) & KeyPairRow.is_active)
-                .order_by(KeyPairRow.is_default.desc(), KeyPairRow.created_at)
-                .limit(1)
+            querier = DefaultKeypairQuerier()
+            marked = await db_session.scalar(
+                querier.build_select().where(querier.owner_id_column() == user_uuid)
             )
-            return row.to_data() if row is not None else None
+            if marked is None:
+                raise KeyPairNotFound(f"User {user_uuid} holds no active default keypair")
+            return querier.to_data(marked)
 
     @auth_db_source_resilience.apply()
     async def fetch_current_time(self) -> datetime:

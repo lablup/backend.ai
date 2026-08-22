@@ -7,7 +7,7 @@ from typing import Any
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.manager.errors.repository import (
     AmbiguousEntityKeyError,
     EmptyOperationScopeError,
@@ -19,7 +19,7 @@ from ai.backend.manager.models.specs.lookup import (
     FieldOwnerKeyLookup,
     FieldOwnerLookup,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.querier import DataQuerier, OwnedFieldQuerier
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
 from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
 
@@ -89,6 +89,33 @@ class V2ReadOps(V2OpsBase):
                 "A field owner key matched more than one row, so it is not a key."
             )
         return lookup.to_entity_id(rows[0][0])
+
+    async def query_owned_fields[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
+        self,
+        querier: OwnedFieldQuerier[TOwnerID, TRow, TData],
+        owner_ids: Sequence[TOwnerID],
+    ) -> Mapping[TOwnerID, TData]:
+        """Read the row each named entity designates, keyed by that entity.
+
+        An owner designating nothing is absent from the mapping. A second row for the
+        same owner is a fault rather than a pick: the querier's SELECT names one row,
+        so two mean the narrowing is wrong or the constraint enforcing it is missing.
+        """
+        if not owner_ids:
+            return {}
+        owner_column = querier.owner_id_column()
+        rows = (
+            await self._sess.scalars(querier.build_select().where(owner_column.in_(owner_ids)))
+        ).all()
+        designated: dict[TOwnerID, TData] = {}
+        for row in rows:
+            owner_id = getattr(row, owner_column.key)
+            if owner_id in designated:
+                raise AmbiguousEntityKeyError(
+                    f"{querier.__class__.__name__} matched more than one row for one owner."
+                )
+            designated[owner_id] = querier.to_data(row)
+        return designated
 
     async def search_with_scopes[TRow: Base, TData](
         self,

@@ -41,6 +41,7 @@ from ai.backend.manager.errors.common import (
     ObjectNotFound,
     RejectedByHook,
 )
+from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import (
     generate_ssh_keypair,
@@ -293,9 +294,10 @@ class AuthService:
             raise AuthorizationFailed("User credential mismatch.")
         await self._check_password_age(user, auth_config)
 
-        default_keypair = await self._auth_repository.default_keypair(user.uuid)
-        if default_keypair is None:
-            raise AuthorizationFailed("No API keypairs found.")
+        try:
+            default_keypair = await self._auth_repository.default_keypair(user.uuid)
+        except KeyPairNotFound as e:
+            raise AuthorizationFailed("No API keypairs found.") from e
 
         hook_result = await self._hook_plugin_ctx.dispatch(
             "POST_AUTHORIZE",

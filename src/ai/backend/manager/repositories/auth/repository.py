@@ -164,8 +164,8 @@ class AuthRepository:
         )
 
     @auth_repository_resilience.apply()
-    async def default_keypair(self, user_uuid: UUID) -> KeyPairData | None:
-        """The keypair a user authorizes with, or ``None`` if they hold no active one."""
+    async def default_keypair(self, user_uuid: UUID) -> KeyPairData:
+        """The keypair a user authorizes with; raises if they hold no active marked one."""
         return await self._db_source.fetch_default_keypair(user_uuid)
 
     @auth_repository_resilience.apply()

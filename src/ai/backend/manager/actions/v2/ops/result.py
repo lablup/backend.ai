@@ -12,7 +12,7 @@ so by implementing :class:`EntityData`. The bulk shape is different again — th
 named the entities, so it answers for each one against that list.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import override
 
@@ -32,6 +32,7 @@ __all__ = (
     "CreatedEntityOpsResult",
     "CreatedEntityWithFieldsOpsResult",
     "LookupOpsResult",
+    "OwnedFieldsOpsResult",
     "CreatedFieldOpsResult",
     "FieldsOpsResult",
     "BulkFieldOpsResult",
@@ -189,6 +190,18 @@ class BulkFieldOpsResult[TData]:
 
     successes: dict[FieldIdentifier, TData]
     errors: dict[FieldIdentifier, Exception]
+
+
+@dataclass
+class OwnedFieldsOpsResult[TOwnerID: EntityIdentifier, TData: FieldData]:
+    """The field row each named entity designates.
+
+    Keyed by the owner rather than the row, unlike :class:`BulkFieldOpsResult`: the
+    owner is what the caller named and what the run is authorized against. An owner
+    designating nothing is absent.
+    """
+
+    designated: Mapping[TOwnerID, TData]
 
 
 @dataclass

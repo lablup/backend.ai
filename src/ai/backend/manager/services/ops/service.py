@@ -29,6 +29,7 @@ from ai.backend.manager.actions.v2.lookup.bulk_base import BulkLookupKeyResult
 from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
     BatchUpdateOpsAction,
+    BulkGetOwnedFieldOpsAction,
     EntityAtomicCreateOpsAction,
     EntityAtomicUpsertOpsAction,
     EntityCreateOpsAction,
@@ -70,6 +71,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     FieldOwnerLookupOpsResult,
     FieldsOpsResult,
     LookupOpsResult,
+    OwnedFieldsOpsResult,
     ScopedBatchOpsResult,
     ScopedFieldsOpsResult,
 )
@@ -77,6 +79,7 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = (
     "GetService",
+    "BulkOwnedFieldGetService",
     "LookupService",
     "BulkFieldOwnerLookupService",
     "FieldOwnerKeyLookupService",
@@ -126,6 +129,21 @@ class GetService[TData]:
 
     async def execute(self, action: GetOpsAction[Any, TData]) -> EntityOpsResult[TData]:
         return EntityOpsResult(data=await self._repository.get(action.to_querier()))
+
+
+class BulkOwnedFieldGetService[TFieldData: FieldData]:
+    """Reads the field row each entity the action names designates."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: BulkGetOwnedFieldOpsAction[Any, Any, TFieldData]
+    ) -> OwnedFieldsOpsResult[Any, TFieldData]:
+        designated = await self._repository.owned_fields(action.to_querier(), action.owner_ids())
+        return OwnedFieldsOpsResult(designated=designated)
 
 
 class LookupService[TData: EntityData]:

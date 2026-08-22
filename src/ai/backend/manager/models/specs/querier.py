@@ -5,9 +5,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
-from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData
 from ai.backend.manager.models.base import Base
 
 
@@ -64,4 +65,32 @@ class DataQuerier[TRow: Base, TData](ABC):
     @abstractmethod
     def to_data(self, row: TRow) -> TData:
         """Convert the fetched row into its ``data/`` type."""
+        raise NotImplementedError
+
+
+class OwnedFieldQuerier[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](ABC):
+    """The one field row each named entity designates.
+
+    A querier rather than a :class:`~...searcher.Searcher`: an owner designates exactly
+    one row, so the answer is one per owner and a second row for the same owner is a
+    fault, not a page that happens to be longer. Keyed by the owner, which is what a
+    field operation is authorized and recorded against.
+
+    What makes a row the designated one belongs in ``build_select``; the ops layer adds
+    the owner filter and keys the answer by ``owner_id_column``.
+    """
+
+    @abstractmethod
+    def build_select(self) -> sa.sql.Select[Any]:
+        """Build the SELECT narrowed to designated rows, without the owner filter."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def owner_id_column(self) -> InstrumentedAttribute[Any]:
+        """Return the column naming the entity a row belongs to."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert the designated row into its ``data/`` type."""
         raise NotImplementedError

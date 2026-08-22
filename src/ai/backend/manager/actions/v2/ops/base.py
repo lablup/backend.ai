@@ -25,7 +25,7 @@ from ai.backend.manager.models.specs.purger import (
     EntityPurger,
     FieldPurger,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.querier import DataQuerier, OwnedFieldQuerier
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.models.specs.upserter import (
@@ -95,6 +95,8 @@ __all__ = (
     "BatchPurgeScopeOpsAction",
     "BatchPurgeGlobalOpsAction",
     "GetGlobalOpsAction",
+    "OwnedFieldGetOpsAction",
+    "BulkGetOwnedFieldOpsAction",
 )
 
 
@@ -109,6 +111,31 @@ class GetOpsAction[TRow: Base, TData](OpsBackendAction):
     @abstractmethod
     def to_querier(self) -> DataQuerier[TRow, TData]:
         """Return the read spec this action executes."""
+        raise NotImplementedError
+
+
+class OwnedFieldGetOpsAction[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
+    OpsBackendAction
+):
+    """A read of the field row each named entity designates.
+
+    Keyed by the owner, not the row: the caller names entities, and which row each of
+    them designates is the querier's answer. That is also what makes it authorizable
+    without a lookup — the entity to check is already named.
+    """
+
+    @abstractmethod
+    def to_querier(self) -> OwnedFieldQuerier[TOwnerID, TRow, TData]:
+        """Return the read spec this action executes."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def owner_ids(self) -> Sequence[TOwnerID]:
+        """Return the entities whose designated row is read.
+
+        The same entities ``entity_ids()`` reports, narrowed to the type the querier
+        keys on.
+        """
         raise NotImplementedError
 
 
@@ -542,6 +569,22 @@ class BulkScopedSearchOpsAction[TRow: Base, TData](
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
+
+
+class BulkGetOwnedFieldOpsAction[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
+    BaseBulkAction, OwnedFieldGetOpsAction[TOwnerID, TRow, TData], ABC
+):
+    """The row each named entity designates, answered for every one of them.
+
+    Bulk-shaped like :class:`BulkScopedSearchOpsAction` and for the same reason — the
+    owners are named rather than being a scope — while the answer is one row per owner
+    instead of a page.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 class SearchGlobalOpsAction[TRow: Base, TData](

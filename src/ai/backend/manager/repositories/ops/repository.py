@@ -38,7 +38,7 @@ from ai.backend.manager.models.specs.purger import (
     EntityPurger,
     FieldPurger,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.querier import DataQuerier, OwnedFieldQuerier
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
 from ai.backend.manager.models.specs.types import BulkResultWithFailures, EntityWithFieldsResult
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
@@ -86,6 +86,15 @@ class OpsRepository[TData]:
             if entity_id is None:
                 raise EntityNotFoundError(f"No {lookup.row_class().__name__} matches the given key")
             return entity_id
+
+    async def owned_fields[TOwnerID: EntityIdentifier, TFieldData: FieldData](
+        self,
+        querier: OwnedFieldQuerier[TOwnerID, Any, TFieldData],
+        owner_ids: Sequence[TOwnerID],
+    ) -> Mapping[TOwnerID, TFieldData]:
+        """Read the row each named entity designates; an owner designating nothing is absent."""
+        async with self._ops.read_ops() as r:
+            return await r.query_owned_fields(querier, owner_ids)
 
     async def field_owners(
         self, lookup: FieldOwnerLookup[Any, Any], field_ids: Sequence[FieldIdentifier]

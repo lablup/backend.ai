@@ -46,6 +46,7 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
 from ai.backend.manager.actions.v2.global_scope.validator import GlobalActionValidator
 from ai.backend.manager.actions.v2.ops.base import (
     AtomicCreateFieldOpsAction,
+    BulkGetOwnedFieldOpsAction,
     BulkScopedSearchOpsAction,
     CreateFieldOpsAction,
     OperationScopeOpsAction,
@@ -57,6 +58,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedFieldOpsResult,
     EntityOpsResult,
     FieldsOpsResult,
+    OwnedFieldsOpsResult,
     ScopedFieldsOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.monitor import ScopeActionMonitor
@@ -68,6 +70,7 @@ from ai.backend.manager.actions.v2.single_entity.processor import (
 )
 from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
 from ai.backend.manager.services.ops.service import (
+    BulkOwnedFieldGetService,
     DeleteService,
     FieldAtomicCreateService,
     FieldCreateService,
@@ -162,6 +165,26 @@ class FieldGroup[TFieldData: FieldData]:
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.OPS)
         return BulkActionProcessor(
             SearchFieldsService(self._deps.repository).execute,
+            AtomicEntityResultJudge(),
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            validators=(*self._deps.validators.bulk, *validators),
+        )
+
+    def bulk_get_ops[TAction: BulkGetOwnedFieldOpsAction[Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[BulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> BulkActionProcessor[TAction, OwnedFieldsOpsResult[Any, TFieldData]]:
+        """The one row each entity the caller named designates.
+
+        Bulk-shaped like :meth:`bulk_scoped_search_ops`, and answers one row per owner
+        rather than a page. Nothing is looked up: the owners are already named.
+        """
+        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.OPS)
+        return BulkActionProcessor(
+            BulkOwnedFieldGetService(self._deps.repository).execute,
             AtomicEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.bulk, *validators),
