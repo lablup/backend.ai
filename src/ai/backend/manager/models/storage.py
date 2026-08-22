@@ -179,7 +179,7 @@ class PermissionContextBuilder(
         ctx: ClientContext,
         scope: ProjectScope,
     ) -> PermissionContext:
-        from .group import ProjectRow
+        from .project import ProjectRow
 
         permissions = await self.calculate_permission(ctx, scope)
         if not permissions:

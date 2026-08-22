@@ -20,8 +20,8 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
-from .group import ProjectRow
 from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow
+from .project import ProjectRow
 from .session import SessionRow
 from .user import UserRow
 from .utils import ExtendedAsyncSAEngine
