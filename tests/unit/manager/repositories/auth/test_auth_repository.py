@@ -55,13 +55,13 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.auth.repository import AuthRepository
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
@@ -186,9 +186,9 @@ class TestAuthRepository:
         self,
         default_domain: DomainTestData,
         user_resource_policy: ResourcePolicyTestData,
-    ) -> UserCreatorSpec:
-        """Build the creator spec a signup submits: the domain named, its id unset."""
-        return UserCreatorSpec(
+    ) -> UserCreator:
+        """Build the creator spec a signup submits."""
+        return UserCreator(
             email=f"signup-{uuid.uuid4()}@example.com",
             username=f"signup-{uuid.uuid4().hex[:8]}",
             password=PasswordInfo(
@@ -198,7 +198,7 @@ class TestAuthRepository:
                 salt_size=32,
             ),
             need_password_change=False,
-            domain_name=default_domain.name,
+            domain_id=default_domain.id,
             status=UserStatus.INACTIVE,
             role=UserRole.USER,
             resource_policy=user_resource_policy.name,
@@ -583,13 +583,13 @@ class TestAuthRepository:
         time_diff = abs((now_utc - result).total_seconds())
         assert time_diff < 1.0
 
-    async def test_create_user_with_keypair_writes_the_domain_id_from_the_name(
+    async def test_create_user_with_keypair_writes_the_domain_name_from_the_id(
         self,
         auth_repository: AuthRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         default_domain: DomainTestData,
         keypair_resource_policy: ResourcePolicyTestData,
-        signup_user_spec: UserCreatorSpec,
+        signup_user_spec: UserCreator,
     ) -> None:
         result = await auth_repository.create_user_with_keypair(
             signup_user_spec,

@@ -46,14 +46,12 @@ from ai.backend.manager.models.user import (
     UserStatus,
     users,
 )
+from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.virtual_scope.queries import (
     user_scope_membership_exists,
     user_scope_membership_query,
 )
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
-from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
@@ -930,27 +928,24 @@ class UserInput(graphene.InputObjectType):  # type: ignore[misc]
         )
 
         return CreateUserAction(
-            domain_id=domain_id,
-            creator=Creator(
-                spec=UserCreatorSpec(
-                    username=str(self.username),
-                    password=password_info,
-                    email=email,
-                    need_password_change=bool(self.need_password_change),
-                    domain_name=str(self.domain_name),
-                    full_name=value_or_none(self.full_name),
-                    description=value_or_none(self.description),
-                    is_active=value_or_none(self.is_active),
-                    status=UserStatus(self.status) if self.status is not Undefined else None,
-                    role=UserRole(self.role) if self.role is not Undefined else None,
-                    allowed_client_ip=value_or_none(self.allowed_client_ip),
-                    totp_activated=value_or_none(self.totp_activated),
-                    resource_policy=value_or_none(self.resource_policy),
-                    sudo_session_enabled=value_or_none(self.sudo_session_enabled),
-                    container_uid=value_or_none(self.container_uid),
-                    container_main_gid=value_or_none(self.container_main_gid),
-                    container_gids=value_or_none(self.container_gids),
-                ),
+            creator=UserCreator(
+                domain_id=domain_id,
+                username=str(self.username),
+                password=password_info,
+                email=email,
+                need_password_change=bool(self.need_password_change),
+                full_name=value_or_none(self.full_name),
+                description=value_or_none(self.description),
+                is_active=value_or_none(self.is_active),
+                status=UserStatus(self.status) if self.status is not Undefined else None,
+                role=UserRole(self.role) if self.role is not Undefined else None,
+                allowed_client_ip=value_or_none(self.allowed_client_ip),
+                totp_activated=value_or_none(self.totp_activated),
+                resource_policy=value_or_none(self.resource_policy),
+                sudo_session_enabled=value_or_none(self.sudo_session_enabled),
+                container_uid=value_or_none(self.container_uid),
+                container_main_gid=value_or_none(self.container_main_gid),
+                container_gids=value_or_none(self.container_gids),
             ),
             group_ids=value_or_none(self.group_ids),
         )
@@ -999,7 +994,8 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
             )
             password_state = OptionalState[PasswordInfo].from_graphql(password_info)
 
-        spec = UserUpdaterSpec(
+        updater = UserUpdater(
+            user_id=user_id,
             username=OptionalState[str].from_graphql(
                 self.username,
             ),
@@ -1052,10 +1048,7 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
                 self.group_ids,
             ),
         )
-        return UpdateUserAction(
-            user_id=user_id,
-            updater=Updater(spec=spec, pk_value=user_id),
-        )
+        return UpdateUserAction(updater=updater)
 
 
 class PurgeUserInput(graphene.InputObjectType):  # type: ignore[misc]
