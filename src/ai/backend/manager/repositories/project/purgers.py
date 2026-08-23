@@ -8,15 +8,12 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ProjectHasActiveKernelsError
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
 from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
@@ -120,25 +117,3 @@ class ProjectPurgerSpec(RBACEntityPurgerSpec[ProjectRow]):
     @override
     def entity_ref(self) -> RBACElementRef:
         return RBACElementRef(element_type=RBACElementType.PROJECT, element_id=str(self.project_id))
-
-
-@dataclass
-class UsersForProjectPurgerSpec(BatchPurgerSpec[AssociationScopesEntitiesRow]):
-    """PurgerSpec for removing user-project memberships (PROJECT/USER ASE rows)."""
-
-    user_uuids: list[UUID]
-    project_id: UUID
-
-    @override
-    def build_subquery(self) -> sa.sql.Select[tuple[AssociationScopesEntitiesRow]]:
-        entity_ids = [str(uid) for uid in self.user_uuids]
-        return sa.select(AssociationScopesEntitiesRow).where(
-            AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-            AssociationScopesEntitiesRow.scope_id == str(self.project_id),
-            AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-            AssociationScopesEntitiesRow.entity_id.in_(entity_ids),
-        )
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
