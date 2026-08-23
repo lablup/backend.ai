@@ -11,28 +11,15 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from pathlib import Path
 from typing import Any
 
 import pytest
 
-from ai.backend.agent.enroot.runtime import EnrootRuntime
-
-
-@pytest.fixture
-def runtime(tmp_path: Path) -> EnrootRuntime:
-    return EnrootRuntime(
-        data_path=tmp_path / "data",
-        cache_path=tmp_path / "cache",
-        runtime_path=tmp_path / "run",
-        state_path=tmp_path / "state",
-        kernel_uid=1000,
-        kernel_gid=1000,
-    )
+from ai.backend.agent.rootless.base import RootlessOciRuntime
 
 
 @contextlib.asynccontextmanager
-async def _consumer(runtime: EnrootRuntime) -> Any:
+async def _consumer(runtime: RootlessOciRuntime) -> Any:
     """Run the poller in the background, yielding the list it appends to.
 
     One generator for the whole scenario, driven by a task rather than by cancelling
@@ -61,14 +48,14 @@ async def _settle() -> None:
 
 class TestExitReporting:
     async def test_a_death_is_reported_exactly_once(
-        self, runtime: EnrootRuntime, monkeypatch: pytest.MonkeyPatch
+        self, runtime: RootlessOciRuntime, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """The container stays in `_pids` until remove_container clears it — several seconds after
         the process is gone. Re-firing across that window produced 4 CLEAN events for one death,
         and the duplicates raced the first, recording the kernel as `already-terminated` instead of
         `self-terminated`."""
         monkeypatch.setattr(
-            "ai.backend.agent.enroot.runtime._TASK_POLL_INTERVAL_SEC", 0.01, raising=False
+            "ai.backend.agent.rootless.base.TASK_POLL_INTERVAL_SEC", 0.01, raising=False
         )
         runtime._pids["dead"] = 424242
         monkeypatch.setattr(runtime, "_alive", lambda pid: False)
@@ -79,10 +66,10 @@ class TestExitReporting:
         assert [e.container_id for e in events] == ["dead"]
 
     async def test_a_live_container_is_not_reported(
-        self, runtime: EnrootRuntime, monkeypatch: pytest.MonkeyPatch
+        self, runtime: RootlessOciRuntime, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(
-            "ai.backend.agent.enroot.runtime._TASK_POLL_INTERVAL_SEC", 0.01, raising=False
+            "ai.backend.agent.rootless.base.TASK_POLL_INTERVAL_SEC", 0.01, raising=False
         )
         runtime._pids["alive"] = 424242
         monkeypatch.setattr(runtime, "_alive", lambda pid: True)
@@ -93,10 +80,10 @@ class TestExitReporting:
         assert events == []
 
     async def test_each_container_is_reported_on_its_own(
-        self, runtime: EnrootRuntime, monkeypatch: pytest.MonkeyPatch
+        self, runtime: RootlessOciRuntime, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(
-            "ai.backend.agent.enroot.runtime._TASK_POLL_INTERVAL_SEC", 0.01, raising=False
+            "ai.backend.agent.rootless.base.TASK_POLL_INTERVAL_SEC", 0.01, raising=False
         )
         runtime._pids.update({"a": 1, "b": 2})
         monkeypatch.setattr(runtime, "_alive", lambda pid: pid != 1)
@@ -112,20 +99,22 @@ class TestExitReporting:
 
 
 class TestExitCode:
-    def test_unknown_when_the_container_was_not_ours(self, runtime: EnrootRuntime) -> None:
+    def test_unknown_when_the_container_was_not_ours(self, runtime: RootlessOciRuntime) -> None:
         """A container recovered from the journal after an agent restart is not our child, so
         there is no status to collect. Reporting 0 would turn a crash into a clean exit."""
         runtime._pids["recovered"] = 1
         assert runtime._exit_code_of("recovered") == -1
 
-    def test_unknown_while_the_process_is_still_being_reaped(self, runtime: EnrootRuntime) -> None:
+    def test_unknown_while_the_process_is_still_being_reaped(
+        self, runtime: RootlessOciRuntime
+    ) -> None:
         class _Unreaped:
             returncode = None
 
         runtime._procs["c"] = _Unreaped()  # type: ignore[assignment]
         assert runtime._exit_code_of("c") == -1
 
-    def test_the_real_status_once_it_is_known(self, runtime: EnrootRuntime) -> None:
+    def test_the_real_status_once_it_is_known(self, runtime: RootlessOciRuntime) -> None:
         class _Exited:
             returncode = 137
 

@@ -21,7 +21,7 @@ import struct
 from collections.abc import Mapping, Sequence
 from typing import Any, Final
 
-from ai.backend.agent.enroot.syscall_tables import SYSCALL_TABLES
+from ai.backend.agent.rootless.syscall_tables import SYSCALL_TABLES
 
 # --- classic BPF, as seccomp uses it (linux/bpf_common.h) ---------------------------------------
 _LD: Final = 0x00

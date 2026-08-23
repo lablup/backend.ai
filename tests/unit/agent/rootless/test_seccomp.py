@@ -1,4 +1,4 @@
-"""Semantics of the enroot seccomp compiler.
+"""Semantics of the rootless backends' seccomp compiler.
 
 The compiler emits a BPF program nobody can eyeball, and a mistake in it does not fail loudly — a
 mis-resolved jump or a half-checked 64-bit argument produces a filter that installs cleanly and
@@ -17,14 +17,14 @@ from typing import Any
 import pytest
 
 from ai.backend.agent.containerd.agent import _docker_seccomp_to_oci
-from ai.backend.agent.enroot.seccomp import (
+from ai.backend.agent.rootless.seccomp import (
     SECCOMP_RET_ALLOW,
     SECCOMP_RET_ERRNO,
     SECCOMP_RET_KILL_PROCESS,
     SeccompCompileError,
     compile_profile,
 )
-from ai.backend.agent.enroot.syscall_tables import SYSCALL_TABLES
+from ai.backend.agent.rootless.syscall_tables import SYSCALL_TABLES
 
 _AUDIT_X86_64 = 0xC000003E
 _U32 = 0xFFFFFFFF

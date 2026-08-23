@@ -1,12 +1,13 @@
-"""Regenerate ``ai.backend.agent.enroot.syscall_tables`` from the kernel's uapi headers.
+"""Regenerate ``ai.backend.agent.rootless.syscall_tables`` from the kernel's uapi headers.
 
-The enroot backend compiles Backend.AI's seccomp profile to BPF itself (no libseccomp, no runc),
+The rootless backends (enroot, singularity) compile Backend.AI's seccomp profile to BPF
+themselves (no libseccomp, no runc),
 and BPF speaks syscall *numbers*. Nothing in the Python stdlib knows them, so the table is a
 checked-in artifact — the same choice libseccomp makes.
 
 Usage (needs linux-libc-dev installed):
     python scripts/codegen/gen_syscall_tables.py > \
-        src/ai/backend/agent/enroot/syscall_tables.py
+        src/ai/backend/agent/rootless/syscall_tables.py
 
 x86_64 has its own table; aarch64 uses the asm-generic one. A name absent from an architecture's
 header genuinely does not exist there (aarch64 has no `access`/`chmod`/`dup2`, only the `*at`
