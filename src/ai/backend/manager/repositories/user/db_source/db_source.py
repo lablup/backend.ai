@@ -206,7 +206,7 @@ class UserDBSource:
         )
         return UserCreateResultData(
             user=result.user_row.to_data(),
-            keypair=result.keypair_row.to_data(),
+            keypair=result.keypair,
         )
 
     async def bulk_create_users_validated(
