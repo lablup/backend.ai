@@ -155,7 +155,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
             UserUsageBucketEdge,
             UserUsageBucketGQL,
         )
-        from ai.backend.manager.repositories.resource_usage_history.types import (
+        from ai.backend.manager.models.resource_usage_history.scopes import (
             UserUsageBucketOperationScope,
         )
 
@@ -249,7 +249,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
             ProjectV2Edge,
             ProjectV2GQL,
         )
-        from ai.backend.manager.repositories.project.types import UserProjectOperationScope
+        from ai.backend.manager.models.project.scopes import UserProjectOperationScope
 
         scope = UserProjectOperationScope(user_uuid=UUID(str(self.id)))
         payload = await info.context.adapters.project.search_by_user(

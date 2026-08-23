@@ -137,6 +137,7 @@ from ai.backend.manager.models.endpoint import (
     EndpointRow,
     EndpointTokenRow,
 )
+from ai.backend.manager.models.endpoint.scopes import ProjectDeploymentOperationScope
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
@@ -190,7 +191,6 @@ from ai.backend.manager.repositories.deployment.creators import (
     DeploymentRevisionCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment.types import (
-    ProjectDeploymentOperationScope,
     RouteData,
     RouteServiceDiscoveryInfo,
     RouteSessionInfo,

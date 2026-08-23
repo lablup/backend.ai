@@ -60,10 +60,7 @@ from ai.backend.manager.models.app_config_fragment.upserters import (
     PublicAppConfigFragmentUpserter,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.base import (
-    combine_conditions_or,
-    negate_conditions,
-)
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.services.app_config.actions.fragment.admin_search import (
     AdminSearchAppConfigFragmentAction,
 )

@@ -53,10 +53,7 @@ from ai.backend.manager.models.app_config_allow_list.updaters import (
     AppConfigAllowListUpdater,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.base import (
-    combine_conditions_or,
-    negate_conditions,
-)
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.services.app_config.actions.allow_list.admin_search import (
     AdminSearchAppConfigAllowListAction,
 )

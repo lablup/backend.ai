@@ -9,8 +9,8 @@ from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.vfolder.types import VFolderData
+from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.vfolder.types import UserVFolderOperationScope
 from ai.backend.manager.services.vfolder.actions.base import (
     VFolderScopeAction,
     VFolderScopeActionResult,

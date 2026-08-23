@@ -1,4 +1,4 @@
-"""Types for audit log repository operations."""
+"""Operation scopes for audit logs."""
 
 from __future__ import annotations
 

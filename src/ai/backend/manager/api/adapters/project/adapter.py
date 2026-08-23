@@ -54,23 +54,20 @@ from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.orders import ProjectOrders
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.project.searchers import ProjectSearcher
-from ai.backend.manager.models.project.updaters import ProjectSoftDeleteUpdater, ProjectUpdater
-from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import (
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
-from ai.backend.manager.repositories.project.types import (
+from ai.backend.manager.models.project.scopes import (
     DomainProjectOperationScope,
     UserProjectOperationScope,
 )
+from ai.backend.manager.models.project.searchers import ProjectSearcher
+from ai.backend.manager.models.project.updaters import ProjectSoftDeleteUpdater, ProjectUpdater
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.project.actions.assign_users_to_project import (
     AssignUsersToProjectAction,

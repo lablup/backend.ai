@@ -91,6 +91,7 @@ from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
+from ai.backend.manager.models.endpoint.scopes import ProjectDeploymentOperationScope
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scheduling_history import (
     RouteHistoryRow,
@@ -106,18 +107,17 @@ from ai.backend.manager.repositories.base.updater import (
     Updater,
 )
 from ai.backend.manager.repositories.base.upserter import Upserter
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.scheduling_history.creators import DeploymentHistoryCreatorSpec
-
-from .db_source import DeploymentDBSource
-from .storage_source import DeploymentStorageSource
-from .types import (
-    ProjectDeploymentOperationScope,
+from ai.backend.manager.repositories.deployment.types import (
     RouteData,
     RouteServiceDiscoveryInfo,
     RouteSessionInfo,
     RouteSessionKernelInfo,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.scheduling_history.creators import DeploymentHistoryCreatorSpec
+
+from .db_source import DeploymentDBSource
+from .storage_source import DeploymentStorageSource
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

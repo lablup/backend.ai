@@ -69,6 +69,11 @@ from ai.backend.common.dto.manager.fair_share import (
     UserUsageBucketFilter,
 )
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.manager.models.fair_share.scopes import (
+    DomainFairShareOperationScope,
+    ProjectFairShareOperationScope,
+    UserFairShareOperationScope,
+)
 from ai.backend.manager.models.resource_group.conditions import ResourceGroupConditions
 from ai.backend.manager.models.resource_usage_history.searchers import (
     DomainUsageBucketSearcher,
@@ -77,11 +82,6 @@ from ai.backend.manager.models.resource_usage_history.searchers import (
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.fair_share.types import (
-    DomainFairShareOperationScope,
-    ProjectFairShareOperationScope,
-    UserFairShareOperationScope,
-)
 from ai.backend.manager.services.fair_share.actions import (
     BulkUpsertDomainFairShareWeightAction,
     BulkUpsertProjectFairShareWeightAction,

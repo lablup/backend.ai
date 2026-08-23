@@ -76,6 +76,7 @@ from ai.backend.manager.data.resource.types import (
 )
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.keypair.conditions import KeypairConditions
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -108,10 +109,6 @@ from ai.backend.manager.models.resource_policy.updaters import (
     UserResourcePolicyUpdater,
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import (
-    combine_conditions_or,
-    negate_conditions,
-)
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
 )

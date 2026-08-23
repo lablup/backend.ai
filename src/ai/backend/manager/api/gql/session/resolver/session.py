@@ -117,7 +117,7 @@ async def project_sessions_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> SessionV2ConnectionGQL | None:
-    from ai.backend.manager.repositories.session.types import ProjectSessionOperationScope
+    from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
 
     payload = await info.context.adapters.session.gql_search_by_project(
         scope=ProjectSessionOperationScope(project_id=scope.project_id),

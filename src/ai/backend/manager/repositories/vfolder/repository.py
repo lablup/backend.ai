@@ -119,6 +119,10 @@ from ai.backend.manager.models.vfolder import (
     vfolders,
 )
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
+from ai.backend.manager.models.vfolder.scopes import (
+    ProjectVFolderOperationScope,
+    UserVFolderOperationScope,
+)
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -146,8 +150,6 @@ from ai.backend.manager.repositories.vfolder.creators import VFolderCreatorSpec
 from ai.backend.manager.repositories.vfolder.purge_guards import find_active_vfolder_references
 from ai.backend.manager.repositories.vfolder.types import (
     BulkVFolderPurgeResult,
-    ProjectVFolderOperationScope,
-    UserVFolderOperationScope,
     VFolderPurgeFailure,
 )
 

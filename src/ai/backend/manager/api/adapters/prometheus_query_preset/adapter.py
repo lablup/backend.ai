@@ -48,6 +48,7 @@ from ai.backend.manager.data.prometheus_query_preset import (
     PrometheusQueryPresetData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset.conditions import (
     PrometheusQueryPresetConditions,
@@ -60,11 +61,7 @@ from ai.backend.manager.models.prometheus_query_preset.searchers import (
     PrometheusQueryPresetSearcher,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import (
-    Updater,
-    combine_conditions_or,
-    negate_conditions,
-)
+from ai.backend.manager.repositories.base import Updater
 from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
     PrometheusQueryPresetUpdaterSpec,
 )

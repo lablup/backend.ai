@@ -10,9 +10,9 @@ from ai.backend.manager.actions.v2.ops.base import (
 )
 from ai.backend.manager.data.auth.login_session_types import LoginSessionData
 from ai.backend.manager.models.login_session.row import LoginSessionRow
+from ai.backend.manager.models.login_session.scopes import MyLoginSessionOperationScope
 from ai.backend.manager.models.login_session.searchers import LoginSessionSearcher
 from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.repositories.auth.types import MyLoginSessionOperationScope
 
 
 @dataclass(frozen=True)

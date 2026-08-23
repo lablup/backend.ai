@@ -33,24 +33,22 @@ from ai.backend.manager.data.user.types import (
 from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.keypair.types import (
-    UserKeypairOperationScope,
-)
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.user.creators import UserCreateSpec
-from ai.backend.manager.repositories.user.db_source import UserDBSource
-from ai.backend.manager.repositories.user.types import (
+from ai.backend.manager.models.user.scopes import (
     DomainUserOperationScope,
     ProjectUserOperationScope,
     RoleUserOperationScope,
 )
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.user.creators import UserCreateSpec
+from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.manager.repositories.user.updaters import UserUpdateSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

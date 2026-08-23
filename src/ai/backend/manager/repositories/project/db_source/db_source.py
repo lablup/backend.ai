@@ -50,6 +50,10 @@ from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.project.row import (
     ProjectRow,
 )
+from ai.backend.manager.models.project.scopes import (
+    DomainProjectOperationScope,
+    UserProjectOperationScope,
+)
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.routing import RoutingRow
@@ -89,11 +93,7 @@ from ai.backend.manager.repositories.project.purgers import (
     SessionByIdsBatchPurgerSpec,
 )
 from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
-from ai.backend.manager.repositories.project.types import (
-    DomainProjectOperationScope,
-    ProjectSearchResult,
-    UserProjectOperationScope,
-)
+from ai.backend.manager.repositories.project.types import ProjectSearchResult
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

@@ -30,7 +30,7 @@ from ai.backend.manager.api.gql.model_card.types import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types.enum import VFolderOperationStatusGQL
-from ai.backend.manager.repositories.model_card.types import VFolderModelCardOperationScope
+from ai.backend.manager.models.model_card.scopes import VFolderModelCardOperationScope
 
 from .nested import (
     VFolderAccessControlInfoGQL,

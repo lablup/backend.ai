@@ -1,4 +1,4 @@
-"""Types for error log repository operations."""
+"""Operation scopes for error logs."""
 
 from __future__ import annotations
 

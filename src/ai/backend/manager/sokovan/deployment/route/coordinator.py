@@ -27,14 +27,11 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.condition_utils import combine_conditions_and, combine_conditions_or
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    combine_conditions_and,
-    combine_conditions_or,
-)
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment import DeploymentRepository

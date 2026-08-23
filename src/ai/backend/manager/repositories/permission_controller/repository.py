@@ -56,8 +56,15 @@ from ai.backend.manager.data.permission.virtual_scope import (
 )
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.role_invitation.scopes import (
+    InviteeOperationScope,
+    InviterOperationScope,
+    RoleInvitationOperationScope,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import (
     BulkCreator,
@@ -70,16 +77,7 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
     UserRoleCreatorSpec,
 )
-from ai.backend.manager.repositories.permission_controller.types import (
-    PermissionOperationScope,
-    ScopedRoleOperationScope,
-)
-from ai.backend.manager.repositories.role_invitation.types import (
-    InviteeOperationScope,
-    InviterOperationScope,
-    RoleInvitationOperationScope,
-    RoleInvitationSearchResult,
-)
+from ai.backend.manager.repositories.role_invitation.types import RoleInvitationSearchResult
 
 from .db_source.db_source import CreateRoleInput, PermissionDBSource
 

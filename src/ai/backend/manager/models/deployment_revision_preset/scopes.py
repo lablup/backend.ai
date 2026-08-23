@@ -1,4 +1,4 @@
-"""Operation scopes for the role preset repository."""
+"""Operation scopes for deployment revision presets."""
 
 from __future__ import annotations
 
@@ -8,28 +8,26 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
-    RolePermissionPresetRow,
-)
+from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
-__all__ = ("RolePresetPermissionOperationScope",)
+__all__ = ("DeploymentPresetSlotOperationScope",)
 
 
 @dataclass(frozen=True)
-class RolePresetPermissionOperationScope(OperationScope):
-    """The permission entries one preset holds."""
+class DeploymentPresetSlotOperationScope(OperationScope):
+    """The slot amounts one preset declares."""
 
-    preset_id: RolePresetID
+    preset_id: DeploymentPresetID
 
     @override
     def to_condition(self) -> QueryCondition:
         preset_id = self.preset_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RolePermissionPresetRow.role_preset_id == preset_id
+            return PresetResourceSlotRow.preset_id == preset_id
 
         return inner
 

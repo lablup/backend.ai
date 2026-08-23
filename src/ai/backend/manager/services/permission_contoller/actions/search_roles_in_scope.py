@@ -6,8 +6,8 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.models.rbac_models.scopes import ScopedRoleOperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.permission_controller.types import ScopedRoleOperationScope
 from ai.backend.manager.services.permission_contoller.actions.base import (
     RoleScopeAction,
     RoleScopeActionResult,

@@ -45,6 +45,11 @@ from ai.backend.manager.models.fair_share import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
+from ai.backend.manager.models.fair_share.scopes import (
+    DomainFairShareOperationScope,
+    ProjectFairShareOperationScope,
+    UserFairShareOperationScope,
+)
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
@@ -68,11 +73,8 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareEntitySearchResult,
-    DomainFairShareOperationScope,
     ProjectFairShareEntitySearchResult,
-    ProjectFairShareOperationScope,
     UserFairShareEntitySearchResult,
-    UserFairShareOperationScope,
 )
 
 if TYPE_CHECKING:

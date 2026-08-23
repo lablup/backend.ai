@@ -3,13 +3,9 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, override
-from uuid import UUID
-
-import sqlalchemy as sa
+from typing import Any
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -24,11 +20,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.resource import ProjectNotFound
-from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 
 @dataclass
@@ -145,33 +136,3 @@ class RouteServiceDiscoveryInfo:
     kernel_port: int
     session_owner: uuid.UUID
     project: uuid.UUID
-
-
-@dataclass(frozen=True)
-class ProjectDeploymentOperationScope(OperationScope):
-    """Required scope for searching endpoints within a project.
-
-    Used for project-scoped deployment search (project admin).
-    """
-
-    project_id: UUID
-
-    @override
-    def to_condition(self) -> QueryCondition:
-        project_id = self.project_id
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.project == project_id
-
-        return inner
-
-    @property
-    @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
-        return [
-            ExistenceCheck(
-                column=ProjectRow.id,
-                value=self.project_id,
-                error=ProjectNotFound(str(self.project_id)),
-            ),
-        ]

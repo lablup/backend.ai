@@ -1,7 +1,4 @@
-"""Types for keypair repository operations.
-
-Contains OperationScope dataclasses for keypair search operations.
-"""
+"""Operation scopes for keypairs."""
 
 from __future__ import annotations
 

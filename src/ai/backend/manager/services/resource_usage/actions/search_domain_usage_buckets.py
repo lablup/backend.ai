@@ -9,13 +9,11 @@ from ai.backend.common.data.entity.types import EntityType, ScopeRef
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.resource_usage_history.types import DomainUsageBucketData
 from ai.backend.manager.models.resource_usage_history.row import DomainUsageBucketRow
+from ai.backend.manager.models.resource_usage_history.scopes import DomainUsageBucketOperationScope
 from ai.backend.manager.models.resource_usage_history.searchers import (
     DomainUsageBucketSearcher,
 )
 from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.repositories.resource_usage_history.types import (
-    DomainUsageBucketOperationScope,
-)
 
 
 @dataclass

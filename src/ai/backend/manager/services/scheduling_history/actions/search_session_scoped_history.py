@@ -7,10 +7,10 @@ from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionSchedulingHistoryData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.scheduling_history.types import (
+from ai.backend.manager.models.scheduling_history.scopes import (
     SessionSchedulingHistoryOperationScope,
 )
+from ai.backend.manager.repositories.base import BatchQuerier
 
 from .base import SchedulingHistoryScopeActionResult, SessionSchedulingHistoryAction
 

@@ -1,4 +1,4 @@
-"""Search scope types for login session and login history queries."""
+"""Operation scopes for login sessions and login history."""
 
 from __future__ import annotations
 

@@ -60,6 +60,7 @@ from ai.backend.manager.data.role_preset.types import (
     RolePresetData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.rbac_models.role_permission_preset.conditions import (
     RolePermissionPresetConditions,
 )
@@ -81,10 +82,6 @@ from ai.backend.manager.models.rbac_models.role_preset.searchers import (
     RolePresetSearcher,
 )
 from ai.backend.manager.models.rbac_models.role_preset.updaters import RolePresetUpdater
-from ai.backend.manager.repositories.base import (
-    combine_conditions_or,
-    negate_conditions,
-)
 from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
     BulkAddRolePermissionPresetsAction,
 )

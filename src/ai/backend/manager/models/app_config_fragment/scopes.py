@@ -1,4 +1,4 @@
-"""Types for app config fragment repository operations (search scopes)."""
+"""Operation scopes for app config fragments."""
 
 from __future__ import annotations
 

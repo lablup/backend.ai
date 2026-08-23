@@ -1,4 +1,4 @@
-"""Types for session repository operations."""
+"""Operation scopes for sessions."""
 
 from __future__ import annotations
 

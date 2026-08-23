@@ -31,6 +31,7 @@ from ai.backend.manager.data.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryRow,
 )
@@ -47,10 +48,6 @@ from ai.backend.manager.models.prometheus_query_preset_category.searchers import
     PrometheusQueryPresetCategorySearcher,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import (
-    combine_conditions_or,
-    negate_conditions,
-)
 from ai.backend.manager.services.prometheus_query_preset_category.actions import (
     CreateCategoryAction,
     GetCategoryAction,

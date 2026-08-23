@@ -31,12 +31,9 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.models.audit_log.searchers import AuditLogSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.audit_log.options import AuditLogConditions, AuditLogOrders
-from ai.backend.manager.repositories.base import (
-    combine_conditions_or,
-    negate_conditions,
-)
 from ai.backend.manager.services.audit_log.actions.scoped_search import (
     AuditLogScopeItem,
     EntityAuditLogScopeItem,
