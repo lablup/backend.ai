@@ -1459,7 +1459,7 @@ class TestAgentDBSourceKernelFiltering:
         agent_detail = result.items[0]
 
         # Validate actual_occupied_slots reflects only resource-occupied kernels
-        actual_cpu = agent_detail.agent.actual_occupied_slots.get("cpu", 0)
+        actual_cpu = agent_detail.agent.occupied_slots.get("cpu", 0)
         assert Decimal(str(actual_cpu)) == agent_with_kernels.expected_actual_occupied_cpu
 
     # ==================== update_resource_group tests ====================

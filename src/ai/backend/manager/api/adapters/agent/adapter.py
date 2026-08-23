@@ -268,8 +268,8 @@ class AgentAdapter(BaseAdapter):
             id=str(data.id),
             resource_info=AgentResourceInfo(
                 capacity=dict(data.available_slots.to_json()),
-                used=dict(data.actual_occupied_slots.to_json()),
-                free=dict((data.available_slots - data.actual_occupied_slots).to_json()),
+                used=dict(data.occupied_slots.to_json()),
+                free=dict((data.available_slots - data.occupied_slots).to_json()),
             ),
             status_info=AgentStatusInfo(
                 status=data.status.name,

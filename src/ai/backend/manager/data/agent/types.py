@@ -81,8 +81,7 @@ class AgentData(EntityData):
     resource_group: str
     schedulable: bool
     available_slots: ResourceSlot
-    cached_occupied_slots: ResourceSlot
-    actual_occupied_slots: ResourceSlot
+    occupied_slots: ResourceSlot
     addr: str
     public_host: str | None
     first_contact: datetime | None

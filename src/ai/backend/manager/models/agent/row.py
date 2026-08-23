@@ -51,8 +51,7 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_slot import AgentResourceRow
-from ai.backend.manager.models.types import QueryCondition
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 __all__: Sequence[str] = (
     "AgentRow",
@@ -97,12 +96,13 @@ class AgentRow(Base):
     schedulable: Mapped[bool] = mapped_column(
         "schedulable", sa.Boolean(), nullable=False, server_default=true(), default=True
     )
+    # DEPRECATED (BA-7439): No longer read. Agent capacity is served by the
+    # normalized agent_resources table; will be dropped in BA-7440.
     available_slots: Mapped[ResourceSlot] = mapped_column(
         "available_slots", ResourceSlotColumn(), nullable=False
     )
-    # DEPRECATED (Phase 3, BA-4308): No longer written to.
-    # Agent occupied slots are now tracked by the normalized agent_resources table.
-    # Retained for historical audit; will be dropped in a future major version.
+    # DEPRECATED (Phase 3, BA-4308): No longer written to; no longer read (BA-7439).
+    # Agent occupied slots are tracked by the normalized agent_resources table.
     occupied_slots: Mapped[ResourceSlot] = mapped_column(
         "occupied_slots", ResourceSlotColumn(), nullable=False
     )
@@ -134,10 +134,18 @@ class AgentRow(Base):
 
     agent_resource_rows: Mapped[list[AgentResourceRow]] = relationship("AgentResourceRow")
 
+    def _resource_rows_by_rank(self) -> list[AgentResourceRow]:
+        return sorted(self.agent_resource_rows, key=lambda r: r.slot_type_row.rank)
+
+    def actual_available_slots(self) -> ResourceSlot:
+        available = ResourceSlot()
+        for resource_row in self._resource_rows_by_rank():
+            available[resource_row.slot_name] = resource_row.capacity
+        return available
+
     def actual_occupied_slots(self) -> ResourceSlot:
         occupied = ResourceSlot()
-        sorted_rows = sorted(self.agent_resource_rows, key=lambda r: r.slot_type_row.rank)
-        for resource_row in sorted_rows:
+        for resource_row in self._resource_rows_by_rank():
             occupied[resource_row.slot_name] = resource_row.used
         return occupied
 
@@ -150,9 +158,8 @@ class AgentRow(Base):
             region=self.region,
             resource_group=self.scaling_group,
             schedulable=self.schedulable,
-            available_slots=self.available_slots,
-            cached_occupied_slots=self.occupied_slots,
-            actual_occupied_slots=self.actual_occupied_slots(),
+            available_slots=self.actual_available_slots(),
+            occupied_slots=self.actual_occupied_slots(),
             addr=self.addr,
             public_host=self.public_host,
             first_contact=self.first_contact,
@@ -168,7 +175,7 @@ class AgentRow(Base):
         return AgentDataForHeartbeatUpdate(
             status=self.status,
             status_changed=self.status_changed,
-            available_slots=self.available_slots,
+            available_slots=self.actual_available_slots(),
             addr=self.addr,
             public_host=self.public_host,
             version=self.version,
@@ -176,33 +183,6 @@ class AgentRow(Base):
             compute_plugins=self.compute_plugins,
             public_key=self.public_key,
             auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
-        )
-
-    @classmethod
-    async def get_agents_by_condition(
-        cls, conditions: Sequence[QueryCondition], *, db: ExtendedAsyncSAEngine
-    ) -> Sequence[AgentRow]:
-        query_stmt = sa.select(AgentRow)
-        for cond in conditions:
-            query_stmt = cond(query_stmt)
-
-        async def fetch(db_session: SASession) -> Sequence[AgentRow]:
-            return (await db_session.scalars(query_stmt)).all()
-
-        async with db.connect() as db_conn:
-            return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
-
-    @classmethod
-    async def get_schedulable_agents_by_sgroup(
-        cls, sgroup_name: str, *, db: ExtendedAsyncSAEngine
-    ) -> Sequence[AgentRow]:
-        return await cls.get_agents_by_condition(
-            [
-                by_scaling_group(sgroup_name),
-                by_schedulable(True),
-                by_status(AgentStatus.ALIVE),
-            ],
-            db=db,
         )
 
     @classmethod
@@ -225,40 +205,6 @@ class AgentRow(Base):
 
 # For compatibility
 agents = AgentRow.__table__
-
-
-def by_scaling_group(
-    scaling_group: str,
-) -> QueryCondition:
-    def _by_scaling_group(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(AgentRow.scaling_group == scaling_group)
-
-    return _by_scaling_group
-
-
-def by_status(
-    status: AgentStatus,
-) -> QueryCondition:
-    def _by_status(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(AgentRow.status == status)
-
-    return _by_status
-
-
-def by_schedulable(
-    schedulable: bool,
-) -> QueryCondition:
-    def _by_schedulable(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        schedulable_ = true() if schedulable else false()
-        return query_stmt.where(AgentRow.schedulable == schedulable_)
-
-    return _by_schedulable
 
 
 async def list_schedulable_agents_by_sgroup(
