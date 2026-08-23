@@ -14,10 +14,9 @@ from ai.backend.manager.data.model_card.types import (
     ModelCardData,
     VFolderScanData,
 )
-from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.model_card.types import (
     AvailablePresetsSearchResult,
 )
@@ -39,14 +38,14 @@ class ModelCardRepository:
 
     async def delete(
         self,
-        purger: Purger[ModelCardRow],
+        purger: ModelCardPurger,
         options: DeleteModelCardOptions,
     ) -> UUID:
         return await self._db_source.delete(purger, options)
 
     async def bulk_delete(
         self,
-        purgers: list[Purger[ModelCardRow]],
+        purgers: list[ModelCardPurger],
         options: DeleteModelCardOptions,
     ) -> BulkModelCardDeleteResultData:
         return await self._db_source.bulk_delete(purgers, options)
