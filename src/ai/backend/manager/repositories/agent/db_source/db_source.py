@@ -17,7 +17,6 @@ from ai.backend.manager.data.agent.types import (
     AgentDetailData,
     AgentHeartbeatUpsert,
     AgentListResult,
-    AgentStatus,
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
@@ -31,10 +30,8 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 from ai.backend.manager.repositories.base import BulkUpserter, execute_bulk_upserter
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -170,31 +167,6 @@ class AgentDBSource:
             raise UnresolvableResourceGroup(
                 "No initial resource group name is configured and no default scaling group is set."
             )
-
-    async def update_agent_status_exit(self, updater: Updater[AgentRow]) -> None:
-        async with self._db.begin_session() as session:
-            fetch_query = (
-                sa.select(AgentRow.status)
-                .select_from(AgentRow)
-                .where(AgentRow.id == updater.pk_value)
-                .with_for_update()
-            )
-            prev_status = await session.scalar(fetch_query)
-            if prev_status in (None, AgentStatus.LOST, AgentStatus.TERMINATED):
-                return
-
-            spec = updater.spec
-            if isinstance(spec, AgentStatusUpdaterSpec):
-                if spec.status == AgentStatus.LOST:
-                    log.warning("agent {0} heartbeat timeout detected.", updater.pk_value)
-                elif spec.status == AgentStatus.TERMINATED:
-                    log.info("agent {0} has terminated.", updater.pk_value)
-
-            await execute_updater(session, updater)
-
-    async def update_agent_status(self, updater: Updater[AgentRow]) -> None:
-        async with self._db.begin_session() as session:
-            await execute_updater(session, updater)
 
     async def update_resource_group(
         self,

@@ -24,7 +24,7 @@ and is read through an entity's permission like a field, while belonging to neit
 |---|---|---|
 | creator | `GlobalEntityCreator` / `EntityCreator` / `RoleManagedEntityCreator` / `FieldCreator` / `SidecarCreator` | only a create settles what a row belongs to |
 | purger | `EntityPurger` / `FieldPurger` | removing an entity removes what it left in the graph |
-| updater | `DataUpdater` alone | an update never changes what a row belongs to |
+| updater | `DataUpdater` / `GuardedDataUpdater` | an update never changes what a row belongs to, so the roots split on how the row is picked: by id, or by id behind a precondition |
 
 The roots are deliberately unrelated. Do NOT extract a common base across them
 or type any function against "any creator/purger" — the absence of a common supertype

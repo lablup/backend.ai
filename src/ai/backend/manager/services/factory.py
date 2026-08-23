@@ -245,9 +245,6 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.agent.repository,
             repositories.scheduler.repository,
             args.scheduling_controller,
-            args.hook_plugin_ctx,
-            args.event_producer,
-            args.agent_cache,
         ),
         app_config=AppConfigService(OpsRepository(repositories.v2_ops_provider)),
         domain=DomainService(repositories.domain.repository),
@@ -523,7 +520,6 @@ def create_processors(
             resource_group_groups.group(GroupMeta(AGENT_ENTITY_TYPE)),
             services.agent,
             action_monitors,
-            validators,
         ),
         app_config=AppConfigProcessors(
             app_config_groups.group(GroupMeta(APP_CONFIG_ENTITY_TYPE)),

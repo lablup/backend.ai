@@ -160,7 +160,7 @@ class ResourceHandler:
 
     async def recalculate_usage(self, ctx: UserContext) -> APIResponse:
         log.info("RECALCULATE_USAGE ()")
-        await self._agent.recalculate_usage.wait_for_complete(RecalculateUsageAction())
+        await self._agent.recalculate_usage.run(RecalculateUsageAction())
         return APIResponse.build(HTTPStatus.OK, EmptyResponse())
 
     # ------------------------------------------------------------------
@@ -236,7 +236,7 @@ class ResourceHandler:
     ) -> APIResponse:
         params = query.parsed
         log.info("GET_WATCHER_STATUS (ag:{})", params.agent_id)
-        result = await self._agent.get_watcher_status.wait_for_complete(
+        result = await self._agent.get_watcher_status.run(
             GetWatcherStatusAction(agent_id=AgentId(params.agent_id))
         )
         return APIResponse.build(HTTPStatus.OK, WatcherDataResponse(root=result.data))
@@ -252,7 +252,7 @@ class ResourceHandler:
     ) -> APIResponse:
         params = body.parsed
         log.info("WATCHER_AGENT_START (ag:{})", params.agent_id)
-        result = await self._agent.watcher_agent_start.wait_for_complete(
+        result = await self._agent.watcher_agent_start.run(
             WatcherAgentStartAction(agent_id=AgentId(params.agent_id))
         )
         return APIResponse.build(HTTPStatus.OK, WatcherDataResponse(root=result.data))
@@ -268,7 +268,7 @@ class ResourceHandler:
     ) -> APIResponse:
         params = body.parsed
         log.info("WATCHER_AGENT_STOP (ag:{})", params.agent_id)
-        result = await self._agent.watcher_agent_stop.wait_for_complete(
+        result = await self._agent.watcher_agent_stop.run(
             WatcherAgentStopAction(agent_id=AgentId(params.agent_id))
         )
         return APIResponse.build(HTTPStatus.OK, WatcherDataResponse(root=result.data))
@@ -284,7 +284,7 @@ class ResourceHandler:
     ) -> APIResponse:
         params = body.parsed
         log.info("WATCHER_AGENT_RESTART (ag:{})", params.agent_id)
-        result = await self._agent.watcher_agent_restart.wait_for_complete(
+        result = await self._agent.watcher_agent_restart.run(
             WatcherAgentRestartAction(agent_id=AgentId(params.agent_id))
         )
         return APIResponse.build(HTTPStatus.OK, WatcherDataResponse(root=result.data))

@@ -34,8 +34,6 @@ from ai.backend.manager.actions.registry.types import (
     ConcernMeta,
     GroupMeta,
 )
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -62,7 +60,6 @@ from ai.backend.manager.services.session.resource_allocation.processors import (
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -152,10 +149,6 @@ def agent_processors_mock(processor_registry: ProcessorRegistry[Any]) -> AgentPr
         processor_registry.group(GroupMeta(AGENT_ENTITY_TYPE)),
         AsyncMock(),
         [],
-        ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
-        ),
     )
 
 

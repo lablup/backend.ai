@@ -96,6 +96,7 @@ from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.revision.actions.lookup_owner import (
@@ -229,6 +230,8 @@ def test_every_defined_v2_action_is_wired() -> None:
     resource_slot_groups = registry.concern(ConcernMeta(Concern.SYSTEM))
     scheduling_history_groups = registry.concern(ConcernMeta(Concern.SESSION))
     resource_allocation_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
+    agent_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
+    AgentProcessors(agent_groups.group(GroupMeta(AGENT_ENTITY_TYPE)), MagicMock(), [])
     AppConfigProcessors(
         registry.group(GroupMeta(APP_CONFIG_ENTITY_TYPE)),
         registry.group(GroupMeta(APP_CONFIG_DEFINITION_ENTITY_TYPE)),
