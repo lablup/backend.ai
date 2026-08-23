@@ -90,6 +90,10 @@ from ai.backend.manager.models.resource_slot import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
+from ai.backend.manager.models.resource_slot.aggregates import (
+    batch_load_kernel_allocations,
+    kernel_requested_slots_expr,
+)
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import (
     PRIVATE_SESSION_TYPES,
@@ -1711,13 +1715,16 @@ class ScheduleDBSource:
                             KernelRow.container_id,
                             KernelRow.agent,
                             KernelRow.agent_addr,
-                            KernelRow.occupied_slots,
                         )
                     )
                 )
             )
             result = await session.execute(query)
             session_rows = list(result.scalars().all())
+            allocations = await batch_load_kernel_allocations(
+                session,
+                [KernelId(kernel.id) for row in session_rows for kernel in row.kernels],
+            )
 
             terminating_sessions = []
             for session_row in session_rows:
@@ -1728,7 +1735,11 @@ class ScheduleDBSource:
                         container_id=kernel.container_id,
                         agent_id=AgentId(kernel.agent) if kernel.agent else None,
                         agent_addr=kernel.agent_addr,
-                        occupied_slots=kernel.occupied_slots,
+                        occupied_slots=(
+                            allocations[KernelId(kernel.id)].used
+                            if KernelId(kernel.id) in allocations
+                            else ResourceSlot()
+                        ),
                     )
                     for kernel in session_row.kernels
                 ]
@@ -3676,7 +3687,7 @@ class ScheduleDBSource:
                 KernelRow.uid,
                 KernelRow.main_gid,
                 KernelRow.gids,
-                KernelRow.requested_slots,
+                kernel_requested_slots_expr(KernelRow.id).label("requested_slots"),
                 KernelRow.resource_opts,
                 KernelRow.bootstrap_script,
                 KernelRow.startup_command,
@@ -3988,6 +3999,15 @@ class ScheduleDBSource:
 
             return handler_sessions
 
+    async def get_kernel_allocated_slots(
+        self,
+        kernel_ids: Sequence[KernelId],
+    ) -> dict[KernelId, ResourceSlot]:
+        """Read from ``resource_allocations`` what each kernel was ever allocated."""
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            aggregates = await batch_load_kernel_allocations(db_sess, kernel_ids)
+        return {kernel_id: agg.allocated for kernel_id, agg in aggregates.items()}
+
     async def search_kernels_for_handler(
         self,
         querier: BatchQuerier,
@@ -4254,7 +4274,7 @@ class ScheduleDBSource:
                 KernelRow.uid,
                 KernelRow.main_gid,
                 KernelRow.gids,
-                KernelRow.requested_slots,
+                kernel_requested_slots_expr(KernelRow.id).label("requested_slots"),
                 KernelRow.resource_opts,
                 KernelRow.bootstrap_script,
                 KernelRow.startup_command,
@@ -4398,7 +4418,7 @@ class ScheduleDBSource:
                     KernelRow.uid,
                     KernelRow.main_gid,
                     KernelRow.gids,
-                    KernelRow.requested_slots,
+                    kernel_requested_slots_expr(KernelRow.id).label("requested_slots"),
                     KernelRow.resource_opts,
                     KernelRow.bootstrap_script,
                     KernelRow.startup_command,
@@ -4560,7 +4580,7 @@ class ScheduleDBSource:
                     KernelRow.uid,
                     KernelRow.main_gid,
                     KernelRow.gids,
-                    KernelRow.requested_slots,
+                    kernel_requested_slots_expr(KernelRow.id).label("requested_slots"),
                     KernelRow.resource_opts,
                     KernelRow.bootstrap_script,
                     KernelRow.startup_command,

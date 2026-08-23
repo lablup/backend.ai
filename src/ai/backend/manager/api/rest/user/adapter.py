@@ -6,8 +6,7 @@ as well as data-to-DTO conversion.
 
 from __future__ import annotations
 
-from uuid import UUID
-
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.user import (
     OrderDirection,
@@ -25,13 +24,11 @@ from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.user.conditions import UserConditions
 from ai.backend.manager.models.user.orders import UserOrders
 from ai.backend.manager.models.user.searchers import UserSearcher
+from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
 __all__ = ("UserAdapter",)
@@ -68,9 +65,9 @@ class UserAdapter(BaseFilterAdapter):
     def build_updater(
         self,
         request: UpdateUserRequest,
-        email: str,
+        user_id: UserID,
         password_info: PasswordInfo | None = None,
-    ) -> Updater[UserRow]:
+    ) -> UserUpdater:
         """Convert update request to updater."""
         username = OptionalState[str].nop()
         password = OptionalState[PasswordInfo].nop()
@@ -122,7 +119,8 @@ class UserAdapter(BaseFilterAdapter):
         if request.group_ids is not None:
             group_ids = OptionalState.update(request.group_ids)
 
-        updater_spec = UserUpdaterSpec(
+        return UserUpdater(
+            user_id=user_id,
             username=username,
             password=password,
             need_password_change=need_password_change,
@@ -140,9 +138,6 @@ class UserAdapter(BaseFilterAdapter):
             container_gids=container_gids,
             group_ids=group_ids,
         )
-        return Updater(
-            spec=updater_spec, pk_value=UUID(int=0)
-        )  # pk_value unused; email-based lookup
 
     def build_searcher(self, request: SearchUsersRequest) -> UserSearcher:
         """Build a user searcher from the search request."""

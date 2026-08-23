@@ -21,7 +21,7 @@ from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityRef, ScopeRef
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
-from ai.backend.common.types import SlotName, VFolderID
+from ai.backend.common.types import ResourceSlot, SlotName, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -55,6 +55,7 @@ from ai.backend.manager.models.project.scopes import (
     UserProjectOperationScope,
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -219,7 +220,7 @@ class ProjectDBSource:
                     kernels.c.domain_name,
                     kernels.c.group_id,
                     kernels.c.attached_devices,
-                    kernels.c.occupied_slots,
+                    kernel_allocated_slots_expr(kernels.c.id).label("occupied_slots"),
                     kernels.c.resource_opts,
                     kernels.c.vfolder_mounts,
                     kernels.c.mounts,
@@ -382,8 +383,8 @@ class ProjectDBSource:
         start_date: datetime,
         end_date: datetime,
         project_ids: Sequence[UUID] | None = None,
-    ) -> list[KernelRow]:
-        """Fetch resource usage data for projects."""
+    ) -> tuple[list[KernelRow], dict[UUID, ResourceSlot]]:
+        """Fetch the project's kernels with the slots they were allocated."""
         return await fetch_resource_usage(self._db, start_date, end_date, project_ids=project_ids)
 
     async def purge_group(

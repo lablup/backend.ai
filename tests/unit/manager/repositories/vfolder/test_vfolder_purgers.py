@@ -26,16 +26,16 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.vfolder.purgers import (
+    VFolderInvitationBatchPurger,
+    VFolderPermissionBatchPurger,
+)
 from ai.backend.manager.models.vfolder.row import (
     VFolderInvitationRow,
     VFolderPermissionRow,
     VFolderRow,
 )
-from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
-from ai.backend.manager.repositories.vfolder.purgers import (
-    VFolderInvitationBatchPurgerSpec,
-    VFolderPermissionBatchPurgerSpec,
-)
+from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
@@ -237,9 +237,9 @@ class TestVFolderPurgersIntegration:
 
         # Purge invitations
         async with db_with_cleanup.begin_session() as session:
-            purger = BatchPurger(spec=VFolderInvitationBatchPurgerSpec(vfolder_ids=vfolder_ids))
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == len(sample_invitations)
+            purger = VFolderInvitationBatchPurger(vfolder_ids=vfolder_ids)
+            removed = await V2WriteOps(session).batch_purge_in_global(purger)
+            assert len(removed) == len(sample_invitations)
 
         # Verify invitations are deleted
         async with db_with_cleanup.begin_session() as session:
@@ -261,9 +261,9 @@ class TestVFolderPurgersIntegration:
 
         # Purge permissions
         async with db_with_cleanup.begin_session() as session:
-            purger = BatchPurger(spec=VFolderPermissionBatchPurgerSpec(vfolder_ids=vfolder_ids))
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == len(sample_permissions)
+            purger = VFolderPermissionBatchPurger(vfolder_ids=vfolder_ids)
+            removed = await V2WriteOps(session).batch_purge_in_global(purger)
+            assert len(removed) == len(sample_permissions)
 
         # Verify permissions are deleted
         async with db_with_cleanup.begin_session() as session:

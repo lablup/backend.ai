@@ -41,6 +41,10 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_slot import (
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -73,6 +77,8 @@ class TestPersistentNetworkNotRecreated:
                 AgentRow,
                 SessionRow,
                 KernelRow,
+                ResourceSlotTypeRow,
+                ResourceAllocationRow,
             ],
         ):
             yield database_connection

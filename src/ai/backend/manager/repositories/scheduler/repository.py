@@ -32,6 +32,7 @@ from ai.backend.common.types import (
     AgentId,
     KernelId,
     PreemptionMode,
+    ResourceSlot,
     SessionId,
     VFolderMount,
     VFolderMountOptions,
@@ -786,6 +787,14 @@ class SchedulerRepository:
         return await self._db_source.fetch_sessions_for_handler(
             resource_group_id, session_statuses, kernel_statuses
         )
+
+    @scheduler_repository_resilience.apply()
+    async def get_kernel_allocated_slots(
+        self,
+        kernel_ids: Sequence[KernelId],
+    ) -> dict[KernelId, ResourceSlot]:
+        """Read from ``resource_allocations`` what each kernel was ever allocated."""
+        return await self._db_source.get_kernel_allocated_slots(kernel_ids)
 
     @scheduler_repository_resilience.apply()
     async def search_kernels_for_handler(

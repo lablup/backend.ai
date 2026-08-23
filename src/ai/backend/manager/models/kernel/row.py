@@ -249,13 +249,11 @@ class KernelRow(CreatedAtMixin, Base):
     container_id: Mapped[str | None] = mapped_column(
         "container_id", sa.String(length=64), nullable=True
     )
-    # DEPRECATED (Phase 3, BA-4308): No longer the source of truth.
-    # Kernel resource allocations are now tracked by the normalized
-    # resource_allocations table.  Retained for historical audit.
+    # DEPRECATED: nothing reads these; the authority is resource_allocations.
+    # See models/resource_slot/aggregates.py.
     occupied_slots: Mapped[ResourceSlot] = mapped_column(
         "occupied_slots", ResourceSlotColumn(), nullable=False
     )
-    # DEPRECATED (Phase 3, BA-4308): See resource_allocations table.
     requested_slots: Mapped[ResourceSlot] = mapped_column(
         "requested_slots", ResourceSlotColumn(), nullable=False
     )
@@ -561,8 +559,6 @@ class KernelRow(CreatedAtMixin, Base):
                 agent=self.agent,
                 agent_addr=self.agent_addr,
                 container_id=self.container_id,
-                occupied_slots=self.occupied_slots,
-                requested_slots=self.requested_slots,
                 occupied_shares=self.occupied_shares,
                 attached_devices=self.attached_devices or {},
                 resource_opts=self.resource_opts or {},

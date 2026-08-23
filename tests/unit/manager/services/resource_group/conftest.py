@@ -70,6 +70,7 @@ from ai.backend.manager.models.virtual_scope.entity_membership import EntityMemb
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.services.resource_group.service import ResourceGroupService
 from ai.backend.testutils.db import with_tables
@@ -186,12 +187,14 @@ async def database_fixture(
 @pytest.fixture
 def resource_group_repository(database_engine: ExtendedAsyncSAEngine) -> ResourceGroupRepository:
     """Direct repository instance for association existence checks."""
-    return ResourceGroupRepository(database_engine)
+    return ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
 
 
 @pytest.fixture
 def resource_group_service(database_engine: ExtendedAsyncSAEngine) -> ResourceGroupService:
-    return ResourceGroupService(ResourceGroupRepository(database_engine))
+    return ResourceGroupService(
+        ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
+    )
 
 
 # ---------------------------------------------------------------------------

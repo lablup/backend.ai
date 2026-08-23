@@ -15,6 +15,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -115,8 +116,8 @@ class ProjectRepository:
         start_date: datetime,
         end_date: datetime,
         project_ids: Sequence[UUID] | None = None,
-    ) -> list[KernelRow]:
-        """Fetch resource usage data for projects."""
+    ) -> tuple[list[KernelRow], dict[UUID, ResourceSlot]]:
+        """Fetch the project's kernels with the slots they were allocated."""
         return await self._db_source.fetch_project_resource_usage(start_date, end_date, project_ids)
 
     @project_repository_resilience.apply()

@@ -40,20 +40,18 @@ from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
 from ai.backend.manager.models.keypair.updaters import KeypairUpdater
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.updater import DataUpdater
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.scopes import (
     DomainUserOperationScope,
     ProjectUserOperationScope,
     RoleUserOperationScope,
 )
+from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.repositories.user.db_source import UserDBSource
-from ai.backend.manager.repositories.user.updaters import UserUpdateSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -109,7 +107,7 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def create_user_validated(
-        self, creator: Creator[UserRow], group_ids: list[str] | None
+        self, creator: UserCreator, group_ids: list[str] | None
     ) -> UserCreateResultData:
         """
         Create a new user with default keypair and group associations.
@@ -127,20 +125,9 @@ class UserRepository:
         return await self._db_source.bulk_create_users_validated(items)
 
     @user_repository_resilience.apply()
-    async def update_user_validated(
-        self,
-        email: str,
-        updater: Updater[UserRow],
-    ) -> UserData:
-        """
-        Update user with ownership validation and handle role/group changes.
-        """
-        return await self._db_source.update_user_validated(email, updater)
-
-    @user_repository_resilience.apply()
     async def bulk_update_users_validated(
         self,
-        items: list[UserUpdateSpec],
+        items: list[UserUpdater],
     ) -> BulkUserUpdateResultData:
         """
         Update multiple users with partial failure support.
@@ -148,30 +135,14 @@ class UserRepository:
         return await self._db_source.bulk_update_users_validated(items)
 
     @user_repository_resilience.apply()
-    async def update_user_by_uuid_validated(
-        self,
-        user_uuid: UUID,
-        updater: Updater[UserRow],
-    ) -> UserData:
+    async def update_user_by_uuid_validated(self, updater: UserUpdater) -> UserData:
         """Update user by UUID with validation and handle role/group changes."""
-        return await self._db_source.update_user_by_uuid_validated(user_uuid, updater)
+        return await self._db_source.update_user_by_uuid_validated(updater)
 
     @user_repository_resilience.apply()
     async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> None:
         """Soft delete user by UUID, setting status to DELETED and deactivating keypairs."""
         await self._db_source.delete_user_by_uuid_validated(user_uuid)
-
-    @user_repository_resilience.apply()
-    async def soft_delete_user_validated(self, email: str) -> None:
-        """
-        Soft delete user by setting status to DELETED and deactivating keypairs.
-        """
-        await self._db_source.soft_delete_user_validated(email)
-
-    @user_repository_resilience.apply()
-    async def purge_user(self, email: str) -> None:
-        """Completely purge user and all associated data."""
-        await self._db_source.purge_user(email)
 
     @user_repository_resilience.apply()
     async def purge_user_by_uuid(self, user_uuid: UUID) -> None:

@@ -4,10 +4,7 @@ import math
 import uuid
 from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
-from typing import (
-    Any,
-    cast,
-)
+from typing import Any
 
 import aiohttp
 import msgpack
@@ -73,7 +70,6 @@ from ai.backend.manager.models.vfolder import (
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CloneVFolderActionResult,
@@ -453,7 +449,7 @@ class VFolderService:
     async def update_attribute(
         self, action: UpdateVFolderAttributeAction
     ) -> UpdateVFolderAttributeActionResult:
-        spec = cast(VFolderAttributeUpdaterSpec, action.updater.spec)
+        updater = action.updater
         allowed_vfolder_types = (
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
@@ -477,7 +473,7 @@ class VFolderService:
 
         # Check for name conflicts if name is being updated
         try:
-            new_name = spec.name.value()
+            new_name = updater.name.value()
         except ValueError:
             pass
         else:

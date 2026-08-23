@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
 from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
 from ai.backend.common.data.entity.etcd_config import ETCD_CONFIG_ENTITY_TYPE
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
@@ -41,6 +42,7 @@ from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
+from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.etcd_config.repository import EtcdConfigRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
@@ -53,6 +55,8 @@ from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
+from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
 from ai.backend.manager.services.etcd_config.service import EtcdConfigService
 from ai.backend.manager.services.project.processors import ProjectProcessors
@@ -198,7 +202,7 @@ def resource_group_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
 ) -> ResourceGroupProcessors:
-    repo = ResourceGroupRepository(database_engine)
+    repo = ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
     service = ResourceGroupService(repo, appproxy_client_pool=AsyncMock())
     return ResourceGroupProcessors(
         processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service
@@ -206,9 +210,22 @@ def resource_group_processors(
 
 
 @pytest.fixture()
+def domain_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> DomainProcessors:
+    """The handler resolves the caller's domain name to its id, so this runs against the DB."""
+    service = DomainService(
+        repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
+    )
+    return DomainProcessors(processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), service, [])
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     container_registry_processors: ContainerRegistryProcessors,
+    domain_processors: DomainProcessors,
     etcd_config_processors: EtcdConfigProcessors,
     resource_preset_processors: ResourcePresetProcessors,
     agent_processors: AgentProcessors,
@@ -239,7 +256,12 @@ def server_module_registries(
             route_deps,
         ),
         register_resource_group_routes(
-            ResourceGroupHandler(resource_group=resource_group_processors), route_deps
+            ResourceGroupHandler(
+                resource_group=resource_group_processors,
+                domain=domain_processors,
+                project=project_processors,
+            ),
+            route_deps,
         ),
     ]
 

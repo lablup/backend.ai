@@ -9,7 +9,12 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.common import (
+    ResourceSlotEntryInfo,
+    ResourceSlotEntryInput,
+    ResourceSlotInfo,
+)
+from ai.backend.common.dto.manager.v2.kernel.response import ResourceAllocationGQLDTO
 from ai.backend.common.dto.manager.v2.session.request import (
     BatchConfigInput,
     EnqueueSessionInput,
@@ -43,8 +48,6 @@ def _create_session_data(
         domain_name="default",
         group_id=uuid4(),
         user_uuid=uuid4(),
-        occupying_slots={},
-        requested_slots={"cpu": Decimal("1"), "mem": Decimal("1073741824")},
         use_host_network=False,
         created_at=datetime.now(tz=UTC),
         status=status,
@@ -79,13 +82,33 @@ def _create_session_data(
     )
 
 
+def _create_allocation(
+    requested: dict[str, Decimal] | None = None,
+    used: dict[str, Decimal] | None = None,
+) -> ResourceAllocationGQLDTO:
+    """Build the slot allocation the adapter receives from resource_allocations."""
+
+    def _entries(slots: dict[str, Decimal] | None) -> ResourceSlotInfo:
+        return ResourceSlotInfo(
+            entries=[
+                ResourceSlotEntryInfo(resource_type=k, quantity=v) for k, v in (slots or {}).items()
+            ]
+        )
+
+    return ResourceAllocationGQLDTO(
+        requested=_entries(requested),
+        used=_entries(used),
+        allocated=_entries(used),
+    )
+
+
 class TestSessionDataToNode:
     """Tests for _session_data_to_node conversion."""
 
     def test_basic_conversion(self) -> None:
         """SessionData should convert to SessionNode with correct fields."""
         data = _create_session_data(name="my-session")
-        node = SessionAdapter._session_data_to_node(data)
+        node = SessionAdapter._session_data_to_node(data, _create_allocation())
 
         assert node.metadata.name == "my-session"
         assert node.metadata.session_type == "interactive"
@@ -96,7 +119,12 @@ class TestSessionDataToNode:
     def test_resource_allocation_conversion(self) -> None:
         """Resource slots should be converted to ResourceSlotInfo entries."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data)
+        node = SessionAdapter._session_data_to_node(
+            data,
+            _create_allocation(
+                requested={"cpu": Decimal("1"), "mem": Decimal("1073741824")},
+            ),
+        )
 
         requested = node.resource.allocation.requested
         assert len(requested.entries) == 2
@@ -107,25 +135,25 @@ class TestSessionDataToNode:
     def test_lifecycle_running_status(self) -> None:
         """RUNNING status should be preserved as RUNNING."""
         data = _create_session_data(status=SessionStatus.RUNNING)
-        node = SessionAdapter._session_data_to_node(data)
+        node = SessionAdapter._session_data_to_node(data, _create_allocation())
         assert node.lifecycle.status == "RUNNING"
 
     def test_lifecycle_pending_status(self) -> None:
         """PENDING status should be preserved as PENDING."""
         data = _create_session_data(status=SessionStatus.PENDING)
-        node = SessionAdapter._session_data_to_node(data)
+        node = SessionAdapter._session_data_to_node(data, _create_allocation())
         assert node.lifecycle.status == "PENDING"
 
     def test_lifecycle_result(self) -> None:
         """Result should be passed through as string value."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data)
+        node = SessionAdapter._session_data_to_node(data, _create_allocation())
         assert node.lifecycle.result == "undefined"
 
     def test_domain_and_user_fields(self) -> None:
         """Domain name and user/project IDs should be mapped."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data)
+        node = SessionAdapter._session_data_to_node(data, _create_allocation())
         assert node.domain_name == "default"
         assert node.user_id == data.user_uuid
         assert node.project_id == data.group_id
@@ -133,13 +161,13 @@ class TestSessionDataToNode:
     def test_network_host_network_false(self) -> None:
         """Network info should reflect use_host_network."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data)
+        node = SessionAdapter._session_data_to_node(data, _create_allocation())
         assert node.network.use_host_network is False
 
     def test_empty_occupying_slots(self) -> None:
         """Empty occupying slots should produce empty entries list."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data)
+        node = SessionAdapter._session_data_to_node(data, _create_allocation())
         assert len(node.resource.allocation.used.entries) == 0
 
 
@@ -152,6 +180,11 @@ class TestEnqueueActionBuilding:
         result = MagicMock()
         result.session_data = _create_session_data()
         processors.session.enqueue_session.run = AsyncMock(return_value=result)
+        allocation_result = MagicMock()
+        allocation_result.data = {}
+        processors.session.batch_get_session_resource_allocation.run = AsyncMock(
+            return_value=allocation_result
+        )
         return processors
 
     @pytest.fixture

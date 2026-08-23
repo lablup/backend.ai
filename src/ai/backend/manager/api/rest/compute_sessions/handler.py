@@ -16,8 +16,12 @@ from ai.backend.common.dto.manager.compute_session import (
 )
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
+    BatchGetSessionResourceAllocationAction,
+)
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 from ai.backend.manager.services.session.processors import SessionProcessors
@@ -62,9 +66,21 @@ class ComputeSessionsHandler:
             )
             kernels_by_session = self._adapter.group_kernels_by_session(kernel_result.data)
 
-        # Step 3: Convert to DTOs
+        # Step 3: Aggregate the slot amounts from resource_allocations
+        allocations: dict[SessionId, ResourceAllocationAggregate] = {}
+        if session_ids:
+            allocation_result = await self._session.batch_get_session_resource_allocation.run(
+                BatchGetSessionResourceAllocationAction(session_ids=session_ids)
+            )
+            allocations = allocation_result.data
+
+        # Step 4: Convert to DTOs
         items = [
-            self._adapter.convert_session_to_dto(session, kernels_by_session.get(session.id, []))
+            self._adapter.convert_session_to_dto(
+                session,
+                allocations.get(SessionId(session.id)),
+                kernels_by_session.get(session.id, []),
+            )
             for session in session_result.data
         ]
 

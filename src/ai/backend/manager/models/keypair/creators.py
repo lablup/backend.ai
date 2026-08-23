@@ -21,8 +21,8 @@ from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 class KeypairCreator(FieldCreator[UserID, KeyPairRow, KeyPairData]):
     """Creator for one keypair, written under the user that owns it.
 
-    Never marks the row default: the marker moves only through the switch, so issuing
-    a key cannot take it off the key the user authorizes with.
+    Leaves the row unmarked: the marker moves only through the switch, so issuing a
+    key cannot take it off the key the user authorizes with.
     """
 
     secrets: KeyPairSecrets
@@ -68,3 +68,16 @@ class KeypairCreator(FieldCreator[UserID, KeyPairRow, KeyPairData]):
     @override
     def to_data(self, row: KeyPairRow) -> KeyPairData:
         return row.to_data()
+
+
+@dataclass
+class DefaultKeypairCreator(KeypairCreator):
+    """Creator for the keypair written together with its user, marked as the one the
+    user authorizes with. Nothing else holds the marker at that point.
+    """
+
+    @override
+    def build_row(self, owner_id: UserID) -> KeyPairRow:
+        row = super().build_row(owner_id)
+        row.is_default = True
+        return row

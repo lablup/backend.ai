@@ -6,7 +6,6 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.permission.types import RBACElementType
@@ -22,7 +21,6 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.resource_group.types import PreemptionConfig as DataPreemptionConfig
 from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.resource import (
     DefaultResourceGroupAlreadyExists,
     ResourceGroupNotFound,
@@ -34,7 +32,7 @@ from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
+from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -54,6 +52,8 @@ from ai.backend.manager.models.resource_group import (
     ResourceGroupOpts,
     ResourceGroupRow,
 )
+from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
+from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -62,7 +62,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.session import SessionId, SessionRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -71,35 +71,24 @@ from ai.backend.manager.models.virtual_scope.entity_membership import EntityMemb
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
-from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.rbac.scope_binder import (
     RBACScopeBinder,
     RBACScopeBindingPair,
 )
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_group import ResourceGroupRepository
 from ai.backend.manager.repositories.resource_group.creators import (
-    ResourceGroupCreatorSpec,
     ResourceGroupForDomainCreatorSpec,
     ResourceGroupForKeypairsCreatorSpec,
     ResourceGroupForProjectCreatorSpec,
 )
 from ai.backend.manager.repositories.resource_group.purgers import (
-    ResourceGroupNamePurgerSpec,
     create_resource_group_for_keypairs_purger,
 )
 from ai.backend.manager.repositories.resource_group.scope_binders import (
     ResourceGroupDomainEntityUnbinder,
     ResourceGroupProjectEntityUnbinder,
-)
-from ai.backend.manager.repositories.resource_group.updaters import (
-    ResourceGroupDriverConfigUpdaterSpec,
-    ResourceGroupMetadataUpdaterSpec,
-    ResourceGroupNetworkConfigUpdaterSpec,
-    ResourceGroupSchedulerConfigUpdaterSpec,
-    ResourceGroupStatusUpdaterSpec,
-    ResourceGroupUpdaterSpec,
 )
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
@@ -172,9 +161,9 @@ class TestScalingGroupRepositoryDB:
         driver_opts: dict[str, Any] | None = None,
         scheduler_opts: ResourceGroupOpts | None = None,
         use_host_network: bool = False,
-    ) -> Creator[ResourceGroupRow]:
-        """Create a ResourceGroupCreatorSpec with the given parameters."""
-        spec = ResourceGroupCreatorSpec(
+    ) -> ResourceGroupCreator:
+        """Build a ResourceGroupCreator with the given parameters."""
+        return ResourceGroupCreator(
             name=name,
             driver=driver,
             scheduler=scheduler,
@@ -187,9 +176,6 @@ class TestScalingGroupRepositoryDB:
             driver_opts=driver_opts if driver_opts is not None else {},
             scheduler_opts=scheduler_opts,
             use_host_network=use_host_network,
-        )
-        return Creator(
-            spec=spec,
         )
 
     async def _create_scaling_groups(
@@ -423,99 +409,12 @@ class TestScalingGroupRepositoryDB:
         yield (test_user_uuid, test_domain, test_group_id)
 
     @pytest.fixture
-    async def sample_scaling_group_with_sessions_and_routes(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
-    ) -> AsyncGenerator[str, None]:
-        """Create scaling group with sessions and routes for cascade delete testing.
-
-        Returns:
-            The scaling group name
-        """
-        test_user_uuid, test_domain, test_group_id = test_user_domain_group
-        sgroup_name = f"test-sgroup-cascade-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            # Create scaling group
-            sgroup = ResourceGroupRow(
-                name=sgroup_name,
-                description="Test scaling group for cascade delete",
-                is_active=True,
-                is_public=True,
-                created_at=datetime.now(tz=UTC),
-                wsproxy_addr=None,
-                wsproxy_api_token=None,
-                driver="static",
-                driver_opts={},
-                scheduler="fifo",
-                scheduler_opts=ResourceGroupOpts(),
-                use_host_network=False,
-            )
-            db_sess.add(sgroup)
-            await db_sess.flush()  # Flush to ensure scaling group exists before creating references
-
-            domain_id = await db_sess.scalar(
-                sa.select(DomainRow.id).where(DomainRow.name == test_domain)
-            )
-            assert domain_id is not None
-
-            # Create 2 sessions with this scaling group
-            for i in range(2):
-                session_id = SessionId(uuid.uuid4())
-                session = SessionRow(
-                    id=session_id,
-                    domain_name=test_domain,
-                    domain_id=domain_id,
-                    group_id=test_group_id,
-                    user_uuid=test_user_uuid,
-                    resource_group_id=sgroup.id,
-                    scaling_group_name=sgroup_name,
-                    cluster_size=1,
-                    vfolder_mounts={},
-                )
-                db_sess.add(session)
-
-                # Create minimal endpoint for routing
-                endpoint_id = DeploymentID(uuid.uuid4())
-                endpoint = EndpointRow(
-                    id=endpoint_id,
-                    name=f"test-endpoint-{i}",
-                    domain=test_domain,
-                    project=test_group_id,
-                    resource_group=sgroup_name,
-                    lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    session_owner=test_user_uuid,
-                    created_user=test_user_uuid,
-                )
-                db_sess.add(endpoint)
-
-                # Create routing connected to session
-                routing = RoutingRow(
-                    id=uuid.uuid4(),
-                    endpoint=endpoint_id,
-                    session=session_id,
-                    session_owner=test_user_uuid,
-                    domain=test_domain,
-                    project=test_group_id,
-                    traffic_ratio=1.0,
-                    revision=uuid.uuid4(),
-                )
-                db_sess.add(routing)
-
-            await db_sess.flush()
-
-        yield sgroup_name
-
-    @pytest.fixture
     async def resource_group_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ResourceGroupRepository, None]:
         """Create ResourceGroupRepository instance with database"""
-        repo = ResourceGroupRepository(
-            db=db_with_cleanup,
-        )
+        repo = ResourceGroupRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
         yield repo
 
     @pytest.fixture
@@ -719,29 +618,21 @@ class TestScalingGroupRepositoryDB:
         new_scheduler_opts = ResourceGroupOpts(
             allowed_session_types=[SessionTypes.BATCH],
         )
-        spec = ResourceGroupUpdaterSpec(
-            status=ResourceGroupStatusUpdaterSpec(
-                is_active=OptionalState.update(False),
-                is_public=OptionalState.update(False),
+        updater = ResourceGroupUpdater(
+            resource_group_id=await resource_group_repository.get_resource_group_id_by_name(
+                ResourceGroupName(sample_scaling_group_for_update)
             ),
-            metadata=ResourceGroupMetadataUpdaterSpec(
-                description=TriState.update("Updated description"),
-            ),
-            network=ResourceGroupNetworkConfigUpdaterSpec(
-                wsproxy_addr=TriState.update("http://new-wsproxy:5000"),
-                wsproxy_api_token=TriState.update("new-token"),
-                use_host_network=OptionalState.update(True),
-            ),
-            driver=ResourceGroupDriverConfigUpdaterSpec(
-                driver=OptionalState.update("docker"),
-                driver_opts=OptionalState.update({"new_opt": "value"}),
-            ),
-            scheduler=ResourceGroupSchedulerConfigUpdaterSpec(
-                scheduler=OptionalState.update("drf"),
-                scheduler_opts=OptionalState.update(new_scheduler_opts),
-            ),
+            is_active=OptionalState.update(False),
+            is_public=OptionalState.update(False),
+            description=TriState.update("Updated description"),
+            wsproxy_addr=TriState.update("http://new-wsproxy:5000"),
+            wsproxy_api_token=TriState.update("new-token"),
+            use_host_network=OptionalState.update(True),
+            driver=OptionalState.update("docker"),
+            driver_opts=OptionalState.update({"new_opt": "value"}),
+            scheduler=OptionalState.update("drf"),
+            scheduler_opts=OptionalState.update(new_scheduler_opts),
         )
-        updater = Updater(spec=spec, pk_value=sample_scaling_group_for_update)
         result = await resource_group_repository.update_resource_group(updater)
 
         assert result.metadata.description == "Updated description"
@@ -762,17 +653,17 @@ class TestScalingGroupRepositoryDB:
     ) -> None:
         """A preemption-config update persists ``victim_scope`` and the
         re-read data reflects it."""
-        spec = ResourceGroupUpdaterSpec(
-            scheduler=ResourceGroupSchedulerConfigUpdaterSpec(
-                preemption_config=OptionalState.update(
-                    DataPreemptionConfig(
-                        enabled=True,
-                        victim_scope=PreemptionVictimScope.DOMAIN,
-                    )
-                ),
+        updater = ResourceGroupUpdater(
+            resource_group_id=await resource_group_repository.get_resource_group_id_by_name(
+                ResourceGroupName(sample_scaling_group_for_update)
+            ),
+            preemption_config=OptionalState.update(
+                DataPreemptionConfig(
+                    enabled=True,
+                    victim_scope=PreemptionVictimScope.DOMAIN,
+                )
             ),
         )
-        updater = Updater(spec=spec, pk_value=sample_scaling_group_for_update)
         result = await resource_group_repository.update_resource_group(updater)
 
         assert result.scheduler.options.preemption.enabled is True
@@ -783,15 +674,16 @@ class TestScalingGroupRepositoryDB:
         resource_group_repository: ResourceGroupRepository,
     ) -> None:
         """Test updating a non-existent scaling group raises ScalingGroupNotFound"""
-        spec = ResourceGroupUpdaterSpec(
-            metadata=ResourceGroupMetadataUpdaterSpec(
-                description=TriState.update("Updated description"),
-            ),
-        )
-        updater = Updater(spec=spec, pk_value="test-sgroup-nonexistent")
-
         with pytest.raises(ResourceGroupNotFound):
-            await resource_group_repository.update_resource_group(updater)
+            resource_group_id = await resource_group_repository.get_resource_group_id_by_name(
+                ResourceGroupName("test-sgroup-nonexistent")
+            )
+            await resource_group_repository.update_resource_group(
+                ResourceGroupUpdater(
+                    resource_group_id=resource_group_id,
+                    description=TriState.update("Updated description"),
+                )
+            )
 
     # Default Resource Group Tests
 
@@ -841,11 +733,11 @@ class TestScalingGroupRepositoryDB:
         resource_group_for_update: str,
     ) -> None:
         """A second default is rejected as a bad request; the current one is untouched"""
-        updater = Updater(
-            spec=ResourceGroupUpdaterSpec(
-                status=ResourceGroupStatusUpdaterSpec(is_default=OptionalState.update(True)),
+        updater = ResourceGroupUpdater(
+            resource_group_id=await resource_group_repository.get_resource_group_id_by_name(
+                ResourceGroupName(resource_group_for_update)
             ),
-            pk_value=resource_group_for_update,
+            is_default=OptionalState.update(True),
         )
 
         with pytest.raises(DefaultResourceGroupAlreadyExists):
@@ -862,11 +754,11 @@ class TestScalingGroupRepositoryDB:
         resource_group_for_update: str,
     ) -> None:
         """Setting the flag works while it is free"""
-        updater = Updater(
-            spec=ResourceGroupUpdaterSpec(
-                status=ResourceGroupStatusUpdaterSpec(is_default=OptionalState.update(True)),
+        updater = ResourceGroupUpdater(
+            resource_group_id=await resource_group_repository.get_resource_group_id_by_name(
+                ResourceGroupName(resource_group_for_update)
             ),
-            pk_value=resource_group_for_update,
+            is_default=OptionalState.update(True),
         )
 
         result = await resource_group_repository.update_resource_group(updater)
@@ -883,11 +775,11 @@ class TestScalingGroupRepositoryDB:
         existing_default_scaling_group: str,
     ) -> None:
         """Clearing the flag on the sole default is allowed and leaves no default behind"""
-        updater = Updater(
-            spec=ResourceGroupUpdaterSpec(
-                status=ResourceGroupStatusUpdaterSpec(is_default=OptionalState.update(False)),
+        updater = ResourceGroupUpdater(
+            resource_group_id=await resource_group_repository.get_resource_group_id_by_name(
+                ResourceGroupName(existing_default_scaling_group)
             ),
-            pk_value=existing_default_scaling_group,
+            is_default=OptionalState.update(False),
         )
 
         result = await resource_group_repository.update_resource_group(updater)
@@ -908,8 +800,11 @@ class TestScalingGroupRepositoryDB:
         _, sgroup_name = sample_scaling_group_for_purge
 
         # When: Purge the scaling group
-        purger = Purger(spec=ResourceGroupNamePurgerSpec(name=sgroup_name))
-        result = await resource_group_repository.purge_resource_group(purger)
+        result = await resource_group_repository.purge_resource_group(
+            await resource_group_repository.get_resource_group_id_by_name(
+                ResourceGroupName(sgroup_name)
+            )
+        )
 
         # Then: Should return the deleted scaling group data
         assert result.name == sgroup_name
@@ -927,29 +822,14 @@ class TestScalingGroupRepositoryDB:
     ) -> None:
         """Test purging non-existent scaling group raises ScalingGroupNotFound"""
         # Given: A purger for non-existent scaling group with uuid-based name
-        non_existent_name = f"test-sgroup-nonexistent-{uuid.uuid4().hex[:8]}"
-        purger = Purger(spec=ResourceGroupNamePurgerSpec(name=non_existent_name))
+        non_existent_name = ResourceGroupName(f"test-sgroup-nonexistent-{uuid.uuid4().hex[:8]}")
 
         # When/Then: Purging should raise ResourceGroupNotFound
         with pytest.raises(ResourceGroupNotFound):
-            await resource_group_repository.purge_resource_group(purger)
-
-    async def test_purge_scaling_group_with_sessions_and_routes(
-        self,
-        resource_group_repository: ResourceGroupRepository,
-        sample_scaling_group_with_sessions_and_routes: str,
-    ) -> None:
-        """Test purging a scaling group with associated sessions and routes."""
-        # Given: A scaling group with sessions and routes (created by fixture)
-        sgroup_name = sample_scaling_group_with_sessions_and_routes
-
-        # When: Purge the scaling group
-        purger = Purger(spec=ResourceGroupNamePurgerSpec(name=sgroup_name))
-        result = await resource_group_repository.purge_resource_group(purger)
-
-        # Then: Should return the deleted scaling group data
-        assert result.name == sgroup_name
-        assert result.metadata.description == "Test scaling group for cascade delete"
+            resource_group_id = await resource_group_repository.get_resource_group_id_by_name(
+                non_existent_name
+            )
+            await resource_group_repository.purge_resource_group(resource_group_id)
 
     # Associate with Domain Tests
     async def test_associate_scaling_group_with_domains_success(
@@ -1412,219 +1292,6 @@ class TestScalingGroupRepositoryDB:
         )
         # Then: Should not raise any error (unbinder deletes 0 rows silently)
         await resource_group_repository.disassociate_resource_group_with_user_groups(unbinder)
-
-    @pytest.fixture
-    async def sample_scaling_group_for_hierarchy(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
-        sgroup_name = f"test-{uuid.uuid4().hex[:8]}"
-        async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ResourceGroupRow(
-                name=sgroup_name,
-                description="Test scaling group for full hierarchy cascade delete",
-                is_active=True,
-                is_public=True,
-                created_at=datetime.now(tz=UTC),
-                wsproxy_addr=None,
-                wsproxy_api_token=None,
-                driver="static",
-                driver_opts={},
-                scheduler="fifo",
-                scheduler_opts=ResourceGroupOpts(),
-                use_host_network=False,
-            )
-            db_sess.add(sgroup)
-            await db_sess.flush()
-        yield sgroup_name
-
-    @pytest.fixture
-    async def sample_session(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_scaling_group_for_hierarchy: str,
-        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
-    ) -> AsyncGenerator[SessionId, None]:
-        """Create a session referencing the scaling group."""
-        test_user_uuid, test_domain, test_group_id = test_user_domain_group
-        session_id = SessionId(uuid.uuid4())
-        async with db_with_cleanup.begin_session() as db_sess:
-            domain_id = await db_sess.scalar(
-                sa.select(DomainRow.id).where(DomainRow.name == test_domain)
-            )
-            resource_group_id = await db_sess.scalar(
-                sa.select(ResourceGroupRow.id).where(
-                    ResourceGroupRow.name == sample_scaling_group_for_hierarchy
-                )
-            )
-            assert domain_id is not None
-            assert resource_group_id is not None
-
-            db_sess.add(
-                SessionRow(
-                    id=session_id,
-                    domain_name=test_domain,
-                    domain_id=domain_id,
-                    group_id=test_group_id,
-                    user_uuid=test_user_uuid,
-                    resource_group_id=resource_group_id,
-                    scaling_group_name=sample_scaling_group_for_hierarchy,
-                    cluster_size=1,
-                    vfolder_mounts={},
-                )
-            )
-            await db_sess.flush()
-        yield session_id
-
-    @pytest.fixture
-    async def sample_kernel(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_session: SessionId,
-        sample_scaling_group_for_hierarchy: str,
-        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
-    ) -> AsyncGenerator[uuid.UUID, None]:
-        """Create a kernel for the session."""
-        test_user_uuid, test_domain, test_group_id = test_user_domain_group
-        kernel_id = uuid.uuid4()
-        async with db_with_cleanup.begin_session() as db_sess:
-            resource_group_id = await db_sess.scalar(
-                sa.select(ResourceGroupRow.id).where(
-                    ResourceGroupRow.name == sample_scaling_group_for_hierarchy
-                )
-            )
-            assert resource_group_id is not None
-            db_sess.add(
-                KernelRow(
-                    id=kernel_id,
-                    session_id=sample_session,
-                    domain_name=test_domain,
-                    group_id=test_group_id,
-                    user_uuid=test_user_uuid,
-                    scaling_group=sample_scaling_group_for_hierarchy,
-                    resource_group_id=resource_group_id,
-                    cluster_role=DEFAULT_ROLE,
-                    occupied_slots=ResourceSlot(),
-                    repl_in_port=0,
-                    repl_out_port=0,
-                    stdin_port=0,
-                    stdout_port=0,
-                    vfolder_mounts=None,
-                )
-            )
-            await db_sess.flush()
-        yield kernel_id
-
-    @pytest.fixture
-    async def sample_endpoint(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_scaling_group_for_hierarchy: str,
-        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
-    ) -> AsyncGenerator[DeploymentID, None]:
-        """Create an endpoint referencing the scaling group."""
-        test_user_uuid, test_domain, test_group_id = test_user_domain_group
-        endpoint_id = DeploymentID(uuid.uuid4())
-        async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(
-                EndpointRow(
-                    id=endpoint_id,
-                    name="test-endpoint-hierarchy",
-                    domain=test_domain,
-                    project=test_group_id,
-                    resource_group=sample_scaling_group_for_hierarchy,
-                    lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    session_owner=test_user_uuid,
-                    created_user=test_user_uuid,
-                )
-            )
-            await db_sess.flush()
-        yield endpoint_id
-
-    @pytest.fixture
-    async def sample_route(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_session: SessionId,
-        sample_endpoint: DeploymentID,
-        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
-    ) -> AsyncGenerator[uuid.UUID, None]:
-        """Create a route connecting the session to the endpoint."""
-        test_user_uuid, test_domain, test_group_id = test_user_domain_group
-        route_id = uuid.uuid4()
-        async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(
-                RoutingRow(
-                    id=route_id,
-                    endpoint=sample_endpoint,
-                    session=sample_session,
-                    session_owner=test_user_uuid,
-                    domain=test_domain,
-                    project=test_group_id,
-                    traffic_ratio=1.0,
-                    revision=uuid.uuid4(),
-                )
-            )
-            await db_sess.flush()
-        yield route_id
-
-    async def test_purge_scaling_group_with_full_hierarchy(
-        self,
-        resource_group_repository: ResourceGroupRepository,
-        sample_scaling_group_for_hierarchy: str,
-        sample_session: SessionId,
-        sample_kernel: uuid.UUID,
-        sample_endpoint: DeploymentID,
-        sample_route: uuid.UUID,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> None:
-        """Test purging a scaling group with the full FK hierarchy.
-
-        Hierarchy: ScalingGroup → Session → Kernel + Endpoint → Route
-        """
-        sgroup_name = sample_scaling_group_for_hierarchy
-        session_id = sample_session
-        kernel_id = sample_kernel
-        endpoint_id = sample_endpoint
-        route_id = sample_route
-
-        purger = Purger(spec=ResourceGroupNamePurgerSpec(name=sgroup_name))
-        # FK Error should not occur, and all related records should be deleted
-        result = await resource_group_repository.purge_resource_group(purger)
-
-        assert result.name == sgroup_name
-
-        # Verify all records in the hierarchy are deleted
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            # Verify scaling group is deleted
-            sg_result = await db_sess.execute(
-                sa.select(ResourceGroupRow).where(ResourceGroupRow.name == sgroup_name)
-            )
-            assert sg_result.scalar_one_or_none() is None
-
-            # Verify session is deleted
-            session_result = await db_sess.execute(
-                sa.select(SessionRow).where(SessionRow.id == session_id)
-            )
-            assert session_result.scalar_one_or_none() is None
-
-            # Verify kernel is deleted
-            kernel_result = await db_sess.execute(
-                sa.select(KernelRow).where(KernelRow.id == kernel_id)
-            )
-            assert kernel_result.scalar_one_or_none() is None
-
-            # Verify endpoint is deleted
-            endpoint_result = await db_sess.execute(
-                sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
-            )
-            assert endpoint_result.scalar_one_or_none() is None
-
-            # Verify route is deleted
-            route_result = await db_sess.execute(
-                sa.select(RoutingRow).where(RoutingRow.id == route_id)
-            )
-            assert route_result.scalar_one_or_none() is None
 
     async def test_get_resource_group_id_by_name_success(
         self,

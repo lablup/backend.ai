@@ -15,6 +15,7 @@ from sqlalchemy.engine import CursorResult
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
@@ -54,17 +55,13 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     get_sessions_by_mounted_folder,
 )
-from ai.backend.manager.repositories.base.updater import (
-    Updater,
-    execute_updater,
-)
+from ai.backend.manager.models.vfolder.updaters import VFolderSoftDeleteUpdater
 from ai.backend.manager.repositories.base.upserter import BulkUpserter, execute_bulk_upserter
 from ai.backend.manager.repositories.model_card.types import (
     AvailablePresetsSearchResult,
 )
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
-from ai.backend.manager.repositories.vfolder.updaters import VFolderTrashUpdaterSpec
 from ai.backend.manager.types import TriState
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -203,8 +200,8 @@ class ModelCardDBSource:
                     vfolder_id,
                     deleted.id,
                 )
-            await execute_updater(
-                session, Updater(spec=VFolderTrashUpdaterSpec(), pk_value=vfolder_id)
+            await V2WriteOps(session).update_data(
+                VFolderSoftDeleteUpdater(vfolder_id=VFolderUUID(vfolder_id))
             )
         return deleted.id
 

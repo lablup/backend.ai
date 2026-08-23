@@ -33,6 +33,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.webapp import WebappPlugin
 from ai.backend.manager.repositories.base.querier import BatchQuerier
@@ -40,7 +41,7 @@ from ai.backend.manager.repositories.ops.rbac.provider import (
     FullUserCreation,
     RBACOpsProvider,
 )
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec, UserScopeCreation
+from ai.backend.manager.repositories.user.creators import UserScopeCreation
 
 from .config import OIDCWebAppConfig
 from .valkey_client import ValkeyOpenIDClient
@@ -160,12 +161,12 @@ async def create_user_if_not_exists(
         )
         project_ids = [ProjectID(row.id) for row in project_result.rows]
 
-        user_spec = UserCreatorSpec(
+        user_creator = UserCreator(
+            domain_id=domain_id,
             email=user_data["email"],
             username=user_data["username"],
             password=password_info,
             need_password_change=user_data["need_password_change"],
-            domain_name=user_data["domain_name"],
             full_name=user_data["full_name"],
             description=user_data["description"],
             status=user_data["status"],
@@ -173,10 +174,9 @@ async def create_user_if_not_exists(
             role=user_data["role"],
             resource_policy=user_data["resource_policy"],
         )
-        user_spec.domain_id = domain_id
         result = await w.create_full_user(
             FullUserCreation(
-                creation=UserScopeCreation(spec=user_spec),
+                creation=UserScopeCreation(spec=user_creator),
                 domain_id=domain_id,
                 project_ids=project_ids,
                 keypair_resource_policy=user_info["keypair_resource_policy"],

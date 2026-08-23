@@ -4,6 +4,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -16,6 +17,7 @@ from ai.backend.manager.data.auth.types import (
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
@@ -23,7 +25,6 @@ from ai.backend.manager.repositories.auth.db_source.db_source import (
     CredentialVerificationResult,
     LoginSessionCreationResult,
 )
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 
 auth_repository_resilience = Resilience(
     policies=[
@@ -47,9 +48,14 @@ class AuthRepository:
         return await self._db_source.verify_email_exists(email)
 
     @auth_repository_resilience.apply()
+    async def domain_id(self, domain_name: str) -> DomainID:
+        """The id of the domain a signup names."""
+        return await self._db_source.fetch_domain_id(domain_name)
+
+    @auth_repository_resilience.apply()
     async def create_user_with_keypair(
         self,
-        user_spec: UserCreatorSpec,
+        user_spec: UserCreator,
         project_ids: Collection[ProjectID],
         *,
         keypair_resource_policy: str,
