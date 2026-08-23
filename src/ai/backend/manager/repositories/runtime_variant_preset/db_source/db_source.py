@@ -12,12 +12,8 @@ from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantP
 from ai.backend.manager.errors.resource import RuntimeVariantPresetNotFound
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-RANK_GAP = 100
 
 
 class RuntimeVariantPresetDBSource:
@@ -25,19 +21,6 @@ class RuntimeVariantPresetDBSource:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-
-    async def get_next_rank(self, variant_id: UUID) -> int:
-        async with self._db.begin_readonly_session_read_committed() as session:
-            stmt = sa.select(sa.func.max(RuntimeVariantPresetRow.rank)).where(
-                RuntimeVariantPresetRow.runtime_variant == variant_id
-            )
-            max_rank = (await session.execute(stmt)).scalar_one_or_none()
-            return (max_rank + RANK_GAP) if max_rank is not None else RANK_GAP
-
-    async def create(self, creator: Creator[RuntimeVariantPresetRow]) -> RuntimeVariantPresetData:
-        async with self._db.begin_session() as session:
-            result = await execute_creator(session, creator)
-            return result.row.to_data()
 
     async def get_by_id(self, preset_id: UUID) -> RuntimeVariantPresetData:
         async with self._db.begin_readonly_session_read_committed() as session:
@@ -56,12 +39,3 @@ class RuntimeVariantPresetDBSource:
             )
             rows = (await session.execute(stmt)).scalars().all()
             return [row.to_data() for row in rows]
-
-    async def update(self, updater: Updater[RuntimeVariantPresetRow]) -> RuntimeVariantPresetData:
-        async with self._db.begin_session() as session:
-            result = await execute_updater(session, updater)
-            if result is None:
-                raise RuntimeVariantPresetNotFound(
-                    f"Runtime variant preset with ID {updater.pk_value} not found."
-                )
-            return result.row.to_data()

@@ -42,20 +42,18 @@ from ai.backend.manager.models.condition_utils import combine_conditions_or, neg
 from ai.backend.manager.models.runtime_variant_preset.conditions import (
     RuntimeVariantPresetConditions,
 )
+from ai.backend.manager.models.runtime_variant_preset.creators import (
+    RuntimeVariantPresetCreator,
+)
 from ai.backend.manager.models.runtime_variant_preset.orders import RuntimeVariantPresetOrders
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.runtime_variant_preset.searchers import (
     RuntimeVariantPresetSearcher,
 )
+from ai.backend.manager.models.runtime_variant_preset.updaters import (
+    RuntimeVariantPresetUpdater,
+)
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.runtime_variant_preset.creators import (
-    RuntimeVariantPresetCreatorSpec,
-)
-from ai.backend.manager.repositories.runtime_variant_preset.updaters import (
-    RuntimeVariantPresetUpdaterSpec,
-)
 from ai.backend.manager.services.runtime_variant_preset.actions.create import (
     CreateRuntimeVariantPresetAction,
 )
@@ -155,32 +153,30 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         self,
         input: CreateRuntimeVariantPresetInput,
     ) -> CreateRuntimeVariantPresetPayload:
-        creator = Creator(
-            spec=RuntimeVariantPresetCreatorSpec(
-                runtime_variant_id=RuntimeVariantID(input.runtime_variant_id),
-                name=input.name,
-                description=input.description,
-                rank=0,
-                preset_target=input.preset_target,
-                value_type=input.value_type,
-                default_value=input.default_value,
-                key=input.key,
-                required=input.required,
-                category=input.category,
-                display_name=input.display_name,
-                ui_option=input.ui_option,
-            )
+        creator = RuntimeVariantPresetCreator(
+            runtime_variant_id=RuntimeVariantID(input.runtime_variant_id),
+            name=input.name,
+            description=input.description,
+            preset_target=input.preset_target,
+            value_type=input.value_type,
+            default_value=input.default_value,
+            key=input.key,
+            required=input.required,
+            category=input.category,
+            display_name=input.display_name,
+            ui_option=input.ui_option,
         )
         result = await self._processors.runtime_variant_preset.global_create.run(
             CreateRuntimeVariantPresetAction(creator=creator)
         )
-        return CreateRuntimeVariantPresetPayload(preset=self._data_to_node(result.preset))
+        return CreateRuntimeVariantPresetPayload(preset=self._data_to_node(result.data))
 
     async def update(
         self,
         input: UpdateRuntimeVariantPresetInput,
     ) -> UpdateRuntimeVariantPresetPayload:
-        spec = RuntimeVariantPresetUpdaterSpec(
+        updater = RuntimeVariantPresetUpdater(
+            preset_id=RuntimeVariantPresetID(input.id),
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
@@ -239,9 +235,8 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 else TriState.update(input.ui_option)
             ),
         )
-        updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=input.id)
         result = await self._processors.runtime_variant_preset.update.run(
-            UpdateRuntimeVariantPresetAction(id=RuntimeVariantPresetID(input.id), updater=updater)
+            UpdateRuntimeVariantPresetAction(updater=updater)
         )
         return UpdateRuntimeVariantPresetPayload(preset=self._data_to_node(result.preset))
 

@@ -49,6 +49,7 @@ from ai.backend.manager.models.resource_usage_history.row import (
     UserUsageBucketRow,
 )
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
+from ai.backend.manager.models.retention.updaters import LastSweptAtUpdater
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.scheduling_history.row import (
@@ -64,11 +65,9 @@ from ai.backend.manager.models.vfolder.row import VFolderInvitationRow
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
-    Updater,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider, ReadOps, WriteOps
 from ai.backend.manager.repositories.retention.purgers import RetentionPurgerSpec
-from ai.backend.manager.repositories.retention.updaters import LastSweptAtUpdaterSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -359,8 +358,8 @@ class RetentionDBSource:
                 try:
                     async with w.savepoint() as sp:
                         deleted = await self._drain_specs(sp, specs, batch_size)
-                        await sp.update(
-                            Updater(spec=LastSweptAtUpdaterSpec(now), pk_value=policy.id)
+                        await sp.update_data(
+                            LastSweptAtUpdater(policy_id=policy.id, last_swept_at=now)
                         )
                 except Exception:
                     log.exception(

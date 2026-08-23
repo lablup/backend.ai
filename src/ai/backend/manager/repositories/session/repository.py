@@ -28,10 +28,10 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
+from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.session.db_source import SessionDBSource
 
 session_repository_resilience = Resilience(
@@ -200,7 +200,7 @@ class SessionRepository:
     @session_repository_resilience.apply()
     async def update_session(
         self,
-        updater: Updater[SessionRow],
+        updater: SessionUpdater,
         session_name: str | None = None,
     ) -> SessionRow | None:
         return await self._db_source.update_session(updater, session_name)

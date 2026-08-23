@@ -74,17 +74,15 @@ from ai.backend.manager.models.condition_utils import combine_conditions_or, neg
 from ai.backend.manager.models.model_card.conditions import ModelCardConditions
 from ai.backend.manager.models.model_card.creators import ModelCardCreator
 from ai.backend.manager.models.model_card.orders import ModelCardOrders
+from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.model_card.scopes import VFolderModelCardOperationScope
 from ai.backend.manager.models.model_card.searchers import (
     ModelCardResourceRequirementSearcher,
     ModelCardSearcher,
 )
+from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.model_card.purgers import ModelCardPurgerSpec
-from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.model_card.actions.available_presets import (
     AvailablePresetsAction,
@@ -315,7 +313,8 @@ class ModelCardAdapter(BaseAdapter):
             else:
                 min_resource_state = TriState.update(_entries_to_requirements(input.min_resource))
 
-        spec = ModelCardUpdaterSpec(
+        updater = ModelCardUpdater(
+            card_id=ModelCardID(input.id),
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
@@ -401,7 +400,6 @@ class ModelCardAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        updater: Updater[ModelCardRow] = Updater(spec=spec, pk_value=input.id)
         result = await self._processors.model_card.update.run(
             UpdateModelCardAction(model_card_id=ModelCardID(input.id), updater=updater)
         )
@@ -417,7 +415,7 @@ class ModelCardAdapter(BaseAdapter):
         result = await self._processors.model_card.delete.run(
             DeleteModelCardAction(
                 model_card_id=ModelCardID(card_id),
-                purger=Purger(spec=ModelCardPurgerSpec(card_id=card_id)),
+                purger=ModelCardPurger(card_id=ModelCardID(card_id)),
                 options=options,
             )
         )
@@ -445,7 +443,7 @@ class ModelCardAdapter(BaseAdapter):
     ) -> BulkDeleteModelCardActionResult:
         return await self._processors.model_card.bulk_delete.run(
             BulkDeleteModelCardAction(
-                purgers=[Purger(spec=ModelCardPurgerSpec(card_id=card_id)) for card_id in card_ids],
+                purgers=[ModelCardPurger(card_id=ModelCardID(card_id)) for card_id in card_ids],
                 options=options,
             )
         )

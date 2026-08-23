@@ -37,7 +37,9 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -52,7 +54,6 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     get_sessions_by_mounted_folder,
 )
-from ai.backend.manager.repositories.base.purger import Purger, execute_purger
 from ai.backend.manager.repositories.base.updater import (
     Updater,
     execute_updater,
@@ -61,8 +62,8 @@ from ai.backend.manager.repositories.base.upserter import BulkUpserter, execute_
 from ai.backend.manager.repositories.model_card.types import (
     AvailablePresetsSearchResult,
 )
-from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
+from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.repositories.vfolder.updaters import VFolderTrashUpdaterSpec
 from ai.backend.manager.types import TriState
 
@@ -75,23 +76,18 @@ class ModelCardDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def update(self, updater: Updater[ModelCardRow]) -> ModelCardData:
+    async def update(self, updater: ModelCardUpdater) -> ModelCardData:
         async with self._db.begin_session() as session:
-            result = await execute_updater(session, updater)
-            # execute_updater returns the current row even when build_values() is empty
-            # (e.g. a child-only update that syncs model_card_resource_requirements), and
-            # None only when the row is missing.
-            if result is None:
-                raise ModelCardNotFound(f"Model card with ID {updater.pk_value} not found.")
-            row = result.row
+            # The card comes back even when build_values() is empty (a child-only update
+            # that syncs model_card_resource_requirements); None means it is missing.
+            data = await V2WriteOps(session).update_data(updater)
+            if data is None:
+                raise ModelCardNotFound(f"Model card with ID {updater.card_id} not found.")
 
-            # Sync the normalized model_card_resource_requirements table when
-            # the updater spec requests a change. Plain column UPDATE cannot
-            # touch this child table, so we delete-then-insert explicitly.
-            if isinstance(updater.spec, ModelCardUpdaterSpec):
-                await self._apply_min_resource_change(session, row.id, updater.spec.min_resource)
+            # Plain column UPDATE cannot touch the child table, so replace it explicitly.
+            await self._apply_min_resource_change(session, data.id, updater.min_resource)
 
-            return row.to_data()
+            return data
 
     async def _apply_min_resource_change(
         self,
@@ -143,7 +139,7 @@ class ModelCardDBSource:
 
     async def delete(
         self,
-        purger: Purger[ModelCardRow],
+        purger: ModelCardPurger,
         options: DeleteModelCardOptions,
     ) -> UUID:
         async with self._db.begin_session() as session:
@@ -151,7 +147,7 @@ class ModelCardDBSource:
 
     async def bulk_delete(
         self,
-        purgers: list[Purger[ModelCardRow]],
+        purgers: list[ModelCardPurger],
         options: DeleteModelCardOptions,
     ) -> BulkModelCardDeleteResultData:
         """Hard-delete every card behind ``purgers`` with partial-failure semantics.
@@ -166,9 +162,7 @@ class ModelCardDBSource:
             return BulkModelCardDeleteResultData(successes=successes, failures=failures)
         async with self._db.begin_session() as session:
             for purger in purgers:
-                # ModelCardRow uses a UUID primary key; the Purger generic type permits
-                # UUID/str/int so narrow it once for the failure record.
-                card_id = cast(UUID, purger.spec.pk_value())
+                card_id = purger.card_id
                 try:
                     async with session.begin_nested():
                         deleted_id = await self._delete_card_in_session(session, purger, options)
@@ -180,20 +174,19 @@ class ModelCardDBSource:
     async def _delete_card_in_session(
         self,
         session: SASession,
-        purger: Purger[ModelCardRow],
+        purger: ModelCardPurger,
         options: DeleteModelCardOptions,
     ) -> UUID:
-        result = await execute_purger(session, purger)
-        if result is None:
+        deleted = await V2WriteOps(session).purge_entity(purger)
+        if deleted is None:
             raise ModelCardNotFound()
-        deleted_row = result.row
         if options.delete_associated_vfolder:
             # The VFolder is going to trash, so any sibling model card pointing
             # at it would be orphaned. Reject up front if the vfolder is still
             # mounted, then hard-delete the siblings and flip the VFolder
             # status atomically — this avoids wasted sibling deletions that
             # would only get rolled back on a mount-check failure.
-            vfolder_id = cast(UUID, deleted_row.vfolder)
+            vfolder_id = deleted.vfolder_id
             await self._reject_if_vfolders_mounted(session, [vfolder_id])
             sibling_result = await session.execute(
                 sa.delete(ModelCardRow).where(ModelCardRow.vfolder == vfolder_id)
@@ -208,12 +201,12 @@ class ModelCardDBSource:
                     "alongside target {}",
                     sibling_count,
                     vfolder_id,
-                    deleted_row.id,
+                    deleted.id,
                 )
             await execute_updater(
                 session, Updater(spec=VFolderTrashUpdaterSpec(), pk_value=vfolder_id)
             )
-        return deleted_row.id
+        return deleted.id
 
     async def _reject_if_vfolders_mounted(
         self,

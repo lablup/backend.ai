@@ -1,16 +1,29 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
 
-from ai.backend.manager.data.model_card.types import ResourceRequirementEntry
+from sqlalchemy.orm import InstrumentedAttribute
+
+from ai.backend.common.data.entity.model_card import ModelCardID
+from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.repositories.base.updater import UpdaterSpec
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
-class ModelCardUpdaterSpec(UpdaterSpec[ModelCardRow]):
+class ModelCardUpdater(DataUpdater[ModelCardRow, ModelCardData]):
+    """Edit a card's metadata.
+
+    ``min_resource`` names no column: the minimum slot quantities live in the
+    requirement rows the card owns, which the caller replaces alongside this update.
+    """
+
+    card_id: ModelCardID
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     author: TriState[str] = field(default_factory=TriState[str].nop)
     title: TriState[str] = field(default_factory=TriState[str].nop)
@@ -34,6 +47,19 @@ class ModelCardUpdaterSpec(UpdaterSpec[ModelCardRow]):
         return ModelCardRow
 
     @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ModelCardRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
+        return self.card_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
     def build_values(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
         self.name.update_dict(to_update, "name")
@@ -50,3 +76,7 @@ class ModelCardUpdaterSpec(UpdaterSpec[ModelCardRow]):
         self.readme.update_dict(to_update, "readme")
         self.access_level.update_dict(to_update, "access_level")
         return to_update
+
+    @override
+    def to_data(self, row: ModelCardRow) -> ModelCardData:
+        return row.to_data()

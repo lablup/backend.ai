@@ -54,6 +54,7 @@ from ai.backend.manager.models.session import (
     batch_populate_session_occupied_slots,
 )
 from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
+from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.session_template import SessionTemplateRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole, UserRow
@@ -62,8 +63,8 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
 )
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
 from ai.backend.manager.utils import query_userinfo
 
@@ -375,10 +376,10 @@ class SessionDBSource:
 
     async def update_session(
         self,
-        updater: Updater[SessionRow],
+        updater: SessionUpdater,
         session_name: str | None = None,
     ) -> SessionRow | None:
-        session_id = updater.pk_value
+        session_id = updater.session_id
 
         async with self._db.begin_session() as db_session:
             query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
@@ -401,9 +402,8 @@ class SessionDBSource:
                         f"Duplicate session name. Session(id:{sess.id}) already has the name"
                     )
 
-            # Use execute_updater to apply changes
-            result = await execute_updater(db_session, updater)
-            if result is None:
+            updated = await V2WriteOps(db_session).update_data(updater)
+            if updated is None:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
 
             if session_name:

@@ -38,6 +38,7 @@ from ai.backend.manager.models.replica_group_history.conditions import (
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
@@ -77,7 +78,6 @@ from ai.backend.manager.repositories.replica_group.types import (
     RevisionRouteConfig,
     ScalingReconcileFetch,
 )
-from ai.backend.manager.repositories.session_group.creators import SessionGroupCreatorSpec
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.manager.views.replica_group import (
     ReplicaGroupAutoscaleReconcileView,
@@ -452,20 +452,18 @@ class ReplicaGroupDBSource:
                         # The deployment disappeared between the read and here;
                         # its rollout has nothing left to point at.
                         continue
-                    session_group = await w.create(
-                        Creator(
-                            spec=SessionGroupCreatorSpec.for_replica_group(
-                                domain_name=endpoint_row.domain,
-                                project_id=ProjectID(endpoint_row.project),
-                                owner_user_id=UserID(endpoint_row.session_owner),
-                            )
+                    session_group = await w.create_entity(
+                        SessionGroupCreator.for_replica_group(
+                            domain_name=endpoint_row.domain,
+                            project_id=ProjectID(endpoint_row.project),
+                            owner_user_id=UserID(endpoint_row.session_owner),
                         )
                     )
                     created = await w.create(
                         Creator(
                             spec=ReplicaGroupCreatorSpec(
                                 deployment_id=setup.deployment_id,
-                                session_group_id=session_group.row.id,
+                                session_group_id=session_group.id,
                                 target_revision_id=setup.target_revision_id,
                                 desired_target_replica_count=setup.desired_target_replica_count,
                                 rollout=setup.spec.rollout,

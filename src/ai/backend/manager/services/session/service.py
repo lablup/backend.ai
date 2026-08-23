@@ -104,7 +104,6 @@ from ai.backend.manager.models.session import (
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
-from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
     BatchGetKernelResourceAllocationAction,
@@ -1500,8 +1499,7 @@ class SessionService:
 
     async def update_session(self, action: UpdateSessionAction) -> UpdateSessionActionResult:
         session_id = action.session_id
-        spec = cast(SessionUpdaterSpec, action.updater.spec)
-        session_name = spec.name.optional_value()
+        session_name = action.updater.name.optional_value()
 
         session_row = await self._session_repository.update_session(action.updater, session_name)
         if session_row is None:

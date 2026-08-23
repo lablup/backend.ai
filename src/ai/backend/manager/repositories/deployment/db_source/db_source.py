@@ -157,6 +157,7 @@ from ai.backend.manager.models.scheduling_history import (
     RouteHistoryRow,
 )
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow, query_accessible_vfolders
@@ -196,10 +197,10 @@ from ai.backend.manager.repositories.deployment.types import (
     RouteSessionInfo,
     RouteSessionKernelInfo,
 )
+from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.repositories.scheduling_history.creators import (
     DeploymentHistoryCreatorSpec,
 )
-from ai.backend.manager.repositories.session_group.creators import SessionGroupCreatorSpec
 from ai.backend.manager.utils import query_userinfo_from_session
 
 
@@ -345,13 +346,13 @@ class DeploymentDBSource:
 
             # Every replica group owns a session group (1:1) carrying the
             # placement policy of its replicas.
-            primary_session_group = SessionGroupCreatorSpec.for_replica_group(
-                domain_name=endpoint.domain,
-                project_id=ProjectID(endpoint.project),
-                owner_user_id=UserID(endpoint.session_owner),
-            ).build_row()
-            db_sess.add(primary_session_group)
-            await db_sess.flush()
+            primary_session_group = await V2WriteOps(db_sess).create_entity(
+                SessionGroupCreator.for_replica_group(
+                    domain_name=endpoint.domain,
+                    project_id=ProjectID(endpoint.project),
+                    owner_user_id=UserID(endpoint.session_owner),
+                )
+            )
 
             # Every deployment owns a primary replica group that holds its
             # revision pointers and per-revision desired replica counts. The

@@ -350,6 +350,7 @@ def create_services(args: ServiceArgs) -> Services:
         role_preset=RolePresetService(OpsRepository(repositories.v2_ops_provider)),
         runtime_variant_preset=RuntimeVariantPresetService(
             repositories.runtime_variant_preset.repository,
+            OpsRepository(repositories.v2_ops_provider),
         ),
         deployment_revision_preset=DeploymentPresetService(
             repositories.deployment_revision_preset.repository,

@@ -12,6 +12,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
@@ -38,6 +39,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.model_card.creators import ModelCardCreator
+from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
@@ -57,9 +59,7 @@ from ai.backend.manager.models.resource_slot.row import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.model_card.db_source.db_source import ModelCardDBSource
-from ai.backend.manager.repositories.model_card.purgers import ModelCardPurgerSpec
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
@@ -67,6 +67,7 @@ from ai.backend.testutils.db import with_tables
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.data.permission.types import ScopeType
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
@@ -131,6 +132,7 @@ class TestModelCardDelete:
                 ScopeBindingRow,
                 EntityMembershipRow,
                 RoleRow,
+                PermissionRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -423,7 +425,7 @@ class TestModelCardDelete:
         assert target.vfolder_id == sibling.vfolder_id
 
         await db_source.delete(
-            Purger(spec=ModelCardPurgerSpec(card_id=target.id)),
+            ModelCardPurger(card_id=ModelCardID(target.id)),
             case.options,
         )
 
@@ -462,9 +464,9 @@ class TestModelCardDelete:
 
         result = await db_source.bulk_delete(
             [
-                Purger(spec=ModelCardPurgerSpec(card_id=valid_a.id)),
-                Purger(spec=ModelCardPurgerSpec(card_id=missing_id)),
-                Purger(spec=ModelCardPurgerSpec(card_id=valid_b.id)),
+                ModelCardPurger(card_id=ModelCardID(valid_a.id)),
+                ModelCardPurger(card_id=ModelCardID(missing_id)),
+                ModelCardPurger(card_id=ModelCardID(valid_b.id)),
             ],
             DeleteModelCardOptions(delete_associated_vfolder=False),
         )
@@ -500,8 +502,8 @@ class TestModelCardDelete:
 
         result = await db_source.bulk_delete(
             [
-                Purger(spec=ModelCardPurgerSpec(card_id=free_card.id)),
-                Purger(spec=ModelCardPurgerSpec(card_id=mounted_card.id)),
+                ModelCardPurger(card_id=ModelCardID(free_card.id)),
+                ModelCardPurger(card_id=ModelCardID(mounted_card.id)),
             ],
             DeleteModelCardOptions(delete_associated_vfolder=True),
         )

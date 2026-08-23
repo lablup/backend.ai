@@ -52,7 +52,6 @@ class ModelCardService:
         self._storage_manager = storage_manager
 
     async def update(self, action: UpdateModelCardAction) -> UpdateModelCardActionResult:
-        action.updater.pk_value = action.model_card_id
         data = await self._repository.update(action.updater)
         return UpdateModelCardActionResult(model_card=data)
 

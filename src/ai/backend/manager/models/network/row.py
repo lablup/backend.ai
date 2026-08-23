@@ -10,8 +10,9 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship, selectinload
 
+from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.manager.data.network.types import NetworkType
+from ai.backend.manager.data.network.types import NetworkData, NetworkType
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -95,6 +96,19 @@ class NetworkRow(LifecycleTimestampsMixin, Base):
         self.domain_name = domain
         self.project = project
         self.options = options or {}
+
+    def to_data(self) -> NetworkData:
+        return NetworkData(
+            id=NetworkID(self.id),
+            name=self.name,
+            ref_name=self.ref_name,
+            driver=self.driver,
+            project_id=self.project,
+            domain_name=self.domain_name,
+            options=self.options,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
     @classmethod
     async def get(
