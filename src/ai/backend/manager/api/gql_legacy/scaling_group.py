@@ -37,35 +37,25 @@ from ai.backend.manager.models.resource_group import (
     sgroups_for_groups,
     sgroups_for_keypairs,
 )
+from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
+from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
-from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.rbac.scope_binder import (
     RBACScopeBinder,
     RBACScopeBindingPair,
 )
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_group.creators import (
-    ResourceGroupCreatorSpec,
     ResourceGroupForDomainCreatorSpec,
     ResourceGroupForKeypairsCreatorSpec,
     ResourceGroupForProjectCreatorSpec,
 )
 from ai.backend.manager.repositories.resource_group.purgers import (
-    ResourceGroupNamePurgerSpec,
     create_resource_group_for_keypairs_purger,
 )
 from ai.backend.manager.repositories.resource_group.scope_binders import (
     ResourceGroupDomainEntityUnbinder,
     ResourceGroupProjectEntityUnbinder,
-)
-from ai.backend.manager.repositories.resource_group.updaters import (
-    ResourceGroupDriverConfigUpdaterSpec,
-    ResourceGroupMetadataUpdaterSpec,
-    ResourceGroupNetworkConfigUpdaterSpec,
-    ResourceGroupSchedulerConfigUpdaterSpec,
-    ResourceGroupStatusUpdaterSpec,
-    ResourceGroupUpdaterSpec,
 )
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.resource_group.actions.associate_with_domain import (
@@ -688,25 +678,18 @@ class ModifyScalingGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     scheduler_opts = graphene.JSONString(required=False)
     use_host_network = graphene.Boolean(required=False)
 
-    def to_updater(self, name: str) -> Updater[ResourceGroupRow]:
-        """Convert GraphQL input to Updater for scaling group modification."""
-        status_spec = ResourceGroupStatusUpdaterSpec(
+    def to_updater(self, resource_group_id: ResourceGroupID) -> ResourceGroupUpdater:
+        """Convert GraphQL input to the update spec for scaling group modification."""
+        return ResourceGroupUpdater(
+            resource_group_id=resource_group_id,
             is_active=OptionalState.from_graphql(self.is_active),
             is_public=OptionalState.from_graphql(self.is_public),
-        )
-        metadata_spec = ResourceGroupMetadataUpdaterSpec(
             description=TriState.from_graphql(self.description),
-        )
-        network_spec = ResourceGroupNetworkConfigUpdaterSpec(
             wsproxy_addr=TriState.from_graphql(self.wsproxy_addr),
             wsproxy_api_token=TriState.from_graphql(self.wsproxy_api_token),
             use_host_network=OptionalState.from_graphql(self.use_host_network),
-        )
-        driver_spec = ResourceGroupDriverConfigUpdaterSpec(
             driver=OptionalState.from_graphql(self.driver),
             driver_opts=OptionalState.from_graphql(self.driver_opts),
-        )
-        scheduler_spec = ResourceGroupSchedulerConfigUpdaterSpec(
             scheduler=OptionalState.from_graphql(self.scheduler),
             scheduler_opts=OptionalState.from_graphql(
                 ResourceGroupOpts.model_validate(self.scheduler_opts)
@@ -714,14 +697,6 @@ class ModifyScalingGroupInput(graphene.InputObjectType):  # type: ignore[misc]
                 else Undefined
             ),
         )
-        spec = ResourceGroupUpdaterSpec(
-            status=status_spec,
-            metadata=metadata_spec,
-            network=network_spec,
-            driver=driver_spec,
-            scheduler=scheduler_spec,
-        )
-        return Updater(spec=spec, pk_value=name)
 
 
 class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
@@ -744,7 +719,7 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
         props: CreateScalingGroupInput,
     ) -> CreateScalingGroup:
         graph_ctx: GraphQueryContext = info.context
-        spec = ResourceGroupCreatorSpec(
+        creator = ResourceGroupCreator(
             name=name,
             description=props.description,
             is_active=bool(props.is_active),
@@ -757,7 +732,6 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
             scheduler_opts=ResourceGroupOpts.model_validate(props.scheduler_opts),
             use_host_network=bool(props.use_host_network),
         )
-        creator = Creator(spec=spec)
         action = CreateResourceGroupAction(creator=creator)
         result = await graph_ctx.processors.resource_group.create_resource_group.run(action)
         return cls(
@@ -802,7 +776,7 @@ class ModifyScalingGroup(graphene.Mutation):  # type: ignore[misc]
         resource_group_id = await _resolve_resource_group_id(graph_ctx, name)
         await graph_ctx.processors.resource_group.update_resource_group.run(
             UpdateResourceGroupAction(
-                resource_group_id=resource_group_id, updater=props.to_updater(name)
+                resource_group_id=resource_group_id, updater=props.to_updater(resource_group_id)
             )
         )
         return cls(ok=True, msg="success")
@@ -828,10 +802,7 @@ class DeleteScalingGroup(graphene.Mutation):  # type: ignore[misc]
 
         resource_group_id = await _resolve_resource_group_id(graph_ctx, name)
         await graph_ctx.processors.resource_group.purge_resource_group.run(
-            PurgeResourceGroupAction(
-                resource_group_id=resource_group_id,
-                purger=Purger(spec=ResourceGroupNamePurgerSpec(name=name)),
-            )
+            PurgeResourceGroupAction(resource_group_id=resource_group_id)
         )
 
         return cls(ok=True, msg="success")

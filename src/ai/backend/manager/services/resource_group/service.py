@@ -9,13 +9,8 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.fair_share import InvalidResourceWeightError
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.repositories.base import Updater
+from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.repositories.resource_group import ResourceGroupRepository
-from ai.backend.manager.repositories.resource_group.updaters import (
-    ResourceGroupFairShareUpdaterSpec,
-    ResourceGroupUpdaterSpec,
-)
 
 if TYPE_CHECKING:
     from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
@@ -55,14 +50,6 @@ from ai.backend.manager.services.resource_group.actions.get_allowed_projects_for
     GetAllowedProjectsForResourceGroupAction,
     GetAllowedProjectsForResourceGroupActionResult,
 )
-from ai.backend.manager.services.resource_group.actions.get_allowed_rgs_for_domain import (
-    GetAllowedResourceGroupsForDomainAction,
-    GetAllowedResourceGroupsForDomainActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.get_allowed_rgs_for_project import (
-    GetAllowedResourceGroupsForProjectAction,
-    GetAllowedResourceGroupsForProjectActionResult,
-)
 from ai.backend.manager.services.resource_group.actions.get_resource_info import (
     GetResourceInfoAction,
     GetResourceInfoActionResult,
@@ -70,10 +57,6 @@ from ai.backend.manager.services.resource_group.actions.get_resource_info import
 from ai.backend.manager.services.resource_group.actions.get_wsproxy_version import (
     GetWsproxyVersionAction,
     GetWsproxyVersionActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.list_allowed import (
-    ListAllowedResourceGroupsAction,
-    ListAllowedResourceGroupsActionResult,
 )
 from ai.backend.manager.services.resource_group.actions.list_resource_groups import (
     SearchResourceGroupsAction,
@@ -138,21 +121,6 @@ class ResourceGroupService:
         self._repository = repository
         self._appproxy_client_pool = appproxy_client_pool
 
-    async def list_allowed_sgroups(
-        self, action: ListAllowedResourceGroupsAction
-    ) -> ListAllowedResourceGroupsActionResult:
-        """List resource groups allowed for a user, filtered by visibility."""
-        sgroups = await self._repository.list_allowed_sgroups(
-            domain_name=action.domain_name,
-            group=action.group,
-            access_key=action.access_key,
-        )
-        if not action.is_admin:
-            sgroups = [sg for sg in sgroups if sg.status.is_public]
-        return ListAllowedResourceGroupsActionResult(
-            resource_group_names=[sg.name for sg in sgroups],
-        )
-
     async def get_wsproxy_version(
         self, action: GetWsproxyVersionAction
     ) -> GetWsproxyVersionActionResult:
@@ -209,7 +177,7 @@ class ResourceGroupService:
         self, action: PurgeResourceGroupAction
     ) -> PurgeResourceGroupActionResult:
         """Purges a resource group and all related sessions and routes."""
-        data = await self._repository.purge_resource_group(action.purger)
+        data = await self._repository.purge_resource_group(action.resource_group_id)
         return PurgeResourceGroupActionResult(data=data)
 
     async def update_resource_group(
@@ -376,14 +344,12 @@ class ResourceGroupService:
         )
 
         # 7. Save via repository
-        fair_share_updater = ResourceGroupFairShareUpdaterSpec(
-            fair_share_spec=TriState.update(new_spec),
+        result = await self._repository.update_resource_group(
+            ResourceGroupUpdater(
+                resource_group_id=action.resource_group_id,
+                fair_share_spec=TriState.update(new_spec),
+            )
         )
-        updater = Updater[ResourceGroupRow](
-            pk_value=action.resource_group,
-            spec=ResourceGroupUpdaterSpec(fair_share=fair_share_updater),
-        )
-        result = await self._repository.update_resource_group(updater)
 
         return UpdateFairShareSpecActionResult(resource_group=result)
 
@@ -436,22 +402,6 @@ class ResourceGroupService:
             remove=action.remove,
         )
         return UpdateAllowedProjectsForResourceGroupActionResult(allowed_projects=items)
-
-    async def get_allowed_resource_groups_for_domain(
-        self,
-        action: GetAllowedResourceGroupsForDomainAction,
-    ) -> GetAllowedResourceGroupsForDomainActionResult:
-        """Get allowed resource groups for a domain."""
-        items = await self._repository.get_allowed_resource_groups_for_domain(action.domain_name)
-        return GetAllowedResourceGroupsForDomainActionResult(items=items)
-
-    async def get_allowed_resource_groups_for_project(
-        self,
-        action: GetAllowedResourceGroupsForProjectAction,
-    ) -> GetAllowedResourceGroupsForProjectActionResult:
-        """Get allowed resource groups for a project."""
-        items = await self._repository.get_allowed_resource_groups_for_project(action.project_id)
-        return GetAllowedResourceGroupsForProjectActionResult(items=items)
 
     async def get_allowed_domains_for_resource_group(
         self,

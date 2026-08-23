@@ -202,7 +202,11 @@ def build_api_routes(
         user=processors.user,
         container_registry=processors.container_registry,
     )
-    resource_group_handler = ResourceGroupHandler(resource_group=processors.resource_group)
+    resource_group_handler = ResourceGroupHandler(
+        resource_group=processors.resource_group,
+        domain=processors.domain,
+        project=processors.project,
+    )
     scheduling_history_handler = SchedulingHistoryHandler(
         scheduling_history=processors.scheduling_history
     )
