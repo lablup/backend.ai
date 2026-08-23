@@ -1,4 +1,7 @@
-"""Purger for delete operations."""
+"""Purger for delete operations.
+
+Deprecated: declare new delete specs in ``models/specs/purger.py``.
+"""
 
 from __future__ import annotations
 
@@ -55,7 +58,10 @@ async def validate_conflict_checks(
 
 
 class PurgerSpec[TRow: Base](ABC):
-    """Abstract base class defining a single-row purge target."""
+    """Abstract base class defining a single-row purge target.
+
+    Deprecated: use ``EntityPurger`` / ``FieldPurger`` in ``models/specs/purger.py``.
+    """
 
     @abstractmethod
     def row_class(self) -> type[TRow]:
@@ -75,6 +81,8 @@ class PurgerSpec[TRow: Base](ABC):
 
 class DataPurger[TRow: Base, TData](PurgerSpec[TRow], ABC):
     """A purger spec that also says how the deleted row becomes data.
+
+    Deprecated with :class:`PurgerSpec`; the v2 roots already carry ``to_data``.
 
     ``PurgerSpec`` is already self-contained about what to delete; this adds the
     conversion so the ops layer returns the ``data/`` type of the row it removed
@@ -216,6 +224,8 @@ async def execute_purger[TRow: Base](
 
 class BatchPurgerSpec[TRow: Base](ABC):
     """Abstract base class for defining batch purge targets.
+
+    Deprecated: use ``DataBatchPurger`` in ``models/specs/purger.py``.
 
     Implementations specify what to delete by providing a subquery
     that selects rows to delete. The table and PK columns are inferred
