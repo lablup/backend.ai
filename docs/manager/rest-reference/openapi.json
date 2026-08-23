@@ -32481,21 +32481,6 @@
         "title": "AuthorizeRequest",
         "type": "object"
       },
-      "LogoutRequest": {
-        "description": "Request to invalidate a login session.",
-        "properties": {
-          "session_token": {
-            "description": "The session token to invalidate",
-            "title": "Session Token",
-            "type": "string"
-          }
-        },
-        "required": [
-          "session_token"
-        ],
-        "title": "LogoutRequest",
-        "type": "object"
-      },
       "SignupRequest": {
         "description": "Request to sign up a new user. Created with INACTIVE status; requires separate activation.",
         "properties": {
@@ -32593,6 +32578,21 @@
           "new_password"
         ],
         "title": "UpdatePasswordNoAuthRequest",
+        "type": "object"
+      },
+      "LogoutRequest": {
+        "description": "Request to invalidate a login session.",
+        "properties": {
+          "session_token": {
+            "description": "The session token to invalidate",
+            "title": "Session Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_token"
+        ],
+        "title": "LogoutRequest",
         "type": "object"
       },
       "SignoutRequest": {
@@ -53834,30 +53834,6 @@
         "description": ""
       }
     },
-    "/auth/logout": {
-      "post": {
-        "operationId": "auth.logout",
-        "tags": [
-          "auth"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LogoutRequest"
-              }
-            }
-          }
-        },
-        "parameters": [],
-        "description": ""
-      }
-    },
     "/auth/signup": {
       "post": {
         "operationId": "auth.signup",
@@ -53962,6 +53938,35 @@
             "TokenAuth": []
           }
         ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "auth.logout",
+        "tags": [
+          "auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutRequest"
+              }
+            }
+          }
+        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
