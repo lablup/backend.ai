@@ -7,6 +7,7 @@ import sqlalchemy as sa
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.exception import BackendAIError
@@ -26,6 +27,8 @@ from ai.backend.manager.data.agent.types import (
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.agent.lookups import AgentNameLookup
+from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater, AgentStatusUpdater
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -34,10 +37,9 @@ from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSou
 from ai.backend.manager.repositories.agent.stateful_source.stateful_source import (
     AgentStatefulSource,
 )
-from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 from ai.backend.manager.repositories.base import BulkUpserter
 from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
 from ai.backend.manager.repositories.resource_slot.types import resource_slot_to_quantities
 from ai.backend.manager.repositories.resource_slot.upserters import AgentResourceUpserterSpec
@@ -65,6 +67,7 @@ class AgentRepository:
     _cache_source: AgentCacheSource
     _stateful_source: AgentStatefulSource
     _config_provider: ManagerConfigProvider
+    _v2_ops: V2DBOpsProvider
 
     def __init__(
         self,
@@ -73,11 +76,13 @@ class AgentRepository:
         valkey_live: ValkeyLiveClient,
         valkey_stat: ValkeyStatClient,
         config_provider: ManagerConfigProvider,
+        v2_ops_provider: V2DBOpsProvider,
     ) -> None:
         self._db_source = AgentDBSource(db)
         self._cache_source = AgentCacheSource(valkey_image, valkey_live, valkey_stat)
         self._stateful_source = AgentStatefulSource(valkey_image, valkey_stat)
         self._config_provider = config_provider
+        self._v2_ops = v2_ops_provider
 
     @agent_repository_resilience.apply()
     async def load_agent_container_counts(self, agent_ids: Sequence[AgentId]) -> Sequence[int]:
@@ -142,24 +147,34 @@ class AgentRepository:
         return upsert_result
 
     @agent_repository_resilience.apply()
-    async def cleanup_agent_on_exit(self, agent_id: AgentId, spec: AgentStatusUpdaterSpec) -> None:
+    async def lookup_uuid(self, agent_id: AgentId) -> AgentUUID | None:
+        """Resolve the operator-facing agent id into the entity id rows are written by."""
+        async with self._v2_ops.read_ops() as r:
+            return await r.lookup_entity_id(AgentNameLookup(agent_id=agent_id))
+
+    @agent_repository_resilience.apply()
+    async def cleanup_agent_caches(self, agent_id: AgentId) -> None:
+        """Drop what an exiting agent left in the caches, which are keyed by its name."""
         with suppress_with_log(
             [Exception], message=f"Failed to remove last seen for agent: {agent_id}"
         ):
             await self._cache_source.remove_agent_last_seen(agent_id)
-
-        updater = Updater[AgentRow](spec=spec, pk_value=agent_id)
-        await self._db_source.update_agent_status_exit(updater)
-
         with suppress_with_log(
             [Exception], message=f"Failed to remove agent: {agent_id} from all images"
         ):
             await self._cache_source.remove_agent_from_all_images(agent_id)
 
     @agent_repository_resilience.apply()
-    async def update_agent_status(self, agent_id: AgentId, spec: AgentStatusUpdaterSpec) -> None:
-        updater = Updater[AgentRow](spec=spec, pk_value=agent_id)
-        await self._db_source.update_agent_status(updater)
+    async def mark_agent_exit(self, updater: AgentExitStatusUpdater) -> AgentId | None:
+        """Record the agent's exit, returning it when the write landed and ``None``
+        when the agent was already terminal."""
+        async with self._v2_ops.write_ops() as w:
+            return await w.update_guarded_data(updater)
+
+    @agent_repository_resilience.apply()
+    async def update_agent_status(self, updater: AgentStatusUpdater) -> None:
+        async with self._v2_ops.write_ops() as w:
+            await w.update_data(updater)
 
     @agent_repository_resilience.apply()
     async def update_resource_group(

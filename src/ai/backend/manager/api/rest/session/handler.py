@@ -888,9 +888,7 @@ class SessionHandler:
             owner_access_key,
             agent_id,
         )
-        await self._agent.sync_agent_registry.wait_for_complete(
-            SyncAgentRegistryAction(agent_id=agent_id)
-        )
+        await self._agent.sync_agent_registry.run(SyncAgentRegistryAction(agent_id=agent_id))
         return APIResponse.build(HTTPStatus.OK, CreateSessionResponse({}))
 
     # ------------------------------------------------------------------

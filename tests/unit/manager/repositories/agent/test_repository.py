@@ -47,6 +47,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.agent import AgentHasConflictingSessions
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -78,6 +79,8 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
 
@@ -249,6 +252,7 @@ class TestAgentRepositoryDB:
             valkey_live=mock_valkey_live,
             valkey_stat=mock_valkey_stat,
             config_provider=mock_config_provider,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
         )
 
     @pytest.fixture
@@ -338,6 +342,60 @@ class TestAgentRepositoryDB:
             )
             db_sess.add(agent)
         yield AgentFixtureData(agent_id=agent_id, resource_group=resource_group.name)
+
+    # ==================== mark_agent_exit tests ====================
+
+    async def test_mark_agent_exit_records_the_exit_of_a_live_agent(
+        self,
+        agent_repository: AgentRepository,
+        alive_agent: AgentFixtureData,
+    ) -> None:
+        agent_uuid = await agent_repository.lookup_uuid(alive_agent.agent_id)
+        assert agent_uuid is not None
+        now = datetime.now(tzutc())
+
+        written = await agent_repository.mark_agent_exit(
+            AgentExitStatusUpdater(
+                agent_uuid=agent_uuid,
+                status=AgentStatus.LOST,
+                status_changed=now,
+                lost_at=OptionalState.update(now),
+            )
+        )
+
+        assert written == alive_agent.agent_id
+        data = await agent_repository.get_by_id(alive_agent.agent_id)
+        assert data.status == AgentStatus.LOST
+        assert data.lost_at is not None
+
+    async def test_mark_agent_exit_leaves_an_already_terminal_agent_alone(
+        self,
+        agent_repository: AgentRepository,
+        lost_agent: AgentFixtureData,
+    ) -> None:
+        agent_uuid = await agent_repository.lookup_uuid(lost_agent.agent_id)
+        assert agent_uuid is not None
+        before = await agent_repository.get_by_id(lost_agent.agent_id)
+
+        written = await agent_repository.mark_agent_exit(
+            AgentExitStatusUpdater(
+                agent_uuid=agent_uuid,
+                status=AgentStatus.TERMINATED,
+                status_changed=datetime.now(tzutc()),
+                lost_at=OptionalState.update(datetime.now(tzutc())),
+            )
+        )
+
+        assert written is None
+        after = await agent_repository.get_by_id(lost_agent.agent_id)
+        assert after.status == AgentStatus.LOST
+        assert after.lost_at == before.lost_at
+
+    async def test_lookup_uuid_answers_none_for_an_unknown_agent(
+        self,
+        agent_repository: AgentRepository,
+    ) -> None:
+        assert await agent_repository.lookup_uuid(AgentId(str(uuid4()))) is None
 
     # ==================== get_by_id tests ====================
 
@@ -995,6 +1053,7 @@ class TestAgentRepositoryCache:
             valkey_live=valkey_live_client,
             valkey_stat=valkey_stat_client,
             config_provider=mock_config_provider,
+            v2_ops_provider=V2DBOpsProvider(mock_database_engine),
         )
         yield repo
 

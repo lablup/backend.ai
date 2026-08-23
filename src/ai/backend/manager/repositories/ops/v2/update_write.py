@@ -1,17 +1,20 @@
-"""Update writes of the v2 ops: single-row and bulk updates.
+"""Update writes of the v2 ops: single-row, guarded single-row, and bulk updates.
 
-Updates never touch scope provisioning, so one update spec serves every row.
+Updates never touch scope provisioning; the specs differ only in how the row to
+write is picked.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 
+import sqlalchemy as sa
+
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 
 
@@ -32,6 +35,38 @@ class V2UpdateWriteOps(V2WriteOpsBase):
             updater.build_values(),
             updater.integrity_error_checks,
         )
+        if row is None:
+            return None
+        return updater.to_data(row)
+
+    async def update_guarded_data[TRow: Base, TData](
+        self, updater: GuardedDataUpdater[TRow, TData]
+    ) -> TData | None:
+        """Update the row the id names when its guard holds, returning what was
+        written; ``None`` when nothing was — the row is gone or the guard refused.
+
+        The guard rides on the statement, so no separate read and no row lock stand
+        between the check and the write. Callers that must tell the two misses apart
+        read the row themselves.
+        """
+        row_class = updater.row_class
+        table = row_class.__table__
+        values = updater.build_values()
+        stmt = (
+            sa.update(table)
+            .values(values)
+            .where(updater.target_id_column() == updater.target_id_value())
+        )
+        for condition in updater.guard_conditions():
+            stmt = stmt.where(condition())
+        stmt = stmt.returning(*table.columns)
+        try:
+            result = await self._sess.execute(sa.select(row_class).from_statement(stmt))
+        except sa.exc.IntegrityError as e:
+            self._match_integrity_error(
+                self._parse_integrity_error(e), updater.integrity_error_checks
+            )
+        row = result.scalar_one_or_none()
         if row is None:
             return None
         return updater.to_data(row)

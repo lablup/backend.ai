@@ -86,7 +86,7 @@ class AgentAdapter(BaseAdapter):
             pagination=NoPagination(),
             conditions=[AgentConditions.by_ids(agent_ids)],
         )
-        action_result = await self._processors.agent.search_agents.wait_for_complete(
+        action_result = await self._processors.agent.search_agents.run(
             SearchAgentsAction(querier=querier)
         )
         agent_map = {detail.agent.id: self._data_to_dto(detail) for detail in action_result.agents}
@@ -100,7 +100,7 @@ class AgentAdapter(BaseAdapter):
         """
         if not agent_ids:
             return []
-        action_result = await self._processors.agent.load_container_counts.wait_for_complete(
+        action_result = await self._processors.agent.load_container_counts.run(
             LoadContainerCountsAction(agent_ids=agent_ids)
         )
         return list(action_result.container_counts)
@@ -125,7 +125,7 @@ class AgentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.agent.search_agents.wait_for_complete(
+        action_result = await self._processors.agent.search_agents.run(
             SearchAgentsAction(querier=querier)
         )
         return AdminSearchAgentsPayload(
@@ -236,7 +236,7 @@ class AgentAdapter(BaseAdapter):
     ) -> UpdateAgentResourceGroupPayload:
         """Change an agent's resource group, cleaning up conflicting sessions per policy."""
         applied_policy = input.policy or ConflictingSessionCleanupPolicyEnum.TERMINATE
-        action_result = await self._processors.agent.update_resource_group.wait_for_complete(
+        action_result = await self._processors.agent.update_resource_group.run(
             UpdateAgentResourceGroupAction(
                 agent_id=input.agent_id,
                 resource_group_id=input.resource_group_id,
@@ -259,9 +259,7 @@ class AgentAdapter(BaseAdapter):
     async def get_total_resources(self) -> TotalResourceData:
         """Retrieve aggregate resource capacity/usage across all agents."""
         action_result: GetTotalResourcesActionResult = (
-            await self._processors.agent.get_total_resources.wait_for_complete(
-                GetTotalResourcesAction()
-            )
+            await self._processors.agent.get_total_resources.run(GetTotalResourcesAction())
         )
         return action_result.total_resources
 

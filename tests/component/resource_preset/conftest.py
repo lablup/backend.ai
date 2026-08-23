@@ -15,8 +15,6 @@ from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
@@ -54,7 +52,6 @@ from ai.backend.manager.services.resource_preset.processors import ResourcePrese
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 # Statically imported so that Pants includes these modules in the test PEX.
 _RESOURCE_PRESET_SERVER_SUBAPP_MODULES = (_auth_api,)
@@ -103,8 +100,6 @@ def agent_processors(
     database_engine: ExtendedAsyncSAEngine,
     async_etcd: AsyncEtcd,
     config_provider: ManagerConfigProvider,
-    hook_plugin_ctx: HookPluginContext,
-    event_producer: EventProducer,
     valkey_clients: ValkeyClients,
     processor_registry: ProcessorRegistry[Any],
 ) -> AgentProcessors:
@@ -114,6 +109,7 @@ def agent_processors(
         valkey_clients.live,
         valkey_clients.stat,
         config_provider,
+        V2DBOpsProvider(database_engine),
     )
     scheduler_repo = SchedulerRepository(
         database_engine,
@@ -129,18 +125,11 @@ def agent_processors(
         agent_repository=agent_repo,
         scheduler_repository=scheduler_repo,
         scheduling_controller=AsyncMock(),
-        hook_plugin_ctx=hook_plugin_ctx,
-        event_producer=event_producer,
-        agent_cache=AsyncMock(),
     )
     return AgentProcessors(
         processor_registry.group(GroupMeta(AGENT_ENTITY_TYPE)),
         service,
         [],
-        ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
-        ),
     )
 
 

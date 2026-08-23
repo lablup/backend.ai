@@ -4,18 +4,23 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.types import AgentId
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
-from .base import AgentAction
 
-
-@dataclass
-class LoadContainerCountsAction(AgentAction):
+@dataclass(frozen=True)
+class LoadContainerCountsAction(BaseGlobalAction):
     """Action to load container counts."""
 
     agent_ids: Sequence[AgentId]
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return AGENT_ENTITY_TYPE
 
     @override
     @classmethod
@@ -23,19 +28,16 @@ class LoadContainerCountsAction(AgentAction):
         return ActionOperationType.GET
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_load_agent_container_counts"
 
 
-@dataclass
-class LoadContainerCountsActionResult(BaseActionResult):
+@dataclass(frozen=True)
+class LoadContainerCountsActionResult:
     """Result of loading container counts.
 
     container_counts is in the same order as the input agent_ids.
     """
 
     container_counts: Sequence[int]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

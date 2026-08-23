@@ -929,7 +929,7 @@ class ModifyAgent(graphene.Mutation):  # type: ignore[misc]
                 return cls(False, f"no such scaling group: {scaling_group}")
             # The v1 mutation refuses to move an agent that still has sessions
             # under the old group; drain them first.
-            await graph_ctx.processors.agent.update_resource_group.wait_for_complete(
+            await graph_ctx.processors.agent.update_resource_group.run(
                 UpdateAgentResourceGroupAction(
                     agent_id=AgentId(id),
                     resource_group_id=ResourceGroupID(resource_group_id),

@@ -12,14 +12,9 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair, ResourceSlot
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.api.rest.agent.handler import AgentHandler
 from ai.backend.manager.api.rest.agent.registry import register_agent_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -30,10 +25,10 @@ from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 
 @pytest.fixture()
@@ -64,9 +59,6 @@ def agent_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
     agent_registry: AgentRegistry,
-    agent_cache: AgentRPCCache,
-    hook_plugin_ctx: HookPluginContext,
-    event_producer: EventProducer,
     async_etcd: AsyncEtcd,
     valkey_clients: Any,
     processor_registry: ProcessorRegistry[Any],
@@ -77,6 +69,7 @@ def agent_processors(
         valkey_live=valkey_clients.live,
         valkey_stat=valkey_clients.stat,
         config_provider=config_provider,
+        v2_ops_provider=V2DBOpsProvider(database_engine),
     )
     scheduler_repository = SchedulerRepository(
         database_engine,
@@ -92,18 +85,11 @@ def agent_processors(
         agent_repository=agent_repository,
         scheduler_repository=scheduler_repository,
         scheduling_controller=AsyncMock(),
-        hook_plugin_ctx=hook_plugin_ctx,
-        event_producer=event_producer,
-        agent_cache=agent_cache,
     )
     return AgentProcessors(
         processor_registry.group(GroupMeta(AGENT_ENTITY_TYPE)),
         service,
         [],
-        ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
-        ),
     )
 
 
