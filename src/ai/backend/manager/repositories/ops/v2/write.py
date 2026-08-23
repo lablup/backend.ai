@@ -8,6 +8,7 @@ from ai.backend.manager.repositories.ops.v2.entity_write import V2EntityWriteOps
 from ai.backend.manager.repositories.ops.v2.field_write import V2FieldWriteOps
 from ai.backend.manager.repositories.ops.v2.global_write import V2GlobalWriteOps
 from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
+from ai.backend.manager.repositories.ops.v2.reconcile_write import V2ReconcileWriteOps
 from ai.backend.manager.repositories.ops.v2.update_write import V2UpdateWriteOps
 
 
@@ -18,12 +19,14 @@ class V2WriteOps(
     V2DanglingFieldWriteOps,
     V2UpdateWriteOps,
     V2BatchWriteOps,
+    V2ReconcileWriteOps,
     V2ReadOps,
 ):
     """Read-write operations over the v2 write specs, bound to a single session.
 
     Composed by inheritance from the per-concern ops — entity writes (the
-    role-managed variants included), global, field and sidecar writes, plus
-    the updates, batch writes — on top of the read ops; each concern lives in its
-    own module and shares the primitives of ``V2WriteOpsBase``.
+    role-managed variants included), global, field and sidecar writes, the
+    updates, batch writes and the reconcile transitions — on top of the read
+    ops; each concern lives in its own module and shares the primitives of
+    ``V2WriteOpsBase``.
     """

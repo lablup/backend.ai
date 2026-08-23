@@ -1293,7 +1293,7 @@ class AutoScalingRuleOrderField(enum.StrEnum):
 
 
 @dataclass
-class DeploymentHistoryData:
+class DeploymentHistoryData(FieldData):
     """Domain model for deployment history."""
 
     id: UUID
@@ -1321,7 +1321,7 @@ class DeploymentHistoryData:
 
 
 @dataclass
-class RouteHistoryData:
+class RouteHistoryData(FieldData):
     """Domain model for route history."""
 
     id: UUID
@@ -1347,7 +1347,7 @@ class RouteHistoryData:
 
 
 @dataclass
-class ReplicaGroupHistoryData:
+class ReplicaGroupHistoryData(FieldData):
     """Domain model for replica-group history."""
 
     id: ReplicaGroupHistoryID
