@@ -93,6 +93,10 @@ joins nothing.
   and a batch alike.
 - It takes two type parameters, so the type `field_id()` answers and the type this
   lookup handles cannot come apart.
+- `FieldOwnerKeyLookup` reads the same thing from the other end: a caller-facing key to
+  the owner. `FieldKeyLookup` reads the row's id and the owner's from that key in one
+  query — an operation naming the row takes its id, so the key has to become one
+  somewhere.
 - Do NOT pre-read the owner to check existence. Declare the FK violation in
   `integrity_error_checks()` mapped to the domain error; preconditions beyond
   existence (e.g. lifecycle) belong to the service layer as EXISTS checks.

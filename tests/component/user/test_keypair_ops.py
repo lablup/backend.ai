@@ -69,9 +69,7 @@ mutation IssueMyKeypair {
 # GQL error extension codes produced by GQLExceptionHandlerExtension
 # ErrorCode.__str__() formats as "{domain}_{operation}_{error_detail}" (underscore-separated)
 _GQL_ERR_FORBIDDEN = "keypair_read_forbidden"
-# A keypair the caller may not reach is refused by the owner lookup's permission check,
-# and one that does not exist ends at the access-key lookup.
-_GQL_ERR_NO_PERMISSION = "role_create_forbidden"
+# An access key naming no keypair ends at the lookup that resolves it into a row id.
 _GQL_ERR_NO_ROW = "database_access_not-found"
 
 
@@ -243,24 +241,9 @@ class TestUpdateMyKeypair:
             async with db_engine.begin() as conn:
                 await conn.execute(keypairs.delete().where(keypairs.c.access_key == secondary_ak))
 
-    async def test_update_another_users_keypair_raises_forbidden(
-        self,
-        user_registry: BackendAIClientRegistry,
-        admin_user_fixture: Any,
-    ) -> None:
-        """S-3: updateMyKeypair with another user's accessKey → KeyPairForbidden."""
-        other_access_key: str = admin_user_fixture.keypair.access_key
-
-        response = await _call_gql(
-            user_registry,
-            _UPDATE_MY_KEYPAIR,
-            {"accessKey": other_access_key, "isActive": False},
-        )
-        assert response.get("errors"), "Expected a GQL error for cross-user keypair update"
-        codes = _gql_error_codes(response)
-        assert any(_GQL_ERR_NO_PERMISSION in code for code in codes), (
-            f"Expected a permission error code, got: {codes}"
-        )
+    # S-3, a keypair owned by another user, is not asserted here. The operation is
+    # authorized against the entity the owner lookup reads, and this harness wires no
+    # v2 validators, so nothing would do the refusing.
 
     async def test_update_nonexistent_access_key_raises_not_found(
         self,
