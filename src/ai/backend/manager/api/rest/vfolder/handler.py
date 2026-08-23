@@ -126,10 +126,9 @@ from ai.backend.manager.models.vfolder import (
     VFolderPermissionSetAlias,
     VFolderStatusSet,
 )
+from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
-from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
 from ai.backend.manager.services.auth.actions.resolve_user_scope import (
     PublicResolveUserScopeAction,
 )
@@ -710,16 +709,13 @@ class VFolderHandler:
             new_name,
         )
 
-        updater_spec = VFolderAttributeUpdaterSpec(
-            name=OptionalState[str].update(new_name),
-        )
         await self._vfolder.update_vfolder_attribute.run(
             UpdateVFolderAttributeAction(
                 user_uuid=vfctx.user_uuid,
                 vfolder_uuid=VFolderUUID(row["id"]),
-                updater=Updater(
-                    spec=updater_spec,
-                    pk_value=row["id"],
+                updater=VFolderAttributeUpdater(
+                    vfolder_id=VFolderUUID(row["id"]),
+                    name=OptionalState[str].update(new_name),
                 ),
             )
         )
@@ -759,12 +755,10 @@ class VFolderHandler:
             UpdateVFolderAttributeAction(
                 user_uuid=vfctx.user_uuid,
                 vfolder_uuid=VFolderUUID(row["id"]),
-                updater=Updater(
-                    spec=VFolderAttributeUpdaterSpec(
-                        cloneable=cloneable,
-                        mount_permission=mount_permission,
-                    ),
-                    pk_value=row["id"],
+                updater=VFolderAttributeUpdater(
+                    vfolder_id=VFolderUUID(row["id"]),
+                    cloneable=cloneable,
+                    mount_permission=mount_permission,
                 ),
             )
         )

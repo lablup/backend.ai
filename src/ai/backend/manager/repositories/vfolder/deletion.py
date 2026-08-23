@@ -17,16 +17,16 @@ from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.storage import VFolderGone, VFolderOperationFailed
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder.purgers import (
+    VFolderInvitationBatchPurger,
+    VFolderPermissionBatchPurger,
+)
 from ai.backend.manager.models.vfolder.row import (
     VFolderDeletionInfo,
     is_unmanaged,
     update_vfolder_status,
 )
-from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
-from ai.backend.manager.repositories.vfolder.purgers import (
-    VFolderInvitationBatchPurgerSpec,
-    VFolderPermissionBatchPurgerSpec,
-)
+from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -50,14 +50,9 @@ async def initiate_vfolder_deletion(
         return 0
 
     async with db_engine.begin_session() as db_session:
-        await execute_batch_purger(
-            db_session,
-            BatchPurger(spec=VFolderInvitationBatchPurgerSpec(vfolder_ids=vfolder_ids)),
-        )
-        await execute_batch_purger(
-            db_session,
-            BatchPurger(spec=VFolderPermissionBatchPurgerSpec(vfolder_ids=vfolder_ids)),
-        )
+        ops = V2WriteOps(db_session)
+        await ops.batch_purge_in_global(VFolderInvitationBatchPurger(vfolder_ids=vfolder_ids))
+        await ops.batch_purge_in_global(VFolderPermissionBatchPurger(vfolder_ids=vfolder_ids))
     await update_vfolder_status(
         db_engine,
         vfolder_ids,
