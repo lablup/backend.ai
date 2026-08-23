@@ -8,12 +8,14 @@ from ai.backend.common.dto.storage.request import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.artifact.types import ArtifactStatus
+from ai.backend.manager.data.artifact.types import ArtifactRevisionData, ArtifactStatus
 from ai.backend.manager.errors.artifact import ArtifactNotApproved, ArtifactReadonly
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.object_storage import ObjectStorageOperationNotSupported
+from ai.backend.manager.models.artifact_revision.queriers import ArtifactRevisionQuerier
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
@@ -37,12 +39,14 @@ class ObjectStorageService:
     def __init__(
         self,
         artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
         object_storage_repository: ObjectStorageRepository,
         storage_namespace_repository: StorageNamespaceRepository,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
     ) -> None:
         self._artifact_repository = artifact_repository
+        self._revision_ops = revision_ops
         self._object_storage_repository = object_storage_repository
         self._storage_namespace_repository = storage_namespace_repository
         self._storage_manager = storage_manager
@@ -76,8 +80,8 @@ class ObjectStorageService:
         storage_namespace = await self._storage_namespace_repository.get_by_storage_and_namespace(
             storage_data.id, bucket_name
         )
-        revision_data = await self._artifact_repository.get_artifact_revision_by_id(
-            action.artifact_revision_id
+        revision_data = await self._revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=action.artifact_revision_id)
         )
         artifact_data = await self._artifact_repository.get_artifact_by_id(
             revision_data.artifact_id
@@ -130,8 +134,8 @@ class ObjectStorageService:
             storage_data.id, bucket_name
         )
 
-        revision_data = await self._artifact_repository.get_artifact_revision_by_id(
-            action.artifact_revision_id
+        revision_data = await self._revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=action.artifact_revision_id)
         )
         artifact_data = await self._artifact_repository.get_artifact_by_id(
             revision_data.artifact_id

@@ -2,8 +2,14 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.data.entity.login_session import LoginSessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.auth.actions.base import AuthGlobalAction, UserEntityAction
+from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
+from ai.backend.manager.services.auth.actions.base import AuthGlobalAction
+from ai.backend.manager.services.auth.actions.lookup_login_session_owner import (
+    LookupLoginSessionOwnerAction,
+)
 
 
 @dataclass(frozen=True)
@@ -24,14 +30,14 @@ class GlobalRevokeLoginSessionAction(AuthGlobalAction):
 
 
 @dataclass(frozen=True)
-class RevokeLoginSessionAction(UserEntityAction):
-    """Revoke a login session the named user owns.
+class RevokeLoginSessionAction(BaseSingleFieldAction[LoginSessionID, UserID]):
+    """Revoke one login session, answered for by the user it belongs to.
 
-    The session row belongs to that user, so the operation is an update of the user and
-    is answered for by them; the service rejects a session owned by anyone else.
+    The owner lookup reads that user, so who may revoke the session is decided the way
+    every field operation decides it rather than by comparing ids in the service.
     """
 
-    session_id: UUID
+    session_id: LoginSessionID
 
     @override
     @classmethod
@@ -42,6 +48,10 @@ class RevokeLoginSessionAction(UserEntityAction):
     @classmethod
     def action_name(cls) -> str:
         return "revoke_login_session"
+
+    @override
+    def to_owner_lookup_action(self) -> LookupLoginSessionOwnerAction:
+        return LookupLoginSessionOwnerAction(session_id=self.session_id)
 
 
 @dataclass(frozen=True)

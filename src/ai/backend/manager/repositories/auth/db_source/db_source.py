@@ -20,7 +20,6 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
-    LoginSessionData,
     LoginSessionStatus,
 )
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserCreationData, UserData
@@ -647,19 +646,6 @@ class AuthDBSource:
                 )
             await conn.commit()
             return deleted_tokens
-
-    @auth_db_source_resilience.apply()
-    async def fetch_login_session_by_id(self, session_id: UUID) -> LoginSessionData:
-        """Fetch a single login session by its ID.
-
-        Raises LoginSessionNotFoundError if the session does not exist.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(LoginSessionRow).where(LoginSessionRow.id == session_id)
-            row = await db_session.scalar(query)
-            if row is None:
-                raise LoginSessionNotFoundError(extra_msg=f"Login session not found: {session_id}")
-            return row.to_data()
 
     @auth_db_source_resilience.apply()
     async def delete_session_by_id(

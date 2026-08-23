@@ -13,17 +13,18 @@ from datetime import UTC, datetime
 import pytest
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
+    ArtifactRevisionData,
     ArtifactStatus,
     ArtifactType,
 )
-from ai.backend.manager.errors.artifact import (
-    ArtifactRevisionNotFoundError,
-)
+from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
+from ai.backend.manager.models.artifact_revision.queriers import ArtifactRevisionQuerier
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -53,6 +54,8 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
@@ -354,8 +357,16 @@ class TestArtifactRevisionRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ArtifactRepository, None]:
         """Create ArtifactRepository instance with database"""
-        repo = ArtifactRepository(db=db_with_cleanup)
+        repo = ArtifactRepository(db_with_cleanup)
         yield repo
+
+    @pytest.fixture
+    def revision_ops(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> OpsRepository[ArtifactRevisionData]:
+        """Ops-backed repository for artifact revision reads"""
+        return OpsRepository(V2DBOpsProvider(db_with_cleanup))
 
     # =========================================================================
     # Tests - Get
@@ -364,10 +375,13 @@ class TestArtifactRevisionRepository:
     async def test_get_artifact_revision_by_id(
         self,
         artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
         sample_revision_id: uuid.UUID,
     ) -> None:
         """Test retrieving artifact revision by ID"""
-        revision = await artifact_repository.get_artifact_revision_by_id(sample_revision_id)
+        revision = await revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(sample_revision_id))
+        )
 
         assert revision is not None
         assert revision.id == sample_revision_id
@@ -376,10 +390,13 @@ class TestArtifactRevisionRepository:
     async def test_get_artifact_revision_by_id_not_found(
         self,
         artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
     ) -> None:
         """Test retrieving non-existent artifact revision raises error"""
-        with pytest.raises(ArtifactRevisionNotFoundError):
-            await artifact_repository.get_artifact_revision_by_id(uuid.uuid4())
+        with pytest.raises(EntityNotFoundError):
+            await revision_ops.get_field(
+                ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(uuid.uuid4()))
+            )
 
     async def test_get_artifact_revision(
         self,
@@ -616,6 +633,7 @@ class TestArtifactRevisionRepository:
     async def test_update_artifact_revision_status(
         self,
         artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
         sample_revision_id: uuid.UUID,
     ) -> None:
         """Test updating artifact revision status"""
@@ -626,12 +644,15 @@ class TestArtifactRevisionRepository:
         assert updated_revision_id == sample_revision_id
 
         # Verify status was updated
-        revision = await artifact_repository.get_artifact_revision_by_id(sample_revision_id)
+        revision = await revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(sample_revision_id))
+        )
         assert revision.status == ArtifactStatus.VERIFYING
 
     async def test_update_artifact_revision_bytesize(
         self,
         artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
         sample_revision_id: uuid.UUID,
     ) -> None:
         """Test updating artifact revision byte size"""
@@ -644,12 +665,15 @@ class TestArtifactRevisionRepository:
         assert updated_revision_id == sample_revision_id
 
         # Verify size was updated
-        revision = await artifact_repository.get_artifact_revision_by_id(sample_revision_id)
+        revision = await revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(sample_revision_id))
+        )
         assert revision.size == new_size
 
     async def test_update_artifact_revision_digest(
         self,
         artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
         sample_revision_id: uuid.UUID,
     ) -> None:
         """Test updating artifact revision digest"""
@@ -662,7 +686,9 @@ class TestArtifactRevisionRepository:
         assert updated_revision_id == sample_revision_id
 
         # Verify digest was updated
-        revision = await artifact_repository.get_artifact_revision_by_id(sample_revision_id)
+        revision = await revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(sample_revision_id))
+        )
         assert revision.digest == new_digest
 
     async def test_update_artifact_revision_readme(
@@ -750,6 +776,7 @@ class TestArtifactRevisionRepository:
     async def test_reset_artifact_revision_status(
         self,
         artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
         sample_revision_id: uuid.UUID,
     ) -> None:
         """Test resetting artifact revision status to SCANNED"""
@@ -766,7 +793,9 @@ class TestArtifactRevisionRepository:
         assert reset_revision_id == sample_revision_id
 
         # Verify status was reset to SCANNED
-        revision = await artifact_repository.get_artifact_revision_by_id(sample_revision_id)
+        revision = await revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(sample_revision_id))
+        )
         assert revision.status == ArtifactStatus.SCANNED
 
     async def test_get_artifact_revision_readme(

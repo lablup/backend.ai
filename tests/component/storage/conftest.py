@@ -24,6 +24,8 @@ from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.artifact.revision.actions.lookup_owner import (
@@ -55,6 +57,7 @@ def object_storage_processors(
     storage_namespace_repository = StorageNamespaceRepository(database_engine)
     service = ObjectStorageService(
         artifact_repository=artifact_repository,
+        revision_ops=OpsRepository(V2DBOpsProvider(database_engine)),
         object_storage_repository=object_storage_repository,
         storage_namespace_repository=storage_namespace_repository,
         storage_manager=storage_manager,

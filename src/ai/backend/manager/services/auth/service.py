@@ -567,9 +567,6 @@ class AuthService:
     async def revoke_login_session(
         self, action: RevokeLoginSessionAction
     ) -> RevokeLoginSessionActionResult:
-        session_data = await self._auth_repository.get_login_session_by_id(action.session_id)
-        if session_data.user_id != action.user_id:
-            raise GenericForbidden("You can only revoke your own login sessions.")
         session_token = await self._auth_repository.delete_login_session_by_id(
             action.session_id, LoginAttemptResult.REVOKED_BY_USER
         )
