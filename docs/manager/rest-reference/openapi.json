@@ -59761,7 +59761,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/_/transit-status": {
