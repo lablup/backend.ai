@@ -47,7 +47,9 @@ class DeploymentPresetRepository:
                 )
             if slot_creators is not None:
                 preset_id = data.entity_id()
-                await w.batch_purge_in_global(PresetResourceSlotBatchPurger(preset_id))
+                await w.batch_purge_field_entities_in_global(
+                    PresetResourceSlotBatchPurger(preset_id)
+                )
                 await w.atomic_create_field_entities(preset_id, slot_creators)
             return data
 

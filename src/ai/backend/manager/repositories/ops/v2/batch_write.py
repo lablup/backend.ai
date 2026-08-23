@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import cast
+from collections.abc import Callable, Sequence
+from typing import Any, cast
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.errors.repository import (
     EmptyOperationScopeError,
 )
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.models.specs.purger import DataBatchPurger
+from ai.backend.manager.models.specs.purger import EntityBatchPurger, FieldBatchPurger
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 
@@ -48,32 +50,73 @@ class V2BatchWriteOps(V2WriteOpsBase):
         """
         return await self._batch_update_returning(None, updater)
 
-    async def batch_purge_in_scopes[TRow: Base, TData](
-        self, scopes: Sequence[OperationScope], purger: DataBatchPurger[TRow, TData]
+    async def batch_purge_field_entities_in_scopes[TRow: Base, TData](
+        self, scopes: Sequence[OperationScope], purger: FieldBatchPurger[TRow, TData]
     ) -> list[TData]:
-        """Delete every row the spec selects within ``scopes``; at least one is
-        required. Scope conditions are injected into the selecting subquery.
-
-        Carries no membership work: reserve it for rows that register none until a
-        batch purge that deregisters exists.
-        """
+        """Delete every field row the spec selects within ``scopes``; at least one is
+        required. Scope conditions are injected into the selecting subquery."""
         if not scopes:
             raise EmptyOperationScopeError(
-                "batch_purge_in_scopes requires at least one scope; "
-                "use batch_purge_in_global for an explicit unscoped batch purge."
+                "batch_purge_field_entities_in_scopes requires at least one scope; use "
+                "batch_purge_field_entities_in_global for an explicit unscoped batch purge."
             )
         await self._validate_scope_existence(scopes)
-        return await self._batch_purge_returning(self._scopes_condition(scopes), purger)
+        return await self._batch_purge_returning(
+            self._scopes_condition(scopes),
+            purger.build_subquery,
+            purger.conflict_checks(),
+            purger.to_data,
+        )
 
-    async def batch_purge_in_global[TRow: Base, TData](
-        self, purger: DataBatchPurger[TRow, TData]
+    async def batch_purge_field_entities_in_global[TRow: Base, TData](
+        self, purger: FieldBatchPurger[TRow, TData]
     ) -> list[TData]:
-        """Delete every row the spec selects across the table, with NO scope filter.
+        """Delete every field row the spec selects across the table, with NO scope
+        filter. Same authority requirement as the global search."""
+        return await self._batch_purge_returning(
+            None, purger.build_subquery, purger.conflict_checks(), purger.to_data
+        )
 
-        Same authority requirement as the global search; same membership caveat as
-        :meth:`batch_purge_in_scopes`.
-        """
-        return await self._batch_purge_returning(None, purger)
+    async def batch_purge_entities_in_scopes[TRow: Base, TData](
+        self, scopes: Sequence[OperationScope], purger: EntityBatchPurger[TRow, TData]
+    ) -> list[TData]:
+        """Delete every entity row the spec selects within ``scopes``, each with the
+        RBAC graph it left; at least one scope is required."""
+        if not scopes:
+            raise EmptyOperationScopeError(
+                "batch_purge_entities_in_scopes requires at least one scope; use "
+                "batch_purge_entities_in_global for an explicit unscoped batch purge."
+            )
+        await self._validate_scope_existence(scopes)
+        return await self._batch_purge_entities(self._scopes_condition(scopes), purger)
+
+    async def batch_purge_entities_in_global[TRow: Base, TData](
+        self, purger: EntityBatchPurger[TRow, TData]
+    ) -> list[TData]:
+        """Delete every entity row the spec selects across the table, each with the
+        RBAC graph it left, with NO scope filter. Same authority requirement as the
+        global search."""
+        return await self._batch_purge_entities(None, purger)
+
+    async def _batch_purge_entities[TRow: Base, TData](
+        self,
+        scope_condition: sa.ColumnElement[bool] | None,
+        purger: EntityBatchPurger[TRow, TData],
+    ) -> list[TData]:
+        """The rows go first, then what each left in the graph, so a torn-down entity
+        can never be one whose row survived."""
+        entity_ids: list[EntityIdentifier] = []
+
+        def collect(row: TRow) -> TData:
+            entity_ids.append(purger.entity_id(row))
+            return purger.to_data(row)
+
+        removed = await self._batch_purge_returning(
+            scope_condition, purger.build_subquery, purger.conflict_checks(), collect
+        )
+        for entity_id in entity_ids:
+            await self._teardown_entity(entity_id)
+        return removed
 
     async def _batch_update_returning[TRow: Base, TData](
         self,
@@ -99,20 +142,22 @@ class V2BatchWriteOps(V2WriteOpsBase):
     async def _batch_purge_returning[TRow: Base, TData](
         self,
         scope_condition: sa.ColumnElement[bool] | None,
-        purger: DataBatchPurger[TRow, TData],
+        build_subquery: Callable[[], sa.sql.Select[Any]],
+        conflict_checks: Sequence[ConflictCheck],
+        to_data: Callable[[TRow], TData],
         batch_size: int = 1000,
     ) -> list[TData]:
-        base_subquery = purger.build_subquery()
+        base_subquery = build_subquery()
         entity = base_subquery.column_descriptions[0]["entity"]
         table = sa.inspect(entity).local_table
         pk_columns = list(table.primary_key.columns)
         row_class = cast("type[TRow]", entity)
 
-        await self._validate_conflict_checks(purger.conflict_checks())
+        await self._validate_conflict_checks(conflict_checks)
 
         removed: list[TData] = []
         while True:
-            selecting = purger.build_subquery()
+            selecting = build_subquery()
             if scope_condition is not None:
                 selecting = selecting.where(scope_condition)
             sub = selecting.subquery()
@@ -127,7 +172,7 @@ class V2BatchWriteOps(V2WriteOpsBase):
             except sa.exc.IntegrityError as e:
                 raise self._parse_integrity_error(e) from e
             rows = result.fetchall()
-            removed.extend(purger.to_data(row_class(**dict(r._mapping))) for r in rows)
+            removed.extend(to_data(row_class(**dict(r._mapping))) for r in rows)
             if len(rows) < batch_size:
                 break
         return removed

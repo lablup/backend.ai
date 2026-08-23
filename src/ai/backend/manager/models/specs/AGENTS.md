@@ -23,7 +23,7 @@ and is read through an entity's permission like a field, while belonging to neit
 | Operation | Roots | Why |
 |---|---|---|
 | creator | `GlobalEntityCreator` / `EntityCreator` / `RoleManagedEntityCreator` / `FieldCreator` / `SidecarCreator` | only a create settles what a row belongs to |
-| purger | `EntityPurger` / `FieldPurger` / `GuardedFieldPurger` | removing an entity removes what it left in the graph; a field row splits further on how it is picked: by id, or by id behind a precondition |
+| purger | `EntityPurger` / `EntityBatchPurger` / `FieldPurger` / `GuardedFieldPurger` / `FieldBatchPurger` | removing an entity removes what it left in the graph; a field row splits further on how it is picked: by id, or by id behind a precondition; the batch roots pick by subquery instead of by id |
 | updater | `DataUpdater` / `GuardedDataUpdater` | an update never changes what a row belongs to, so the roots split on how the row is picked: by id, or by id behind a precondition |
 
 The roots are deliberately unrelated. Do NOT extract a common base across them
@@ -71,6 +71,15 @@ joins nothing.
 - The plain entity paths never touch roles, even when matching presets exist.
 - Enrollment writes graph edges only. Granting a joining user the target's auto_assign
   roles is an explicit ops primitive — never an implicit side effect keyed on the type.
+
+## A batch purge says which kind it removes
+
+- `EntityBatchPurger` tears down each deleted row's virtual scope, memberships and
+  permissions, as `EntityPurger` does for one; `FieldBatchPurger` does not, because a
+  field row holds nothing in the graph.
+- The two are unrelated roots, so an entity spec cannot flow through the field path and
+  leave its graph rows behind. There is no unmarked batch purge.
+- `entity_id(row)` takes the row: a batch names a subquery, not an id.
 
 ## Values left for the database to compute
 

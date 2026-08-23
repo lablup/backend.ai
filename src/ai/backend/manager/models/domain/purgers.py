@@ -24,7 +24,7 @@ from ai.backend.manager.models.kernel.row import (
     KernelRow,
 )
 from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.specs.purger import DataBatchPurger, EntityPurger
+from ai.backend.manager.models.specs.purger import EntityPurger, FieldBatchPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.user import UserRow
 
@@ -67,7 +67,7 @@ class DomainPurger(EntityPurger[DomainRow, DomainData]):
 
 
 @dataclass
-class DomainKernelPurger(DataBatchPurger[KernelRow, KernelId]):
+class DomainKernelPurger(FieldBatchPurger[KernelRow, KernelId]):
     """Clears the kernel rows a domain leaves behind, before the domain itself goes.
 
     Kernels stand outside the RBAC graph, so nothing is torn down with them.

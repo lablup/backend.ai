@@ -92,8 +92,8 @@ from ai.backend.manager.models.specs.creator import (
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.purger import (
-    DataBatchPurger,
     EntityPurger,
+    FieldBatchPurger,
     FieldPurger,
 )
 from ai.backend.manager.models.specs.querier import DataQuerier
@@ -365,7 +365,7 @@ class _PresetBatchUpdater(DataBatchUpdater[RolePresetRow, _PresetData]):
 
 
 @dataclass
-class _PresetBatchPurger(DataBatchPurger[RolePresetRow, _PresetData]):
+class _PresetBatchPurger(FieldBatchPurger[RolePresetRow, _PresetData]):
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[RolePresetRow]]:
         return sa.select(RolePresetRow)
@@ -1112,7 +1112,7 @@ class _BatchPurgeAction(BaseScopeAction, BatchPurgeOpsAction[RolePresetRow, _Pre
     scopes: list[OperationScope] = field(default_factory=list)
 
     @override
-    def to_batch_purger(self) -> DataBatchPurger[RolePresetRow, _PresetData]:
+    def to_batch_purger(self) -> FieldBatchPurger[RolePresetRow, _PresetData]:
         return self.purger
 
     @override
@@ -1237,8 +1237,8 @@ def repository(stored: _PresetData) -> MagicMock:
         "atomic_create_field_entities",
         "batch_update_in_scopes",
         "batch_update_in_global",
-        "batch_purge_in_scopes",
-        "batch_purge_in_global",
+        "batch_purge_field_entities_in_scopes",
+        "batch_purge_field_entities_in_global",
     ):
         setattr(mock, operation, AsyncMock(return_value=[stored]))
     for operation in (
@@ -1587,7 +1587,7 @@ async def test_batch_purge_names_what_it_removed(
     )
 
     assert result.entity_ids() == (stored.id,)
-    repository.batch_purge_in_scopes.assert_awaited_once_with([search_scope], purger)
+    repository.batch_purge_field_entities_in_scopes.assert_awaited_once_with([search_scope], purger)
 
 
 async def test_search_forwards_the_searcher_and_its_scopes(

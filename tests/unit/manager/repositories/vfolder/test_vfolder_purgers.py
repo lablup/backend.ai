@@ -238,7 +238,7 @@ class TestVFolderPurgersIntegration:
         # Purge invitations
         async with db_with_cleanup.begin_session() as session:
             purger = VFolderInvitationBatchPurger(vfolder_ids=vfolder_ids)
-            removed = await V2WriteOps(session).batch_purge_in_global(purger)
+            removed = await V2WriteOps(session).batch_purge_field_entities_in_global(purger)
             assert len(removed) == len(sample_invitations)
 
         # Verify invitations are deleted
@@ -262,7 +262,7 @@ class TestVFolderPurgersIntegration:
         # Purge permissions
         async with db_with_cleanup.begin_session() as session:
             purger = VFolderPermissionBatchPurger(vfolder_ids=vfolder_ids)
-            removed = await V2WriteOps(session).batch_purge_in_global(purger)
+            removed = await V2WriteOps(session).batch_purge_field_entities_in_global(purger)
             assert len(removed) == len(sample_permissions)
 
         # Verify permissions are deleted

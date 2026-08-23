@@ -225,7 +225,7 @@ async def execute_purger[TRow: Base](
 class BatchPurgerSpec[TRow: Base](ABC):
     """Abstract base class for defining batch purge targets.
 
-    Deprecated: use ``DataBatchPurger`` in ``models/specs/purger.py``.
+    Deprecated: use ``FieldBatchPurger`` in ``models/specs/purger.py``.
 
     Implementations specify what to delete by providing a subquery
     that selects rows to delete. The table and PK columns are inferred
@@ -253,7 +253,7 @@ class BatchPurgerSpec[TRow: Base](ABC):
 
 
 class DataBatchPurger[TRow: Base, TData](
-    BatchPurgerSpec[TRow], specs_purger.DataBatchPurger[TRow, TData], ABC
+    BatchPurgerSpec[TRow], specs_purger.FieldBatchPurger[TRow, TData], ABC
 ):
     """Legacy-compatible view of the v2 batch purge spec.
 

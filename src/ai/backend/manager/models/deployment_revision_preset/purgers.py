@@ -13,7 +13,7 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
 )
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
-from ai.backend.manager.models.specs.purger import DataBatchPurger, EntityPurger
+from ai.backend.manager.models.specs.purger import EntityPurger, FieldBatchPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
 __all__ = (
@@ -53,7 +53,7 @@ class DeploymentPresetPurger(
         return row.to_data()
 
 
-class PresetResourceSlotBatchPurger(DataBatchPurger[PresetResourceSlotRow, ResourceSlotEntryData]):
+class PresetResourceSlotBatchPurger(FieldBatchPurger[PresetResourceSlotRow, ResourceSlotEntryData]):
     """Clear every slot row of one preset, so an update can restate the whole set."""
 
     _preset_id: DeploymentPresetID

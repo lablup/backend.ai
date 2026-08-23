@@ -10,7 +10,7 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.manager.models.specs.purger import DataBatchPurger
+from ai.backend.manager.models.specs.purger import FieldBatchPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.vfolder.row import (
     VFolderInvitationRow,
@@ -19,7 +19,7 @@ from ai.backend.manager.models.vfolder.row import (
 
 
 @dataclass
-class VFolderInvitationBatchPurger(DataBatchPurger[VFolderInvitationRow, VFolderUUID]):
+class VFolderInvitationBatchPurger(FieldBatchPurger[VFolderInvitationRow, VFolderUUID]):
     """Clears the invitations of the vfolders going away.
 
     Invitations stand outside the RBAC graph, so nothing is torn down with them.
@@ -43,7 +43,7 @@ class VFolderInvitationBatchPurger(DataBatchPurger[VFolderInvitationRow, VFolder
 
 
 @dataclass
-class VFolderPermissionBatchPurger(DataBatchPurger[VFolderPermissionRow, VFolderUUID]):
+class VFolderPermissionBatchPurger(FieldBatchPurger[VFolderPermissionRow, VFolderUUID]):
     """Clears the per-user permission rows of the vfolders going away.
 
     Permission rows stand outside the RBAC graph, so nothing is torn down with them.

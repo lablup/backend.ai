@@ -51,8 +51,12 @@ async def initiate_vfolder_deletion(
         return 0
 
     async with v2_ops_provider.write_ops() as w:
-        await w.batch_purge_in_global(VFolderInvitationBatchPurger(vfolder_ids=vfolder_ids))
-        await w.batch_purge_in_global(VFolderPermissionBatchPurger(vfolder_ids=vfolder_ids))
+        await w.batch_purge_field_entities_in_global(
+            VFolderInvitationBatchPurger(vfolder_ids=vfolder_ids)
+        )
+        await w.batch_purge_field_entities_in_global(
+            VFolderPermissionBatchPurger(vfolder_ids=vfolder_ids)
+        )
     await update_vfolder_status(
         db_engine,
         vfolder_ids,

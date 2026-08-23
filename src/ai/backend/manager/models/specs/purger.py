@@ -117,13 +117,47 @@ class GuardedFieldPurger[TRow: Base, TData: FieldData](ABC):
         raise NotImplementedError
 
 
-class DataBatchPurger[TRow: Base, TData](ABC):
-    """Delete spec for every row a subquery selects, converting each deleted row
+class FieldBatchPurger[TRow: Base, TData](ABC):
+    """Delete spec for every field row a subquery selects, converting each deleted row
     to data so the operation can report what it actually removed.
 
-    Carries no scope teardown: reserve it for rows that provision no scope
-    until a batch purge that tears scopes down exists.
+    A field row holds nothing in the RBAC graph, so the delete is the whole operation —
+    the batch counterpart of :class:`FieldPurger`.
     """
+
+    @abstractmethod
+    def build_subquery(self) -> sa.sql.Select[tuple[TRow]]:
+        """Build the subquery selecting the rows to delete."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        """Return rows that must not exist before deletion (empty if none)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert one deleted row into its ``data/`` type."""
+        raise NotImplementedError
+
+
+class EntityBatchPurger[TRow: Base, TData](ABC):
+    """Delete spec for every entity row a subquery selects; each row's RBAC graph goes
+    with it, as :class:`EntityPurger` does for one.
+
+    Deliberately NOT a :class:`FieldBatchPurger` subtype — the hooks are duplicated
+    instead — so an entity spec cannot flow through the field path and leave its virtual
+    scope, memberships and permissions behind.
+    """
+
+    @abstractmethod
+    def entity_id(self, row: TRow) -> EntityIdentifier:
+        """The id of the entity a deleted row was, read off that row.
+
+        Takes the row because the selection names no id; it answers its own type, so
+        nothing declares the type separately.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def build_subquery(self) -> sa.sql.Select[tuple[TRow]]:

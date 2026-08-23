@@ -21,8 +21,8 @@ from ai.backend.manager.models.specs.creator import (
 )
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.purger import (
-    DataBatchPurger,
     EntityPurger,
+    FieldBatchPurger,
     FieldPurger,
 )
 from ai.backend.manager.models.specs.querier import (
@@ -547,7 +547,7 @@ class BatchPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
     """A hard delete of every row matching a condition within the scopes it names."""
 
     @abstractmethod
-    def to_batch_purger(self) -> DataBatchPurger[TRow, TData]:
+    def to_batch_purger(self) -> FieldBatchPurger[TRow, TData]:
         """Return the batch delete spec this action executes."""
         raise NotImplementedError
 
@@ -561,7 +561,7 @@ class GlobalBatchPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
     """A hard delete of every matching row across the table, with no scope filter."""
 
     @abstractmethod
-    def to_batch_purger(self) -> DataBatchPurger[TRow, TData]:
+    def to_batch_purger(self) -> FieldBatchPurger[TRow, TData]:
         """Return the batch delete spec this action executes."""
         raise NotImplementedError
 
