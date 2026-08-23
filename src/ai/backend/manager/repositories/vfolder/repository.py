@@ -145,6 +145,7 @@ from ai.backend.manager.repositories.base.rbac.revoker import (
     RBACRevoker,
     execute_rbac_revoker,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.repositories.vfolder.purge_guards import find_active_vfolder_references
 from ai.backend.manager.repositories.vfolder.types import (
@@ -177,9 +178,11 @@ class _VFolderWithLinkedModelCards:
 
 class VfolderRepository:
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops_provider
 
     @vfolder_repository_resilience.apply()
     async def get_by_id_validated(
@@ -571,8 +574,8 @@ class VfolderRepository:
         Update VFolder attributes.
         Returns updated VFolderData.
         """
-        async with self._db.begin_session() as session:
-            data = await V2WriteOps(session).update_data(updater)
+        async with self._v2_ops.write_ops() as w:
+            data = await w.update_data(updater)
             if data is None:
                 raise VFolderNotFound()
             return data

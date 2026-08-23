@@ -119,7 +119,7 @@ def vfolder_processors(
     valkey_clients: ValkeyClients,
     processor_registry: ProcessorRegistry[Any],
 ) -> VFolderProcessors:
-    vfolder_repository = VfolderRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
     user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
     service = VFolderService(
         config_provider=config_provider,
@@ -140,7 +140,7 @@ def vfolder_file_processors(
     storage_manager: StorageSessionManager,
     processor_registry: ProcessorRegistry[Any],
 ) -> VFolderFileProcessors:
-    vfolder_repository = VfolderRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
     user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
     service = VFolderFileService(
         config_provider=config_provider,
@@ -157,7 +157,7 @@ def vfolder_invite_processors(
     config_provider: ManagerConfigProvider,
     processor_registry: ProcessorRegistry[Any],
 ) -> VFolderInviteProcessors:
-    vfolder_repository = VfolderRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
     user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
     service = VFolderInviteService(
         config_provider=config_provider,
@@ -175,7 +175,7 @@ def vfolder_sharing_processors(
     config_provider: ManagerConfigProvider,
     processor_registry: ProcessorRegistry[Any],
 ) -> VFolderSharingProcessors:
-    vfolder_repository = VfolderRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
     user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
     service = VFolderSharingService(
         config_provider=config_provider,

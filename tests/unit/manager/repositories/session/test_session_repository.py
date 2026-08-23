@@ -53,6 +53,7 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.testutils.db import with_tables
 
@@ -111,7 +112,7 @@ class TestSessionRepository:
 
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> SessionRepository:
-        return SessionRepository(db_with_cleanup)
+        return SessionRepository(db_with_cleanup, DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def session_with_kernel(
@@ -878,7 +879,9 @@ class TestBatchLoadSessionAllocations:
     ) -> None:
         """Verify the repository aggregate returns values computed from
         resource_allocations, not the empty JSONB column."""
-        repository = SessionRepository(db_with_resource_tables)
+        repository = SessionRepository(
+            db_with_resource_tables, DBOpsProvider(db_with_resource_tables)
+        )
         session_id = SessionId(session_with_allocations.session_id)
         aggregates = await repository.batch_get_resource_allocation_by_session([session_id])
 
@@ -923,7 +926,7 @@ class TestGetTemplateInfoById:
 
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> SessionRepository:
-        return SessionRepository(db_with_cleanup)
+        return SessionRepository(db_with_cleanup, DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def active_template(

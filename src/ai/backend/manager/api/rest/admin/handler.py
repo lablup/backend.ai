@@ -134,6 +134,7 @@ class AdminHandler:
             scheduler_repository=gql_deps.scheduler_repository,
             user_repository=gql_deps.user_repository,
             agent_repository=gql_deps.agent_repository,
+            network_repository=gql_deps.network_repository,
         )
         result = cast(
             ExecutionResult,

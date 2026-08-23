@@ -61,7 +61,7 @@ class ProjectRepository:
         valkey_stat_client: ValkeyStatClient,
         storage_manager: StorageSessionManager,
     ) -> None:
-        self._db_source = ProjectDBSource(db)
+        self._db_source = ProjectDBSource(db, v2_ops_provider)
         self._v2_ops = v2_ops_provider
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client

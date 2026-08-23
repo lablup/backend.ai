@@ -85,6 +85,7 @@ from ai.backend.manager.repositories.ops.rbac.provider import (
     ScopeDeletion,
     ScopeUserMember,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.project.purgers import (
     ProjectEndpointBatchPurgerSpec,
@@ -102,10 +103,12 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class ProjectDBSource:
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
     _rbac_ops_provider: RBACOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops_provider
         self._rbac_ops_provider = RBACOpsProvider(db)
 
     async def _get_domain_id(self, w: RBACWriteOps, domain_name: str) -> DomainID:
@@ -473,6 +476,7 @@ class ProjectDBSource:
         storage_ptask_group = aiotools.PersistentTaskGroup()
         await initiate_vfolder_deletion(
             self._db,
+            self._v2_ops,
             target_vfs,
             storage_manager,
             storage_ptask_group,

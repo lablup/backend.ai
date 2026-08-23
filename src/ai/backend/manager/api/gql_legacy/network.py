@@ -29,8 +29,6 @@ from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.models.network.creators import NetworkCreator
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.ops.repository import OpsRepository
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 from .base import (
     FilterExprArg,
@@ -296,8 +294,7 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
             raise
 
         async def _do_mutate() -> CreateNetwork:
-            ops: OpsRepository[NetworkData] = OpsRepository(V2DBOpsProvider(graph_ctx.db))
-            data = await ops.create_entity(
+            data = await graph_ctx.network_repository.create_entity(
                 NetworkCreator(
                     name=name,
                     ref_name=network_name,

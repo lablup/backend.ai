@@ -24,6 +24,7 @@ def setup_api(
     """
     from ai.backend.manager.api.adapters.registry import Adapters
     from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
+    from ai.backend.manager.repositories.ops.repository import OpsRepository
 
     from .tree import build_api_routes
     from .types import GQLContextDeps
@@ -55,6 +56,7 @@ def setup_api(
         scheduler_repository=r.domain.repositories.scheduler.repository,
         user_repository=r.domain.repositories.user.repository,
         agent_repository=r.domain.repositories.agent.repository,
+        network_repository=OpsRepository(r.domain.repositories.v2_ops_provider),
         strawberry_gql_adapter=BaseGQLAdapter(),
         adapters=adapters,
     )

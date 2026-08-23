@@ -107,6 +107,7 @@ from ai.backend.manager.repositories.ops.rbac.provider import (
     ScopeBatchDeletion,
     ScopeUserMember,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.creators import (
     UserCreateSpec,
     UserScopeCreation,
@@ -129,10 +130,12 @@ class UserDBSource:
     """Database source for user-related operations."""
 
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
     _rbac_ops_provider: RBACOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops_provider
         self._rbac_ops_provider = RBACOpsProvider(db)
 
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
@@ -504,6 +507,7 @@ class UserDBSource:
         storage_ptask_group = aiotools.PersistentTaskGroup()
         await initiate_vfolder_deletion(
             self._db,
+            self._v2_ops,
             target_vfs,
             storage_manager,
             storage_ptask_group,
