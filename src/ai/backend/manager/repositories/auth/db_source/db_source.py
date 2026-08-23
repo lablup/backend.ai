@@ -149,7 +149,7 @@ class AuthDBSource:
             )
             return UserCreationData(
                 user=self._user_row_to_data(result.user_row),
-                keypair=result.keypair_row.to_data(),
+                keypair=result.keypair,
             )
 
     @auth_db_source_resilience.apply()

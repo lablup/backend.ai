@@ -35,7 +35,7 @@ from ai.backend.common.data.permission.types import (
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import RBACTypeConversionError, UnreachableError
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.keypair.types import KeyPairSecrets
+from ai.backend.manager.data.keypair.types import KeyPairData, KeyPairSecrets
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -56,7 +56,8 @@ from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data
+from ai.backend.manager.models.keypair import generate_keypair_data
+from ai.backend.manager.models.keypair.creators import DefaultKeypairCreator
 from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -107,7 +108,6 @@ from ai.backend.manager.repositories.base.rbac.entity_upserter import (
     RBACEntityUpserterResult,
 )
 from ai.backend.manager.repositories.base.rbac.utils import bulk_insert_on_conflict_do_nothing
-from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider, WriteOps
 from ai.backend.manager.repositories.permission_controller.creators import (
     AssociationScopesEntitiesCreatorSpec,
@@ -175,10 +175,10 @@ class FullUserCreation:
 
 @dataclass
 class FullUserCreationResult:
-    """A fully provisioned user: the row and its default keypair, marked as the main one."""
+    """A fully provisioned user: the row and the keypair the user authorizes with."""
 
     user_row: UserRow
-    keypair_row: KeyPairRow
+    keypair: KeyPairData
 
 
 class ScopeMember(ABC):
@@ -984,32 +984,26 @@ class RBACWriteOps(WriteOps):
         """Provision a user end to end in one transaction.
 
         Creates the user scope (row, virtual scope, own-scope roles) and grants those
-        roles, creates the default keypair under the user scope and marks it as the
-        user's main one, then enrolls the user in its domain's and projects'
-        virtual scopes — the domain's model-store projects always included, and
-        ``project_ids`` narrowed to projects that exist in the domain.
+        roles, writes the keypair the user authorizes with, then enrolls the user in
+        its domain's and projects' virtual scopes — the domain's model-store projects
+        always included, and ``project_ids`` narrowed to projects that exist in the
+        domain.
         """
         creation_result = await self.create_scope(full_creation.creation)
         user_row = creation_result.row
         user_id = UserID(user_row.uuid)
         await self.assign_roles_to_user(user_id, creation_result.auto_grant_role_ids)
 
-        kp_result = await self.create_scoped(
-            RBACEntityCreator(
-                spec=KeyPairCreatorSpec(
-                    secrets=full_creation.keypair_secrets or generate_keypair_data(),
-                    user_id=user_row.uuid,
-                    is_active=user_row.status == UserStatus.ACTIVE,
-                    is_admin=user_row.role in (UserRole.SUPERADMIN, UserRole.ADMIN),
-                    is_default=True,
-                    resource_policy=full_creation.keypair_resource_policy,
-                    rate_limit=full_creation.keypair_rate_limit,
-                ),
-                element_type=RBACElementType.KEYPAIR,
-                scope_ref=RBACElementRef(RBACElementType.USER, str(user_row.uuid)),
-            )
+        keypair = await self.create_field(
+            user_id,
+            DefaultKeypairCreator(
+                secrets=full_creation.keypair_secrets or generate_keypair_data(),
+                is_active=user_row.status == UserStatus.ACTIVE,
+                is_admin=user_row.role in (UserRole.SUPERADMIN, UserRole.ADMIN),
+                resource_policy=full_creation.keypair_resource_policy,
+                rate_limit=full_creation.keypair_rate_limit,
+            ),
         )
-        keypair_row = kp_result.row
 
         member = ScopeUserMember(user_id=user_id)
         domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=full_creation.domain_id)
@@ -1032,7 +1026,7 @@ class RBACWriteOps(WriteOps):
         await self._sess.flush()
         await self._sess.refresh(user_row)
         await self._sess.refresh(user_row, ["default_keypair"])
-        return FullUserCreationResult(user_row=user_row, keypair_row=keypair_row)
+        return FullUserCreationResult(user_row=user_row, keypair=keypair)
 
     async def _domain_member_project_ids(
         self,
