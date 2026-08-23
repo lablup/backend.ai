@@ -13,7 +13,6 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     CIStrEnum,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -237,8 +236,6 @@ class ResourceInfo:
     agent: str | None
     agent_addr: str | None
     container_id: str | None
-    occupied_slots: ResourceSlot
-    requested_slots: ResourceSlot
     occupied_shares: dict[str, Any]
     attached_devices: dict[str, Any]
     resource_opts: dict[str, Any]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
+from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -23,10 +24,12 @@ from ai.backend.common.types import (
     AgentId,
     BinarySize,
     KernelId,
+    ResourceSlot,
     SessionId,
 )
 from ai.backend.manager.api.gql_legacy.stat_converter import LegacyLiveStatConverter
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import (
@@ -43,6 +46,9 @@ from ai.backend.manager.models.minilang.queryfilter import (
     QueryFilterParser,
 )
 from ai.backend.manager.models.project import groups
+from ai.backend.manager.models.resource_slot.aggregates import (
+    batch_load_kernel_allocations,
+)
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.services.metric.actions.batch_get_kernel_live_stats import (
     BatchGetKernelLiveStatsAction,
@@ -83,6 +89,15 @@ async def _batch_load_kernel_live_stat(
     )
     converted = LegacyLiveStatConverter.convert(kernel_ids, action_result.stats)
     return [converted.get(kid) for kid in kernel_ids]
+
+
+async def _batch_load_kernel_allocations(
+    ctx: GraphQueryContext,
+    kernel_ids: Sequence[KernelId],
+) -> list[ResourceAllocationAggregate]:
+    async with ctx.db.begin_readonly_session() as db_session:
+        aggregates = await batch_load_kernel_allocations(db_session, kernel_ids)
+    return [aggregates.get(kid) or ResourceAllocationAggregate.empty() for kid in kernel_ids]
 
 
 class KernelNode(graphene.ObjectType):  # type: ignore[misc]
@@ -186,7 +201,6 @@ class KernelNode(graphene.ObjectType):  # type: ignore[misc]
             terminated_at=row.terminated_at,
             starts_at=row.starts_at,
             scheduled_at=status_history.get(KernelStatus.SCHEDULED.name),
-            occupied_slots=row.occupied_slots.to_json(),
             agent_id=row.agent if not hide_agents else None,
             agent_addr=row.agent_addr if not hide_agents else None,
             container_id=row.container_id if not hide_agents else None,
@@ -211,6 +225,14 @@ class KernelNode(graphene.ObjectType):  # type: ignore[misc]
             graph_ctx, _batch_load_kernel_live_stat
         )
         return cast(dict[str, Any] | None, await loader.load(self.row_id))
+
+    async def resolve_occupied_slots(self, info: graphene.ResolveInfo) -> Mapping[str, str]:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, _batch_load_kernel_allocations
+        )
+        aggregate = cast(ResourceAllocationAggregate, await loader.load(self.row_id))
+        return aggregate.used.to_json()
 
 
 class KernelConnection(Connection):
@@ -301,7 +323,6 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
             "terminated_at": row.terminated_at,
             "starts_at": row.starts_at,
             "scheduled_at": status_history.get(KernelStatus.SCHEDULED.name),
-            "occupied_slots": row.occupied_slots.to_json(),
             # resources
             "agent": row.agent if not hide_agents else None,
             "agent_addr": row.agent_addr if not hide_agents else None,
@@ -331,6 +352,14 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
 
     async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         return await self.resolve_live_stat(info)
+
+    async def resolve_occupied_slots(self, info: graphene.ResolveInfo) -> Mapping[str, str]:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, _batch_load_kernel_allocations
+        )
+        aggregate = cast(ResourceAllocationAggregate, await loader.load(self.id))
+        return aggregate.used.to_json()
 
     async def resolve_abusing_report(
         self,
@@ -627,6 +656,33 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
     async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         return await self.resolve_live_stat(info)
 
+    async def _resolve_occupied_slots(self, info: graphene.ResolveInfo) -> ResourceSlot:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, _batch_load_kernel_allocations
+        )
+        aggregate = cast(ResourceAllocationAggregate, await loader.load(self.id))
+        return aggregate.used
+
+    async def resolve_occupied_slots(self, info: graphene.ResolveInfo) -> Mapping[str, str]:
+        return (await self._resolve_occupied_slots(info)).to_json()
+
+    async def resolve_mem_slot(self, info: graphene.ResolveInfo) -> int:
+        occupied = await self._resolve_occupied_slots(info)
+        return int(BinarySize.from_str(occupied.get("mem", Decimal(0)))) // (2**20)
+
+    async def resolve_cpu_slot(self, info: graphene.ResolveInfo) -> float:
+        occupied = await self._resolve_occupied_slots(info)
+        return float(occupied.get("cpu", 0))
+
+    async def resolve_gpu_slot(self, info: graphene.ResolveInfo) -> float:
+        occupied = await self._resolve_occupied_slots(info)
+        return float(occupied.get("cuda.device", 0))
+
+    async def resolve_tpu_slot(self, info: graphene.ResolveInfo) -> float:
+        occupied = await self._resolve_occupied_slots(info)
+        return float(occupied.get("tpu.device", 0))
+
     async def _resolve_legacy_metric(
         self,
         info: graphene.ResolveInfo,
@@ -699,7 +755,6 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
             raise DataTransformationFailed("Legacy compute session row is None")
         from ai.backend.manager.models.user import UserRole
 
-        mega = 2**20
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
         if is_superadmin:
             hide_agents = False
@@ -730,7 +785,6 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
             "startup_command": row.startup_command,
             "result": row.result.name,
             "service_ports": row.service_ports,
-            "occupied_slots": row.occupied_slots.to_json(),
             "resource_opts": row.resource_opts,
             "num_queries": row.num_queries,
             # optionally hidden
@@ -752,10 +806,6 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
             "io_cur_scratch_size": 0,
             "lang": row.image,
             "occupied_shares": row.occupied_shares,
-            "mem_slot": BinarySize.from_str(row.occupied_slots.get("mem", 0)) // mega,
-            "cpu_slot": float(row.occupied_slots.get("cpu", 0)),
-            "gpu_slot": float(row.occupied_slots.get("cuda.device", 0)),
-            "tpu_slot": float(row.occupied_slots.get("tpu.device", 0)),
         }
 
     @classmethod

@@ -339,7 +339,7 @@ class SessionAdapter(BaseAdapter):
 
         result = await self._processors.session.enqueue_session.run(action)
         return EnqueueSessionPayload(
-            session=self._session_data_to_node(result.session_data),
+            session=(await self._session_data_to_nodes([result.session_data]))[0],
         )
 
     # -------------------------------------------------------------------------
@@ -435,7 +435,7 @@ class SessionAdapter(BaseAdapter):
         action_result = await self._processors.session.get_session.run(
             GetSessionAction(session_id=SessionID(session_id))
         )
-        return self._session_data_to_node(action_result.session_data)
+        return (await self._session_data_to_nodes([action_result.session_data]))[0]
 
     # -------------------------------------------------------------------------
     # Batch load (DataLoader)
@@ -455,8 +455,9 @@ class SessionAdapter(BaseAdapter):
         action_result = await self._processors.session.search_sessions.run(
             SearchSessionsAction(querier=querier, user_id=UserID(self._require_user_id()))
         )
+        nodes = await self._session_data_to_nodes(action_result.data)
         session_map: dict[SessionId, SessionNode] = {
-            SessionId(data.id): self._session_data_to_node(data) for data in action_result.data
+            SessionId(data.id): node for data, node in zip(action_result.data, nodes, strict=True)
         }
         return [session_map.get(session_id) for session_id in session_ids]
 
@@ -476,8 +477,9 @@ class SessionAdapter(BaseAdapter):
         action_result = await self._processors.session.search_kernels.run(
             SearchKernelsAction(querier=querier, user_id=UserID(self._require_user_id()))
         )
+        nodes = await self._kernel_infos_to_nodes(action_result.data)
         kernel_map: dict[KernelId, KernelNode] = {
-            info.id: self._kernel_info_to_node(info) for info in action_result.data
+            info.id: node for info, node in zip(action_result.data, nodes, strict=True)
         }
         return [kernel_map.get(kernel_id) for kernel_id in kernel_ids]
 
@@ -539,6 +541,26 @@ class SessionAdapter(BaseAdapter):
             self._aggregate_to_allocation_dto(action_result.data.get(kid)) for kid in kernel_ids
         ]
 
+    async def _session_data_to_nodes(self, data: Sequence[SessionData]) -> list[SessionNode]:
+        """Convert session data to nodes, batch-loading their slot allocations."""
+        allocations = await self.batch_resource_allocation_by_session([
+            SessionId(item.id) for item in data
+        ])
+        return [
+            self._session_data_to_node(item, allocation)
+            for item, allocation in zip(data, allocations, strict=True)
+        ]
+
+    async def _kernel_infos_to_nodes(self, data: Sequence[KernelInfo]) -> list[KernelNode]:
+        """Convert kernel infos to nodes, batch-loading their slot allocations."""
+        allocations = await self.batch_resource_allocation_by_kernel([
+            KernelId(item.id) for item in data
+        ])
+        return [
+            self._kernel_info_to_node(item, allocation)
+            for item, allocation in zip(data, allocations, strict=True)
+        ]
+
     # -------------------------------------------------------------------------
     # Session search
     # -------------------------------------------------------------------------
@@ -567,7 +589,7 @@ class SessionAdapter(BaseAdapter):
         )
 
         return AdminSearchSessionsPayload(
-            items=[self._session_data_to_node(item) for item in action_result.data],
+            items=await self._session_data_to_nodes(action_result.data),
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -600,7 +622,7 @@ class SessionAdapter(BaseAdapter):
         )
 
         return AdminSearchSessionsPayload(
-            items=[self._session_data_to_node(item) for item in action_result.data],
+            items=await self._session_data_to_nodes(action_result.data),
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -634,7 +656,7 @@ class SessionAdapter(BaseAdapter):
             SearchSessionsAction(querier=querier, user_id=UserID(user.user_id))
         )
         return AdminSearchSessionsPayload(
-            items=[self._session_data_to_node(item) for item in action_result.data],
+            items=await self._session_data_to_nodes(action_result.data),
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -663,7 +685,7 @@ class SessionAdapter(BaseAdapter):
             SearchSessionsInProjectAction(scope=scope, querier=querier)
         )
         return AdminSearchSessionsPayload(
-            items=[self._session_data_to_node(item) for item in action_result.data],
+            items=await self._session_data_to_nodes(action_result.data),
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -695,7 +717,7 @@ class SessionAdapter(BaseAdapter):
             SearchSessionsAction(querier=querier, user_id=UserID(self._require_user_id()))
         )
         return AdminSearchSessionsPayload(
-            items=[self._session_data_to_node(item) for item in action_result.data],
+            items=await self._session_data_to_nodes(action_result.data),
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -827,7 +849,7 @@ class SessionAdapter(BaseAdapter):
         )
 
         return AdminSearchKernelsPayload(
-            items=[self._kernel_info_to_node(item) for item in action_result.data],
+            items=await self._kernel_infos_to_nodes(action_result.data),
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -860,7 +882,7 @@ class SessionAdapter(BaseAdapter):
         )
 
         return AdminSearchKernelsPayload(
-            items=[self._kernel_info_to_node(item) for item in action_result.data],
+            items=await self._kernel_infos_to_nodes(action_result.data),
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -893,7 +915,7 @@ class SessionAdapter(BaseAdapter):
         )
 
         return AdminSearchKernelsPayload(
-            items=[self._kernel_info_to_node(item) for item in action_result.data],
+            items=await self._kernel_infos_to_nodes(action_result.data),
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -1079,7 +1101,9 @@ class SessionAdapter(BaseAdapter):
                 owner_access_key=AccessKey(access_key),
             )
             result = await self._processors.session.rename_session.run(action)
-            return UpdateSessionPayload(session=self._session_data_to_node(result.session_data))
+            return UpdateSessionPayload(
+                session=(await self._session_data_to_nodes([result.session_data]))[0]
+            )
         # If no fields to update, just return the current session
         session_node = await self.get(SessionId(session_id))
         return UpdateSessionPayload(session=session_node)
@@ -1089,19 +1113,9 @@ class SessionAdapter(BaseAdapter):
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def _session_data_to_node(data: SessionData) -> SessionNode:
-        requested = ResourceSlotInfo(
-            entries=[
-                ResourceSlotEntryInfo(resource_type=k, quantity=Decimal(str(v)))
-                for k, v in (data.requested_slots or {}).items()
-            ]
-        )
-        occupied = ResourceSlotInfo(
-            entries=[
-                ResourceSlotEntryInfo(resource_type=k, quantity=Decimal(str(v)))
-                for k, v in (data.occupying_slots or {}).items()
-            ]
-        )
+    def _session_data_to_node(
+        data: SessionData, allocation: ResourceAllocationGQLDTO
+    ) -> SessionNode:
         environ = (
             EnvironmentVariablesInfoDTO(
                 entries=[
@@ -1131,7 +1145,7 @@ class SessionAdapter(BaseAdapter):
                 tag=data.tag,
             ),
             resource=SessionResourceInfoGQLDTO(
-                allocation=ResourceAllocationGQLDTO(requested=requested, used=occupied),
+                allocation=allocation,
                 resource_group_name=data.resource_group_name,
             ),
             lifecycle=SessionLifecycleInfoGQLDTO(
@@ -1157,19 +1171,7 @@ class SessionAdapter(BaseAdapter):
         )
 
     @staticmethod
-    def _kernel_info_to_node(info: KernelInfo) -> KernelNode:
-        requested = ResourceSlotInfo(
-            entries=[
-                ResourceSlotEntryInfo(resource_type=k, quantity=Decimal(v))
-                for k, v in info.resource.requested_slots.to_json().items()
-            ]
-        )
-        occupied = ResourceSlotInfo(
-            entries=[
-                ResourceSlotEntryInfo(resource_type=k, quantity=Decimal(v))
-                for k, v in info.resource.occupied_slots.to_json().items()
-            ]
-        )
+    def _kernel_info_to_node(info: KernelInfo, allocation: ResourceAllocationGQLDTO) -> KernelNode:
         shares = ResourceSlotInfo(
             entries=[
                 ResourceSlotEntryInfo(resource_type=k, quantity=Decimal(str(v)))
@@ -1216,7 +1218,7 @@ class SessionAdapter(BaseAdapter):
                 agent_id=info.resource.agent,
                 resource_group_name=info.resource.resource_group,
                 container_id=info.resource.container_id,
-                allocation=ResourceAllocationGQLDTO(requested=requested, used=occupied),
+                allocation=allocation,
                 shares=shares,
                 resource_opts=resource_opts,
             ),
