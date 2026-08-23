@@ -14,9 +14,9 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.errors.common import (
     GenericForbidden,
     ObjectNotFound,
@@ -26,13 +26,11 @@ from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.network import NetworkRow
+from ai.backend.manager.models.network.creators import NetworkCreator
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    execute_rbac_entity_creator,
-)
-from ai.backend.manager.repositories.network.creators import NetworkCreatorSpec
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 from .base import (
     FilterExprArg,
@@ -121,6 +119,21 @@ class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
             options=row.options,
             created_at=row.created_at,
             updated_at=row.updated_at,
+        )
+
+    @classmethod
+    def from_data(cls, data: NetworkData) -> NetworkNode:
+        return cls(
+            id=data.id,
+            row_id=data.id,
+            name=data.name,
+            ref_name=data.ref_name,
+            driver=data.driver,
+            project=data.project_id,
+            domain_name=data.domain_name,
+            options=data.options,
+            created_at=data.created_at,
+            updated_at=data.updated_at,
         )
 
     async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> NetworkNode:
@@ -283,28 +296,22 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
             raise
 
         async def _do_mutate() -> CreateNetwork:
-            async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
-                rbac_creator = RBACEntityCreator(
-                    spec=NetworkCreatorSpec(
-                        name=name,
-                        ref_name=network_name,
-                        driver=_driver,
-                        domain_name=project.domain_name,
-                        project_id=project.id,
-                        options=network_info.options,
-                    ),
-                    element_type=RBACElementType.NETWORK,
-                    scope_ref=RBACElementRef(
-                        element_type=RBACElementType.PROJECT,
-                        element_id=str(project.id),
-                    ),
+            ops: OpsRepository[NetworkData] = OpsRepository(V2DBOpsProvider(graph_ctx.db))
+            data = await ops.create_entity(
+                NetworkCreator(
+                    name=name,
+                    ref_name=network_name,
+                    driver=_driver,
+                    domain_name=project.domain_name,
+                    project_id=ProjectID(project.id),
+                    options=network_info.options,
                 )
-                result = await execute_rbac_entity_creator(db_session, rbac_creator)
-                return CreateNetwork(
-                    ok=True,
-                    msg="Network created",
-                    network=NetworkNode.from_row(result.row),
-                )
+            )
+            return CreateNetwork(
+                ok=True,
+                msg="Network created",
+                network=NetworkNode.from_data(data),
+            )
 
         return await gql_mutation_wrapper(CreateNetwork, _do_mutate)
 
