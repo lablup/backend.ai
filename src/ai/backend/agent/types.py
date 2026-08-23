@@ -42,6 +42,7 @@ class AgentBackend(enum.StrEnum):
     DUMMY = "dummy"
     CONTAINERD = "containerd"
     ENROOT = "enroot"
+    SINGULARITY = "singularity"
 
 
 class AbstractAgentDiscovery(ABC):

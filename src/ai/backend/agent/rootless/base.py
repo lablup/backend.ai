@@ -151,6 +151,30 @@ def write_layer(rootfs: Path, layer_path: Path) -> str:
     return f"sha256:{diff.hexdigest()}"
 
 
+def force_rmtree(path: Path) -> None:
+    """``rmtree`` that also removes directories it cannot descend into.
+
+    overlayfs creates its own ``work/work`` with mode ``0000``, and ``shutil.rmtree`` cannot
+    scandir that even when it owns it — so a plain ``ignore_errors=True`` silently leaves the whole
+    tree behind (measured end-to-end: every container leaked its overlay, holding everything it had
+    written). We own these paths, so restore traversal permission on the way down and then remove.
+
+    Retrying from ``rmtree``'s own error hook is not an option: its fd-based implementation hands
+    the hook ``os.open``, which cannot be re-invoked with a path alone.
+
+    Whatever survives is swallowed, matching the ``ignore_errors=True`` this replaces — a reclaim
+    that cannot finish must not take down the teardown around it.
+    """
+    if not path.exists():
+        return
+    # topdown, so each directory is made traversable before the walk tries to descend into it.
+    for parent, dirnames, _ in os.walk(path, topdown=True, onerror=lambda _e: None):
+        for dirname in dirnames:
+            with contextlib.suppress(OSError):
+                Path(parent, dirname).chmod(0o700)
+    shutil.rmtree(path, ignore_errors=True)
+
+
 class RootlessOciRuntime(OciRuntime):
     """Shared implementation for the daemonless rootless backends. See the module docstring."""
 
@@ -410,7 +434,7 @@ class RootlessOciRuntime(OciRuntime):
         # log on disk forever, since nothing else ever revisits that path.
         await asyncio.to_thread(unlink_log_files, self._log_path(container_id))
         # ...and the two-phase gate (pause.sh + the `go` FIFO) under the per-container state dir.
-        await asyncio.to_thread(shutil.rmtree, self._state_path / container_id, ignore_errors=True)
+        await asyncio.to_thread(force_rmtree, self._state_path / container_id)
         await asyncio.to_thread(self._remove_cgroup, container_id)
         self._specs.pop(container_id, None)
         self._commands.pop(container_id, None)
