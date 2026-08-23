@@ -16,6 +16,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.types import ConflictCheck
 
 
@@ -65,6 +66,46 @@ class FieldPurger[TRow: Base, TData: FieldData](ABC):
     @abstractmethod
     def target_id_value(self) -> UUID:
         """Return the id of the field row to delete."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        raise NotImplementedError
+
+
+class GuardedFieldPurger[TRow: Base, TData: FieldData](ABC):
+    """Delete spec of a field row that declines to delete unless its guard holds.
+
+    The id still names exactly one row. The guard is a precondition on that row's
+    current values, carried in the statement so the read and the delete cannot part
+    ways.
+    """
+
+    @abstractmethod
+    def row_class(self) -> type[TRow]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        """Return the column carrying the field id, which the delete keys on."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def target_id_value(self) -> UUID:
+        """Return the id of the field row to delete."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def guard_conditions(self) -> list[QueryCondition]:
+        """Return the preconditions the row must satisfy (AND combined).
+
+        They narrow nothing: the row is already named. A row failing them is left
+        alone and the operation reports that it removed nothing.
+        """
         raise NotImplementedError
 
     @abstractmethod

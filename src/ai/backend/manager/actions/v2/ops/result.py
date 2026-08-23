@@ -37,6 +37,7 @@ __all__ = (
     "FieldsOpsResult",
     "BulkFieldOpsResult",
     "FieldOwnerLookupOpsResult",
+    "FieldKeyLookupOpsResult",
     "EntitiesOpsResult",
     "BulkOpsResult",
     "BatchOpsResult",
@@ -109,6 +110,22 @@ class FieldOwnerLookupOpsResult(BaseLookupActionResult):
     name the RBAC target and the audit row of the operation that follows.
     """
 
+    owner_entity_id: EntityIdentifier
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.owner_entity_id
+
+
+@dataclass
+class FieldKeyLookupOpsResult(BaseLookupActionResult):
+    """The id of the field row a key names, alongside the entity owning it.
+
+    The row's id is what the operation that follows names it by; the owner is what this
+    run is recorded against, since a field row is not an entity.
+    """
+
+    field_id: FieldIdentifier
     owner_entity_id: EntityIdentifier
 
     @override

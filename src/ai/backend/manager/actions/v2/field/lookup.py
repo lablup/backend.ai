@@ -3,11 +3,17 @@ from abc import ABC, abstractmethod
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
 from ai.backend.manager.actions.v2.ops.backend import OpsBackendAction
-from ai.backend.manager.models.specs.lookup import FieldOwnerKeyLookup, FieldOwnerLookup
+from ai.backend.manager.models.specs.lookup import (
+    FieldKeyLookup,
+    FieldOwnerKeyLookup,
+    FieldOwnerLookup,
+)
 
 __all__ = (
+    "FieldKeyLookupOpsAction",
     "FieldOwnerKeyLookupOpsAction",
     "FieldOwnerLookupOpsAction",
+    "LookupFieldByKeyOpsAction",
     "LookupFieldOwnerByKeyOpsAction",
     "LookupFieldOwnerOpsAction",
 )
@@ -61,3 +67,25 @@ class LookupFieldOwnerByKeyOpsAction[TOwnerID: EntityIdentifier](
     BaseLookupAction, FieldOwnerKeyLookupOpsAction[TOwnerID], ABC
 ):
     """The owner resolution seen as what it is: the field row's key is the external key."""
+
+
+class FieldKeyLookupOpsAction[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](
+    OpsBackendAction
+):
+    """A read of the field row a caller-facing key names, and of the entity owning it.
+
+    What turns a request carrying an access key or a name into the row id every
+    operation naming that row takes. The owner comes back with it because a field row is
+    not an entity, so the run has to be recorded against something.
+    """
+
+    @abstractmethod
+    def to_field_lookup(self) -> FieldKeyLookup[TFieldID, TOwnerID]:
+        """Return the spec this action executes."""
+        raise NotImplementedError
+
+
+class LookupFieldByKeyOpsAction[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](
+    BaseLookupAction, FieldKeyLookupOpsAction[TFieldID, TOwnerID], ABC
+):
+    """The row resolution seen as what it is: the field row's key is the external key."""

@@ -22,6 +22,7 @@ from ai.backend.manager.actions.v2.field.bulk_lookup import (
     LookupBulkFieldOwnerOpsAction,
 )
 from ai.backend.manager.actions.v2.field.lookup import (
+    FieldKeyLookupOpsAction,
     FieldOwnerKeyLookupOpsAction,
     FieldOwnerLookupOpsAction,
 )
@@ -69,6 +70,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedFieldOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
+    FieldKeyLookupOpsResult,
     FieldOwnerLookupOpsResult,
     FieldsOpsResult,
     LookupOpsResult,
@@ -83,6 +85,7 @@ __all__ = (
     "BulkOwnedFieldGetService",
     "LookupService",
     "BulkFieldOwnerLookupService",
+    "FieldKeyLookupService",
     "FieldOwnerKeyLookupService",
     "FieldOwnerLookupService",
     "SearchService",
@@ -201,6 +204,19 @@ class FieldOwnerKeyLookupService:
     async def execute(self, action: FieldOwnerKeyLookupOpsAction[Any]) -> FieldOwnerLookupOpsResult:
         owner_entity_id = await self._repository.field_owner_by_key(action.to_owner_lookup())
         return FieldOwnerLookupOpsResult(owner_entity_id=owner_entity_id)
+
+
+class FieldKeyLookupService:
+    """Reads the id of the field row a key names, and of the entity that owns it."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: FieldKeyLookupOpsAction[Any, Any]) -> FieldKeyLookupOpsResult:
+        field_id, owner_entity_id = await self._repository.field_by_key(action.to_field_lookup())
+        return FieldKeyLookupOpsResult(field_id=field_id, owner_entity_id=owner_entity_id)
 
 
 class BulkFieldOwnerLookupService:

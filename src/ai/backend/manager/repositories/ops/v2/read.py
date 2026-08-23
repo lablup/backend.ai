@@ -16,6 +16,7 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.lookup import (
     DataLookup,
+    FieldKeyLookup,
     FieldOwnerKeyLookup,
     FieldOwnerLookup,
 )
@@ -93,6 +94,20 @@ class V2ReadOps(V2OpsBase):
                 "A field owner key matched more than one row, so it is not a key."
             )
         return lookup.to_entity_id(rows[0][0])
+
+    async def lookup_field_by_key[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](
+        self, lookup: FieldKeyLookup[TFieldID, TOwnerID]
+    ) -> tuple[TFieldID, TOwnerID] | None:
+        """Read the field row the key names and the entity owning it; ``None`` if
+        nothing matches."""
+        rows = (await self._sess.execute(lookup.build_query().limit(2))).all()
+        if not rows:
+            return None
+        if len(rows) > 1:
+            raise AmbiguousEntityKeyError(
+                "A field row key matched more than one row, so it is not a key."
+            )
+        return lookup.to_field_id(rows[0][0]), lookup.to_entity_id(rows[0][1])
 
     async def query_owned_fields[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
         self,

@@ -17,21 +17,19 @@ from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityRef, ScopeRef
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE, UserID
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import (
-    GeneratedKeyPairData,
     KeyPairCreator,
     KeyPairData,
 )
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
@@ -58,7 +56,6 @@ from ai.backend.manager.models.kernel import (
 )
 from ai.backend.manager.models.keypair import (
     KeyPairRow,
-    generate_keypair_data,
     keypairs,
 )
 from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
@@ -101,15 +98,10 @@ from ai.backend.manager.repositories.base.creator import (
     Creator,
 )
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    execute_rbac_entity_creator,
-)
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityBatchPurger,
 )
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
-from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
     FullUserCreation,
@@ -745,7 +737,8 @@ class UserDBSource:
     async def _switch_default_keypair(
         self, session: SASession, user_id: UserID, access_key: str
     ) -> None:
-        """Move the default marker onto ``access_key``.
+        """Move the default marker onto ``access_key``, which must still be an active
+        key of the user.
 
         Clearing the previous marker needs its own statement: a partial unique index
         allows a user only one marked keypair.
@@ -755,11 +748,20 @@ class UserDBSource:
             .where((KeyPairRow.user == user_id) & KeyPairRow.is_default)
             .values(is_default=False)
         )
-        await session.execute(
+        switched = await session.scalar(
             sa.update(KeyPairRow)
-            .where((KeyPairRow.user == user_id) & (KeyPairRow.access_key == access_key))
+            .where(
+                (KeyPairRow.user == user_id)
+                & (KeyPairRow.access_key == access_key)
+                & KeyPairRow.is_active
+            )
             .values(is_default=True)
+            .returning(KeyPairRow.access_key)
         )
+        if switched is None:
+            # The target stopped being an active key of the user between the two
+            # statements; the same transaction carries the cleared marker back.
+            raise KeyPairForbidden("The access key is no longer an active key of this user.")
 
     async def _sync_keypair_roles(
         self, session: SASession, user_uuid: UUID, new_role: UserRole
@@ -1127,19 +1129,10 @@ class UserDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def issue_my_keypair(self, user_uuid: UUID) -> GeneratedKeyPairData:
-        """Issue a new keypair for the current user, inheriting settings from the default keypair."""
-        async with self._db.begin_session() as session:
-            user_row = (
-                await session.scalars(
-                    sa.select(UserRow)
-                    .where(UserRow.uuid == user_uuid)
-                    .options(load_only(UserRow.email))
-                )
-            ).first()
-            if not user_row:
-                raise UserNotFound(f"User {user_uuid} not found")
-
+    async def keypair_settings_to_inherit(self, user_uuid: UUID) -> KeyPairCreator:
+        """The settings a newly issued keypair takes from the user's default keypair,
+        falling back to the marked resource policy when they have none."""
+        async with self._db.begin_readonly_session() as session:
             default_kp_row = (
                 await session.scalars(
                     sa.select(KeyPairRow)
@@ -1147,51 +1140,18 @@ class UserDBSource:
                     .options(noload("*"))
                 )
             ).first()
-
-            # A new keypair follows the user's existing default, or the marked policy.
-            fallback_policy = await self._default_keypair_resource_policy(session)
-            kp_spec = KeyPairCreatorSpec(
-                secrets=generate_keypair_data(),
-                user_id=user_uuid,
+            if default_kp_row is None:
+                return KeyPairCreator(
+                    is_active=True,
+                    is_admin=False,
+                    resource_policy=await self._default_keypair_resource_policy(session),
+                )
+            return KeyPairCreator(
                 is_active=True,
-                is_admin=default_kp_row.is_admin if default_kp_row else False,
-                is_default=False,
-                resource_policy=(
-                    default_kp_row.resource_policy if default_kp_row else fallback_policy
-                ),
-                rate_limit=default_kp_row.rate_limit if default_kp_row else None,
+                is_admin=default_kp_row.is_admin,
+                resource_policy=default_kp_row.resource_policy,
+                rate_limit=default_kp_row.rate_limit,
             )
-            rbac_kp_creator = RBACEntityCreator(
-                spec=kp_spec,
-                element_type=RBACElementType.KEYPAIR,
-                scope_ref=RBACElementRef(
-                    element_type=RBACElementType.USER,
-                    element_id=str(user_uuid),
-                ),
-            )
-            result = await execute_rbac_entity_creator(session, rbac_kp_creator)
-            return GeneratedKeyPairData(keypair=result.row.to_data())
-
-    async def revoke_my_keypair(self, user_uuid: UUID, access_key: str) -> None:
-        """Revoke a keypair owned by the current user."""
-        async with self._db.begin_session() as session:
-            kp_row = (
-                await session.scalars(
-                    sa.select(KeyPairRow)
-                    .where(KeyPairRow.access_key == access_key)
-                    .options(noload("*"))
-                )
-            ).first()
-            if not kp_row:
-                raise KeyPairNotFound(f"Keypair {access_key} not found")
-            if kp_row.user != user_uuid:
-                raise KeyPairForbidden("Cannot revoke another user's keypair")
-            if kp_row.is_default:
-                raise KeyPairForbidden(
-                    "Cannot revoke the default access key. Switch the default access key first."
-                )
-
-            await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
 
     async def switch_default_access_key(self, user_id: UserID, access_key: AccessKey) -> None:
         """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
@@ -1223,27 +1183,6 @@ class UserDBSource:
 
             await self._switch_default_keypair(session, user_id, access_key)
 
-    async def update_my_keypair(self, user_uuid: UUID, updater: Updater[KeyPairRow]) -> KeyPairData:
-        """Update a keypair owned by the current user."""
-        access_key = str(updater.pk_value)
-        async with self._db.begin_session() as session:
-            # Use a scalar-only query to avoid loading the full ORM object into the
-            # session identity map. Loading the full row here would cause execute_updater's
-            # UPDATE...RETURNING to return the stale cached object instead of the fresh
-            # post-update values.
-            user_of_keypair = await session.scalar(
-                sa.select(KeyPairRow.user).where(KeyPairRow.access_key == access_key)
-            )
-            if user_of_keypair is None:
-                raise KeyPairNotFound(f"Keypair {access_key} not found")
-            if user_of_keypair != user_uuid:
-                raise KeyPairForbidden("Cannot update another user's keypair")
-
-            update_result = await execute_updater(session, updater)
-            if update_result is None:
-                raise KeyPairNotFound(f"Keypair {access_key} not found after update")
-            return update_result.row.to_data()
-
     async def search_my_keypairs(
         self,
         scope: UserKeypairOperationScope,
@@ -1269,64 +1208,6 @@ class UserDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def admin_create_keypair(
-        self, user_id: UUID, creator: KeyPairCreator
-    ) -> GeneratedKeyPairData:
-        """Admin creates a keypair for a given user."""
-        async with self._db.begin_session() as session:
-            if not await session.scalar(sa.select(sa.exists().where(UserRow.uuid == user_id))):
-                raise UserNotFound(f"User {user_id} not found")
-
-            kp_spec = KeyPairCreatorSpec(
-                secrets=generate_keypair_data(),
-                user_id=user_id,
-                is_active=creator.is_active,
-                is_admin=creator.is_admin,
-                is_default=False,
-                resource_policy=creator.resource_policy,
-                rate_limit=creator.rate_limit,
-            )
-            rbac_kp_creator = RBACEntityCreator(
-                spec=kp_spec,
-                element_type=RBACElementType.KEYPAIR,
-                scope_ref=RBACElementRef(
-                    element_type=RBACElementType.USER,
-                    element_id=str(user_id),
-                ),
-            )
-            result = await execute_rbac_entity_creator(session, rbac_kp_creator)
-            return GeneratedKeyPairData(keypair=result.row.to_data())
-
-    async def admin_update_keypair(self, updater: Updater[KeyPairRow]) -> KeyPairData:
-        """Admin updates any keypair by access key."""
-        access_key = str(updater.pk_value)
-        async with self._db.begin_session() as session:
-            update_result = await execute_updater(session, updater)
-            if update_result is None:
-                raise KeyPairNotFound(f"Keypair {access_key} not found")
-            return update_result.row.to_data()
-
-    async def admin_delete_keypair(self, access_key: str) -> None:
-        """Admin deletes any keypair by access key."""
-        async with self._db.begin_session() as session:
-            kp_row = (
-                await session.scalars(
-                    sa.select(KeyPairRow)
-                    .where(KeyPairRow.access_key == access_key)
-                    .options(
-                        load_only(KeyPairRow.access_key, KeyPairRow.user, KeyPairRow.is_default)
-                    )
-                )
-            ).first()
-            if not kp_row:
-                raise KeyPairNotFound(f"Keypair {access_key} not found")
-            if kp_row.is_default:
-                raise KeyPairForbidden(
-                    "Cannot delete a keypair set as the user's default access key."
-                )
-
-            await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
-
     async def admin_search_keypairs(
         self,
         querier: BatchQuerier,
@@ -1342,6 +1223,18 @@ class UserDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def keypair(self, keypair_id: KeyPairID) -> KeyPairData:
+        """Read one keypair by its id."""
+        async with self._db.begin_readonly_session() as db_session:
+            kp_row = (
+                await db_session.scalars(
+                    sa.select(KeyPairRow).where(KeyPairRow.id == keypair_id).options(noload("*"))
+                )
+            ).first()
+            if not kp_row:
+                raise KeyPairNotFound(f"Keypair {keypair_id} not found")
+            return kp_row.to_data()
 
     async def admin_get_keypair(self, access_key: str) -> KeyPairData:
         """Admin retrieves a single keypair by access key."""

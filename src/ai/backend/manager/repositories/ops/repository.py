@@ -30,6 +30,7 @@ from ai.backend.manager.models.specs.creator import (
 )
 from ai.backend.manager.models.specs.lookup import (
     DataLookup,
+    FieldKeyLookup,
     FieldOwnerKeyLookup,
     FieldOwnerLookup,
 )
@@ -146,6 +147,20 @@ class OpsRepository[TData]:
         if owner is None:
             raise EntityNotFoundError("No field row matches the given key")
         return owner
+
+    async def field_by_key[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](
+        self, lookup: FieldKeyLookup[TFieldID, TOwnerID]
+    ) -> tuple[TFieldID, TOwnerID]:
+        """Read the field row the key names and its owner, raising if nothing matches.
+
+        A lookup has to produce an id, so an absent row cannot be reported by returning
+        ``None`` — the same contract the other lookups keep.
+        """
+        async with self._ops.read_ops() as r:
+            resolved = await r.lookup_field_by_key(lookup)
+        if resolved is None:
+            raise EntityNotFoundError("No field row matches the given key")
+        return resolved
 
     async def search_in_scopes(
         self,

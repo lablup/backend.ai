@@ -10,6 +10,7 @@ from uuid import UUID
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDInMatchSpec
@@ -119,7 +120,6 @@ from ai.backend.manager.models.user.scopes import (
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.keypair.updaters import KeyPairUpdaterSpec
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
@@ -131,19 +131,20 @@ from ai.backend.manager.services.user.actions.delete_user import DeleteUserActio
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminCreateKeypairAction,
-    AdminDeleteKeypairAction,
     AdminDeleteSSHKeypairAction,
-    AdminGetKeypairAction,
     AdminGetSSHKeypairAction,
     AdminRegisterSSHKeypairAction,
     AdminSearchKeypairsAction,
-    AdminUpdateKeypairAction,
     GetDefaultKeypairsAction,
+    GetKeypairAction,
     IssueMyKeypairAction,
-    RevokeMyKeypairAction,
+    PurgeKeypairAction,
     SearchMyKeypairsAction,
     SwitchDefaultAccessKeyAction,
-    UpdateMyKeypairAction,
+    UpdateKeypairAction,
+)
+from ai.backend.manager.services.user.actions.lookup_keypair import (
+    LookupKeypairByAccessKeyAction,
 )
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupKeypairOwnerByAccessKeyAction,
@@ -700,24 +701,17 @@ class UserAdapter(BaseAdapter):
             secret_key=str(result.generated_data.keypair.secret_key),
         )
 
-    async def revoke_my_keypair(self, user_id: UUID, access_key: str) -> RevokeMyKeypairPayload:
+    async def revoke_my_keypair(self, access_key: str) -> RevokeMyKeypairPayload:
         """Revoke a keypair owned by the current user."""
-        result = await self._processors.user.revoke_my_keypair.run(
-            RevokeMyKeypairAction(user_id=UserID(user_id), access_key=access_key)
-        )
-        return RevokeMyKeypairPayload(success=result.success)
+        await self._purge_keypair(access_key)
+        return RevokeMyKeypairPayload(success=True)
 
-    async def update_my_keypair(
-        self, user_id: UUID, access_key: str, is_active: bool
-    ) -> UpdateMyKeypairPayload:
+    async def update_my_keypair(self, access_key: str, is_active: bool) -> UpdateMyKeypairPayload:
         """Update a keypair owned by the current user."""
-        result = await self._processors.user.update_my_keypair.run(
-            UpdateMyKeypairAction(
-                user_id=UserID(user_id),
-                updater=Updater(
-                    spec=KeyPairUpdaterSpec(is_active=OptionalState.update(is_active)),
-                    pk_value=access_key,
-                ),
+        result = await self._processors.user.update_keypair.run(
+            UpdateKeypairAction(
+                keypair_id=await self._resolve_keypair(access_key),
+                is_active=OptionalState.update(is_active),
             )
         )
         return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
@@ -821,55 +815,43 @@ class UserAdapter(BaseAdapter):
         )
         return UserID(result.entity_id())
 
+    async def _resolve_keypair(self, access_key: str) -> KeyPairID:
+        """The id of the keypair an access key names, which every operation on that row
+        is built from."""
+        result = await self._processors.user.lookup_keypair.run(
+            LookupKeypairByAccessKeyAction(access_key=AccessKey(access_key))
+        )
+        return KeyPairID(result.field_id)
+
+    async def _purge_keypair(self, access_key: str) -> str:
+        result = await self._processors.user.purge_keypair.run(
+            PurgeKeypairAction(keypair_id=await self._resolve_keypair(access_key))
+        )
+        return str(result.keypair.access_key)
+
     async def admin_update_keypair(
         self, input: AdminUpdateKeypairInput
     ) -> AdminUpdateKeypairPayload:
         """Admin updates any keypair."""
-        updater_spec = KeyPairUpdaterSpec(
-            is_active=(
-                OptionalState.update(input.is_active)
-                if input.is_active is not None
-                else OptionalState.nop()
-            ),
-            is_admin=(
-                OptionalState.update(input.is_admin)
-                if input.is_admin is not None
-                else OptionalState.nop()
-            ),
-            resource_policy=(
-                OptionalState.update(input.resource_policy)
-                if input.resource_policy is not None
-                else OptionalState.nop()
-            ),
-            rate_limit=(
-                OptionalState.update(input.rate_limit)
-                if input.rate_limit is not None
-                else OptionalState.nop()
-            ),
-        )
-        updater: Updater[KeyPairRow] = Updater(spec=updater_spec, pk_value=input.access_key)
-        result = await self._processors.user.admin_update_keypair.run(
-            AdminUpdateKeypairAction(
-                user_id=await self._resolve_keypair_owner(input.access_key), updater=updater
+        result = await self._processors.user.update_keypair.run(
+            UpdateKeypairAction(
+                keypair_id=await self._resolve_keypair(input.access_key),
+                is_active=OptionalState.from_nullable(input.is_active),
+                is_admin=OptionalState.from_nullable(input.is_admin),
+                resource_policy=OptionalState.from_nullable(input.resource_policy),
+                rate_limit=OptionalState.from_nullable(input.rate_limit),
             )
         )
         return AdminUpdateKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
     async def admin_delete_keypair(self, access_key: str) -> AdminDeleteKeypairPayload:
         """Admin deletes any keypair."""
-        result = await self._processors.user.admin_delete_keypair.run(
-            AdminDeleteKeypairAction(
-                user_id=await self._resolve_keypair_owner(access_key), access_key=access_key
-            )
-        )
-        return AdminDeleteKeypairPayload(access_key=result.access_key)
+        return AdminDeleteKeypairPayload(access_key=await self._purge_keypair(access_key))
 
     async def admin_get_keypair(self, access_key: str) -> KeypairNode:
         """Admin retrieves a single keypair by access key."""
-        result = await self._processors.user.admin_get_keypair.run(
-            AdminGetKeypairAction(
-                user_id=await self._resolve_keypair_owner(access_key), access_key=access_key
-            )
+        result = await self._processors.user.get_keypair.run(
+            GetKeypairAction(keypair_id=await self._resolve_keypair(access_key))
         )
         return self._keypair_data_to_node(result.keypair)
 

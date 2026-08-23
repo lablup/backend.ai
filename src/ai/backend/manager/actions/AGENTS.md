@@ -60,6 +60,14 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   entity ids only.
 - A row that is gone ends at the lookup, whose record carries the key in
   `lookup_kind` / `lookup_key`.
+- A request naming the row by a caller-facing key — an access key, a name — resolves
+  that key into the row's id first (`LookupFieldByKeyOpsAction`). A field action takes
+  the row's id, never the key.
+- That lookup answers with the owner's id beside the row's, because a field row is not
+  an entity and the run still has to be recorded against something. The action that
+  follows runs its own owner lookup; the key lookup gates on authentication alone.
+- Do NOT resolve the owner in the adapter and pass it to a `single_entity` action. That
+  is the field shape written by hand, and it lets the owner and the row part ways.
 
 ## Wiring
 

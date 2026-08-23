@@ -50,6 +50,7 @@ from ai.backend.manager.actions.v2.field.bulk_processor import (
     OwnerBulkLookupProcessor,
 )
 from ai.backend.manager.actions.v2.field.lookup import (
+    LookupFieldByKeyOpsAction,
     LookupFieldOwnerByKeyOpsAction,
     LookupFieldOwnerOpsAction,
 )
@@ -111,6 +112,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityWithFieldsOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
+    FieldKeyLookupOpsResult,
     FieldOwnerLookupOpsResult,
     LookupOpsResult,
     ScopedBatchOpsResult,
@@ -140,6 +142,7 @@ from ai.backend.manager.services.ops.service import (
     EntityPartialBulkPurgeService,
     EntityPurgeService,
     EntityUpsertService,
+    FieldKeyLookupService,
     FieldOwnerKeyLookupService,
     FieldOwnerLookupService,
     GetService,
@@ -462,6 +465,25 @@ class ProcessorGroup[TData: EntityData]:
         self._record(action_cls, ActionKind.LOOKUP, ActionGate.PERMISSION, ActionBacking.GENERIC)
         return LookupActionProcessor(
             FieldOwnerKeyLookupService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.lookup, *monitors),
+            validators=self._deps.validators.lookup,
+            post_validators=(),
+        )
+
+    def key_field_lookup_ops[TAction: LookupFieldByKeyOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        monitors: Sequence[LookupActionMonitor] = (),
+    ) -> LookupActionProcessor[TAction, FieldKeyLookupOpsResult]:
+        """The field row a caller-facing key names, and the entity owning it.
+
+        Authentication is the only gate, as with every lookup: the operation naming the
+        resolved row is checked against the owner its own lookup reads.
+        """
+        self._record(action_cls, ActionKind.LOOKUP, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return LookupActionProcessor(
+            FieldKeyLookupService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.lookup, *monitors),
             validators=self._deps.validators.lookup,
             post_validators=(),
