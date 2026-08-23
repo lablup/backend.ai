@@ -87,21 +87,12 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_group.conditions import ResourceGroupConditions
+from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
 from ai.backend.manager.models.resource_group.orders import ResourceGroupOrders
+from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
+from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.resource_group.creators import ResourceGroupCreatorSpec
-from ai.backend.manager.repositories.resource_group.purgers import ResourceGroupNamePurgerSpec
-from ai.backend.manager.repositories.resource_group.updaters import (
-    ResourceGroupMetadataUpdaterSpec,
-    ResourceGroupNetworkConfigUpdaterSpec,
-    ResourceGroupSchedulerConfigUpdaterSpec,
-    ResourceGroupStatusUpdaterSpec,
-    ResourceGroupUpdaterSpec,
-)
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.resource_group.actions.create import CreateResourceGroupAction
 from ai.backend.manager.services.resource_group.actions.get_allowed_domains_for_rg import (
@@ -109,12 +100,6 @@ from ai.backend.manager.services.resource_group.actions.get_allowed_domains_for_
 )
 from ai.backend.manager.services.resource_group.actions.get_allowed_projects_for_rg import (
     GetAllowedProjectsForResourceGroupAction,
-)
-from ai.backend.manager.services.resource_group.actions.get_allowed_rgs_for_domain import (
-    GetAllowedResourceGroupsForDomainAction,
-)
-from ai.backend.manager.services.resource_group.actions.get_allowed_rgs_for_project import (
-    GetAllowedResourceGroupsForProjectAction,
 )
 from ai.backend.manager.services.resource_group.actions.get_resource_info import (
     GetResourceInfoAction,
@@ -134,6 +119,12 @@ from ai.backend.manager.services.resource_group.actions.replace_default_session_
 )
 from ai.backend.manager.services.resource_group.actions.resolve_resource_group_ids_by_names import (
     ResolveResourceGroupIDsByNamesAction,
+)
+from ai.backend.manager.services.resource_group.actions.scoped_search import (
+    DomainResourceGroupScopeItem,
+    ProjectResourceGroupScopeItem,
+    ResourceGroupScopeItem,
+    ScopedSearchResourceGroupsAction,
 )
 from ai.backend.manager.services.resource_group.actions.update import UpdateResourceGroupAction
 from ai.backend.manager.services.resource_group.actions.update_allowed_domains_for_rg import (
@@ -389,9 +380,9 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Pydantic payload containing the created resource group node.
         """
-        creator_spec = ResourceGroupCreatorSpec(
+        creator = ResourceGroupCreator(
             name=input.name,
-            # ResourceGroupCreatorSpec requires driver and scheduler fields
+            # ResourceGroupCreator requires driver and scheduler fields
             # which are not exposed in CreateResourceGroupInput.
             # Default to "static" driver and "fifo" scheduler as reasonable defaults.
             driver="static",
@@ -400,7 +391,6 @@ class ResourceGroupAdapter(BaseAdapter):
             is_active=True,
             is_default=input.is_default,
         )
-        creator = Creator(spec=creator_spec)
         action_result = await self._processors.resource_group.create_resource_group.run(
             CreateResourceGroupAction(creator=creator)
         )
@@ -423,15 +413,14 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Pydantic payload containing the updated resource group node.
         """
-        status_spec = ResourceGroupStatusUpdaterSpec(
+        updater = ResourceGroupUpdater(
+            resource_group_id=await self._resolve_resource_group_id(name),
             is_active=(
                 OptionalState.update(input.is_active)
                 if input.is_active is not None
                 else OptionalState.nop()
             ),
             is_default=OptionalState.from_nullable(input.is_default),
-        )
-        metadata_spec = ResourceGroupMetadataUpdaterSpec(
             description=(
                 TriState.nullify()
                 if input.description is SENTINEL
@@ -442,15 +431,8 @@ class ResourceGroupAdapter(BaseAdapter):
                 )
             ),
         )
-        updater_spec = ResourceGroupUpdaterSpec(
-            status=status_spec,
-            metadata=metadata_spec,
-        )
-        updater = Updater(spec=updater_spec, pk_value=name)
         action_result = await self._processors.resource_group.update_resource_group.run(
-            UpdateResourceGroupAction(
-                resource_group_id=await self._resolve_resource_group_id(name), updater=updater
-            )
+            UpdateResourceGroupAction(resource_group_id=updater.resource_group_id, updater=updater)
         )
 
         return UpdateResourceGroupPayload(
@@ -589,46 +571,6 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Payload DTO containing the updated resource group.
         """
-        status_spec = ResourceGroupStatusUpdaterSpec(
-            is_active=(
-                OptionalState.update(input.is_active)
-                if input.is_active is not None
-                else OptionalState.nop()
-            ),
-            is_public=(
-                OptionalState.update(input.is_public)
-                if input.is_public is not None
-                else OptionalState.nop()
-            ),
-            is_default=OptionalState.from_nullable(input.is_default),
-        )
-
-        metadata_spec = ResourceGroupMetadataUpdaterSpec(
-            description=(
-                TriState.update(input.description)
-                if input.description is not None
-                else TriState.nop()
-            ),
-        )
-
-        network_spec = ResourceGroupNetworkConfigUpdaterSpec(
-            wsproxy_addr=(
-                TriState.update(input.app_proxy_addr)
-                if input.app_proxy_addr is not None
-                else TriState.nop()
-            ),
-            wsproxy_api_token=(
-                TriState.update(input.appproxy_api_token)
-                if input.appproxy_api_token is not None
-                else TriState.nop()
-            ),
-            use_host_network=(
-                OptionalState.update(input.use_host_network)
-                if input.use_host_network is not None
-                else OptionalState.nop()
-            ),
-        )
-
         scheduler_value: str | None = None
         if input.scheduler_type is not None:
             scheduler_value = SchedulerType(input.scheduler_type).value
@@ -648,7 +590,39 @@ class ResourceGroupAdapter(BaseAdapter):
                 )
             )
 
-        scheduler_spec = ResourceGroupSchedulerConfigUpdaterSpec(
+        updater = ResourceGroupUpdater(
+            resource_group_id=await self._resolve_resource_group_id(input.resource_group_name),
+            is_active=(
+                OptionalState.update(input.is_active)
+                if input.is_active is not None
+                else OptionalState.nop()
+            ),
+            is_public=(
+                OptionalState.update(input.is_public)
+                if input.is_public is not None
+                else OptionalState.nop()
+            ),
+            is_default=OptionalState.from_nullable(input.is_default),
+            description=(
+                TriState.update(input.description)
+                if input.description is not None
+                else TriState.nop()
+            ),
+            wsproxy_addr=(
+                TriState.update(input.app_proxy_addr)
+                if input.app_proxy_addr is not None
+                else TriState.nop()
+            ),
+            wsproxy_api_token=(
+                TriState.update(input.appproxy_api_token)
+                if input.appproxy_api_token is not None
+                else TriState.nop()
+            ),
+            use_host_network=(
+                OptionalState.update(input.use_host_network)
+                if input.use_host_network is not None
+                else OptionalState.nop()
+            ),
             scheduler=(
                 OptionalState.update(scheduler_value)
                 if scheduler_value is not None
@@ -657,17 +631,9 @@ class ResourceGroupAdapter(BaseAdapter):
             preemption_config=preemption_config_state,
         )
 
-        updater_spec = ResourceGroupUpdaterSpec(
-            status=status_spec,
-            metadata=metadata_spec,
-            network=network_spec,
-            scheduler=scheduler_spec,
-        )
-        updater = Updater(spec=updater_spec, pk_value=input.resource_group_name)
-
         action_result = await self._processors.resource_group.update_resource_group.run(
             UpdateResourceGroupAction(
-                resource_group_id=await self._resolve_resource_group_id(input.resource_group_name),
+                resource_group_id=updater.resource_group_id,
                 updater=updater,
             )
         )
@@ -687,11 +653,8 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Pydantic node representing the purged resource group.
         """
-        purger = Purger(spec=ResourceGroupNamePurgerSpec(name=name))
         action_result = await self._processors.resource_group.purge_resource_group.run(
-            PurgeResourceGroupAction(
-                resource_group_id=await self._resolve_resource_group_id(name), purger=purger
-            )
+            PurgeResourceGroupAction(resource_group_id=await self._resolve_resource_group_id(name))
         )
 
         return self._data_to_detail_node(action_result.data)
@@ -802,27 +765,40 @@ class ResourceGroupAdapter(BaseAdapter):
         )
         return AllowedProjectsPayload(items=result.allowed_projects)
 
+    async def _scoped_resource_group_names(self, item: ResourceGroupScopeItem) -> list[str]:
+        """Read the resource groups one scope reaches, by name."""
+        result = await self._processors.resource_group.scoped_search_resource_groups.run(
+            ScopedSearchResourceGroupsAction(
+                items=[item],
+                searcher=ResourceGroupSearcher(
+                    pagination=NoPagination(),
+                    orders=[ResourceGroupOrders.name()],
+                ),
+            )
+        )
+        return [data.name for data in result.items]
+
     async def get_allowed_resource_groups_for_domain(
         self,
         domain_name: str,
     ) -> AllowedResourceGroupsPayload:
         """Get allowed resource groups for a domain."""
-        result = await self._processors.resource_group.get_allowed_rgs_for_domain.run(
-            GetAllowedResourceGroupsForDomainAction(
-                domain_id=await self._resolve_domain_id(domain_name), domain_name=domain_name
+        return AllowedResourceGroupsPayload(
+            items=await self._scoped_resource_group_names(
+                DomainResourceGroupScopeItem(domain_id=await self._resolve_domain_id(domain_name))
             )
         )
-        return AllowedResourceGroupsPayload(items=result.items)
 
     async def get_allowed_resource_groups_for_project(
         self,
         project_id: UUID,
     ) -> AllowedResourceGroupsPayload:
         """Get allowed resource groups for a project."""
-        result = await self._processors.resource_group.get_allowed_rgs_for_project.run(
-            GetAllowedResourceGroupsForProjectAction(project_id=ProjectID(project_id))
+        return AllowedResourceGroupsPayload(
+            items=await self._scoped_resource_group_names(
+                ProjectResourceGroupScopeItem(project_id=ProjectID(project_id))
+            )
         )
-        return AllowedResourceGroupsPayload(items=result.items)
 
     async def get_allowed_domains_for_resource_group(
         self,

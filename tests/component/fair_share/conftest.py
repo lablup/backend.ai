@@ -44,6 +44,7 @@ from ai.backend.manager.models.virtual_scope.entity_membership import EntityMemb
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
 from ai.backend.manager.services.fair_share.service import FairShareService
@@ -90,7 +91,9 @@ def resource_group_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
 ) -> ResourceGroupProcessors:
-    service = ResourceGroupService(ResourceGroupRepository(database_engine))
+    service = ResourceGroupService(
+        ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
+    )
     return ResourceGroupProcessors(
         processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service
     )

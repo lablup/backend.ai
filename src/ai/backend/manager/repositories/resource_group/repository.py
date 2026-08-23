@@ -21,20 +21,23 @@ from ai.backend.manager.data.resource_group.types import (
     ResourceInfo,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
+from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.resource_group import (
     ResourceGroupForDomainRow,
     ResourceGroupForKeypairsRow,
     ResourceGroupForProjectRow,
-    ResourceGroupRow,
 )
+from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
+from ai.backend.manager.models.resource_group.purgers import ResourceGroupPurger
+from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
-from ai.backend.manager.repositories.base.purger import BatchPurger, Purger
+from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.base.purger import BatchPurger
 from ai.backend.manager.repositories.base.rbac.scope_binder import RBACScopeBinder
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
     RBACScopeEntityUnbinder,
 )
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 from .db_source import ResourceGroupDBSource
 
@@ -64,23 +67,27 @@ class ResourceGroupRepository:
     """Repository for resource group-related data access."""
 
     _db_source: ResourceGroupDBSource
+    _v2_ops: V2DBOpsProvider
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
     ) -> None:
         self._db_source = ResourceGroupDBSource(db)
+        self._v2_ops = v2_ops_provider
 
     @resource_group_repository_resilience.apply()
     async def create_resource_group(
         self,
-        creator: Creator[ResourceGroupRow],
+        creator: ResourceGroupCreator,
     ) -> ResourceGroupData:
-        """Creates a new resource group.
+        """Register a resource group as the scope it becomes.
 
-        Raises ScalingGroupConflict if a resource group with the same name already exists.
+        Raises ResourceGroupConflict if a resource group with the same name already exists.
         """
-        return await self._db_source.create_resource_group(creator)
+        async with self._v2_ops.write_ops() as w:
+            return await w.create_role_managed_entity(creator)
 
     @resource_group_repository_resilience.apply()
     async def search_resource_groups(
@@ -123,24 +130,37 @@ class ResourceGroupRepository:
     @resource_group_repository_resilience.apply()
     async def purge_resource_group(
         self,
-        purger: Purger[ResourceGroupRow],
+        resource_group_id: ResourceGroupID,
     ) -> ResourceGroupData:
-        """Purges a resource group and all related sessions, routes, endpoints, and kernels.
+        """Remove a resource group and the scope it was.
 
-        Raises ScalingGroupNotFound if resource group doesn't exist.
+        Rows that reference the group are not touched: a group still holding sessions,
+        kernels, endpoints or agents fails on the foreign key.
+
+        Raises ResourceGroupNotFound if the resource group does not exist.
         """
-        return await self._db_source.purge_resource_group(purger)
+        async with self._v2_ops.write_ops() as w:
+            data = await w.purge_entity(ResourceGroupPurger(resource_group_id=resource_group_id))
+            if data is None:
+                raise ResourceGroupNotFound(f"Resource group not found (id:{resource_group_id})")
+            return data
 
     @resource_group_repository_resilience.apply()
     async def update_resource_group(
         self,
-        updater: Updater[ResourceGroupRow],
+        updater: ResourceGroupUpdater,
     ) -> ResourceGroupData:
-        """Updates an existing resource group.
+        """Edit an existing resource group.
 
-        Raises ScalingGroupNotFound if the resource group does not exist.
+        Raises ResourceGroupNotFound if the resource group does not exist.
         """
-        return await self._db_source.update_resource_group(updater)
+        async with self._v2_ops.write_ops() as w:
+            data = await w.update_data(updater)
+            if data is None:
+                raise ResourceGroupNotFound(
+                    f"Resource group not found (id:{updater.resource_group_id})"
+                )
+            return data
 
     @resource_group_repository_resilience.apply()
     async def replace_default_deployment_options(
@@ -335,20 +355,6 @@ class ResourceGroupRepository:
             add=add,
             remove=remove,
         )
-
-    async def get_allowed_resource_groups_for_domain(
-        self,
-        domain_name: str,
-    ) -> list[str]:
-        """Get allowed resource group names for a domain."""
-        return await self._db_source.get_allowed_resource_groups_for_domain(domain_name)
-
-    async def get_allowed_resource_groups_for_project(
-        self,
-        project_id: UUID,
-    ) -> list[str]:
-        """Get allowed resource group names for a project."""
-        return await self._db_source.get_allowed_resource_groups_for_project(project_id)
 
     async def get_allowed_domains_for_resource_group(
         self,

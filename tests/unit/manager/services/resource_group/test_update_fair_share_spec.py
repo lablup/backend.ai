@@ -150,9 +150,7 @@ class TestValidation:
 
         # Verify repository called with correct spec
         call_args = mock_repository.update_resource_group.call_args
-        saved_spec: FairShareResourceGroupSpec = call_args[0][
-            0
-        ].spec.fair_share.fair_share_spec.value()
+        saved_spec: FairShareResourceGroupSpec = call_args[0][0].fair_share_spec.value()
         assert saved_spec.resource_weights["cpu"] == expected_weights_cpu_mem["cpu"]
         assert saved_spec.resource_weights["mem"] == expected_weights_cpu_mem["mem"]
 
@@ -345,9 +343,7 @@ class TestFiltering:
 
         # Verify repository called with filtered weights
         call_args = mock_repository.update_resource_group.call_args
-        saved_spec: FairShareResourceGroupSpec = call_args[0][
-            0
-        ].spec.fair_share.fair_share_spec.value()
+        saved_spec: FairShareResourceGroupSpec = call_args[0][0].fair_share_spec.value()
         assert "cpu" in saved_spec.resource_weights
         assert "cuda.device" not in saved_spec.resource_weights  # filtered out
 
@@ -394,9 +390,7 @@ class TestFiltering:
 
         # Verify all weights preserved
         call_args = mock_repository.update_resource_group.call_args
-        saved_spec: FairShareResourceGroupSpec = call_args[0][
-            0
-        ].spec.fair_share.fair_share_spec.value()
+        saved_spec: FairShareResourceGroupSpec = call_args[0][0].fair_share_spec.value()
         assert saved_spec.resource_weights["cpu"] == Decimal("1.0")
         assert saved_spec.resource_weights["mem"] == Decimal("0.5")
 
@@ -429,9 +423,7 @@ class TestFiltering:
 
         # Verify all weights cleared
         call_args = mock_repository.update_resource_group.call_args
-        saved_spec: FairShareResourceGroupSpec = call_args[0][
-            0
-        ].spec.fair_share.fair_share_spec.value()
+        saved_spec: FairShareResourceGroupSpec = call_args[0][0].fair_share_spec.value()
         assert len(saved_spec.resource_weights) == 0
 
         assert result is not None
@@ -496,9 +488,7 @@ class TestMerge:
 
         # Verify merged weights
         call_args = mock_repository.update_resource_group.call_args
-        saved_spec: FairShareResourceGroupSpec = call_args[0][
-            0
-        ].spec.fair_share.fair_share_spec.value()
+        saved_spec: FairShareResourceGroupSpec = call_args[0][0].fair_share_spec.value()
         assert saved_spec.resource_weights["cpu"] == Decimal("1.0")  # preserved
         assert saved_spec.resource_weights["mem"] == Decimal("0.5")  # added
 
@@ -534,9 +524,7 @@ class TestMerge:
 
         # Verify updated weight
         call_args = mock_repository.update_resource_group.call_args
-        saved_spec: FairShareResourceGroupSpec = call_args[0][
-            0
-        ].spec.fair_share.fair_share_spec.value()
+        saved_spec: FairShareResourceGroupSpec = call_args[0][0].fair_share_spec.value()
         assert saved_spec.resource_weights["cpu"] == Decimal("2.0")  # updated
 
         assert result is not None
@@ -571,9 +559,7 @@ class TestMerge:
 
         # Verify cpu deleted, mem preserved
         call_args = mock_repository.update_resource_group.call_args
-        saved_spec: FairShareResourceGroupSpec = call_args[0][
-            0
-        ].spec.fair_share.fair_share_spec.value()
+        saved_spec: FairShareResourceGroupSpec = call_args[0][0].fair_share_spec.value()
         assert "cpu" not in saved_spec.resource_weights  # deleted
         assert saved_spec.resource_weights["mem"] == Decimal("0.5")  # preserved
 
@@ -610,9 +596,7 @@ class TestMerge:
 
         # Verify weights preserved, half_life updated
         call_args = mock_repository.update_resource_group.call_args
-        saved_spec: FairShareResourceGroupSpec = call_args[0][
-            0
-        ].spec.fair_share.fair_share_spec.value()
+        saved_spec: FairShareResourceGroupSpec = call_args[0][0].fair_share_spec.value()
         assert saved_spec.resource_weights["cpu"] == Decimal("1.0")  # preserved
         assert saved_spec.half_life_days == 14  # updated
 
@@ -675,9 +659,7 @@ class TestIntegration:
 
         # Verify full flow: validate -> merge -> filter
         call_args = mock_repository.update_resource_group.call_args
-        saved_spec: FairShareResourceGroupSpec = call_args[0][
-            0
-        ].spec.fair_share.fair_share_spec.value()
+        saved_spec: FairShareResourceGroupSpec = call_args[0][0].fair_share_spec.value()
         assert saved_spec.resource_weights["cpu"] == Decimal("2.0")  # updated
         assert saved_spec.resource_weights["mem"] == Decimal("0.5")  # added
         assert "cuda.device" not in saved_spec.resource_weights  # filtered out
@@ -714,9 +696,7 @@ class TestIntegration:
 
         # Verify cuda cleaned up during unrelated update
         call_args = mock_repository.update_resource_group.call_args
-        saved_spec: FairShareResourceGroupSpec = call_args[0][
-            0
-        ].spec.fair_share.fair_share_spec.value()
+        saved_spec: FairShareResourceGroupSpec = call_args[0][0].fair_share_spec.value()
         assert saved_spec.half_life_days == 14
         assert "cuda.device" not in saved_spec.resource_weights  # auto-cleaned
         assert saved_spec.resource_weights["cpu"] == Decimal("1.0")  # preserved
@@ -794,9 +774,7 @@ class TestEdgeCases:
 
         # Verify weights preserved with empty list input
         call_args = mock_repository.update_resource_group.call_args
-        saved_spec: FairShareResourceGroupSpec = call_args[0][
-            0
-        ].spec.fair_share.fair_share_spec.value()
+        saved_spec: FairShareResourceGroupSpec = call_args[0][0].fair_share_spec.value()
         assert saved_spec.resource_weights["cpu"] == Decimal("1.0")  # preserved
 
         assert result is not None

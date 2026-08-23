@@ -5,8 +5,7 @@ from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
 
 from .base import ResourceGroupGlobalAction
 
@@ -15,7 +14,7 @@ from .base import ResourceGroupGlobalAction
 class CreateResourceGroupAction(ResourceGroupGlobalAction):
     """Action to create a resource group."""
 
-    creator: Creator[ResourceGroupRow]
+    creator: ResourceGroupCreator
 
     @override
     @classmethod
