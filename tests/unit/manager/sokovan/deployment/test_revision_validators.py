@@ -6,7 +6,6 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -18,8 +17,8 @@ from ai.backend.manager.data.deployment.types import (
     ResourceSpec,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.repositories.deployment.creators.revision import (
-    DeploymentRevisionCreatorSpec,
+from ai.backend.manager.models.deployment_revision.creators import (
+    DeploymentRevisionCreator,
 )
 from ai.backend.manager.sokovan.deployment.validators import (
     DeploymentRevisionValidationContext,
@@ -27,9 +26,8 @@ from ai.backend.manager.sokovan.deployment.validators import (
 )
 
 
-def _creator_spec(resource_slots: dict[str, int]) -> DeploymentRevisionCreatorSpec:
-    return DeploymentRevisionCreatorSpec(
-        deployment_id=DeploymentID(uuid4()),
+def _creator_spec(resource_slots: dict[str, int]) -> DeploymentRevisionCreator:
+    return DeploymentRevisionCreator(
         image_id=ImageID(uuid4()),
         resource_group="default",
         resource_slots=ResourceSlot(resource_slots),

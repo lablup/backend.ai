@@ -30,10 +30,10 @@ from ai.backend.manager.errors.service import (
     ModelServiceNotFound,
     RouteNotFound,
 )
+from ai.backend.manager.models.endpoint.updaters import LegacyEndpointUpdater
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
-from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.services.model_serving.actions.delete_route import (
     DeleteRouteAction,
@@ -223,10 +223,10 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
             ),
         )
 
-    def _make_updater_spec(
+    def _make_updater(
         self, *, replicas: int | None = None, has_revision_changes: bool = False
     ) -> MagicMock:
-        spec = MagicMock(spec=EndpointUpdaterSpec)
+        spec = MagicMock(spec=LegacyEndpointUpdater)
         if replicas is not None:
             spec.replicas = OptionalState.update(replicas)
             spec.replica_count_modified.return_value = True
@@ -254,9 +254,7 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
         endpoint_id: uuid.UUID,
     ) -> None:
         """replica_count change (2->5) returns success=true with CHECK_REPLICA marking."""
-        updater_spec = self._make_updater_spec(replicas=5)
-        mock_updater = MagicMock()
-        mock_updater.spec = updater_spec
+        mock_updater = self._make_updater(replicas=5)
 
         mock_endpoint_data = MagicMock()
         mock_endpoint_data.id = endpoint_id
@@ -289,9 +287,7 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
         endpoint_id: uuid.UUID,
     ) -> None:
         """Revision-level field change delegates to controller.add_revision + activate_revision."""
-        updater_spec = self._make_updater_spec(replicas=None, has_revision_changes=True)
-        mock_updater = MagicMock()
-        mock_updater.spec = updater_spec
+        mock_updater = self._make_updater(replicas=None, has_revision_changes=True)
 
         mock_endpoint_data = MagicMock()
         mock_endpoint_data.id = endpoint_id
@@ -337,9 +333,7 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
         endpoint_id: uuid.UUID,
     ) -> None:
         """No replica change returns success without CHECK_REPLICA marking."""
-        updater_spec = self._make_updater_spec(replicas=None)
-        mock_updater = MagicMock()
-        mock_updater.spec = updater_spec
+        mock_updater = self._make_updater(replicas=None)
 
         mock_endpoint_data = MagicMock()
         mock_endpoint_data.id = endpoint_id
@@ -360,9 +354,7 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
         endpoint_id: uuid.UUID,
     ) -> None:
         """Non-existent endpoint raises error from repository."""
-        updater_spec = self._make_updater_spec(replicas=5)
-        mock_updater = MagicMock()
-        mock_updater.spec = updater_spec
+        mock_updater = self._make_updater(replicas=5)
         mock_modify_endpoint.side_effect = Exception("Endpoint not found")
 
         action = UpdateEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)

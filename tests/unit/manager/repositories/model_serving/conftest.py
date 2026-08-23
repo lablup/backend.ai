@@ -11,7 +11,6 @@ from pytest_mock import MockerFixture
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
@@ -27,20 +26,15 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.models.endpoint import (
-    AutoScalingMetricComparator,
-    AutoScalingMetricSource,
-    EndpointAutoScalingRuleRow,
     EndpointLifecycle,
     EndpointRow,
 )
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import Creator
-from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 
 @pytest.fixture
@@ -66,7 +60,9 @@ def mock_db_engine() -> MagicMock:
 @pytest.fixture
 def model_serving_repository(mock_db_engine: MagicMock) -> ModelServingRepository:
     """Create a ModelServingRepository instance with mocked database."""
-    return ModelServingRepository(db=mock_db_engine)
+    return ModelServingRepository(
+        db=mock_db_engine, v2_ops_provider=V2DBOpsProvider(mock_db_engine)
+    )
 
 
 @pytest.fixture
@@ -182,99 +178,6 @@ def sample_vfolder() -> VFolderRow:
     vfolder.permission = VFolderMountPermission.READ_WRITE
     vfolder.status = VFolderOperationStatus.READY
     return vfolder
-
-
-@pytest.fixture
-def sample_endpoint_creator_spec(
-    sample_user: UserRow, sample_image: ImageRow, sample_vfolder: VFolderRow
-) -> EndpointCreatorSpec:
-    return EndpointCreatorSpec(
-        name="test-endpoint",
-        model=sample_vfolder.id,
-        model_mount_destination="/models",
-        model_definition_path="model.py",
-        session_owner=sample_user.uuid,
-        tag="test",
-        startup_command="python serve.py",
-        bootstrap_script="pip install -r requirements.txt",
-        callback_url=yarl.URL("https://callback.example.com"),
-        environ={"MODEL_NAME": "test"},
-        resource_slots=ResourceSlot({"cpu": "2", "mem": "4g"}),
-        resource_opts={},
-        image=sample_image.id,
-        replicas=1,
-        cluster_mode=ClusterMode.SINGLE_NODE,
-        cluster_size=1,
-        extra_mounts=[],
-        created_user=sample_user.uuid,
-        project=ProjectID(uuid.uuid4()),
-        domain="default",
-        resource_group="default",
-    )
-
-
-@pytest.fixture
-def sample_endpoint_creator(
-    sample_endpoint_creator_spec: EndpointCreatorSpec,
-) -> Creator[EndpointRow]:
-    """Create a Creator wrapper for endpoint creation."""
-    return Creator(spec=sample_endpoint_creator_spec)
-
-
-@pytest.fixture
-def sample_endpoint(
-    sample_endpoint_creator_spec: EndpointCreatorSpec, sample_user: UserRow, sample_image: ImageRow
-) -> EndpointRow:
-    """Create a sample endpoint for testing."""
-    endpoint = sample_endpoint_creator_spec.build_row()
-    # Set attributes that are normally set by the database
-    endpoint.id = DeploymentID(uuid.uuid4())
-    endpoint.created_at = datetime.now(UTC)
-    endpoint.destroyed_at = None
-    endpoint.lifecycle_stage = EndpointLifecycle.CREATED
-    endpoint.retries = 0
-    endpoint.url = f"https://api.example.com/v1/models/{endpoint.name}"
-    endpoint.open_to_public = False
-    # Set related rows for from_row method
-    endpoint.session_owner_row = sample_user
-    endpoint.created_user_row = sample_user
-    endpoint.routings = []
-    return endpoint
-
-
-@pytest.fixture
-def sample_route(sample_endpoint: EndpointRow) -> RoutingRow:
-    """Create a sample routing for testing."""
-    return RoutingRow(
-        id=uuid.uuid4(),
-        endpoint=sample_endpoint.id,
-        session=uuid.uuid4(),
-        status=RouteStatus.RUNNING,
-        traffic_ratio=1.0,
-        session_owner=sample_endpoint.session_owner,
-        domain=sample_endpoint.domain,
-        project=sample_endpoint.project,
-        revision=uuid.uuid4(),
-    )
-
-
-@pytest.fixture
-def sample_auto_scaling_rule(sample_endpoint: EndpointRow) -> EndpointAutoScalingRuleRow:
-    """Create a sample auto scaling rule for testing."""
-    return EndpointAutoScalingRuleRow(
-        id=uuid.uuid4(),
-        endpoint=sample_endpoint.id,
-        metric_source=AutoScalingMetricSource.KERNEL,
-        metric_name="cpu_util",
-        threshold=80.0,
-        comparator=AutoScalingMetricComparator.GREATER_THAN,
-        step_size=1,
-        cooldown_seconds=300,
-        min_replicas=1,
-        max_replicas=10,
-        created_at=datetime.now(UTC),
-        endpoint_row=sample_endpoint,
-    )
 
 
 @pytest.fixture

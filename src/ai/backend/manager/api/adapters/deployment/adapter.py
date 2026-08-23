@@ -198,7 +198,6 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
-from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import EndpointTokenNotFound
@@ -210,6 +209,7 @@ from ai.backend.manager.models.condition_utils import (
 )
 from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
 from ai.backend.manager.models.deployment_revision.orders import RevisionOrders
@@ -228,6 +228,7 @@ from ai.backend.manager.models.endpoint.orders import (
     AutoScalingRuleOrders,
     DeploymentOrders,
 )
+from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.models.resource_slot.conditions import RevisionResourceSlotConditions
 from ai.backend.manager.models.resource_slot.orders import (
     ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
@@ -239,13 +240,7 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.routing.orders import RouteOrders
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier, Updater
-from ai.backend.manager.repositories.deployment.updaters import (
-    DeploymentMetadataUpdaterSpec,
-    DeploymentNetworkSpecUpdaterSpec,
-    DeploymentUpdaterSpec,
-    ReplicaSpecUpdaterSpec,
-)
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
     BulkDeleteAccessTokensAction,
 )
@@ -823,44 +818,32 @@ class DeploymentAdapter(BaseAdapter):
         deployment_id: DeploymentID,
     ) -> UpdateDeploymentPayload:
         """Update deployment metadata and configuration."""
-        metadata_spec: DeploymentMetadataUpdaterSpec | None = None
-        if input.name is not None:
-            tag_str: str | None = None
-            if not isinstance(input.tags, Sentinel) and input.tags is not None:
-                tag_str = ",".join(input.tags)
-            elif not isinstance(input.tags, Sentinel) and input.tags is None:
-                tag_str = None
-            metadata_spec = DeploymentMetadataUpdaterSpec(
-                name=OptionalState.update(input.name)
+        tag_str: str | None = None
+        if not isinstance(input.tags, Sentinel) and input.tags is not None:
+            tag_str = ",".join(input.tags)
+        updater = DeploymentUpdater(
+            deployment_id=deployment_id,
+            name=(
+                OptionalState.update(input.name)
                 if input.name is not None
-                else OptionalState.nop(),
-                tag=(
-                    TriState[str].nop()
-                    if isinstance(input.tags, Sentinel)
-                    else TriState[str].from_graphql(tag_str)
-                ),
-            )
-        elif not isinstance(input.tags, Sentinel):
-            tag_str = ",".join(input.tags) if input.tags is not None else None
-            metadata_spec = DeploymentMetadataUpdaterSpec(
-                tag=TriState[str].from_graphql(tag_str),
-            )
-        replica_spec: ReplicaSpecUpdaterSpec | None = None
-        if input.replica_count is not None:
-            replica_spec = ReplicaSpecUpdaterSpec(
-                replica_count=OptionalState.update(input.replica_count),
-            )
-        network_spec: DeploymentNetworkSpecUpdaterSpec | None = None
-        if input.open_to_public is not None:
-            network_spec = DeploymentNetworkSpecUpdaterSpec(
-                open_to_public=OptionalState.from_graphql(input.open_to_public),
-            )
-        spec = DeploymentUpdaterSpec(
-            metadata=metadata_spec,
-            replica_spec=replica_spec,
-            network=network_spec,
+                else OptionalState[str].nop()
+            ),
+            tag=(
+                TriState[str].nop()
+                if isinstance(input.tags, Sentinel)
+                else TriState[str].from_graphql(tag_str)
+            ),
+            replica_count=(
+                OptionalState.update(input.replica_count)
+                if input.replica_count is not None
+                else OptionalState[int].nop()
+            ),
+            open_to_public=(
+                OptionalState.from_graphql(input.open_to_public)
+                if input.open_to_public is not None
+                else OptionalState[bool].nop()
+            ),
         )
-        updater: Updater[EndpointRow] = Updater(spec=spec, pk_value=deployment_id)
         action_result = await self._processors.deployment.update_deployment.run(
             UpdateDeploymentAction(deployment_id=deployment_id, updater=updater)
         )
@@ -1221,14 +1204,13 @@ class DeploymentAdapter(BaseAdapter):
                     auto_promote=bg.auto_promote if bg is not None else False,
                     promote_delay_seconds=bg.promote_delay_seconds if bg is not None else 0,
                 )
-        upserter = DeploymentPolicyUpserter(
-            deployment_id=input.deployment_id,
-            strategy=input.strategy,
-            strategy_spec=strategy_spec,
-        )
         action_result = await self._processors.deployment.upsert_deployment_policy.run(
             UpsertDeploymentPolicyAction(
-                deployment_id=DeploymentID(upserter.deployment_id), upserter=upserter
+                deployment_id=DeploymentID(input.deployment_id),
+                upserter=DeploymentPolicyUpserter(
+                    strategy=input.strategy,
+                    strategy_spec=strategy_spec,
+                ),
             )
         )
         return UpsertDeploymentPolicyPayload(policy=self._policy_data_to_dto(action_result.data))

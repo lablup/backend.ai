@@ -25,6 +25,7 @@ from ai.backend.common.schema.deployment import (
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
+    ReplicaGroupData,
     ReplicaGroupHandlerCategory,
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
@@ -46,6 +47,10 @@ from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
+from ai.backend.manager.models.replica_group.updaters import (
+    ReplicaGroupDeployUpdater,
+    ReplicaGroupScalingUpdater,
+)
 from ai.backend.manager.models.replica_group_history import ReplicaGroupHistoryRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
@@ -58,17 +63,14 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.deployment.updaters import (
-    ReplicaGroupDeployUpdaterSpec,
-    ReplicaGroupScalingUpdaterSpec,
-)
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.replica_group import ReplicaGroupRepository
 from ai.backend.manager.repositories.replica_group.types import (
     GroupRolloutSetup,
@@ -335,7 +337,9 @@ class TestReplicaGroupRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ReplicaGroupRepository:
-        return ReplicaGroupRepository(db=db_with_cleanup)
+        return ReplicaGroupRepository(
+            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+        )
 
     async def test_setup_target_groups_gives_a_fresh_group_its_placement_group(
         self,
@@ -411,31 +415,28 @@ class TestReplicaGroupRepository:
         assert result[0].desired_current_replica_count == 1
         assert result[0].scaling_status is ReplicaGroupScalingStatus.SCALING
 
-    async def test_update_replica_groups_applies_per_id_deploy_values(
+    async def test_apply_writes_applies_per_id_deploy_values(
         self,
         replica_group_repository: ReplicaGroupRepository,
         two_group_ids: tuple[ReplicaGroupID, ReplicaGroupID],
     ) -> None:
         first_id, second_id = two_group_ids
-        updaters: list[Updater[ReplicaGroupRow]] = [
-            Updater(
-                spec=ReplicaGroupDeployUpdaterSpec(
-                    lifecycle=OptionalState.update(ReplicaGroupLifecycle.DRAINING),
-                ),
-                pk_value=first_id,
+        updaters: list[DataUpdater[ReplicaGroupRow, ReplicaGroupData]] = [
+            ReplicaGroupDeployUpdater(
+                replica_group_id=first_id,
+                lifecycle=OptionalState.update(ReplicaGroupLifecycle.DRAINING),
             ),
-            Updater(
-                spec=ReplicaGroupDeployUpdaterSpec(
-                    lifecycle=OptionalState.update(ReplicaGroupLifecycle.DRAINED),
-                ),
-                pk_value=second_id,
+            ReplicaGroupDeployUpdater(
+                replica_group_id=second_id,
+                lifecycle=OptionalState.update(ReplicaGroupLifecycle.DRAINED),
             ),
         ]
 
-        result = await replica_group_repository.update_replica_groups(updaters)
+        result = await replica_group_repository.apply_writes(
+            group_updaters=updaters, endpoint_updaters=[]
+        )
 
-        assert result.success_count() == 2
-        assert result.has_failures() is False
+        assert result.updated_group_ids == {first_id, second_id}
 
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10),
@@ -517,31 +518,28 @@ class TestReplicaGroupRepository:
         assert view.current_live_replica_count == 3
         assert view.current_serving_replica_count == 2
 
-    async def test_update_replica_groups_applies_per_id_scaling_values(
+    async def test_apply_writes_applies_per_id_scaling_values(
         self,
         replica_group_repository: ReplicaGroupRepository,
         two_group_ids: tuple[ReplicaGroupID, ReplicaGroupID],
     ) -> None:
         first_id, second_id = two_group_ids
-        updaters: list[Updater[ReplicaGroupRow]] = [
-            Updater(
-                spec=ReplicaGroupScalingUpdaterSpec(
-                    desired_current_replica_count=OptionalState.update(5),
-                ),
-                pk_value=first_id,
+        updaters: list[DataUpdater[ReplicaGroupRow, ReplicaGroupData]] = [
+            ReplicaGroupScalingUpdater(
+                replica_group_id=first_id,
+                desired_current_replica_count=OptionalState.update(5),
             ),
-            Updater(
-                spec=ReplicaGroupScalingUpdaterSpec(
-                    desired_current_replica_count=OptionalState.update(7),
-                ),
-                pk_value=second_id,
+            ReplicaGroupScalingUpdater(
+                replica_group_id=second_id,
+                desired_current_replica_count=OptionalState.update(7),
             ),
         ]
 
-        result = await replica_group_repository.update_replica_groups(updaters)
+        result = await replica_group_repository.apply_writes(
+            group_updaters=updaters, endpoint_updaters=[]
+        )
 
-        assert result.success_count() == 2
-        assert result.has_failures() is False
+        assert result.updated_group_ids == {first_id, second_id}
 
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10),

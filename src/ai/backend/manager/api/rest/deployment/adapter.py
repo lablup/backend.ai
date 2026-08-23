@@ -73,10 +73,10 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
-from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import IncompleteRevisionData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
 from ai.backend.manager.models.deployment_revision.orders import RevisionOrders
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
@@ -622,10 +622,8 @@ class DeploymentPolicyAdapter:
             updated_at=data.updated_at,
         )
 
-    def build_upserter(
-        self, request: UpsertDeploymentPolicyRequest, deployment_id: UUID
-    ) -> DeploymentPolicyUpserter:
-        """Build DeploymentPolicyUpserter from upsert request."""
+    def build_upserter(self, request: UpsertDeploymentPolicyRequest) -> DeploymentPolicyUpserter:
+        """Build the deployment policy upsert spec from the request."""
         strategy = request.strategy
 
         strategy_spec: RollingUpdateSpec | BlueGreenSpec
@@ -650,7 +648,6 @@ class DeploymentPolicyAdapter:
                 raise InvalidAPIParameters(f"Unsupported deployment strategy: {strategy}")
 
         return DeploymentPolicyUpserter(
-            deployment_id=deployment_id,
             strategy=strategy,
             strategy_spec=strategy_spec,
         )

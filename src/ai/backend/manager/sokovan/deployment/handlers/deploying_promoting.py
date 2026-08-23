@@ -11,17 +11,16 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentLifecycleSubStep,
     DeploymentStatusTransitions,
     DeploymentTargetStatuses,
+    ReplicaGroupData,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
+from ai.backend.manager.models.replica_group.updaters import ReplicaGroupDeployUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.deployment.updaters.replica_group import (
-    ReplicaGroupDeployUpdaterSpec,
-)
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import (
@@ -111,7 +110,7 @@ class DeployingPromotingHandler(DeploymentHandler):
 
         completed: list[DeploymentWithHistory] = []
         failures: list[DeploymentExecutionError] = []
-        group_updaters: list[Updater[ReplicaGroupRow]] = []
+        group_updaters: list[DataUpdater[ReplicaGroupRow, ReplicaGroupData]] = []
 
         for deployment in deployments:
             info = deployment.deployment_info
@@ -149,20 +148,16 @@ class DeployingPromotingHandler(DeploymentHandler):
                 )
             )
             group_updaters.append(
-                Updater(
-                    pk_value=target.group_id,
-                    spec=ReplicaGroupDeployUpdaterSpec(
-                        traffic_weight=OptionalState.update(step.target_traffic_weight),
-                    ),
+                ReplicaGroupDeployUpdater(
+                    replica_group_id=target.group_id,
+                    traffic_weight=OptionalState.update(step.target_traffic_weight),
                 )
             )
             if serving is not None:
                 group_updaters.append(
-                    Updater(
-                        pk_value=serving.group_id,
-                        spec=ReplicaGroupDeployUpdaterSpec(
-                            traffic_weight=OptionalState.update(step.serving_traffic_weight),
-                        ),
+                    ReplicaGroupDeployUpdater(
+                        replica_group_id=serving.group_id,
+                        traffic_weight=OptionalState.update(step.serving_traffic_weight),
                     )
                 )
             if step.completed:

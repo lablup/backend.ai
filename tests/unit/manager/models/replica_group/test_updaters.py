@@ -1,31 +1,37 @@
-"""Unit tests for replica group deploy/scaling updater spec build_values()."""
+"""Unit tests for replica group deploy/scaling update specs' build_values()."""
 
 import uuid
 
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
 )
-from ai.backend.manager.repositories.deployment.updaters.replica_group import (
-    ReplicaGroupDeployUpdaterSpec,
-    ReplicaGroupScalingUpdaterSpec,
+from ai.backend.manager.models.replica_group.updaters import (
+    ReplicaGroupDeployUpdater,
+    ReplicaGroupScalingUpdater,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
 
+def _group_id() -> ReplicaGroupID:
+    return ReplicaGroupID(uuid.uuid4())
+
+
 def test_deploy_build_values_empty_when_no_fields_set() -> None:
-    assert ReplicaGroupDeployUpdaterSpec().build_values() == {}
+    assert ReplicaGroupDeployUpdater(replica_group_id=_group_id()).build_values() == {}
 
 
 def test_deploy_build_values_emits_only_set_fields() -> None:
     current_revision_id = DeploymentRevisionID(uuid.uuid4())
-    spec = ReplicaGroupDeployUpdaterSpec(
+    updater = ReplicaGroupDeployUpdater(
+        replica_group_id=_group_id(),
         current_revision_id=TriState.update(current_revision_id),
         lifecycle=OptionalState.update(ReplicaGroupLifecycle.ROLLING),
     )
 
-    values = spec.build_values()
+    values = updater.build_values()
 
     assert values == {
         "current_revision_id": current_revision_id,
@@ -34,12 +40,13 @@ def test_deploy_build_values_emits_only_set_fields() -> None:
 
 
 def test_deploy_build_values_nullifies_target_revision_id() -> None:
-    spec = ReplicaGroupDeployUpdaterSpec(
+    updater = ReplicaGroupDeployUpdater(
+        replica_group_id=_group_id(),
         target_revision_id=TriState.nullify(),
         lifecycle=OptionalState.update(ReplicaGroupLifecycle.STABLE),
     )
 
-    values = spec.build_values()
+    values = updater.build_values()
 
     assert values == {
         "target_revision_id": None,
@@ -48,16 +55,17 @@ def test_deploy_build_values_nullifies_target_revision_id() -> None:
 
 
 def test_scaling_build_values_empty_when_no_fields_set() -> None:
-    assert ReplicaGroupScalingUpdaterSpec().build_values() == {}
+    assert ReplicaGroupScalingUpdater(replica_group_id=_group_id()).build_values() == {}
 
 
 def test_scaling_build_values_emits_only_set_fields() -> None:
-    spec = ReplicaGroupScalingUpdaterSpec(
+    updater = ReplicaGroupScalingUpdater(
+        replica_group_id=_group_id(),
         desired_target_replica_count=OptionalState.update(5),
         scaling_status=OptionalState.update(ReplicaGroupScalingStatus.SCALING),
     )
 
-    values = spec.build_values()
+    values = updater.build_values()
 
     assert values == {
         "desired_target_replica_count": 5,

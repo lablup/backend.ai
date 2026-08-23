@@ -32,6 +32,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint.updaters import LegacyEndpointUpdater
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -53,9 +54,8 @@ from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import Updater
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
-from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import TriState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -359,7 +359,9 @@ class TestModifyEndpointModelDefinitionRefresh:
 
     @pytest.fixture()
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ModelServingRepository:
-        return ModelServingRepository(db=db_with_cleanup)
+        return ModelServingRepository(
+            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+        )
 
     @pytest.fixture()
     def user_context(self, test_user_id: uuid.UUID) -> UserData:
@@ -389,8 +391,10 @@ class TestModifyEndpointModelDefinitionRefresh:
 
         endpoint_id, _ = endpoint_and_revision
         deployment_id = DeploymentID(endpoint_id)
-        spec = EndpointUpdaterSpec(environ=TriState.update({"NEW_VAR": "1"}))
-        updater = Updater(spec=spec, pk_value=deployment_id)
+        updater = LegacyEndpointUpdater(
+            deployment_id=deployment_id,
+            environ=TriState.update({"NEW_VAR": "1"}),
+        )
 
         with (
             with_user(user_context),

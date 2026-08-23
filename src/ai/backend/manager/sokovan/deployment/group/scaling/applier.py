@@ -11,18 +11,14 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupHandlerCategory,
     ReplicaGroupScalingStatus,
 )
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.deployment.updaters.replica_group import (
-    ReplicaGroupScalingUpdaterSpec,
+from ai.backend.manager.models.replica_group.updaters import ReplicaGroupScalingUpdater
+from ai.backend.manager.models.replica_group_history.creators import (
+    ReplicaGroupHistoryCreator,
 )
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.repositories.replica_group.types import (
     ReplicaGroupReconcileTransition,
     ReplicaGroupScalingReconcileApply,
-)
-from ai.backend.manager.repositories.scheduling_history.creators import (
-    ReplicaGroupHistoryCreatorSpec,
 )
 from ai.backend.manager.sokovan.deployment.group.categories import GroupReconcileKind
 from ai.backend.manager.sokovan.deployment.group.scaling.types import (
@@ -80,20 +76,18 @@ class GroupScalingApplier(
         result = apply_input.classified[decision.replica_group_id]
         # No mapped target -> no status change this tick (to_status stays None).
         target_status = metadata.transitions.get(result)
-        status_updater: Updater[ReplicaGroupRow] | None = None
+        status_updater: ReplicaGroupScalingUpdater | None = None
         to_status: str | None = None
         if target_status is not None:
-            status_updater = Updater(
-                spec=ReplicaGroupScalingUpdaterSpec(
-                    scaling_status=OptionalState.update(target_status)
-                ),
-                pk_value=decision.replica_group_id,
+            status_updater = ReplicaGroupScalingUpdater(
+                replica_group_id=decision.replica_group_id,
+                scaling_status=OptionalState.update(target_status),
             )
             to_status = target_status.value
         return ReplicaGroupReconcileTransition(
-            history_spec=ReplicaGroupHistoryCreatorSpec(
+            deployment_id=decision.deployment_id,
+            history_creator=ReplicaGroupHistoryCreator(
                 replica_group_id=decision.replica_group_id,
-                deployment_id=decision.deployment_id,
                 category=metadata.category,
                 phase=metadata.phase,
                 result=result,

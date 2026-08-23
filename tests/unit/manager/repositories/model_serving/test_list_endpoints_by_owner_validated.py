@@ -60,6 +60,7 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -380,7 +381,9 @@ async def listed_endpoint(
 
 @pytest.fixture
 def repository(db_with_cleanup: ExtendedAsyncSAEngine) -> ModelServingRepository:
-    return ModelServingRepository(db=db_with_cleanup)
+    return ModelServingRepository(
+        db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+    )
 
 
 async def test_list_endpoints_by_owner_validated_drives_to_data_end_to_end(

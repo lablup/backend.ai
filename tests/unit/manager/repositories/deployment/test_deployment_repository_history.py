@@ -26,7 +26,7 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
+from ai.backend.manager.models.endpoint.updaters import EndpointLifecycleBatchUpdater
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -41,24 +41,22 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater
 from ai.backend.manager.models.scheduling_history import DeploymentHistoryRow, RouteHistoryRow
+from ai.backend.manager.models.scheduling_history.creators import (
+    DeploymentHistoryCreator,
+    RouteHistoryCreator,
+)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.creators import (
-    EndpointLifecycleBatchUpdaterSpec,
-    RouteBatchUpdaterSpec,
+from ai.backend.manager.repositories.deployment.types import (
+    DeploymentHistoryToCreate,
+    RouteHistoryToCreate,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.scheduling_history.creators import (
-    DeploymentHistoryCreatorSpec,
-    RouteHistoryCreatorSpec,
-)
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -432,28 +430,28 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
         """Status update and history are created in the same transaction."""
         # Test transition from PENDING to CREATED
         batch_updaters = [
-            BatchUpdater(
-                spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=EndpointLifecycle.CREATED),
-                conditions=[
-                    DeploymentConditions.by_ids([test_pending_endpoint_id]),
-                    DeploymentConditions.by_lifecycle_stages([EndpointLifecycle.PENDING]),
-                ],
+            EndpointLifecycleBatchUpdater(
+                deployment_ids=[test_pending_endpoint_id],
+                lifecycle_stages=[EndpointLifecycle.PENDING],
+                lifecycle_stage=EndpointLifecycle.CREATED,
             )
         ]
         history_specs = [
-            DeploymentHistoryCreatorSpec(
+            DeploymentHistoryToCreate(
                 deployment_id=test_pending_endpoint_id,
-                phase="check_pending",
-                result=SchedulingResult.SUCCESS,
-                message="Test completed successfully",
-                from_status=EndpointLifecycle.PENDING,
-                to_status=EndpointLifecycle.CREATED,
+                creator=DeploymentHistoryCreator(
+                    phase="check_pending",
+                    result=SchedulingResult.SUCCESS,
+                    message="Test completed successfully",
+                    from_status=EndpointLifecycle.PENDING,
+                    to_status=EndpointLifecycle.CREATED,
+                ),
             )
         ]
 
         updated_count = await deployment_repository.update_endpoint_lifecycle_bulk_with_history(
             batch_updaters,
-            new_history_specs=history_specs,
+            new_histories=history_specs,
             merge_history_ids=[],
         )
 
@@ -481,7 +479,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
         """Empty batch_updaters returns 0."""
         result = await deployment_repository.update_endpoint_lifecycle_bulk_with_history(
             [],
-            new_history_specs=[],
+            new_histories=[],
             merge_history_ids=[],
         )
         assert result == 0
@@ -874,30 +872,29 @@ class TestUpdateRouteStatusBulkWithHistory:
     ) -> None:
         """Status update and history are created in the same transaction."""
         batch_updaters = [
-            BatchUpdater(
-                spec=RouteBatchUpdaterSpec(status=OptionalState.update(RouteStatus.RUNNING)),
-                conditions=[
-                    RouteConditions.by_ids([test_provisioning_route_id]),
-                    RouteConditions.by_statuses([RouteStatus.PROVISIONING]),
-                ],
+            ReplicaBatchUpdater(
+                replica_ids=[test_provisioning_route_id],
+                status=OptionalState.update(RouteStatus.RUNNING),
             )
         ]
         history_specs = [
-            RouteHistoryCreatorSpec(
-                route_id=ReplicaID(test_provisioning_route_id),
+            RouteHistoryToCreate(
                 deployment_id=test_endpoint_id,
-                category=RouteHandlerCategory.LIFECYCLE,
-                phase="provisioning",
-                result=SchedulingResult.SUCCESS,
-                message="Provisioning completed successfully",
-                from_status=RouteStatus.PROVISIONING,
-                to_status=RouteStatus.RUNNING,
+                creator=RouteHistoryCreator(
+                    route_id=ReplicaID(test_provisioning_route_id),
+                    category=RouteHandlerCategory.LIFECYCLE,
+                    phase="provisioning",
+                    result=SchedulingResult.SUCCESS,
+                    message="Provisioning completed successfully",
+                    from_status=RouteStatus.PROVISIONING,
+                    to_status=RouteStatus.RUNNING,
+                ),
             )
         ]
 
         updated_count = await deployment_repository.update_route_status_bulk_with_history(
             batch_updaters,
-            BulkCreator(specs=history_specs),
+            history_specs,
         )
 
         assert updated_count == 1
@@ -922,9 +919,7 @@ class TestUpdateRouteStatusBulkWithHistory:
         deployment_repository: DeploymentRepository,
     ) -> None:
         """Empty batch_updaters returns 0."""
-        result = await deployment_repository.update_route_status_bulk_with_history(
-            [], BulkCreator(specs=[])
-        )
+        result = await deployment_repository.update_route_status_bulk_with_history([], [])
         assert result == 0
 
 
@@ -1175,15 +1170,15 @@ class TestDeploymentHistoryMergeLogic:
 
         # Create new history with same phase, error_code, to_status
         batch_updaters = [
-            BatchUpdater(
-                spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=EndpointLifecycle.PENDING),
-                conditions=[DeploymentConditions.by_ids([endpoint_id])],
+            EndpointLifecycleBatchUpdater(
+                deployment_ids=[endpoint_id],
+                lifecycle_stage=EndpointLifecycle.PENDING,
             )
         ]
 
         await deployment_repository.update_endpoint_lifecycle_bulk_with_history(
             batch_updaters,
-            new_history_specs=[],
+            new_histories=[],
             merge_history_ids=[history_id],
         )
 
@@ -1208,26 +1203,29 @@ class TestDeploymentHistoryMergeLogic:
         endpoint_id, _ = test_endpoint_with_history
 
         batch_updaters = [
-            BatchUpdater(
-                spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=EndpointLifecycle.CREATED),
-                conditions=[DeploymentConditions.by_ids([endpoint_id])],
+            EndpointLifecycleBatchUpdater(
+                deployment_ids=[endpoint_id],
+                lifecycle_stage=EndpointLifecycle.CREATED,
             )
         ]
         history_specs = [
-            DeploymentHistoryCreatorSpec(
+            DeploymentHistoryToCreate(
                 deployment_id=endpoint_id,
-                phase="allocation",  # Different
-                result=SchedulingResult.SUCCESS,
-                error_code=None,
-                message="Allocation succeeded",
-                from_status=EndpointLifecycle.PENDING,
-                to_status=EndpointLifecycle.CREATED,
+                creator=DeploymentHistoryCreator(
+                    phase="allocation",
+                    # Different
+                    result=SchedulingResult.SUCCESS,
+                    error_code=None,
+                    message="Allocation succeeded",
+                    from_status=EndpointLifecycle.PENDING,
+                    to_status=EndpointLifecycle.CREATED,
+                ),
             )
         ]
 
         await deployment_repository.update_endpoint_lifecycle_bulk_with_history(
             batch_updaters,
-            new_history_specs=history_specs,
+            new_histories=history_specs,
             merge_history_ids=[],
         )
 
@@ -1510,28 +1508,33 @@ class TestRouteHistoryMergeLogic:
         endpoint_id, route_id, history_id = test_route_with_history
 
         batch_updaters = [
-            BatchUpdater(
-                spec=RouteBatchUpdaterSpec(status=OptionalState.update(RouteStatus.PROVISIONING)),
-                conditions=[RouteConditions.by_ids([route_id])],
+            ReplicaBatchUpdater(
+                replica_ids=[route_id],
+                status=OptionalState.update(RouteStatus.PROVISIONING),
             )
         ]
         history_specs = [
-            RouteHistoryCreatorSpec(
-                route_id=ReplicaID(route_id),
+            RouteHistoryToCreate(
                 deployment_id=endpoint_id,
-                category=RouteHandlerCategory.LIFECYCLE,
-                phase="provisioning",  # Same
-                result=SchedulingResult.FAILURE,
-                error_code="SESSION_CREATION_FAILED",  # Same
-                message="Session creation failed again",
-                from_status=RouteStatus.PROVISIONING,
-                to_status=RouteStatus.PROVISIONING,  # Same
+                creator=RouteHistoryCreator(
+                    route_id=ReplicaID(route_id),
+                    category=RouteHandlerCategory.LIFECYCLE,
+                    phase="provisioning",
+                    # Same
+                    result=SchedulingResult.FAILURE,
+                    error_code="SESSION_CREATION_FAILED",
+                    # Same
+                    message="Session creation failed again",
+                    from_status=RouteStatus.PROVISIONING,
+                    to_status=RouteStatus.PROVISIONING,
+                    # Same,
+                ),
             )
         ]
 
         await deployment_repository.update_route_status_bulk_with_history(
             batch_updaters,
-            BulkCreator(specs=history_specs),
+            history_specs,
         )
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -1553,28 +1556,32 @@ class TestRouteHistoryMergeLogic:
         endpoint_id, route_id, _ = test_route_with_history
 
         batch_updaters = [
-            BatchUpdater(
-                spec=RouteBatchUpdaterSpec(status=OptionalState.update(RouteStatus.RUNNING)),
-                conditions=[RouteConditions.by_ids([route_id])],
+            ReplicaBatchUpdater(
+                replica_ids=[route_id],
+                status=OptionalState.update(RouteStatus.RUNNING),
             )
         ]
         history_specs = [
-            RouteHistoryCreatorSpec(
-                route_id=ReplicaID(route_id),
+            RouteHistoryToCreate(
                 deployment_id=endpoint_id,
-                category=RouteHandlerCategory.LIFECYCLE,
-                phase="provisioning",  # Same
-                result=SchedulingResult.SUCCESS,
-                error_code=None,
-                message="Provisioning succeeded",
-                from_status=RouteStatus.PROVISIONING,
-                to_status=RouteStatus.RUNNING,  # Different
+                creator=RouteHistoryCreator(
+                    route_id=ReplicaID(route_id),
+                    category=RouteHandlerCategory.LIFECYCLE,
+                    phase="provisioning",
+                    # Same
+                    result=SchedulingResult.SUCCESS,
+                    error_code=None,
+                    message="Provisioning succeeded",
+                    from_status=RouteStatus.PROVISIONING,
+                    to_status=RouteStatus.RUNNING,
+                    # Different,
+                ),
             )
         ]
 
         await deployment_repository.update_route_status_bulk_with_history(
             batch_updaters,
-            BulkCreator(specs=history_specs),
+            history_specs,
         )
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:

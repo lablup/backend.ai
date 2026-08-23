@@ -831,6 +831,19 @@ class EndpointRow(Base):
             policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
         )
 
+    def to_bare_deployment_info(self) -> DeploymentInfo:
+        """DeploymentInfo carrying this row's own columns only.
+
+        The revision and policy fields come back ``None``: a write path holds the
+        row it just wrote, with no relationship loaded to read them from.
+        """
+        return self._build_deployment_info(
+            current_revision_id=None,
+            deploying_revision_id=None,
+            current_revision=None,
+            deploying_revision=None,
+        )
+
     def _build_deployment_info(
         self,
         current_revision_id: DeploymentRevisionID | None,

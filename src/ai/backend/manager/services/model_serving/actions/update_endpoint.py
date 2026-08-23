@@ -4,8 +4,7 @@ from typing import override
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import EndpointData
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.models.endpoint.updaters import LegacyEndpointUpdater
 from ai.backend.manager.services.model_serving.actions.base import (
     ModelServiceAction,
 )
@@ -13,7 +12,7 @@ from ai.backend.manager.services.model_serving.actions.base import (
 
 @dataclass
 class UpdateEndpointAction(ModelServiceAction):
-    updater: Updater[EndpointRow]
+    updater: LegacyEndpointUpdater
 
     @override
     @classmethod
