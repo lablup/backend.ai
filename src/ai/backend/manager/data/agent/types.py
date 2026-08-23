@@ -136,7 +136,6 @@ class AgentHeartbeatUpsert:
             "id": self.metadata.id,
             "status": AgentStatus.ALIVE,
             "region": self.metadata.region,
-            "available_slots": self.resource_info.available_slots,
             "addr": self.network_info.addr,
             "public_host": self.network_info.public_host,
             "public_key": self.network_info.public_key,
@@ -145,7 +144,6 @@ class AgentHeartbeatUpsert:
             "architecture": self.metadata.architecture,
             "auto_terminate_abusing_kernel": self.metadata.auto_terminate_abusing_kernel,
             "lost_at": None,
-            "occupied_slots": ResourceSlot(),
             "first_contact": self.heartbeat_received,
         }
 
@@ -155,7 +153,6 @@ class AgentHeartbeatUpsert:
             "id": self.metadata.id,
             "status": AgentStatus.ALIVE,
             "region": self.metadata.region,
-            "available_slots": self.resource_info.available_slots,
             "addr": self.network_info.addr,
             "public_host": self.network_info.public_host,
             "public_key": self.network_info.public_key,

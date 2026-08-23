@@ -46,7 +46,6 @@ from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -85,7 +84,6 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     PydanticColumn,
-    ResourceSlotColumn,
     SessionIDColumnType,
     StrEnumType,
     StructuredJSONObjectListColumn,
@@ -496,15 +494,6 @@ class SessionRow(CreatedAtMixin, Base):
     image_ids: Mapped[list[UUID] | None] = mapped_column("image_ids", sa.ARRAY(GUID), nullable=True)
     tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
 
-    # Resource occupation
-    # DEPRECATED: nothing reads these; the authority is resource_allocations.
-    # See models/resource_slot/aggregates.py.
-    occupying_slots: Mapped[ResourceSlot] = mapped_column(
-        "occupying_slots", ResourceSlotColumn(), nullable=False
-    )
-    requested_slots: Mapped[ResourceSlot] = mapped_column(
-        "requested_slots", ResourceSlotColumn(), nullable=False
-    )
     vfolder_mounts: Mapped[list[VFolderMount] | None] = mapped_column(
         "vfolder_mounts", StructuredJSONObjectListColumn(VFolderMount), nullable=True
     )
@@ -698,8 +687,6 @@ class SessionRow(CreatedAtMixin, Base):
             images=session_data.images,
             image_ids=session_data.image_ids,
             tag=session_data.tag,
-            occupying_slots=ResourceSlot(),
-            requested_slots=ResourceSlot(),
             vfolder_mounts=vfolder_mounts,
             environ=session_data.environ,
             bootstrap_script=session_data.bootstrap_script,

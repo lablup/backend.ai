@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.common.types import BinarySize
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -260,8 +260,6 @@ class TestSessionUniqueNamePerUser:
             resource_group_id=resource_group.id,
             scaling_group_name=resource_group.name,
             status=status,
-            occupying_slots=ResourceSlot(),
-            requested_slots=ResourceSlot(),
             vfolder_mounts=[],
         )
 
@@ -310,8 +308,6 @@ class TestSessionUniqueNamePerUser:
                 resource_group_id=prepared_first_session.resource_group_id,
                 scaling_group_name=prepared_first_session.resource_group_name,
                 status=test_config.second_session_status,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 vfolder_mounts=[],
             )
 
@@ -343,8 +339,6 @@ class TestSessionUniqueNamePerUser:
             resource_group_id=prepared_first_session.resource_group_id,
             scaling_group_name=prepared_first_session.resource_group_name,
             status=test_config.second_session_status,
-            occupying_slots=ResourceSlot(),
-            requested_slots=ResourceSlot(),
             vfolder_mounts=[],
         )
 
@@ -387,8 +381,6 @@ class TestSessionUniqueNamePerUser:
                 resource_group_id=prepared_first_session.resource_group_id,
                 scaling_group_name=prepared_first_session.resource_group_name,
                 status=test_config.second_session_status,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 vfolder_mounts=[],
             )
 

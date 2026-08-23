@@ -30,7 +30,6 @@ from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -66,7 +65,6 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     KernelIDColumnType,
-    ResourceSlotColumn,
     SessionIDColumnType,
     StrEnumType,
     StructuredJSONObjectListColumn,
@@ -248,14 +246,6 @@ class KernelRow(CreatedAtMixin, Base):
     # Resource occupation
     container_id: Mapped[str | None] = mapped_column(
         "container_id", sa.String(length=64), nullable=True
-    )
-    # DEPRECATED: nothing reads these; the authority is resource_allocations.
-    # See models/resource_slot/aggregates.py.
-    occupied_slots: Mapped[ResourceSlot] = mapped_column(
-        "occupied_slots", ResourceSlotColumn(), nullable=False
-    )
-    requested_slots: Mapped[ResourceSlot] = mapped_column(
-        "requested_slots", ResourceSlotColumn(), nullable=False
     )
     occupied_shares: Mapped[dict[str, Any]] = mapped_column(
         "occupied_shares", pgsql.JSONB(), nullable=False, default={}

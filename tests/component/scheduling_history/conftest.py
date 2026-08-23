@@ -4,7 +4,6 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
@@ -26,7 +25,7 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID, Resour
 from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
-from ai.backend.common.types import KernelId, ResourceSlot
+from ai.backend.common.types import KernelId
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,
@@ -214,7 +213,6 @@ async def kernel_history_seed(
     session_id = SessionID(uuid.uuid4())
     kernel_id = KernelId(uuid.uuid4())
     other_kernel_id = KernelId(uuid.uuid4())
-    slots = ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")})
     now = datetime.now(tz=UTC)
 
     # created_at is staggered so ordering and cursor pagination are deterministic.
@@ -255,8 +253,6 @@ async def kernel_history_seed(
                 user_uuid=admin_user_fixture.user_uuid,
                 scaling_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
-                occupying_slots=slots,
-                requested_slots=slots,
             )
         )
         await db_sess.flush()
@@ -267,8 +263,6 @@ async def kernel_history_seed(
                 domain_name=domain_fixture.domain_name,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
-                occupied_slots=slots,
-                requested_slots=slots,
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,

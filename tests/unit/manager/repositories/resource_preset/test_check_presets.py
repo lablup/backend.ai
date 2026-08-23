@@ -453,8 +453,6 @@ class TestCheckPresetsOccupiedSlots:
                 scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 schedulable=schedulable,
-                available_slots=_available,
-                occupied_slots=_occupied,
                 addr=addr,
                 version="v25.03.0",
                 architecture="x86_64",
@@ -674,14 +672,6 @@ class TestCheckPresetsOccupiedSlots:
                 cluster_role="main",
                 cluster_idx=1,
                 cluster_hostname="main",
-                occupied_slots=ResourceSlot({
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("8192"),
-                }),
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("8192"),
-                }),
                 vfolder_mounts=[],
                 repl_in_port=0,
                 repl_out_port=0,
@@ -689,11 +679,12 @@ class TestCheckPresetsOccupiedSlots:
                 stdout_port=0,
             )
 
+            kernel_slots = ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")})
             db_sess.add(session)
             db_sess.add(kernel)
             await db_sess.flush()
             # Seed normalized resource_allocations for this kernel
-            for slot_name, value in kernel.occupied_slots.items():
+            for slot_name, value in kernel_slots.items():
                 db_sess.add(
                     ResourceAllocationRow(
                         kernel_id=kernel.id,
@@ -703,7 +694,7 @@ class TestCheckPresetsOccupiedSlots:
                     )
                 )
             # Update AgentResourceRow.used to match kernel occupied slots
-            for slot_name, value in kernel.occupied_slots.items():
+            for slot_name, value in kernel_slots.items():
                 await db_sess.execute(
                     sa.update(AgentResourceRow)
                     .where(
@@ -813,14 +804,6 @@ class TestCheckPresetsOccupiedSlots:
                 cluster_role="main",
                 cluster_idx=1,
                 cluster_hostname="main",
-                occupied_slots=ResourceSlot({
-                    "cpu": Decimal("2"),
-                    "mem": Decimal("4096"),
-                }),
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("2"),
-                    "mem": Decimal("4096"),
-                }),
                 vfolder_mounts=[],
                 repl_in_port=0,
                 repl_out_port=0,
@@ -828,10 +811,11 @@ class TestCheckPresetsOccupiedSlots:
                 stdout_port=0,
             )
 
+            kernel_slots = ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")})
             db_sess.add(session)
             db_sess.add(kernel)
             await db_sess.flush()
-            for slot_name, value in kernel.occupied_slots.items():
+            for slot_name, value in kernel_slots.items():
                 db_sess.add(
                     ResourceAllocationRow(
                         kernel_id=kernel.id,
@@ -840,7 +824,7 @@ class TestCheckPresetsOccupiedSlots:
                         used=Decimal(str(value)),
                     )
                 )
-            for slot_name, value in kernel.occupied_slots.items():
+            for slot_name, value in kernel_slots.items():
                 await db_sess.execute(
                     sa.update(AgentResourceRow)
                     .where(
@@ -949,14 +933,6 @@ class TestCheckPresetsOccupiedSlots:
                 cluster_role="main",
                 cluster_idx=1,
                 cluster_hostname="main",
-                occupied_slots=ResourceSlot({  # Not yet occupied
-                    "cpu": Decimal("0"),
-                    "mem": Decimal("0"),
-                }),
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("8192"),
-                }),
                 vfolder_mounts=[],
                 repl_in_port=0,
                 repl_out_port=0,
@@ -964,11 +940,12 @@ class TestCheckPresetsOccupiedSlots:
                 stdout_port=0,
             )
 
+            kernel_requested = ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")})
             db_sess.add(session)
             db_sess.add(kernel)
             await db_sess.flush()
             # PENDING kernel: allocation exists with requested but no used
-            for slot_name, value in kernel.requested_slots.items():
+            for slot_name, value in kernel_requested.items():
                 db_sess.add(
                     ResourceAllocationRow(
                         kernel_id=kernel.id,
@@ -1045,23 +1022,15 @@ class TestCheckPresetsOccupiedSlots:
                 scaling_group=test_scaling_group_name,
                 resource_group_id=test_scaling_group_id,
                 schedulable=True,
-                available_slots=ResourceSlot({
-                    "cpu": Decimal("16"),
-                    "mem": Decimal("32768"),
-                }),
-                occupied_slots=ResourceSlot({
-                    # WRONG: cached value says 10 CPU occupied
-                    "cpu": Decimal("10"),
-                    "mem": Decimal("20480"),
-                }),
                 addr="10.0.0.2:2001",
                 version="v25.03.0",
                 architecture="x86_64",
             )
+            agent_capacity = ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("32768")})
             db_sess.add(agent)
             await db_sess.flush()
             # Seed normalized agent_resources (ACTUAL occupied = 3 CPU, 6144 mem)
-            for slot_name, capacity in agent.available_slots.items():
+            for slot_name, capacity in agent_capacity.items():
                 db_sess.add(
                     AgentResourceRow(
                         agent_id=agent_id,
@@ -1115,15 +1084,6 @@ class TestCheckPresetsOccupiedSlots:
                 cluster_role="main",
                 cluster_idx=1,
                 cluster_hostname="main",
-                occupied_slots=ResourceSlot({
-                    # ACTUAL: only 3 CPU occupied
-                    "cpu": Decimal("3"),
-                    "mem": Decimal("6144"),
-                }),
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("3"),
-                    "mem": Decimal("6144"),
-                }),
                 vfolder_mounts=[],
                 repl_in_port=0,
                 repl_out_port=0,
@@ -1131,10 +1091,11 @@ class TestCheckPresetsOccupiedSlots:
                 stdout_port=0,
             )
 
+            kernel_slots = ResourceSlot({"cpu": Decimal("3"), "mem": Decimal("6144")})
             db_sess.add(session)
             db_sess.add(kernel)
             await db_sess.flush()
-            for slot_name, value in kernel.occupied_slots.items():
+            for slot_name, value in kernel_slots.items():
                 db_sess.add(
                     ResourceAllocationRow(
                         kernel_id=kernel.id,
@@ -1144,7 +1105,7 @@ class TestCheckPresetsOccupiedSlots:
                     )
                 )
             # Update AgentResourceRow.used to match ACTUAL kernel occupied (3 CPU, 6144 mem)
-            for slot_name, value in kernel.occupied_slots.items():
+            for slot_name, value in kernel_slots.items():
                 await db_sess.execute(
                     sa.update(AgentResourceRow)
                     .where(
@@ -1602,8 +1563,6 @@ class TestCheckPresetsZeroValues:
                 scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 schedulable=True,
-                available_slots=_available,
-                occupied_slots=_occupied,
                 addr=addr,
                 version="v25.03.0",
                 architecture="x86_64",

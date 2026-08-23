@@ -1,9 +1,7 @@
 """Kernel and session slot values aggregated from ``resource_allocations``.
 
 ``resource_allocations`` is the authority for the requested amounts, the current
-occupancy, and what was ever allocated. The deprecated ``kernels.occupied_slots`` /
-``kernels.requested_slots`` / ``sessions.occupying_slots`` /
-``sessions.requested_slots`` columns are never read here.
+occupancy, and what was ever allocated.
 
 Which of the three a reader wants: ``used`` for what an owner holds right now,
 ``allocated`` for what it ever held (it survives termination, so statistics and

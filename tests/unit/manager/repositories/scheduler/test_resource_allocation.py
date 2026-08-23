@@ -348,8 +348,6 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                     region="local",
                     scaling_group=test_scaling_group_name,
                     resource_group_id=test_scaling_group_id,
-                    available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
-                    occupied_slots=ResourceSlot(),
                     addr="127.0.0.1:6001",
                     version="1.0.0",
                     architecture="x86_64",
@@ -407,7 +405,6 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                     status=SessionStatus.CREATING,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
-                    requested_slots=ResourceSlot({"cpu": cpu_requested, "mem": mem_requested}),
                     created_at=datetime.now(tzutc()),
                     images=["python:3.8"],
                     vfolder_mounts=[],
@@ -433,8 +430,6 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                     registry="docker.io",
                     status=kernel_status,
                     status_changed=datetime.now(tzutc()),
-                    occupied_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot({"cpu": cpu_requested, "mem": mem_requested}),
                     domain_name=domain_name,
                     group_id=group_id,
                     user_uuid=user_uuid,
@@ -610,7 +605,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         test_agent_id: str,
         resource_slot_types: None,
     ) -> None:
-        """update_kernel_status_running transitions kernel to RUNNING and sets occupied_slots."""
+        """update_kernel_status_running transitions kernel to RUNNING and marks the allocations used."""
         await self._seed_agent_resources(db_with_cleanup, test_agent_id)
         _, kernel_id = await self._create_kernel_with_pending_allocations(
             db_with_cleanup,
@@ -636,8 +631,20 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             ).scalar_one()
             assert kernel.status == KernelStatus.RUNNING
             assert kernel.container_id == "test-container"
-            assert kernel.occupied_slots["cpu"] is not None
-            assert kernel.occupied_slots["mem"] is not None
+            allocations = (
+                (
+                    await db_sess.execute(
+                        sa.select(ResourceAllocationRow).where(
+                            ResourceAllocationRow.kernel_id == kernel_id,
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            used_by_slot = {row.slot_name: row.used for row in allocations}
+            assert used_by_slot["cpu"] is not None
+            assert used_by_slot["mem"] is not None
 
     async def test_is_idempotent_via_double_call(
         self,

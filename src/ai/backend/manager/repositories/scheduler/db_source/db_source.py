@@ -1931,8 +1931,10 @@ class ScheduleDBSource:
             )
             kernel_result = await execute_rbac_bulk_entity_creator(db_sess, kernel_rbac_creator)
 
-            for kernel_row in kernel_result.rows:
-                quantities = resource_slot_to_quantities(kernel_row.requested_slots)
+            for kernel_spec, kernel_row in zip(
+                kernel_creator_specs, kernel_result.rows, strict=False
+            ):
+                quantities = resource_slot_to_quantities(kernel_spec.requested_slots())
                 if quantities:
                     await db_sess.execute(
                         sa.insert(ResourceAllocationRow),
@@ -2705,7 +2707,6 @@ class ScheduleDBSource:
                     status_info=reason,
                     status_changed=now,
                     starts_at=now,
-                    occupied_slots=occupied_slots,
                     container_id=creation_info.container_id,
                     attached_devices=attached_devices,
                     repl_in_port=creation_info.repl_in_port,

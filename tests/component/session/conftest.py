@@ -27,7 +27,7 @@ from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.common.plugin.monitor import ErrorPluginContext
-from ai.backend.common.types import AgentId, ResourceSlot, SessionTypes
+from ai.backend.common.types import AgentId, SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,
@@ -205,8 +205,6 @@ async def agent_fixture(
                 region="local",
                 scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
-                available_slots=ResourceSlot(),
-                occupied_slots=ResourceSlot(),
                 addr="127.0.0.1:6001",
                 version="test",
                 architecture="x86_64",
@@ -264,8 +262,6 @@ async def session_seed(
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -290,8 +286,6 @@ async def session_seed(
                 agent=agent_fixture,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -361,8 +355,6 @@ async def terminated_session_seed(
                 status=SessionStatus.TERMINATED,
                 status_info="user-requested",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
                 terminated_at=now,
             )
@@ -387,8 +379,6 @@ async def terminated_session_seed(
                 resource_group_id=resource_group_id,
                 status=KernelStatus.TERMINATED,
                 status_info="user-requested",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -455,8 +445,6 @@ async def user_session_seed(
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -480,8 +468,6 @@ async def user_session_seed(
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,

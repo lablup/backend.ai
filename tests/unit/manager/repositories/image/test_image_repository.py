@@ -19,7 +19,7 @@ from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.types import BinarySize, KernelId, ResourceSlot, SessionId
+from ai.backend.common.types import BinarySize, KernelId, SessionId
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
@@ -664,8 +664,6 @@ class TestImageRepositoryLastUsedAt:
                     group_id=group.id,
                     domain_name=domain.name,
                     scaling_group_name=resource_group,
-                    occupying_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
                     vfolder_mounts=[],
                 )
                 db_sess.add(session)
@@ -679,8 +677,6 @@ class TestImageRepositoryLastUsedAt:
                     domain_name=domain.name,
                     group_id=group.id,
                     user_uuid=user.uuid,
-                    occupied_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
                     repl_in_port=0,
                     repl_out_port=0,
                     stdin_port=0,

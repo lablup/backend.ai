@@ -37,7 +37,6 @@ from ai.backend.manager.models.base import (
     Base,
     CurvePublicKeyColumn,
     EnumType,
-    ResourceSlotColumn,
 )
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac import (
@@ -95,16 +94,6 @@ class AgentRow(Base):
     )
     schedulable: Mapped[bool] = mapped_column(
         "schedulable", sa.Boolean(), nullable=False, server_default=true(), default=True
-    )
-    # DEPRECATED (BA-7439): No longer read. Agent capacity is served by the
-    # normalized agent_resources table; will be dropped in BA-7440.
-    available_slots: Mapped[ResourceSlot] = mapped_column(
-        "available_slots", ResourceSlotColumn(), nullable=False
-    )
-    # DEPRECATED (Phase 3, BA-4308): No longer written to; no longer read (BA-7439).
-    # Agent occupied slots are tracked by the normalized agent_resources table.
-    occupied_slots: Mapped[ResourceSlot] = mapped_column(
-        "occupied_slots", ResourceSlotColumn(), nullable=False
     )
     addr: Mapped[str] = mapped_column("addr", sa.String(length=128), nullable=False)
     public_host: Mapped[str | None] = mapped_column(

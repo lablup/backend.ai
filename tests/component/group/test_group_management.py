@@ -197,8 +197,6 @@ async def group_with_vfolder_mounted(
                 scaling_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
             )
         )
         # Create active kernel with mount
@@ -221,8 +219,6 @@ async def group_with_vfolder_mounted(
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
-                occupied_slots=ResourceSlot({}),
-                requested_slots=ResourceSlot({}),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -324,8 +320,6 @@ async def group_with_active_kernel(
                 scaling_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
             )
         )
         # Create active kernel
@@ -348,8 +342,6 @@ async def group_with_active_kernel(
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
-                occupied_slots=ResourceSlot({}),
-                requested_slots=ResourceSlot({}),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
