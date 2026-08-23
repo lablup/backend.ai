@@ -21,12 +21,12 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.role_invitation.types import (
+from ai.backend.manager.models.role_invitation.scopes import (
     InviteeOperationScope,
     InviterOperationScope,
     RoleInvitationOperationScope,
 )
+from ai.backend.manager.repositories.base import BatchQuerier
 
 # ------------------------------------------------------------------ scope base (create, search)
 

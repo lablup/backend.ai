@@ -31,6 +31,9 @@ from ai.backend.manager.models.deployment_revision_preset.creators import (
 )
 from ai.backend.manager.models.deployment_revision_preset.purgers import DeploymentPresetPurger
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.deployment_revision_preset.scopes import (
+    DeploymentPresetSlotOperationScope,
+)
 from ai.backend.manager.models.deployment_revision_preset.searchers import (
     PresetResourceSlotSearcher,
 )
@@ -46,9 +49,6 @@ from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRo
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
-)
-from ai.backend.manager.repositories.deployment_revision_preset.types import (
-    DeploymentPresetSlotOperationScope,
 )
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider

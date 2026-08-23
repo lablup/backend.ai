@@ -1,7 +1,4 @@
-"""Types for user repository operations.
-
-Contains Scope dataclasses for search operations.
-"""
+"""Operation scopes for users."""
 
 from __future__ import annotations
 

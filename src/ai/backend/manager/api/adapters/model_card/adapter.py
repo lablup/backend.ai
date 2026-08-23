@@ -70,22 +70,20 @@ from ai.backend.manager.data.model_card.types import (
     ResourceRequirementEntry,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.model_card.conditions import ModelCardConditions
 from ai.backend.manager.models.model_card.creators import ModelCardCreator
 from ai.backend.manager.models.model_card.orders import ModelCardOrders
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.scopes import VFolderModelCardOperationScope
 from ai.backend.manager.models.model_card.searchers import (
     ModelCardResourceRequirementSearcher,
     ModelCardSearcher,
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import combine_conditions_or, negate_conditions
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.purgers import ModelCardPurgerSpec
-from ai.backend.manager.repositories.model_card.types import (
-    VFolderModelCardOperationScope,
-)
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.model_card.actions.available_presets import (

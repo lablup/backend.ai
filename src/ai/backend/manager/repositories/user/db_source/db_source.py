@@ -61,6 +61,7 @@ from ai.backend.manager.models.keypair import (
     generate_keypair_data,
     keypairs,
 )
+from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
 from ai.backend.manager.models.project import (
     ProjectRow,
     ProjectType,
@@ -79,6 +80,11 @@ from ai.backend.manager.models.session import (
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.types import join_by_related_field
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
+from ai.backend.manager.models.user.scopes import (
+    DomainUserOperationScope,
+    ProjectUserOperationScope,
+    RoleUserOperationScope,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     VFolderDeletionInfo,
@@ -104,9 +110,6 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
-from ai.backend.manager.repositories.keypair.types import (
-    UserKeypairOperationScope,
-)
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
     FullUserCreation,
@@ -128,11 +131,6 @@ from ai.backend.manager.repositories.user.purgers import (
     create_user_project_role_purger,
     create_user_session_group_purger,
     create_user_vfolder_permission_purger,
-)
-from ai.backend.manager.repositories.user.types import (
-    DomainUserOperationScope,
-    ProjectUserOperationScope,
-    RoleUserOperationScope,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec, UserUpdateSpec
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion

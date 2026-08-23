@@ -1,4 +1,4 @@
-"""Types for scheduling history repository scopes."""
+"""Operation scopes for scheduling history."""
 
 from __future__ import annotations
 
@@ -13,10 +13,7 @@ from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.errors.deployment import EndpointNotFound
-from ai.backend.manager.errors.kernel import (
-    KernelNotFound,
-    SessionNotFound,
-)
+from ai.backend.manager.errors.kernel import KernelNotFound, SessionNotFound
 from ai.backend.manager.errors.service import RouteNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint import EndpointRow
@@ -33,16 +30,13 @@ from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.session import SessionRow
 
 __all__ = (
-    "SessionSchedulingHistoryOperationScope",
-    "KernelKernelHistoryOperationScope",
-    "SessionKernelHistoryOperationScope",
     "DeploymentHistoryOperationScope",
     "DeploymentReplicaGroupHistoryOperationScope",
+    "KernelKernelHistoryOperationScope",
     "RouteHistoryOperationScope",
+    "SessionKernelHistoryOperationScope",
+    "SessionSchedulingHistoryOperationScope",
 )
-
-
-# Session Scheduling History Scope
 
 
 @dataclass(frozen=True)
@@ -73,9 +67,6 @@ class SessionSchedulingHistoryOperationScope(OperationScope):
                 error=SessionNotFound(str(self.session_id)),
             ),
         ]
-
-
-# Kernel Scheduling History Scope
 
 
 @dataclass(frozen=True)
@@ -141,9 +132,6 @@ class SessionKernelHistoryOperationScope(OperationScope):
         ]
 
 
-# Deployment History Scope
-
-
 @dataclass(frozen=True)
 class DeploymentHistoryOperationScope(OperationScope):
     """Scope for deployment scheduling history search.
@@ -172,9 +160,6 @@ class DeploymentHistoryOperationScope(OperationScope):
                 error=EndpointNotFound(str(self.deployment_id)),
             ),
         ]
-
-
-# Replica Group History Scope
 
 
 @dataclass(frozen=True)
@@ -207,9 +192,6 @@ class DeploymentReplicaGroupHistoryOperationScope(OperationScope):
                 error=EndpointNotFound(str(self.deployment_id)),
             ),
         ]
-
-
-# Route History Scope
 
 
 @dataclass(frozen=True)

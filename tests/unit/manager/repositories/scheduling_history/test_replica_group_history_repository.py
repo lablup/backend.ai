@@ -54,15 +54,15 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scheduling_history.scopes import (
+    DeploymentReplicaGroupHistoryOperationScope,
+)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
-from ai.backend.manager.repositories.scheduling_history.types import (
-    DeploymentReplicaGroupHistoryOperationScope,
-)
 from ai.backend.testutils.db import with_tables
 
 

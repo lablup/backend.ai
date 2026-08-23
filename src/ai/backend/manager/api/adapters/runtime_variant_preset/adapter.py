@@ -38,6 +38,7 @@ from ai.backend.manager.data.runtime_variant_preset.types import (
     UIOptionData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.runtime_variant_preset.conditions import (
     RuntimeVariantPresetConditions,
 )
@@ -47,10 +48,6 @@ from ai.backend.manager.models.runtime_variant_preset.searchers import (
     RuntimeVariantPresetSearcher,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import (
-    combine_conditions_or,
-    negate_conditions,
-)
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.runtime_variant_preset.creators import (

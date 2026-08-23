@@ -28,15 +28,15 @@ from ai.backend.manager.models.scheduling_history import (
     RouteHistoryRow,
     SessionSchedulingHistoryRow,
 )
+from ai.backend.manager.models.scheduling_history.scopes import (
+    DeploymentHistoryOperationScope,
+    RouteHistoryOperationScope,
+    SessionSchedulingHistoryOperationScope,
+)
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
-)
-from ai.backend.manager.repositories.scheduling_history.types import (
-    DeploymentHistoryOperationScope,
-    RouteHistoryOperationScope,
-    SessionSchedulingHistoryOperationScope,
 )
 
 if TYPE_CHECKING:

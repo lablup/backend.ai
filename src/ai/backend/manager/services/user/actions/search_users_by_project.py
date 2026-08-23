@@ -11,8 +11,8 @@ from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.user.scopes import ProjectUserOperationScope
 from ai.backend.manager.models.user.searchers import UserSearcher
-from ai.backend.manager.repositories.user.types import ProjectUserOperationScope
 
 __all__ = ("SearchUsersByProjectAction",)
 

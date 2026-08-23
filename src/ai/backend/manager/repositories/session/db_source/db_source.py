@@ -53,6 +53,7 @@ from ai.backend.manager.models.session import (
     SessionRow,
     batch_populate_session_occupied_slots,
 )
+from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
 from ai.backend.manager.models.session_template import SessionTemplateRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole, UserRow
@@ -64,7 +65,6 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
-from ai.backend.manager.repositories.session.types import ProjectSessionOperationScope
 from ai.backend.manager.utils import query_userinfo
 
 

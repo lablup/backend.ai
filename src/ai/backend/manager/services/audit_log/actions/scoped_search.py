@@ -12,12 +12,12 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.v2.ops.base import BulkScopedSearchOpsAction
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.audit_log.row import AuditLogRow
-from ai.backend.manager.models.audit_log.searchers import AuditLogSearcher
-from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.repositories.audit_log.types import (
+from ai.backend.manager.models.audit_log.scopes import (
     EntityAuditLogOperationScope,
     TriggeredByAuditLogOperationScope,
 )
+from ai.backend.manager.models.audit_log.searchers import AuditLogSearcher
+from ai.backend.manager.models.scopes import OperationScope
 
 
 class AuditLogScopeItem(ABC):

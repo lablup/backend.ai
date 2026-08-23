@@ -37,7 +37,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, RoleIdPathParam
-from ai.backend.manager.repositories.permission_controller.types import ScopedRoleOperationScope
+from ai.backend.manager.models.rbac_models.scopes import ScopedRoleOperationScope
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
