@@ -3,14 +3,13 @@ from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_card.types import ModelCardData
-from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.services.model_card.actions.base import ModelCardSingleEntityAction
 
 
 @dataclass
 class UpdateModelCardAction(ModelCardSingleEntityAction):
-    updater: Updater[ModelCardRow]
+    updater: ModelCardUpdater
 
     @override
     @classmethod

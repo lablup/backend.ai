@@ -38,6 +38,7 @@ from ai.backend.manager.errors.resource import (
 from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -61,7 +62,6 @@ from ai.backend.manager.repositories.base.upserter import BulkUpserter, execute_
 from ai.backend.manager.repositories.model_card.types import (
     AvailablePresetsSearchResult,
 )
-from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
 from ai.backend.manager.repositories.vfolder.updaters import VFolderTrashUpdaterSpec
 from ai.backend.manager.types import TriState
@@ -75,23 +75,18 @@ class ModelCardDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def update(self, updater: Updater[ModelCardRow]) -> ModelCardData:
+    async def update(self, updater: ModelCardUpdater) -> ModelCardData:
         async with self._db.begin_session() as session:
-            result = await execute_updater(session, updater)
-            # execute_updater returns the current row even when build_values() is empty
-            # (e.g. a child-only update that syncs model_card_resource_requirements), and
-            # None only when the row is missing.
-            if result is None:
-                raise ModelCardNotFound(f"Model card with ID {updater.pk_value} not found.")
-            row = result.row
+            # The card comes back even when build_values() is empty (a child-only update
+            # that syncs model_card_resource_requirements); None means it is missing.
+            data = await V2WriteOps(session).update_data(updater)
+            if data is None:
+                raise ModelCardNotFound(f"Model card with ID {updater.card_id} not found.")
 
-            # Sync the normalized model_card_resource_requirements table when
-            # the updater spec requests a change. Plain column UPDATE cannot
-            # touch this child table, so we delete-then-insert explicitly.
-            if isinstance(updater.spec, ModelCardUpdaterSpec):
-                await self._apply_min_resource_change(session, row.id, updater.spec.min_resource)
+            # Plain column UPDATE cannot touch the child table, so replace it explicitly.
+            await self._apply_min_resource_change(session, data.id, updater.min_resource)
 
-            return row.to_data()
+            return data
 
     async def _apply_min_resource_change(
         self,

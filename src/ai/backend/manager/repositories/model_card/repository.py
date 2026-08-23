@@ -15,9 +15,9 @@ from ai.backend.manager.data.model_card.types import (
     VFolderScanData,
 )
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.types import (
     AvailablePresetsSearchResult,
 )
@@ -34,7 +34,7 @@ class ModelCardRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = ModelCardDBSource(db)
 
-    async def update(self, updater: Updater[ModelCardRow]) -> ModelCardData:
+    async def update(self, updater: ModelCardUpdater) -> ModelCardData:
         return await self._db_source.update(updater)
 
     async def delete(

@@ -66,6 +66,7 @@ from ai.backend.manager.models.session import (
     by_status,
     get_permission_ctx,
 )
+from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -76,8 +77,6 @@ from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import agg_to_array
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.vfolder import get_permission_ctx as get_vfolder_permission_ctx
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.services.session.actions.update_session import UpdateSessionAction
 from ai.backend.manager.types import OptionalState
 
@@ -924,12 +923,10 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):  # type: ignore[mis
         result = await graph_ctx.processors.session.update_session.run(
             UpdateSessionAction(
                 session_id=SessionID(session_id),
-                updater=Updater(
-                    spec=SessionUpdaterSpec(
-                        name=OptionalState[str].from_graphql(name),
-                        priority=OptionalState[int].from_graphql(priority),
-                    ),
-                    pk_value=session_id,
+                updater=SessionUpdater(
+                    session_id=SessionID(session_id),
+                    name=OptionalState[str].from_graphql(name),
+                    priority=OptionalState[int].from_graphql(priority),
                 ),
             )
         )
