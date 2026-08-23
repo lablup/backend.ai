@@ -53,10 +53,10 @@ from ai.backend.manager.models.user import (
     UserStatus,
     compare_to_hashed_password,
 )
+from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.project.repository import ProjectRepository
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -489,8 +489,8 @@ class AuthService:
             salt_size=auth_config.password_hash_salt_size,
         )
 
-        user_spec = UserCreatorSpec(
-            domain_name=action.domain_name,
+        user_spec = UserCreator(
+            domain_id=await self._auth_repository.domain_id(action.domain_name),
             username=action.username if action.username is not None else action.email,
             email=action.email,
             password=password_info,
@@ -504,7 +504,7 @@ class AuthService:
             sudo_session_enabled=False,
         )
         if user_data_overriden:
-            spec_fields = {f.name for f in dataclasses.fields(UserCreatorSpec)}
+            spec_fields = {f.name for f in dataclasses.fields(UserCreator)}
             overrides = {
                 # Hooks name the DB column; the spec field is integration_name.
                 ("integration_name" if key == "integration_id" else key): val

@@ -36,7 +36,6 @@ from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
-from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import (
     UserRole,
     UserRow,
@@ -45,11 +44,11 @@ from ai.backend.manager.models.user import (
     compare_to_hashed_password,
     users,
 )
+from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
-from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.ops.rbac.provider import FullUserCreation, RBACOpsProvider
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec, UserScopeCreation
+from ai.backend.manager.repositories.user.creators import UserScopeCreation
 
 auth_db_source_resilience = Resilience(
     policies=[
@@ -118,9 +117,20 @@ class AuthDBSource:
             return row is not None
 
     @auth_db_source_resilience.apply()
+    async def fetch_domain_id(self, domain_name: str) -> DomainID:
+        """The id of the domain a signup names."""
+        async with self._db.begin_readonly() as conn:
+            domain_id = await conn.scalar(
+                sa.select(DomainRow.id).where(DomainRow.name == domain_name)
+            )
+        if domain_id is None:
+            raise UserCreationBadRequest(f"Domain '{domain_name}' does not exist.")
+        return DomainID(domain_id)
+
+    @auth_db_source_resilience.apply()
     async def insert_user_with_keypair(
         self,
-        user_spec: UserCreatorSpec,
+        user_spec: UserCreator,
         project_ids: Collection[ProjectID],
         *,
         keypair_resource_policy: str,
@@ -129,19 +139,10 @@ class AuthDBSource:
         """Provision a signup user in one transaction: the row, its default keypair,
         and its domain/project (model-store included) scope enrollments."""
         async with self._rbac_ops_provider.write_ops() as w:
-            domain_result = await w.batch_query_in_global(
-                sa.select(DomainRow.id).where(DomainRow.name == user_spec.domain_name),
-                BatchQuerier(pagination=NoPagination()),
-            )
-            if not domain_result.rows:
-                raise UserCreationBadRequest(f"Domain '{user_spec.domain_name}' does not exist.")
-            domain_id = DomainID(domain_result.rows[0].id)
-            user_spec.domain_id = domain_id
-
             result = await w.create_full_user(
                 FullUserCreation(
                     creation=UserScopeCreation(spec=user_spec),
-                    domain_id=domain_id,
+                    domain_id=user_spec.domain_id,
                     project_ids=project_ids,
                     keypair_resource_policy=keypair_resource_policy,
                     keypair_rate_limit=keypair_rate_limit,

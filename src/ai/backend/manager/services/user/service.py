@@ -148,10 +148,7 @@ class UserService:
         return BulkCreateUserActionResult(data=result)
 
     async def update_user(self, action: UpdateUserAction) -> UpdateUserActionResult:
-        user_data = await self._user_repository.update_user_by_uuid_validated(
-            user_uuid=action.user_id,
-            updater=action.updater,
-        )
+        user_data = await self._user_repository.update_user_by_uuid_validated(action.updater)
         return UpdateUserActionResult(data=user_data)
 
     async def bulk_modify_users(self, action: BulkUpdateUserAction) -> BulkUpdateUserActionResult:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
@@ -110,6 +110,7 @@ from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
 from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.user.conditions import UserConditions
+from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.orders import UserOrders
 from ai.backend.manager.models.user.row import UserRole as UserRoleModel
 from ai.backend.manager.models.user.row import UserRow
@@ -118,10 +119,7 @@ from ai.backend.manager.models.user.scopes import (
     ProjectUserOperationScope,
 )
 from ai.backend.manager.models.user.searchers import UserSearcher
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
-from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
@@ -200,7 +198,8 @@ class UserAdapter(BaseAdapter):
         super().__init__(processors)
         self._auth_config = auth_config
 
-    async def _resolve_domain_id(self, domain_name: str) -> DomainID:
+    async def resolve_domain_id(self, domain_name: str) -> DomainID:
+        """The domain's id, for callers that only hold its name."""
         result = await self._processors.domain.lookup.run(
             LookupDomainAction(name=DomainName(domain_name))
         )
@@ -281,7 +280,7 @@ class UserAdapter(BaseAdapter):
         )
         result = await self._processors.user.search_users_by_domain.run(
             SearchUsersByDomainAction(
-                domain_id=await self._resolve_domain_id(scope.domain_name),
+                domain_id=await self.resolve_domain_id(scope.domain_name),
                 domain_name=scope.domain_name,
                 searcher=searcher,
             )
@@ -352,7 +351,7 @@ class UserAdapter(BaseAdapter):
         searcher = self._build_search_searcher(input)
         result = await self._processors.user.search_users_by_domain.run(
             SearchUsersByDomainAction(
-                domain_id=await self._resolve_domain_id(domain_name),
+                domain_id=await self.resolve_domain_id(domain_name),
                 domain_name=domain_name,
                 searcher=searcher,
             )
@@ -424,12 +423,12 @@ class UserAdapter(BaseAdapter):
             rounds=self._auth_config.password_hash_rounds,
             salt_size=self._auth_config.password_hash_salt_size,
         )
-        spec = UserCreatorSpec(
+        creator = UserCreator(
+            domain_id=await self.resolve_domain_id(input.domain_name),
             email=input.email,
             username=input.username,
             password=password_info,
             need_password_change=input.need_password_change,
-            domain_name=input.domain_name,
             full_name=input.full_name,
             description=input.description,
             status=UserStatus(input.status),
@@ -444,13 +443,8 @@ class UserAdapter(BaseAdapter):
             integration_name=input.integration_name,
         )
         group_ids = [str(gid) for gid in input.group_ids] if input.group_ids else None
-        domain_id = await self._resolve_domain_id(spec.domain_name)
         result = await self._processors.user.create_user.run(
-            CreateUserAction(
-                domain_id=domain_id,
-                creator=Creator(spec=spec),
-                group_ids=group_ids,
-            )
+            CreateUserAction(creator=creator, group_ids=group_ids)
         )
         return CreateUserPayload(
             user=await self._user_node(result.data.user),
@@ -459,7 +453,8 @@ class UserAdapter(BaseAdapter):
 
     async def update_user_by_id(self, user_id: UUID, input: UpdateUserInput) -> UpdateUserPayload:
         """Update a user by UUID."""
-        updater_spec = UserUpdaterSpec(
+        updater = UserUpdater(
+            user_id=UserID(user_id),
             username=(
                 OptionalState.update(input.username)
                 if input.username is not None
@@ -552,10 +547,7 @@ class UserAdapter(BaseAdapter):
                 else OptionalState.update([str(gid) for gid in input.group_ids])
             ),
         )
-        updater: Updater[UserRow] = Updater(spec=updater_spec, pk_value=user_id)
-        result = await self._processors.user.update_user.run(
-            UpdateUserAction(user_id=UserID(user_id), updater=updater)
-        )
+        result = await self._processors.user.update_user.run(UpdateUserAction(updater=updater))
         if not isinstance(input.main_access_key, Sentinel) and input.main_access_key is not None:
             await self.switch_default_access_key(UserID(user_id), AccessKey(input.main_access_key))
         return UpdateUserPayload(user=await self._user_node(result.data))
@@ -600,10 +592,8 @@ class UserAdapter(BaseAdapter):
         failed = [
             BulkCreateUserV2Error(
                 index=error.index,
-                username=(
-                    spec := cast(UserCreatorSpec, action.items[error.index].creator.spec)
-                ).username,
-                email=spec.email,
+                username=(creator := action.items[error.index].creator).username,
+                email=creator.email,
                 message=str(error.exception),
             )
             for error in result.data.failures
@@ -629,10 +619,8 @@ class UserAdapter(BaseAdapter):
         failed = [
             BulkCreateUserV2Error(
                 index=error.index,
-                username=(
-                    spec := cast(UserCreatorSpec, action.items[error.index].creator.spec)
-                ).username,
-                email=spec.email,
+                username=(creator := action.items[error.index].creator).username,
+                email=creator.email,
                 message=str(error.exception),
             )
             for error in result.data.failures
