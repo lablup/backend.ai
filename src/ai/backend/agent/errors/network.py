@@ -32,6 +32,28 @@ class LocalSubnetPoolExhausted(BackendAIError, web.HTTPServiceUnavailable):
         )
 
 
+class LocalSubnetSourceUnwired(BackendAIError, web.HTTPInternalServerError):
+    """The session network was built with no way to look up a session's LOCAL subnet.
+
+    Exactly one source is correct: this process's own journal when it owns the node's pool, or an
+    RPC to the privnet when the privnet owns it. With neither, ``local_subnet_of`` answers None for
+    every session, which reads as "no block claimed" — so single-node peer layout silently loses
+    its addresses and the cluster resolver refuses to start. Raise where the wiring is decided,
+    not several layers down where the symptom appears.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/local-subnet-source-unwired"
+    error_title = "The session network has no source for node-local subnet lookups."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class LocalSubnetLayoutChanged(BackendAIError, web.HTTPInternalServerError):
     """The node-local pool was re-cut while sessions still hold blocks from the old one.
 

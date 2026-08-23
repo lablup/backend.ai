@@ -6,6 +6,7 @@ from typing import Any, cast, override
 
 import pytest
 
+import ai.backend.agent.containerd.session_network as session_network_mod
 from ai.backend.agent.containerd.oci import OWNER_AGENT_LABEL, SESSION_ID_LABEL
 from ai.backend.agent.containerd.runtime.interface import ExecResult, OciRuntime, TaskHandle
 from ai.backend.agent.containerd.session_network import (
@@ -14,7 +15,13 @@ from ai.backend.agent.containerd.session_network import (
     build_containerd_session_network,
     session_net_meta_from_network_config,
 )
-from ai.backend.agent.errors.network import SessionNetworkGone, UnusableVtep
+from ai.backend.agent.errors.network import (
+    LocalSubnetSourceUnwired,
+    SessionNetworkGone,
+    UnusableVtep,
+)
+from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
+from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.network.types import (
     AgentNetworkCaps,
@@ -71,31 +78,50 @@ class FakeEtcd:
         yield  # pragma: no cover
 
 
-class RecordingBackend:
+class RecordingBackend(AbstractNetworkAgentPluginV2[Any]):
     """Minimal AbstractNetworkAgentPluginV2-shaped stub recording setup calls."""
 
     def __init__(self) -> None:
+        super().__init__({}, {})
         self.setup: list[str] = []
         self.adopted: list[str] = []
         self.torndown: list[str] = []
         self.last_self_member: Member | None = None
+        self.dns_redirected: list[tuple[str, int]] = []
+        self.dns_torn_down: list[str] = []
+        self.detached: list[Any] = []
 
+    @override
     async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
         self.setup.append(meta.session_id)
         self.last_self_member = self_member
 
+    @override
     async def adopt_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
         self.adopted.append(meta.session_id)
         self.last_self_member = self_member
 
+    @override
     async def teardown_session_network(self, session_id: str) -> None:
         self.torndown.append(session_id)
 
+    @override
+    async def setup_dns_redirect(self, session_id: str, loopback_port: int) -> None:
+        self.dns_redirected.append((session_id, loopback_port))
+
+    @override
+    async def teardown_dns_redirect(self, session_id: str) -> None:
+        self.dns_torn_down.append(session_id)
+
+    @override
     async def add_peer(self, session_id: str, peer: Member) -> None: ...
+    @override
     async def del_peer(self, session_id: str, peer: Member) -> None: ...
+    @override
     async def probe_caps(self) -> AgentNetworkCaps:
         return AgentNetworkCaps(tunnel_offload=False)
 
+    @override
     async def attach_endpoint(
         self, kernel_config: Any, cluster_info: Any, *, meta: SessionNetMeta
     ) -> EndpointPlan:
@@ -109,6 +135,18 @@ class RecordingBackend:
                 )
             ]
         )
+
+    # AbstractPlugin's lifecycle: nothing to set up or tear down in a recording stub, but the
+    # interface requires them — and requiring them is the point of subclassing it here.
+    @override
+    async def init(self, context: Any | None = None) -> None: ...
+    @override
+    async def cleanup(self) -> None: ...
+    @override
+    async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None: ...
+    @override
+    async def detach_endpoint(self, kernel: Any) -> None:
+        self.detached.append(kernel)
 
 
 class _ContainerInfo:
@@ -252,6 +290,36 @@ class RecordingRunner:
         self.calls.append((command, netns))
 
 
+async def _local_subnet_of(_session_id: str) -> str | None:
+    """The node's LOCAL /26 for the session — claimed by setup_session_network, looked up here.
+
+    Production always answers this from one of two sources (the node's own journal in-process, or
+    an RPC to the privnet that owns the pool), so `None` — which makes ensure_cluster_dns fail
+    loudly — is a state only an under-wired test can reach.
+    """
+    return "10.128.5.0/26"
+
+
+class _StubDNSServer:
+    """Stands in for the cluster resolver: reports an OS-assigned port without opening a socket.
+
+    Attaching a container brings the session's resolver up, but nothing in this module is about
+    DNS (that is test_session_network_dns.py). A real one here would bind a loopback UDP port per
+    test and outlive the two tests that do not tear their session down.
+    """
+
+    def __init__(self, resolver: Any, bind_host: str, *, port: int = 53) -> None:
+        self.port = 45321 if port == 0 else port
+
+    async def start(self) -> None: ...
+    async def stop(self) -> None: ...
+
+
+@pytest.fixture(autouse=True)
+def _stub_cluster_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(session_network_mod, "ClusterDNSServer", _StubDNSServer)
+
+
 def _facade(
     etcd: FakeEtcd,
     backend: RecordingBackend,
@@ -269,7 +337,50 @@ def _facade(
         cni_runner=runner,
         backends=backends or {"vxlan": cast(Any, backend), "bridge": cast(Any, backend)},
         vtep_ip=vtep_ip,
+        privnet_local_subnet=_local_subnet_of,
     )
+
+
+class TestLocalSubnetWiring:
+    """Exactly one LOCAL-subnet source, enforced where the wiring is chosen.
+
+    With neither, `local_subnet_of` answers None for every session — which the agent cannot tell
+    from "no block claimed", so single-node peer layout loses its addresses and the cluster
+    resolver refuses to start, several layers away from the actual mistake. That is not
+    hypothetical: it is what let this module's own harness drift out of resembling the agent and
+    still pass. `build_containerd_session_network` is the only production caller and always picks
+    exactly one, so nothing legitimate is rejected here.
+    """
+
+    def _build(self, **wiring: Any) -> ContainerdSessionNetwork:
+        return ContainerdSessionNetwork(
+            cast(AbstractKVStore, FakeEtcd()),
+            agent_id="agent-1",
+            host_ip="192.168.0.10",
+            runtime=FakeRuntime(),
+            cni_runner=RecordingRunner(),
+            backends={},
+            **wiring,
+        )
+
+    def test_neither_source_is_refused(self) -> None:
+        with pytest.raises(LocalSubnetSourceUnwired):
+            self._build()
+
+    def test_both_sources_are_refused(self) -> None:
+        """Two owners of one pool: the journal this process reconciles and the privnet's would
+        hand out the same block to different sessions."""
+        with pytest.raises(LocalSubnetSourceUnwired):
+            self._build(
+                local_subnets=LocalSubnetAllocator(),
+                privnet_local_subnet=_local_subnet_of,
+            )
+
+    def test_the_in_process_mode_is_accepted(self) -> None:
+        assert self._build(local_subnets=LocalSubnetAllocator()) is not None
+
+    def test_the_privnet_mode_is_accepted(self) -> None:
+        assert self._build(privnet_local_subnet=_local_subnet_of) is not None
 
 
 class TestEnsureSession:

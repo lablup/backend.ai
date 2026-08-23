@@ -31,6 +31,7 @@ from ai.backend.agent.containerd.runtime.interface import ExecResult, OciRuntime
 from ai.backend.agent.containerd.session_tracker import SessionContainerTracker, TeardownScope
 from ai.backend.agent.errors.network import (
     ClusterDNSStartError,
+    LocalSubnetSourceUnwired,
     SessionNetworkGone,
     UnusableVtep,
 )
@@ -175,6 +176,16 @@ class ContainerdSessionNetwork:
         self._configured_dns = tuple(configured_dns)
         self._tracker = SessionContainerTracker()
         self._attachments = {}
+        if (local_subnets is None) == (privnet_local_subnet is None):
+            # Exactly one, always: this process owns the node's pool, or the privnet does. Neither
+            # makes every local_subnet_of answer None — indistinguishable from "no block claimed",
+            # so peer layout loses its addresses and the resolver refuses to start, several layers
+            # from the actual mistake. Both would mean two owners of one pool. Refuse at the point
+            # the wiring is chosen; there is exactly one production caller, and a test harness that
+            # trips this is a harness that no longer resembles the agent.
+            raise LocalSubnetSourceUnwired(
+                "exactly one of local_subnets / privnet_local_subnet must be given"
+            )
         self._local_subnets = local_subnets
         # In privnet mode this process owns no LOCAL journal, so the subnet lookup single-node peer
         # resolution needs is delegated to the privnet, which does own the pool. None in-process,

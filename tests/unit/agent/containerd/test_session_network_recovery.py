@@ -10,7 +10,7 @@ import json
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, cast, override
 
 import pytest
 
@@ -18,6 +18,7 @@ from ai.backend.agent.containerd.oci import OWNER_AGENT_LABEL, SESSION_ID_LABEL
 from ai.backend.agent.containerd.session_network import ContainerdSessionNetwork
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
 from ai.backend.agent.network.native_attacher import HostLocalIpam
+from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
 from ai.backend.common.network.keys import endpoint_key, member_key, session_meta_key
 from ai.backend.common.network.types import (
     AgentNetworkCaps,
@@ -87,31 +88,42 @@ class FakeRuntime:
         self.pids.pop(container_id, None)
 
 
-class RecordingBackend:
+class RecordingBackend(AbstractNetworkAgentPluginV2[Any]):
     """Records which lifecycle verb the coordinator drove, so a resume can be told from a setup."""
 
     def __init__(self) -> None:
+        super().__init__({}, {})
         self.setup: list[str] = []
         self.adopted: list[str] = []
         self.torndown: list[str] = []
+        self.detached: list[Any] = []
 
+    @override
     async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
         self.setup.append(meta.session_id)
 
+    @override
     async def adopt_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
         self.adopted.append(meta.session_id)
 
+    @override
     async def teardown_session_network(self, session_id: str) -> None:
         self.torndown.append(session_id)
 
+    @override
     async def add_peer(self, session_id: str, peer: Member) -> None: ...
+    @override
     async def del_peer(self, session_id: str, peer: Member) -> None: ...
+    @override
     async def add_endpoint(self, session_id: str, **kwargs: Any) -> None: ...
+    @override
     async def del_endpoint(self, session_id: str, **kwargs: Any) -> None: ...
 
+    @override
     async def probe_caps(self) -> AgentNetworkCaps:
         return AgentNetworkCaps(tunnel_offload=False)
 
+    @override
     async def attach_endpoint(
         self, kernel_config: Any, cluster_info: Any, *, meta: SessionNetMeta
     ) -> EndpointPlan:
@@ -131,6 +143,18 @@ class RecordingBackend:
             ]
         )
 
+    # AbstractPlugin's lifecycle: nothing to set up or tear down in a recording stub, but the
+    # interface requires them — and requiring them is the point of subclassing it here.
+    @override
+    async def init(self, context: Any | None = None) -> None: ...
+    @override
+    async def cleanup(self) -> None: ...
+    @override
+    async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None: ...
+    @override
+    async def detach_endpoint(self, kernel: Any) -> None:
+        self.detached.append(kernel)
+
 
 class CniRecorder:
     def __init__(self) -> None:
@@ -142,6 +166,16 @@ class CniRecorder:
 
     def dels(self) -> list[dict[str, Any]]:
         return [c for c in self.calls if c["command"] == "DEL"]
+
+
+async def _privnet_local_subnet(_session_id: str) -> str | None:
+    """The privnet's answer for a session's LOCAL block — a read-only RPC in production.
+
+    Wired whenever this harness leaves `local_subnets` unset, because that is privnet mode and
+    privnet mode always has this. The two are mutually exclusive and one is mandatory: with
+    neither, every LOCAL lookup answers None, which the agent reads as "no block claimed".
+    """
+    return "10.128.5.0/26"
 
 
 def _build(
@@ -163,6 +197,8 @@ def _build(
         cni_runner=cast(Any, cni),
         backends={"vxlan": cast(Any, backend)},
         local_subnets=local_subnets,
+        # In-process owns the journal; otherwise this is privnet mode and the lookup is an RPC.
+        privnet_local_subnet=None if local_subnets is not None else _privnet_local_subnet,
         ipam=ipam,
         # A node resuming a vxlan session must have a usable VTEP: publishing a null one would have
         # its peers drop every endpoint on this node (see _self_member).
