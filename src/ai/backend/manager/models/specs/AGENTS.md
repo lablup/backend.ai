@@ -54,6 +54,10 @@ joins nothing.
 - `member_of(row)` declares which existing entities the new one joins as a member; a
   target without a virtual scope node fails the write. It never carries a permission
   cap (membership vs sharing: `KNOWLEDGE.md`).
+- Sharing an entity afterwards is an `EntityGrant`, executed by `grant_entities` /
+  `revoke_entities`. Its `permission_cap` is the ceiling the grantee's permissions are
+  clipped to (`None` clips nothing); re-granting rewrites the cap. Do NOT reach for a
+  creator to share something that already exists.
 - Entity types are open strings: types outside the RBAC element enum are accepted, and
   permission-carrying paths convert lazily.
 - Do NOT keep module-level declaration instances (no `X_MEMBERSHIP = ...()`).
