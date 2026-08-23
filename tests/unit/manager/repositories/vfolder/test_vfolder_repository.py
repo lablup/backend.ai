@@ -18,6 +18,7 @@ from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     BinarySize,
@@ -302,6 +303,17 @@ class TestVfolderRepository:
                 role_id=role_id,
             )
             db_sess.add(user_role)
+            await db_sess.flush()
+
+            # Sharing a vfolder enrolls it in the grantee's virtual scope, which the
+            # real user-create path provisions.
+            db_sess.add(
+                VirtualScopeRow(
+                    id=uuid.uuid4(),
+                    scope_type=USER_SCOPE_TYPE,
+                    scope_id=UserID(user_uuid),
+                )
+            )
             await db_sess.flush()
 
         yield user_uuid

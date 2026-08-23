@@ -64,3 +64,26 @@ class VFolderPermissionBatchPurger(FieldBatchPurger[VFolderPermissionRow, VFolde
     @override
     def to_data(self, row: VFolderPermissionRow) -> VFolderUUID:
         return row.id
+
+
+@dataclass
+class VFolderUserPermissionBatchPurger(FieldBatchPurger[VFolderPermissionRow, VFolderUUID]):
+    """Clears one user's mount permission on one vfolder."""
+
+    vfolder_id: UUID
+    user_id: UUID
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[VFolderPermissionRow]]:
+        return sa.select(VFolderPermissionRow).where(
+            (VFolderPermissionRow.vfolder == self.vfolder_id)
+            & (VFolderPermissionRow.user == self.user_id)
+        )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: VFolderPermissionRow) -> VFolderUUID:
+        return row.id

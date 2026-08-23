@@ -7,8 +7,9 @@ from datetime import datetime
 from functools import lru_cache
 from typing import Any, override
 
-from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
@@ -220,12 +221,12 @@ class VFolderUsageData:
 
 
 @dataclass
-class VFolderPermissionData:
+class VFolderPermissionData(FieldData):
     """
     VFolder permission data representing user-specific permissions on a VFolder.
     """
 
-    id: uuid.UUID
+    id: VFolderPermissionID
     vfolder: uuid.UUID
     user: uuid.UUID
     permission: VFolderMountPermission

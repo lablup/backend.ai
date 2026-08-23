@@ -16,6 +16,9 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import (
     BinarySize,
     ResourceSlot,
@@ -25,9 +28,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import (
-    EntityType,
-    OperationType,
-    RelationType,
     RoleSource,
 )
 from ai.backend.manager.data.project.types import ProjectType
@@ -72,6 +72,36 @@ VFOLDER_HOST = "local:volume1"
 class UserWithKeypair(NamedTuple):
     user_id: uuid.UUID
     email: str
+
+
+async def _membership_cap(
+    db: ExtendedAsyncSAEngine, vfolder_id: uuid.UUID, user_id: uuid.UUID
+) -> tuple[bool, Permission | None]:
+    """Whether the vfolder sits in the user's virtual scope, and under what cap.
+
+    The v2 shape of what the legacy tables split into an AUTO/REF mapping plus
+    permission rows: owning it is a membership with no cap, being shared it is the same
+    membership under one.
+    """
+    async with db.begin_readonly_session() as db_sess:
+        row = (
+            await db_sess.execute(
+                sa.select(EntityMembershipRow.permission_cap)
+                .join(
+                    VirtualScopeRow,
+                    VirtualScopeRow.id == EntityMembershipRow.virtual_scope_id,
+                )
+                .where(
+                    VirtualScopeRow.scope_type == USER_SCOPE_TYPE,
+                    VirtualScopeRow.scope_id == user_id,
+                    EntityMembershipRow.entity_type == VFOLDER_ENTITY_TYPE,
+                    EntityMembershipRow.entity_id == vfolder_id,
+                )
+            )
+        ).first()
+    if row is None:
+        return False, None
+    return True, row.permission_cap
 
 
 class TestVFolderOwnershipTransferRBACCleanup:
@@ -321,6 +351,16 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 rate_limit=30000,
             )
             db_sess.add(keypair)
+
+            # Sharing a vfolder enrolls it in the grantee's virtual scope, which the
+            # real user-create path provisions.
+            db_sess.add(
+                VirtualScopeRow(
+                    id=uuid.uuid4(),
+                    scope_type=USER_SCOPE_TYPE,
+                    scope_id=UserID(user_uuid),
+                )
+            )
             await db_sess.flush()
 
         return UserWithKeypair(user_id=user_uuid, email=email)
@@ -370,77 +410,20 @@ class TestVFolderOwnershipTransferRBACCleanup:
             vfolder_id, user_a_id, VFolderMountPermission.OWNER_PERM
         )
 
-        # Verify A's RBAC records exist before transfer
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            mapping_count = await db_sess.scalar(
-                sa.select(sa.func.count()).where(
-                    sa.and_(
-                        AssociationScopesEntitiesRow.scope_id == str(user_a_id),
-                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
-                    )
-                )
-            )
-            assert mapping_count == 1, "Old owner should have scope-entity mapping before transfer"
+        # Verify A holds the vfolder before transfer
+        granted, _ = await _membership_cap(db_with_cleanup, vfolder_id, user_a_id)
+        assert granted, "Old owner should hold the vfolder before transfer"
 
         # Step 2: Transfer ownership to B
         await repo.change_vfolder_ownership(vfolder_id, user_b_email)
 
-        # Step 3: Verify old owner A's RBAC records are cleaned up
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            mapping_count_after = await db_sess.scalar(
-                sa.select(sa.func.count()).where(
-                    sa.and_(
-                        AssociationScopesEntitiesRow.scope_id == str(user_a_id),
-                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
-                    )
-                )
-            )
-            assert mapping_count_after == 0, (
-                "Old owner's scope-entity mapping should be removed after transfer"
-            )
+        # Step 3: the old owner holds nothing, the new one holds it uncapped
+        granted_a, _ = await _membership_cap(db_with_cleanup, vfolder_id, user_a_id)
+        assert not granted_a, "Old owner should hold nothing after transfer"
 
-            perm_count_after = await db_sess.scalar(
-                sa.select(sa.func.count())
-                .select_from(PermissionRow)
-                .where(
-                    sa.and_(
-                        PermissionRow.scope_id == str(vfolder_id),
-                        PermissionRow.entity_type == EntityType.VFOLDER,
-                    )
-                )
-                .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
-                .where(UserRoleRow.user_id == user_a_id)
-            )
-            assert perm_count_after == 0, "Old owner's permissions should be removed after transfer"
-
-            # Verify new owner B's RBAC records are created
-            b_mapping_count = await db_sess.scalar(
-                sa.select(sa.func.count()).where(
-                    sa.and_(
-                        AssociationScopesEntitiesRow.scope_id == str(user_b_id),
-                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
-                        AssociationScopesEntitiesRow.relation_type == RelationType.AUTO,
-                    )
-                )
-            )
-            assert b_mapping_count == 1, (
-                "New owner should have AUTO scope-entity mapping after transfer"
-            )
-
-            b_perm_count = await db_sess.scalar(
-                sa.select(sa.func.count())
-                .select_from(PermissionRow)
-                .where(
-                    sa.and_(
-                        PermissionRow.scope_id == str(vfolder_id),
-                        PermissionRow.entity_type == EntityType.VFOLDER,
-                        PermissionRow.operation == OperationType.READ,
-                    )
-                )
-                .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
-                .where(UserRoleRow.user_id == user_b_id)
-            )
-            assert b_perm_count == 1, "New owner should have READ permission after transfer"
+        granted_b, cap_b = await _membership_cap(db_with_cleanup, vfolder_id, user_b_id)
+        assert granted_b, "New owner should hold the vfolder after transfer"
+        assert cap_b is None, "An owner's hold carries no cap"
 
     async def test_round_trip_ownership_transfer_cleans_up_rbac(
         self,
@@ -491,50 +474,20 @@ class TestVFolderOwnershipTransferRBACCleanup:
         # Transfer A -> B
         await repo.change_vfolder_ownership(vfolder_id, user_b_email)
 
-        # Verify A's RBAC records are cleaned up after first transfer
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            mapping_count_a = await db_sess.scalar(
-                sa.select(sa.func.count()).where(
-                    sa.and_(
-                        AssociationScopesEntitiesRow.scope_id == str(user_a_id),
-                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
-                    )
-                )
-            )
-            assert mapping_count_a == 0, (
-                "User A's scope-entity mapping should be removed after A -> B transfer"
-            )
+        # Verify A holds nothing after the first transfer
+        granted_a, _ = await _membership_cap(db_with_cleanup, vfolder_id, user_a_id)
+        assert not granted_a, "User A should hold nothing after the A -> B transfer"
 
         # Transfer B -> A (back to original owner)
         await repo.change_vfolder_ownership(vfolder_id, user_a_email)
 
-        # Verify B's RBAC records are cleaned up after second transfer
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            mapping_count_b = await db_sess.scalar(
-                sa.select(sa.func.count()).where(
-                    sa.and_(
-                        AssociationScopesEntitiesRow.scope_id == str(user_b_id),
-                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
-                    )
-                )
-            )
-            assert mapping_count_b == 0, (
-                "User B's scope-entity mapping should be removed after B -> A transfer"
-            )
+        # Verify B holds nothing after the second transfer, and A holds it again
+        granted_b, _ = await _membership_cap(db_with_cleanup, vfolder_id, user_b_id)
+        assert not granted_b, "User B should hold nothing after the B -> A transfer"
 
-        # Verify A now has valid RBAC records as the new owner
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            mapping_count_a_after = await db_sess.scalar(
-                sa.select(sa.func.count()).where(
-                    sa.and_(
-                        AssociationScopesEntitiesRow.scope_id == str(user_a_id),
-                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
-                    )
-                )
-            )
-            assert mapping_count_a_after == 1, (
-                "User A should have scope-entity mapping after ownership returned"
-            )
+        granted_a_after, cap_a_after = await _membership_cap(db_with_cleanup, vfolder_id, user_a_id)
+        assert granted_a_after, "User A should hold the vfolder after ownership returned"
+        assert cap_a_after is None, "An owner's hold carries no cap"
 
     async def test_invitee_rbac_cleaned_up_on_ownership_transfer(
         self,
@@ -589,35 +542,18 @@ class TestVFolderOwnershipTransferRBACCleanup:
             vfolder_id, user_b_id, VFolderMountPermission.READ_ONLY
         )
 
-        # Verify B has RBAC permission before transfer
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            perm_count_b = await db_sess.scalar(
-                sa.select(sa.func.count())
-                .select_from(PermissionRow)
-                .where(PermissionRow.scope_id == str(vfolder_id))
-                .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
-                .where(UserRoleRow.user_id == user_b_id)
-            )
-            assert perm_count_b is not None and perm_count_b > 0, (
-                "User B should have RBAC permissions as invitee"
-            )
+        # Verify B holds the vfolder under a cap before transfer
+        granted_b, cap_b = await _membership_cap(db_with_cleanup, vfolder_id, user_b_id)
+        assert granted_b, "User B should hold the vfolder as invitee"
+        assert cap_b is not None, "An invitee's hold is capped"
 
         # Transfer ownership A -> B (B gets owner RBAC via Step 6)
         await repo.change_vfolder_ownership(vfolder_id, user_b_email)
 
-        # Verify B has owner RBAC after becoming owner
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            b_mapping_after = await db_sess.scalar(
-                sa.select(AssociationScopesEntitiesRow.relation_type).where(
-                    sa.and_(
-                        AssociationScopesEntitiesRow.scope_id == str(user_b_id),
-                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
-                    )
-                )
-            )
-            assert b_mapping_after == RelationType.AUTO, (
-                "User B's mapping should be upgraded to AUTO after becoming owner"
-            )
+        # Verify B's hold loses its cap on becoming owner
+        granted_b_after, cap_b_after = await _membership_cap(db_with_cleanup, vfolder_id, user_b_id)
+        assert granted_b_after, "User B should hold the vfolder as owner"
+        assert cap_b_after is None, "The invitee's cap should be gone once B owns it"
 
         # Transfer ownership B -> A
         await repo.change_vfolder_ownership(vfolder_id, user_a_email)
@@ -627,18 +563,10 @@ class TestVFolderOwnershipTransferRBACCleanup:
             vfolder_id, user_b_id, VFolderMountPermission.READ_ONLY
         )
 
-        # Verify B has new RBAC permission
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            perm_count_b_final = await db_sess.scalar(
-                sa.select(sa.func.count())
-                .select_from(PermissionRow)
-                .where(PermissionRow.scope_id == str(vfolder_id))
-                .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
-                .where(UserRoleRow.user_id == user_b_id)
-            )
-            assert perm_count_b_final is not None and perm_count_b_final > 0, (
-                "User B should have RBAC permissions after re-accepting invitation"
-            )
+        # Verify B holds it again, capped, after re-accepting
+        granted_b_final, cap_b_final = await _membership_cap(db_with_cleanup, vfolder_id, user_b_id)
+        assert granted_b_final, "User B should hold the vfolder after re-accepting"
+        assert cap_b_final is not None, "An invitee's hold is capped"
 
     async def test_ownership_transfer_grants_new_owner_rbac(
         self,
@@ -690,50 +618,18 @@ class TestVFolderOwnershipTransferRBACCleanup:
             vfolder_id, user_b_id, VFolderMountPermission.READ_ONLY
         )
 
-        # Verify B has REF mapping before transfer
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            b_mapping = await db_sess.scalar(
-                sa.select(AssociationScopesEntitiesRow.relation_type).where(
-                    sa.and_(
-                        AssociationScopesEntitiesRow.scope_id == str(user_b_id),
-                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
-                    )
-                )
-            )
-            assert b_mapping == RelationType.REF, "Invitee should have REF mapping before transfer"
+        # Verify B's hold is capped before transfer
+        granted_b, cap_b = await _membership_cap(db_with_cleanup, vfolder_id, user_b_id)
+        assert granted_b, "Invitee should hold the vfolder before transfer"
+        assert cap_b is not None, "An invitee's hold is capped"
 
         # Transfer ownership to B
         await repo.change_vfolder_ownership(vfolder_id, user_b_email)
 
-        # Verify B's mapping is upgraded to AUTO
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            b_mapping_after = await db_sess.scalar(
-                sa.select(AssociationScopesEntitiesRow.relation_type).where(
-                    sa.and_(
-                        AssociationScopesEntitiesRow.scope_id == str(user_b_id),
-                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
-                    )
-                )
-            )
-            assert b_mapping_after == RelationType.AUTO, (
-                "New owner's mapping should be upgraded from REF to AUTO"
-            )
-
-            # Verify B has owner-level READ permission
-            b_perm_count = await db_sess.scalar(
-                sa.select(sa.func.count())
-                .select_from(PermissionRow)
-                .where(
-                    sa.and_(
-                        PermissionRow.scope_id == str(vfolder_id),
-                        PermissionRow.entity_type == EntityType.VFOLDER,
-                        PermissionRow.operation == OperationType.READ,
-                    )
-                )
-                .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
-                .where(UserRoleRow.user_id == user_b_id)
-            )
-            assert (b_perm_count or 0) >= 1, "New owner should have READ permission after transfer"
+        # Verify B's hold loses its cap on becoming owner
+        granted_b_after, cap_b_after = await _membership_cap(db_with_cleanup, vfolder_id, user_b_id)
+        assert granted_b_after, "New owner should hold the vfolder after transfer"
+        assert cap_b_after is None, "An owner's hold carries no cap"
 
     async def test_ownership_transfer_preserves_invitee_legacy_permission(
         self,
