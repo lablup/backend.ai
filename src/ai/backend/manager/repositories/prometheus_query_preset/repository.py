@@ -22,12 +22,10 @@ from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.data.prometheus_query_preset import (
     PrometheusQueryPresetData,
 )
-from ai.backend.manager.repositories.base.updater import Updater
 
 from .db_source import PrometheusQueryPresetDBSource
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 __all__ = ("PrometheusQueryPresetRepository",)
@@ -66,14 +64,6 @@ class PrometheusQueryPresetRepository:
     ) -> None:
         self._db_source = PrometheusQueryPresetDBSource(db)
         self._prometheus_client = prometheus_client
-
-    @prometheus_query_preset_repository_resilience.apply()
-    async def update(
-        self,
-        updater: Updater[PrometheusQueryPresetRow],
-    ) -> PrometheusQueryPresetData:
-        """Updates an existing prometheus query preset."""
-        return await self._db_source.update(updater=updater)
 
     @prometheus_query_preset_repository_resilience.apply()
     async def get_by_id(self, preset_id: UUID) -> PrometheusQueryPresetData:

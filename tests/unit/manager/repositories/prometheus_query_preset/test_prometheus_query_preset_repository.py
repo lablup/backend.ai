@@ -35,6 +35,9 @@ from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
 from ai.backend.manager.models.prometheus_query_preset.searchers import (
     PrometheusQueryPresetSearcher,
 )
+from ai.backend.manager.models.prometheus_query_preset.updaters import (
+    PrometheusQueryPresetUpdater,
+)
 from ai.backend.manager.models.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryRow,
 )
@@ -45,14 +48,10 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
-)
-from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
-    PrometheusQueryPresetUpdaterSpec,
 )
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
@@ -224,20 +223,20 @@ class TestPrometheusQueryPresetRepository:
 
     async def test_update(
         self,
-        preset_repository: PrometheusQueryPresetRepository,
+        preset_ops: OpsRepository[PrometheusQueryPresetData],
         sample_preset_id: uuid.UUID,
     ) -> None:
         updated_name = "updated_preset"
         updated_metric_name = "new_metric"
 
-        updater_spec = PrometheusQueryPresetUpdaterSpec(
+        updater = PrometheusQueryPresetUpdater(
+            preset_id=PrometheusQueryPresetID(sample_preset_id),
             name=OptionalState[str].update(updated_name),
             metric_name=OptionalState[str].update(updated_metric_name),
             time_window=TriState[str].nullify(),
         )
-        updater = Updater(spec=updater_spec, pk_value=sample_preset_id)
 
-        result = await preset_repository.update(updater=updater)
+        result = await preset_ops.update(updater)
 
         assert result.name == updated_name
         assert result.metric_name == updated_metric_name
@@ -245,36 +244,38 @@ class TestPrometheusQueryPresetRepository:
 
     async def test_update_filter_labels_only_preserves_group_labels(
         self,
+        preset_ops: OpsRepository[PrometheusQueryPresetData],
         preset_repository: PrometheusQueryPresetRepository,
         sample_preset_id: uuid.UUID,
     ) -> None:
         original = await preset_repository.get_by_id(sample_preset_id)
 
         updated_filter_labels = ["updated_filter"]
-        updater_spec = PrometheusQueryPresetUpdaterSpec(
+        updater = PrometheusQueryPresetUpdater(
+            preset_id=PrometheusQueryPresetID(sample_preset_id),
             filter_labels=OptionalState[list[str]].update(updated_filter_labels),
         )
-        updater = Updater(spec=updater_spec, pk_value=sample_preset_id)
 
-        result = await preset_repository.update(updater=updater)
+        result = await preset_ops.update(updater)
 
         assert result.filter_labels == updated_filter_labels
         assert result.group_labels == original.group_labels
 
     async def test_update_group_labels_only_preserves_filter_labels(
         self,
+        preset_ops: OpsRepository[PrometheusQueryPresetData],
         preset_repository: PrometheusQueryPresetRepository,
         sample_preset_id: uuid.UUID,
     ) -> None:
         original = await preset_repository.get_by_id(sample_preset_id)
 
         updated_group_labels = ["updated_group"]
-        updater_spec = PrometheusQueryPresetUpdaterSpec(
+        updater = PrometheusQueryPresetUpdater(
+            preset_id=PrometheusQueryPresetID(sample_preset_id),
             group_labels=OptionalState[list[str]].update(updated_group_labels),
         )
-        updater = Updater(spec=updater_spec, pk_value=sample_preset_id)
 
-        result = await preset_repository.update(updater=updater)
+        result = await preset_ops.update(updater)
 
         assert result.group_labels == updated_group_labels
         assert result.filter_labels == original.filter_labels

@@ -60,11 +60,10 @@ from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQ
 from ai.backend.manager.models.prometheus_query_preset.searchers import (
     PrometheusQueryPresetSearcher,
 )
-from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import Updater
-from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
-    PrometheusQueryPresetUpdaterSpec,
+from ai.backend.manager.models.prometheus_query_preset.updaters import (
+    PrometheusQueryPresetUpdater,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.services.prometheus_query_preset.actions import (
     CreatePresetAction,
     ExecutePresetAction,
@@ -148,13 +147,10 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         self, preset_id: UUID, input: ModifyQueryDefinitionInput
     ) -> ModifyQueryDefinitionPayload:
         """Update an existing query definition."""
-        updater: Updater[PrometheusQueryPresetRow] = Updater(
-            spec=self._build_updater_spec(input),
-            pk_value=preset_id,
-        )
-
         action_result = await self._processors.prometheus_query_preset.update_preset.run(
-            UpdatePresetAction(preset_id=PrometheusQueryPresetID(preset_id), updater=updater)
+            UpdatePresetAction(
+                updater=self._build_updater(PrometheusQueryPresetID(preset_id), input)
+            )
         )
 
         return ModifyQueryDefinitionPayload(item=self._data_to_dto(action_result.preset))
@@ -313,8 +309,11 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         return result
 
     @staticmethod
-    def _build_updater_spec(input: ModifyQueryDefinitionInput) -> PrometheusQueryPresetUpdaterSpec:
-        return PrometheusQueryPresetUpdaterSpec(
+    def _build_updater(
+        preset_id: PrometheusQueryPresetID, input: ModifyQueryDefinitionInput
+    ) -> PrometheusQueryPresetUpdater:
+        return PrometheusQueryPresetUpdater(
+            preset_id=preset_id,
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
@@ -330,7 +329,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             if isinstance(input.category_id, Sentinel)
             else TriState.nullify()
             if input.category_id is None
-            else TriState.update(input.category_id),
+            else TriState.update(PrometheusQueryPresetCategoryID(input.category_id)),
             metric_name=(
                 OptionalState.update(input.metric_name)
                 if input.metric_name is not None

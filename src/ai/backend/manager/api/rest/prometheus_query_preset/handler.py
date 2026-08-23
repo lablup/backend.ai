@@ -121,9 +121,7 @@ class PrometheusQueryPresetHandler:
     ) -> APIResponse:
         """Modify a preset."""
         updater = self._adapter.build_updater(body.parsed, path.parsed.id)
-        action_result = await self._processor.update_preset.run(
-            UpdatePresetAction(preset_id=PrometheusQueryPresetID(path.parsed.id), updater=updater)
-        )
+        action_result = await self._processor.update_preset.run(UpdatePresetAction(updater=updater))
         resp = ModifyQueryDefinitionResponse(
             item=self._adapter.convert_to_dto(action_result.preset)
         )

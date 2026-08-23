@@ -35,13 +35,12 @@ from ai.backend.manager.data.prometheus_query_preset import (
 from ai.backend.manager.models.prometheus_query_preset.creators import (
     PrometheusQueryPresetCreator,
 )
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.models.prometheus_query_preset.updaters import (
+    PrometheusQueryPresetUpdater,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
-)
-from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
-    PrometheusQueryPresetUpdaterSpec,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions import (
     CreatePresetAction,
@@ -146,41 +145,37 @@ class TestPrometheusQueryPresetService:
     async def test_modify_preset(
         self,
         service: PrometheusQueryPresetService,
-        mock_repository: MagicMock,
+        mock_ops_repository: MagicMock,
         preset_data: PrometheusQueryPresetData,
     ) -> None:
-        mock_repository.update = AsyncMock(return_value=preset_data)
+        mock_ops_repository.update = AsyncMock(return_value=preset_data)
 
-        updater = Updater(
-            spec=PrometheusQueryPresetUpdaterSpec(
-                query_template=OptionalState[str].update("sum(metric{${{labels}}})"),
-            ),
-            pk_value=preset_data.id,
+        updater = PrometheusQueryPresetUpdater(
+            preset_id=preset_data.id,
+            query_template=OptionalState[str].update("sum(metric{${{labels}}})"),
         )
-        action = UpdatePresetAction(preset_id=preset_data.id, updater=updater)
+        action = UpdatePresetAction(updater=updater)
         result = await service.update_preset(action)
 
         assert result.preset == preset_data
-        mock_repository.update.assert_called_once_with(updater)
+        mock_ops_repository.update.assert_called_once_with(updater)
 
     async def test_modify_preset_rejects_invalid_template(
         self,
         service: PrometheusQueryPresetService,
-        mock_repository: MagicMock,
+        mock_ops_repository: MagicMock,
     ) -> None:
-        mock_repository.update = AsyncMock()
+        mock_ops_repository.update = AsyncMock()
 
-        updater = Updater(
-            spec=PrometheusQueryPresetUpdaterSpec(
-                query_template=OptionalState[str].update("metric{${{unknown_var}}}"),
-            ),
-            pk_value=uuid4(),
+        updater = PrometheusQueryPresetUpdater(
+            preset_id=PrometheusQueryPresetID(uuid4()),
+            query_template=OptionalState[str].update("metric{${{unknown_var}}}"),
         )
-        action = UpdatePresetAction(preset_id=PrometheusQueryPresetID(uuid4()), updater=updater)
+        action = UpdatePresetAction(updater=updater)
 
         with pytest.raises(InvalidMetricPresetTemplate):
             await service.update_preset(action)
-        mock_repository.update.assert_not_called()
+        mock_ops_repository.update.assert_not_called()
 
     async def test_execute_preset(
         self,
