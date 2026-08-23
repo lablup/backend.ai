@@ -16,6 +16,7 @@ from ai.backend.common.data.entity.deployment_revision import DeploymentRevision
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.schema.deployment import (
     IntOrPercent,
     ReplicaGroupRolloutSpec,
@@ -42,6 +43,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
 from ai.backend.manager.models.replica_group_history import ReplicaGroupHistoryRow
@@ -58,6 +60,9 @@ from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment.updaters import (
@@ -163,6 +168,10 @@ class TestReplicaGroupRepository:
         async with with_tables(
             database_connection,
             [
+                VirtualScopeRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
+                PermissionRow,
                 DomainRow,
                 ResourceGroupRow,
                 ResourcePresetRow,
@@ -262,6 +271,11 @@ class TestReplicaGroupRepository:
                     resource_policy=project_policy_name,
                 )
             )
+            await db_sess.flush()
+            # A session group joins its project and its owner, which must be in the
+            # graph first.
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.PROJECT.value, scope_id=group_id))
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
             await db_sess.flush()
             db_sess.add(
                 EndpointRow(

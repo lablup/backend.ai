@@ -31,7 +31,7 @@ from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.schema.deployment import BlueGreenSpec, IntOrPercent, RollingUpdateSpec
 from ai.backend.common.types import (
     AccessKey,
@@ -81,6 +81,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
@@ -107,6 +108,9 @@ from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base.purger import Purger, PurgerSpec
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -205,6 +209,10 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         async with with_tables(
             database_connection,
             [
+                VirtualScopeRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
+                PermissionRow,
                 DomainRow,
                 ResourceGroupRow,
                 ResourcePresetRow,  # ResourceGroupRow relationship dependency
@@ -407,6 +415,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
+            await db_sess.flush()
+            # A session group joins its owner, which must be in the graph first.
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -449,6 +460,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
+            await db_sess.flush()
+            # A session group joins its project, which must be in the graph first.
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.PROJECT.value, scope_id=group_id))
             await db_sess.commit()
 
         return group_id
@@ -1592,6 +1606,9 @@ class TestDeploymentRevisionOperations:
                 domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
+            await db_sess.flush()
+            # A session group joins its owner, which must be in the graph first.
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -1614,6 +1631,9 @@ class TestDeploymentRevisionOperations:
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
+            await db_sess.flush()
+            # A session group joins its project, which must be in the graph first.
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.PROJECT.value, scope_id=group_id))
             await db_sess.commit()
 
         return group_id
@@ -2355,6 +2375,9 @@ class TestDeploymentPolicyOperations:
                 domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
+            await db_sess.flush()
+            # A session group joins its owner, which must be in the graph first.
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -2377,6 +2400,9 @@ class TestDeploymentPolicyOperations:
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
+            await db_sess.flush()
+            # A session group joins its project, which must be in the graph first.
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.PROJECT.value, scope_id=group_id))
             await db_sess.commit()
 
         return group_id
@@ -3082,6 +3108,9 @@ class TestRouteOperations:
                 domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
+            await db_sess.flush()
+            # A session group joins its owner, which must be in the graph first.
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -3104,6 +3133,9 @@ class TestRouteOperations:
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
+            await db_sess.flush()
+            # A session group joins its project, which must be in the graph first.
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.PROJECT.value, scope_id=group_id))
             await db_sess.commit()
 
         return group_id
@@ -3350,6 +3382,10 @@ class TestDeploymentRepositoryDuplicateName:
         async with with_tables(
             database_connection,
             [
+                VirtualScopeRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
+                PermissionRow,
                 DomainRow,
                 ResourceGroupRow,
                 ResourcePresetRow,
@@ -3503,6 +3539,9 @@ class TestDeploymentRepositoryDuplicateName:
                 resource_policy=default_project_policy.name,
             )
             db_sess.add(group)
+            await db_sess.flush()
+            # A session group joins its project, which must be in the graph first.
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.PROJECT.value, scope_id=group.id))
             await db_sess.commit()
             return group
 
@@ -3525,6 +3564,9 @@ class TestDeploymentRepositoryDuplicateName:
                 resource_policy=default_project_policy.name,
             )
             db_sess.add(group)
+            await db_sess.flush()
+            # A session group joins its project, which must be in the graph first.
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.PROJECT.value, scope_id=group.id))
             await db_sess.commit()
             return group
 
@@ -3570,6 +3612,9 @@ class TestDeploymentRepositoryDuplicateName:
                 domain_id=test_domain.id,
             )
             db_sess.add(user)
+            await db_sess.flush()
+            # A session group joins its owner, which must be in the graph first.
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
             await db_sess.commit()
             return user
 

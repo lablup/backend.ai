@@ -22,6 +22,7 @@ from ai.backend.manager.errors.repository import (
 )
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.specs import creator as specs_creator
 from ai.backend.manager.models.specs import updater as specs_updater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
@@ -93,6 +94,7 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityPurgerResult,
     execute_rbac_entity_purger,
 )
+from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -469,6 +471,16 @@ class WriteOps(ReadOps):
             self._sess, Upserter(spec=upserter), index_elements=upserter.index_elements()
         )
         return upserter.to_data(result.row)
+
+    async def create_entity[TRow: Base, TData](
+        self, creator: specs_creator.EntityCreator[TRow, TData]
+    ) -> TData:
+        """Insert an entity row and provision it in the RBAC graph, on this session.
+
+        For the transition: a caller whose transaction still runs legacy specs
+        beside this one reaches the v2 entity write here.
+        """
+        return await V2WriteOps(self._sess).create_entity(creator)
 
     async def create_rbac_entity[TRow: Base](
         self, creator: RBACEntityCreator[TRow]
