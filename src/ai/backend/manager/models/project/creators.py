@@ -39,6 +39,18 @@ class ProjectCreator(RoleManagedEntityCreator[ProjectRow, ProjectData]):
     container_registry: dict[str, str] | None = None
     dotfiles: bytes | None = None
 
+    @classmethod
+    def model_store(cls, domain_id: DomainID, domain_name: str) -> ProjectCreator:
+        """The model-store project a domain is registered with."""
+        return cls(
+            name="model-store",
+            domain_id=domain_id,
+            domain_name=domain_name,
+            description="Model Store",
+            resource_policy="default",
+            type=ProjectType.MODEL_STORE,
+        )
+
     @override
     def entity_id(self, row: ProjectRow) -> EntityIdentifier:
         return ProjectID(row.id)

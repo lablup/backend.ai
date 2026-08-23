@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import ClassVar, override
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -30,6 +30,15 @@ class DomainCreator(RoleManagedEntityCreator[DomainRow, DomainData]):
     allowed_docker_registries: list[str] | None = None
     integration_name: str | None = None
     dotfiles: bytes | None = None
+
+    _MAX_NAME_LENGTH: ClassVar[int] = 64
+
+    def __post_init__(self) -> None:
+        candidate = self.name.strip()
+        if candidate == "" or len(candidate) > self._MAX_NAME_LENGTH:
+            raise InvalidAPIParameters(
+                f"Domain name cannot be empty or exceed {self._MAX_NAME_LENGTH} characters."
+            )
 
     @override
     def entity_id(self, row: DomainRow) -> EntityIdentifier:

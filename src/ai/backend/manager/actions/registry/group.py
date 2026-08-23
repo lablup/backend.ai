@@ -84,6 +84,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     CreateEntityOpsAction,
     CreateEntityWithFieldsOpsAction,
     CreateGlobalOpsAction,
+    CreateGlobalRoleManagedEntityOpsAction,
     CreateGlobalWithFieldsOpsAction,
     CreateRoleManagedEntityOpsAction,
     DeletePartialBulkOpsAction,
@@ -150,6 +151,7 @@ from ai.backend.manager.services.ops.service import (
     GlobalCreateService,
     GlobalCreateWithFieldsService,
     GlobalPartialBulkPurgeService,
+    GlobalRoleManagedEntityCreateService,
     GlobalSearchService,
     GlobalUpsertService,
     LookupService,
@@ -665,6 +667,20 @@ class ProcessorGroup[TData: EntityData]:
             RoleManagedEntityCreateService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.scope, *monitors),
             validators=(*self._deps.validators.scope, *validators),
+        )
+
+    def global_role_managed_create_ops[TAction: CreateGlobalRoleManagedEntityOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> GlobalActionProcessor[TAction, CreatedEntityOpsResult[TData]]:
+        self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return GlobalActionProcessor(
+            GlobalRoleManagedEntityCreateService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
+            validators=(*self._deps.validators.global_scope, *validators),
         )
 
     def global_atomic_create_ops[TAction: AtomicCreateGlobalEntityOpsAction[Any, Any]](

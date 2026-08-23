@@ -8,6 +8,7 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    CreatedEntityOpsResult,
     EntityOpsResult,
     LookupOpsResult,
 )
@@ -16,10 +17,7 @@ from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,
 )
 from ai.backend.manager.data.domain.types import DomainData
-from ai.backend.manager.services.domain.actions.create_domain import (
-    CreateDomainAction,
-    CreateDomainActionResult,
-)
+from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_dotfile import (
     CreateDomainDotfileAction,
     CreateDomainDotfileActionResult,
@@ -64,7 +62,7 @@ class DomainProcessors:
     update_domain: SingleEntityActionProcessor[UpdateDomainAction, EntityOpsResult[DomainData]]
     delete_domain: SingleEntityActionProcessor[DeleteDomainAction, EntityOpsResult[DomainData]]
     restore_domain: SingleEntityActionProcessor[RestoreDomainAction, EntityOpsResult[DomainData]]
-    create_domain: GlobalActionProcessor[CreateDomainAction, CreateDomainActionResult]
+    create_domain: GlobalActionProcessor[CreateDomainAction, CreatedEntityOpsResult[DomainData]]
     create_domain_node: GlobalActionProcessor[CreateDomainNodeAction, CreateDomainNodeActionResult]
     update_domain_node: SingleEntityActionProcessor[
         UpdateDomainNodeAction, UpdateDomainNodeActionResult
@@ -93,7 +91,7 @@ class DomainProcessors:
         self.update_domain = group.single_update_ops(UpdateDomainAction)
         self.delete_domain = group.single_delete_ops(DeleteDomainAction)
         self.restore_domain = group.single_restore_ops(RestoreDomainAction)
-        self.create_domain = group.global_scope(CreateDomainAction, service.create_domain)
+        self.create_domain = group.global_role_managed_create_ops(CreateDomainAction)
         self.create_domain_node = group.global_scope(
             CreateDomainNodeAction, service.create_domain_node
         )
