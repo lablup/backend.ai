@@ -68,6 +68,7 @@ from ai.backend.manager.models.project import (
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
+from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
 from ai.backend.manager.models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     QueryCondition,
@@ -606,7 +607,7 @@ class UserDBSource:
                     kernels.c.id,
                     kernels.c.created_at,
                     kernels.c.terminated_at,
-                    kernels.c.occupied_slots,
+                    kernel_allocated_slots_expr(kernels.c.id).label("occupied_slots"),
                 )
                 .select_from(kernels)
                 .where(

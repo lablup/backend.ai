@@ -26,7 +26,6 @@ from ai.backend.common.types import (
     CIStrEnum,
     ClusterMode,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -196,8 +195,6 @@ class SessionData(EntityData):
     domain_name: str
     group_id: UUID
     user_uuid: UUID
-    occupying_slots: Any  # TODO: ResourceSlot?
-    requested_slots: Any
     use_host_network: bool
     created_at: datetime = field(compare=False)
     status: SessionStatus
@@ -273,8 +270,6 @@ class SessionEntityData(EntityData):
     images: list[str] | None
     image_ids: list[UUID] | None
     tag: str | None
-    occupying_slots: ResourceSlot
-    requested_slots: ResourceSlot
     vfolder_mounts: list[VFolderMount] | None
     environ: dict[str, Any] | None
     bootstrap_script: str | None
@@ -344,8 +339,6 @@ class SessionMetadata:
 class ResourceSpec:
     cluster_mode: str
     cluster_size: int
-    occupying_slots: ResourceSlot
-    requested_slots: ResourceSlot
     resource_group_name: str | None
     target_sgroup_names: list[str] | None
     agent_ids: list[str] | None

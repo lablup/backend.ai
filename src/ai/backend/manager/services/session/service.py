@@ -44,6 +44,7 @@ from ai.backend.common.types import (
     ContainerId,
     ImageAlias,
     KernelId,
+    ResourceSlot,
     ResourceSlotEntry,
     SessionId,
     SessionTypes,
@@ -1199,6 +1200,15 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
+        session_id = SessionId(sess.id)
+        main_kernel_id = KernelId(sess.main_kernel.id)
+        session_allocation = (
+            await self._session_repository.batch_get_resource_allocation_by_session([session_id])
+        ).get(session_id)
+        kernel_allocation = (
+            await self._session_repository.batch_get_resource_allocation_by_kernel([main_kernel_id])
+        ).get(main_kernel_id)
+
         age = datetime.now(tzutc()) - sess.created_at
         session_info = LegacySessionInfo(
             domain_name=sess.domain_name,
@@ -1212,9 +1222,11 @@ class SessionService:
             container_id=ContainerId(sess.main_kernel.container_id)
             if sess.main_kernel.container_id
             else None,
-            occupied_slots=str(sess.main_kernel.occupied_slots),  # legacy
-            occupying_slots=str(sess.occupying_slots),
-            requested_slots=str(sess.requested_slots),
+            occupied_slots=str(kernel_allocation.used if kernel_allocation else ResourceSlot()),
+            occupying_slots=str(session_allocation.used if session_allocation else ResourceSlot()),
+            requested_slots=str(
+                session_allocation.requested if session_allocation else ResourceSlot()
+            ),
             occupied_shares=str(sess.main_kernel.occupied_shares),  # legacy
             environ=str(sess.environ),
             resource_opts=str(sess.resource_opts),

@@ -9,6 +9,10 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+from ai.backend.manager.models.resource_slot.aggregates import (
+    session_allocated_slots_expr,
+    session_requested_slots_expr,
+)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.export import (
@@ -140,7 +144,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Resources Used",
         description="Occupied resource slots",
         field_type=ExportFieldType.JSON,
-        column=SessionRow.occupying_slots,
+        column=session_allocated_slots_expr(SessionRow.id),
         formatter=lambda v: json.dumps(dict(v), default=str) if v else "",
     ),
     ExportFieldDef(
@@ -148,7 +152,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Resources Requested",
         description="Requested resource slots",
         field_type=ExportFieldType.JSON,
-        column=SessionRow.requested_slots,
+        column=session_requested_slots_expr(SessionRow.id),
         formatter=lambda v: json.dumps(dict(v), default=str) if v else "",
     ),
     ExportFieldDef(

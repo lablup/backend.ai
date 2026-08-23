@@ -253,8 +253,6 @@ def _create_kernel_info(
             agent=aid,
             agent_addr=f"tcp://{aid}:5001" if aid else None,
             container_id=f"container-{kid}",
-            occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
-            requested_slots=ResourceSlot(),
             occupied_shares={},
             attached_devices={},
             resource_opts={},

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import KernelId, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.fair_share import (
     DomainUsageBucketKey,
@@ -78,6 +78,7 @@ class FairShareAggregator:
     def prepare_kernel_usage_records(
         self,
         kernels: Sequence[KernelInfo],
+        allocated_slots: Mapping[KernelId, ResourceSlot],
         resource_group_id: ResourceGroupID,
         resource_group: str,
         now: datetime,
@@ -104,7 +105,11 @@ class FairShareAggregator:
 
         for kernel in kernels:
             kernel_specs, observation_end = self._prepare_kernel_usage_specs(
-                kernel, resource_group_id, resource_group, now
+                kernel,
+                allocated_slots.get(KernelId(kernel.id), ResourceSlot()),
+                resource_group_id,
+                resource_group,
+                now,
             )
             if kernel_specs:
                 result.specs.extend(kernel_specs)
@@ -271,6 +276,7 @@ class FairShareAggregator:
     def _prepare_kernel_usage_specs(
         self,
         kernel: KernelInfo,
+        allocated_slots: ResourceSlot,
         resource_group_id: ResourceGroupID,
         resource_group: str,
         now: datetime,
@@ -286,6 +292,7 @@ class FairShareAggregator:
 
         Args:
             kernel: Kernel to process
+            allocated_slots: The slots the kernel was allocated
             resource_group_id: The resource group ID
             resource_group: The resource group name retained for compatibility
             now: Current time from DB
@@ -345,6 +352,7 @@ class FairShareAggregator:
         # Generate 5-minute slices
         specs = self._generate_slice_specs(
             kernel=kernel,
+            allocated_slots=allocated_slots,
             resource_group_id=resource_group_id,
             resource_group=resource_group,
             start_time=start_time,
@@ -365,6 +373,7 @@ class FairShareAggregator:
     def _generate_slice_specs(
         self,
         kernel: KernelInfo,
+        allocated_slots: ResourceSlot,
         resource_group_id: ResourceGroupID,
         resource_group: str,
         start_time: datetime,
@@ -406,7 +415,7 @@ class FairShareAggregator:
 
             # Calculate resource-seconds for this slice
             resource_seconds = self._calculate_resource_seconds(
-                kernel.resource.occupied_slots,
+                allocated_slots,
                 slice_seconds,
             )
 
@@ -421,7 +430,7 @@ class FairShareAggregator:
                 period_start=current_start,
                 period_end=current_end,
                 resource_usage=resource_seconds,
-                occupied_slots=kernel.resource.occupied_slots,
+                occupied_slots=allocated_slots,
             )
             specs.append(spec)
 

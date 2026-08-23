@@ -72,6 +72,10 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_slot import (
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import SessionRow
@@ -107,6 +111,8 @@ _IDLE_ROWS: list[TableOrORM] = [
     SessionRow,
     AgentRow,
     KernelRow,
+    ResourceSlotTypeRow,
+    ResourceAllocationRow,
     ReplicaGroupRow,
     RoutingRow,
 ]

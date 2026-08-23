@@ -14,7 +14,6 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
-from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
@@ -47,7 +46,8 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
-from ai.backend.manager.models.session import SessionRow, batch_populate_session_occupied_slots
+from ai.backend.manager.models.resource_slot.aggregates import batch_load_session_allocations
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import SessionTemplateRow, TemplateType
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -585,10 +585,9 @@ class TestSessionRepository:
             await repository.get_session_with_routing_minimal(SessionID(terminated_id))
 
 
-class TestBatchPopulateSessionOccupiedSlots:
-    """Test batch_populate_session_occupied_slots computes occupied_slots
-    from the normalized resource_allocations table instead of the deprecated
-    JSONB column."""
+class TestBatchLoadSessionAllocations:
+    """Test that the session slot values are aggregated from the normalized
+    resource_allocations table instead of the deprecated JSONB columns."""
 
     @pytest.fixture
     async def db_with_resource_tables(
@@ -853,64 +852,49 @@ class TestBatchPopulateSessionOccupiedSlots:
             access_key=access_key,
         )
 
-    async def test_batch_populate_computes_slots_from_resource_allocations(
+    async def test_used_slots_come_from_resource_allocations(
         self,
         db_with_resource_tables: ExtendedAsyncSAEngine,
         session_with_allocations: SessionTestData,
     ) -> None:
-        """Verify that batch_populate reads from resource_allocations
-        instead of the deprecated JSONB column."""
+        """Verify the aggregate reads resource_allocations, not the JSONB column."""
+        session_id = SessionId(session_with_allocations.session_id)
         async with db_with_resource_tables.begin_readonly_session() as db_sess:
-            stmt = (
-                sa.select(SessionRow)
-                .where(SessionRow.id == session_with_allocations.session_id)
-                .options(selectinload(SessionRow.kernels))
-            )
+            stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
             session_row = await db_sess.scalar(stmt)
             assert session_row is not None
-
-            # Before: JSONB column is empty (post-Phase 3)
+            # The deprecated JSONB column is empty (post-Phase 3)
             assert session_row.occupying_slots == ResourceSlot()
 
-            # Act: batch_populate computes from resource_allocations
-            await batch_populate_session_occupied_slots(db_sess, [session_row])
+            aggregates = await batch_load_session_allocations(db_sess, [session_id])
 
-            # After: occupying_slots is populated from resource_allocations
-            slots = session_row.occupying_slots
-            assert slots is not None
-            assert len(slots) == 2
-            # cpu: used=1.5 takes precedence over requested=2.0
-            assert slots["cpu"] == Decimal("1.500000")
-            # mem: used=NULL -> requested=2147483648
-            assert slots["mem"] == Decimal("2147483648")
+        slots = aggregates[session_id].used
+        assert len(slots) == 2
+        # cpu: used=1.5 takes precedence over requested=2.0
+        assert slots["cpu"] == Decimal("1.500000")
+        # mem: used=NULL -> requested=2147483648
+        assert slots["mem"] == Decimal("2147483648")
 
-    async def test_batch_populate_empty_sessions(
+    async def test_empty_session_ids(
         self,
         db_with_resource_tables: ExtendedAsyncSAEngine,
     ) -> None:
-        """Verify that batch_populate handles empty list gracefully."""
+        """Verify that an empty id list is handled gracefully."""
         async with db_with_resource_tables.begin_readonly_session() as db_sess:
-            await batch_populate_session_occupied_slots(db_sess, [])
+            assert await batch_load_session_allocations(db_sess, []) == {}
 
-    async def test_search_returns_computed_occupied_slots(
+    async def test_repository_aggregate_returns_computed_slots(
         self,
         db_with_resource_tables: ExtendedAsyncSAEngine,
         session_with_allocations: SessionTestData,
     ) -> None:
-        """Verify the search() repository method returns computed occupied_slots
-        from resource_allocations, not the empty JSONB column."""
+        """Verify the repository aggregate returns values computed from
+        resource_allocations, not the empty JSONB column."""
         repository = SessionRepository(db_with_resource_tables)
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await repository.search(querier=querier)
+        session_id = SessionId(session_with_allocations.session_id)
+        aggregates = await repository.batch_get_resource_allocation_by_session([session_id])
 
-        assert result.total_count == 1
-        session_data = result.items[0]
-        slots = session_data.occupying_slots
-        assert slots is not None
+        slots = aggregates[session_id].used
         assert slots["cpu"] == Decimal("1.500000")
         assert slots["mem"] == Decimal("2147483648")
 

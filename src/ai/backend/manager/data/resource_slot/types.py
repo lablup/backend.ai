@@ -25,6 +25,11 @@ class ResourceAllocationAggregate:
     used: ResourceSlot
     allocated: ResourceSlot
 
+    @classmethod
+    def empty(cls) -> ResourceAllocationAggregate:
+        """The aggregate an owner with no ``resource_allocations`` rows reports."""
+        return cls(requested=ResourceSlot(), used=ResourceSlot(), allocated=ResourceSlot())
+
 
 @dataclass(frozen=True)
 class NumberFormatData:

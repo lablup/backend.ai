@@ -42,6 +42,7 @@ from ai.backend.manager.data.permission.permission_defs import ComputeSessionPer
 from ai.backend.manager.data.permission.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
 )
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.api import NotImplementedAPI
@@ -54,12 +55,14 @@ from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryF
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac import ScopeType, SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.resource_slot.aggregates import (
+    batch_load_session_allocations,
+)
 from ai.backend.manager.models.session import (
     DEFAULT_SESSION_ORDERING,
     SessionDependencyRow,
     SessionRow,
     SessionTypes,
-    batch_populate_session_occupied_slots,
     by_domain_name,
     by_raw_filter,
     by_resource_group_name,
@@ -212,6 +215,23 @@ def _dedup_folder_ids(mounts: Iterable[_HasVFID]) -> list[uuid.UUID]:
     return list(dict.fromkeys(vf.vfid.folder_id for vf in mounts))
 
 
+async def _batch_load_session_allocations(
+    ctx: GraphQueryContext,
+    session_ids: Sequence[SessionId],
+) -> list[ResourceAllocationAggregate]:
+    async with ctx.db.begin_readonly_session() as db_session:
+        aggregates = await batch_load_session_allocations(db_session, session_ids)
+    return [aggregates.get(sid) or ResourceAllocationAggregate.empty() for sid in session_ids]
+
+
+async def _load_session_allocation(
+    info: graphene.ResolveInfo, session_id: SessionId
+) -> ResourceAllocationAggregate:
+    ctx: GraphQueryContext = info.context
+    loader = ctx.dataloader_manager.get_loader_by_func(ctx, _batch_load_session_allocations)
+    return cast(ResourceAllocationAggregate, await loader.load(session_id))
+
+
 @graphene_federation.key("id")
 class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
@@ -317,7 +337,6 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             query_result = await db_session.scalar(stmt)
             if query_result is None:
                 return None
-            await batch_populate_session_occupied_slots(db_session, [query_result])
             return cls.from_row(graphene_ctx, query_result)
 
     @classmethod
@@ -399,8 +418,6 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             scaling_group=row.scaling_group_name,
             # TODO: Deprecate 'vfolder_mounts' and replace it with a list of VirtualFolderNodes
             vfolder_mounts=_dedup_folder_ids(row.vfolders_sorted_by_id),
-            occupied_slots=row.occupying_slots.to_json(),
-            requested_slots=row.requested_slots.to_json(),
             image_references=row.images,
             service_ports=row.main_kernel.service_ports,
             # statistics
@@ -459,8 +476,6 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             agent_ids=session_data.agent_ids,
             scaling_group=session_data.resource_group_name,
             vfolder_mounts=vfolder_mounts,
-            occupied_slots=session_data.occupying_slots,
-            requested_slots=session_data.requested_slots,
             image_references=session_data.images,
             service_ports=session_data.service_ports,
             # statistics
@@ -478,6 +493,14 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         return await ComputeSessionNode.get_accessible_node(
             info, resolved_id, SystemScope(), ComputeSessionPermission.READ_ATTRIBUTE
         )
+
+    async def resolve_occupied_slots(self, info: graphene.ResolveInfo) -> Mapping[str, str]:
+        aggregate = await _load_session_allocation(info, SessionId(self.row_id))
+        return aggregate.used.to_json()
+
+    async def resolve_requested_slots(self, info: graphene.ResolveInfo) -> Mapping[str, str]:
+        aggregate = await _load_session_allocation(info, SessionId(self.row_id))
+        return aggregate.requested.to_json()
 
     async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> dict[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
@@ -602,7 +625,6 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
                 )
             )
             session_rows = list((await db_sess.execute(query)).scalars().all())
-            await batch_populate_session_occupied_slots(db_sess, session_rows)
 
         # Convert into GraphQL node objects
         sessions = [type(self).from_row(ctx, r) for r in session_rows]
@@ -659,7 +681,6 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
                 )
             )
             rows = list((await db_sess.execute(sess_query)).unique().scalars().all())
-            await batch_populate_session_occupied_slots(db_sess, rows)
 
             for row in rows:
                 for dependee_id in dep_map.get(row.id, []):
@@ -704,7 +725,6 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
                 )
             )
             rows = list((await db_sess.execute(sess_query)).unique().scalars().all())
-            await batch_populate_session_occupied_slots(db_sess, rows)
 
             for row in rows:
                 for dependent_id in dep_map.get(row.id, []):
@@ -732,8 +752,6 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             query = cls._add_basic_options_to_query(query)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_row = await db_session.scalar(query)
-                if session_row is not None:
-                    await batch_populate_session_occupied_slots(db_session, [session_row])
         if session_row is None:
             return None
         return cls.from_row(
@@ -800,7 +818,6 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_rows = list((await db_session.scalars(query)).all())
                 total_cnt = await db_session.scalar(cnt_query)
-                await batch_populate_session_occupied_slots(db_session, session_rows)
         result: list[Self] = [
             cls.from_row(
                 graph_ctx,
@@ -857,17 +874,18 @@ class TotalResourceSlot(graphene.ObjectType):  # type: ignore[misc]
             query_conditions, query_options, db=ctx.db
         )
         async with ctx.db.begin_readonly_session() as db_sess:
-            await batch_populate_session_occupied_slots(db_sess, session_rows)
+            aggregates = await batch_load_session_allocations(
+                db_sess, [SessionId(row.id) for row in session_rows]
+            )
         occupied_slots = ResourceSlot()
         requested_slots = ResourceSlot()
-        for row in session_rows:
-            occupied_slots += row.occupying_slots
-            requested_slots += row.requested_slots
-        occupied, requested = occupied_slots.to_json(), requested_slots.to_json()
+        for aggregate in aggregates.values():
+            occupied_slots += aggregate.used
+            requested_slots += aggregate.requested
 
         return TotalResourceSlot(
-            occupied_slots=occupied,
-            requested_slots=requested,
+            occupied_slots=occupied_slots.to_json(),
+            requested_slots=requested_slots.to_json(),
         )
 
 
@@ -1121,9 +1139,6 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
             "mounts": [*{mount.name for mount in vfolder_mounts}],
             # TODO: Deprecate 'vfolder_mounts' and replace it with a list of VirtualFolderNodes
             "vfolder_mounts": [*{vf.vfid.folder_id for vf in vfolder_mounts}],
-            "occupying_slots": row.occupying_slots.to_json(),
-            "occupied_slots": row.occupying_slots.to_json(),
-            "requested_slots": row.requested_slots.to_json(),
             # statistics
             "num_queries": row.num_queries,
         }
@@ -1144,6 +1159,17 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
             KernelStatistics.batch_load_inference_metrics_by_kernel,
         )
         return cast(Mapping[str, Any] | None, await loader.load(self.id))
+
+    async def resolve_occupying_slots(self, info: graphene.ResolveInfo) -> Mapping[str, str]:
+        aggregate = await _load_session_allocation(info, SessionId(self.session_id))
+        return aggregate.used.to_json()
+
+    async def resolve_occupied_slots(self, info: graphene.ResolveInfo) -> Mapping[str, str]:
+        return await self.resolve_occupying_slots(info)
+
+    async def resolve_requested_slots(self, info: graphene.ResolveInfo) -> Mapping[str, str]:
+        aggregate = await _load_session_allocation(info, SessionId(self.session_id))
+        return aggregate.requested.to_json()
 
     async def resolve_containers(
         self,
@@ -1348,8 +1374,6 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
             query = query.order_by(*DEFAULT_SESSION_ORDERING)
         async with ctx.db.begin_readonly_session() as db_sess:
             rows = (await db_sess.execute(query)).all()
-            session_rows = [r.SessionRow for r in rows]
-            await batch_populate_session_occupied_slots(db_sess, session_rows)
             return [cls.from_row(ctx, r) for r in rows]
 
     @classmethod
@@ -1381,8 +1405,6 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(SessionRow.access_key == access_key)
         async with ctx.db.begin_readonly_session() as db_sess:
             rows = (await db_sess.execute(query)).all()
-            sr_list = [r.SessionRow for r in rows]
-            await batch_populate_session_occupied_slots(db_sess, sr_list)
             objs_per_key: dict[SessionId, ComputeSession | None] = dict.fromkeys(session_ids)
             for row in rows:
                 objs_per_key[row.SessionRow.id] = cls.from_row(ctx, row)
@@ -1407,8 +1429,6 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         )
         async with ctx.db.begin_readonly_session() as db_sess:
             rows = (await db_sess.execute(query)).all()
-            sr_list = [r.SessionRow for r in rows]
-            await batch_populate_session_occupied_slots(db_sess, sr_list)
             objs_per_key: dict[SessionId, list[ComputeSession]] = {sid: [] for sid in session_ids}
             for row in rows:
                 obj = cls.from_row(ctx, row)
