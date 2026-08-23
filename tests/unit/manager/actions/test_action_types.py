@@ -6,25 +6,29 @@ from ai.backend.manager.actions.types import ActionOperationType
 
 # Import representative concrete action classes across different entity types
 # and operation types to verify enum usage at runtime.
-from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
-from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
-from ai.backend.manager.services.auth.actions.logout import LogoutAction
-from ai.backend.manager.services.auth.actions.search_login_history import (
-    SearchLoginHistoryAction,
+from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
+from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
+from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
+    GetRoleDetailAction,
 )
-from ai.backend.manager.services.auth.actions.update_password import UpdatePasswordAction
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
+from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
+    ReplaceRolePermissionsAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_entities import (
+    SearchEntitiesAction,
+)
 
 # Legacy-family actions only. The v2 families answer with
 # ``ai.backend.common.data.entity.types.EntityType``, a distinct NewType, so mixing
 # them in would conflate two type systems rather than test either one.
 _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
-    AuthorizeAction,
-    GetRoleAction,
-    LogoutAction,
+    CreateRoleAction,
+    DeleteRoleAction,
+    GetRoleDetailAction,
     PurgeRoleAction,
-    SearchLoginHistoryAction,
-    UpdatePasswordAction,
+    ReplaceRolePermissionsAction,
+    SearchEntitiesAction,
 ]
 
 

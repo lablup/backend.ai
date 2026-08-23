@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE
 from ai.backend.common.data.entity.artifact_registry import ARTIFACT_REGISTRY_ENTITY_TYPE
 from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_FIELD_TYPE
 from ai.backend.common.data.entity.audit_log import AUDIT_LOG_FIELD_TYPE
+from ai.backend.common.data.entity.auth import AUTH_ENTITY_TYPE
 from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
@@ -669,7 +670,11 @@ def create_processors(
             deployment_groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
             services.model_serving_auto_scaling,
         ),
-        auth=AuthProcessors(services.auth, action_monitors, validators),
+        auth=AuthProcessors(
+            organization_groups.group(GroupMeta(AUTH_ENTITY_TYPE)),
+            organization_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+            services.auth,
+        ),
         login_client_type=LoginClientTypeProcessors(
             system_groups.group(GroupMeta(LOGIN_CLIENT_TYPE_ENTITY_TYPE))
         ),

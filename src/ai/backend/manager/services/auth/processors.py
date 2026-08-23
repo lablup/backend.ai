@@ -1,8 +1,25 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
-from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
+from typing import Any
+
+from ai.backend.common.data.entity.login_history import LOGIN_HISTORY_FIELD_TYPE
+from ai.backend.common.data.entity.login_session import LOGIN_SESSION_FIELD_TYPE
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    AnonymousGlobalActionProcessor,
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    LookupOpsResult,
+    ScopedFieldsOpsResult,
+)
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
     AuthorizeActionResult,
@@ -11,44 +28,52 @@ from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
     GenerateSSHKeypairAction,
     GenerateSSHKeypairActionResult,
 )
-from ai.backend.manager.services.auth.actions.get_role import GetRoleAction, GetRoleActionResult
+from ai.backend.manager.services.auth.actions.get_role import (
+    PublicGetRoleAction,
+    PublicGetRoleActionResult,
+)
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
     GetSSHKeypairActionResult,
 )
 from ai.backend.manager.services.auth.actions.logout import LogoutAction, LogoutActionResult
+from ai.backend.manager.services.auth.actions.lookup_login_history_owner import (
+    LookupBulkLoginHistoryOwnerAction,
+    LookupLoginHistoryOwnerAction,
+)
+from ai.backend.manager.services.auth.actions.lookup_login_session_owner import (
+    LookupBulkLoginSessionOwnerAction,
+    LookupLoginSessionOwnerAction,
+)
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
-    ResolveAccessKeyScopeAction,
-    ResolveAccessKeyScopeResult,
+    PublicResolveAccessKeyScopeAction,
+    PublicResolveAccessKeyScopeResult,
 )
 from ai.backend.manager.services.auth.actions.resolve_user_id_by_access_key import (
     ResolveUserIDByAccessKeyAction,
-    ResolveUserIDByAccessKeyResult,
 )
 from ai.backend.manager.services.auth.actions.resolve_user_scope import (
-    ResolveUserScopeAction,
-    ResolveUserScopeResult,
+    PublicResolveUserScopeAction,
+    PublicResolveUserScopeResult,
 )
 from ai.backend.manager.services.auth.actions.revoke_login_session import (
-    AdminRevokeLoginSessionAction,
-    MyRevokeLoginSessionAction,
+    GlobalRevokeLoginSessionAction,
+    RevokeLoginSessionAction,
     RevokeLoginSessionActionResult,
 )
 from ai.backend.manager.services.auth.actions.search_login_history import (
-    AdminSearchLoginHistoryAction,
+    GlobalSearchLoginHistoryAction,
     SearchLoginHistoryAction,
-    SearchLoginHistoryActionResult,
 )
 from ai.backend.manager.services.auth.actions.search_login_sessions import (
-    AdminSearchLoginSessionsAction,
+    GlobalSearchLoginSessionsAction,
     SearchLoginSessionsAction,
-    SearchLoginSessionsActionResult,
 )
 from ai.backend.manager.services.auth.actions.signout import SignoutAction, SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupAction, SignupActionResult
 from ai.backend.manager.services.auth.actions.unblock_user import (
-    AdminUnblockUserAction,
-    AdminUnblockUserActionResult,
+    GlobalUnblockUserAction,
+    GlobalUnblockUserActionResult,
 )
 from ai.backend.manager.services.auth.actions.update_full_name import (
     UpdateFullNameAction,
@@ -70,90 +95,133 @@ from ai.backend.manager.services.auth.service import AuthService
 
 
 class AuthProcessors:
-    logout: ActionProcessor[LogoutAction, LogoutActionResult]
-    signout: ActionProcessor[SignoutAction, SignoutActionResult]
-    update_full_name: ActionProcessor[UpdateFullNameAction, UpdateFullNameActionResult]
-    get_ssh_keypair: SingleEntityActionProcessor[GetSSHKeypairAction, GetSSHKeypairActionResult]
-    generate_ssh_keypair: ScopeActionProcessor[
-        GenerateSSHKeypairAction, GenerateSSHKeypairActionResult
-    ]
-    upload_ssh_keypair: ScopeActionProcessor[UploadSSHKeypairAction, UploadSSHKeypairActionResult]
-    get_role: ActionProcessor[GetRoleAction, GetRoleActionResult]
-    authorize: ActionProcessor[AuthorizeAction, AuthorizeActionResult]
-    signup: ActionProcessor[SignupAction, SignupActionResult]
-    update_password: ActionProcessor[UpdatePasswordAction, UpdatePasswordActionResult]
-    update_password_no_auth: ActionProcessor[
+    """Every auth operation, split by what answers for it.
+
+    Neither group is typed on one ``EntityData``: the login rows a user owns are read
+    through the user group, so its ops wirings answer with more than one kind.
+
+    ``auth_group`` holds the credential and login-session state that names no entity:
+    the caller of a sign-in, a sign-out or a password reset holds no principal yet, and
+    an administrator reaching every session names none either. ``user_group`` holds what
+    one user's row, credentials or login rows answer for.
+
+    The three anonymous wirings are the sign-in path itself. Each authenticates its caller
+    inside the service, against the password the row stores or the hook plugins' verdict,
+    which is what a gate would otherwise have done.
+    """
+
+    authorize: AnonymousGlobalActionProcessor[AuthorizeAction, AuthorizeActionResult]
+    signup: AnonymousGlobalActionProcessor[SignupAction, SignupActionResult]
+    update_password_no_auth: AnonymousGlobalActionProcessor[
         UpdatePasswordNoAuthAction, UpdatePasswordNoAuthActionResult
     ]
-    resolve_access_key_scope: ActionProcessor[
-        ResolveAccessKeyScopeAction, ResolveAccessKeyScopeResult
+    public_get_role: PublicActionProcessor[PublicGetRoleAction, PublicGetRoleActionResult]
+    public_resolve_access_key_scope: PublicActionProcessor[
+        PublicResolveAccessKeyScopeAction, PublicResolveAccessKeyScopeResult
     ]
-    resolve_user_scope: ActionProcessor[ResolveUserScopeAction, ResolveUserScopeResult]
-    resolve_user_id_by_access_key: ActionProcessor[
-        ResolveUserIDByAccessKeyAction, ResolveUserIDByAccessKeyResult
+    public_resolve_user_scope: PublicActionProcessor[
+        PublicResolveUserScopeAction, PublicResolveUserScopeResult
     ]
-    admin_search_login_sessions: ActionProcessor[
-        AdminSearchLoginSessionsAction, SearchLoginSessionsActionResult
+    global_revoke_login_session: GlobalActionProcessor[
+        GlobalRevokeLoginSessionAction, RevokeLoginSessionActionResult
     ]
-    search_login_sessions: ActionProcessor[
-        SearchLoginSessionsAction, SearchLoginSessionsActionResult
+    global_unblock_user: GlobalActionProcessor[
+        GlobalUnblockUserAction, GlobalUnblockUserActionResult
     ]
-    admin_search_login_history: ActionProcessor[
-        AdminSearchLoginHistoryAction, SearchLoginHistoryActionResult
+    logout: SingleEntityActionProcessor[LogoutAction, LogoutActionResult]
+    signout: SingleEntityActionProcessor[SignoutAction, SignoutActionResult]
+    update_full_name: SingleEntityActionProcessor[UpdateFullNameAction, UpdateFullNameActionResult]
+    update_password: SingleEntityActionProcessor[UpdatePasswordAction, UpdatePasswordActionResult]
+    get_ssh_keypair: SingleEntityActionProcessor[GetSSHKeypairAction, GetSSHKeypairActionResult]
+    generate_ssh_keypair: SingleEntityActionProcessor[
+        GenerateSSHKeypairAction, GenerateSSHKeypairActionResult
     ]
-    search_login_history: ActionProcessor[SearchLoginHistoryAction, SearchLoginHistoryActionResult]
-    admin_revoke_login_session: ActionProcessor[
-        AdminRevokeLoginSessionAction, RevokeLoginSessionActionResult
+    upload_ssh_keypair: SingleEntityActionProcessor[
+        UploadSSHKeypairAction, UploadSSHKeypairActionResult
     ]
-    my_revoke_login_session: ActionProcessor[
-        MyRevokeLoginSessionAction, RevokeLoginSessionActionResult
+    revoke_login_session: SingleEntityActionProcessor[
+        RevokeLoginSessionAction, RevokeLoginSessionActionResult
     ]
-    admin_unblock_user: ActionProcessor[AdminUnblockUserAction, AdminUnblockUserActionResult]
+    resolve_user_id_by_access_key: LookupActionProcessor[
+        ResolveUserIDByAccessKeyAction, LookupOpsResult[UserID]
+    ]
+    login_sessions: LookupFieldGroup[LoginSessionData]
+    login_history: LookupFieldGroup[LoginHistoryData]
+    search_login_sessions: ScopeActionProcessor[
+        SearchLoginSessionsAction, ScopedFieldsOpsResult[LoginSessionData]
+    ]
+    search_login_history: ScopeActionProcessor[
+        SearchLoginHistoryAction, ScopedFieldsOpsResult[LoginHistoryData]
+    ]
+    global_search_login_sessions: GlobalActionProcessor[
+        GlobalSearchLoginSessionsAction, BatchOpsResult[LoginSessionData]
+    ]
+    global_search_login_history: GlobalActionProcessor[
+        GlobalSearchLoginHistoryAction, BatchOpsResult[LoginHistoryData]
+    ]
 
     def __init__(
         self,
+        auth_group: ProcessorGroup[Any],
+        user_group: ProcessorGroup[Any],
         service: AuthService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
     ) -> None:
-        self.logout = ActionProcessor(service.logout, action_monitors)
-        self.signout = ActionProcessor(service.signout, action_monitors)
-        self.update_full_name = ActionProcessor(service.update_full_name, action_monitors)
-        self.get_ssh_keypair = SingleEntityActionProcessor(
-            service.get_ssh_keypair, action_monitors, validators=[validators.rbac.single_entity]
+        self.authorize = auth_group.anonymous_global(AuthorizeAction, service.authorize)
+        self.update_password_no_auth = auth_group.anonymous_global(
+            UpdatePasswordNoAuthAction, service.update_password_no_auth
         )
-        self.generate_ssh_keypair = ScopeActionProcessor(
-            service.generate_ssh_keypair, action_monitors, validators=[validators.rbac.scope]
+        self.public_get_role = auth_group.public(PublicGetRoleAction, service.get_role)
+        self.public_resolve_access_key_scope = auth_group.public(
+            PublicResolveAccessKeyScopeAction, service.resolve_access_key_scope
         )
-        self.upload_ssh_keypair = ScopeActionProcessor(
-            service.upload_ssh_keypair, action_monitors, validators=[validators.rbac.scope]
+        self.public_resolve_user_scope = auth_group.public(
+            PublicResolveUserScopeAction, service.resolve_user_scope
         )
-        self.get_role = ActionProcessor(service.get_role, action_monitors)
-        self.authorize = ActionProcessor(service.authorize, action_monitors)
-        self.signup = ActionProcessor(service.signup, action_monitors)
-        self.update_password = ActionProcessor(service.update_password, action_monitors)
-        self.update_password_no_auth = ActionProcessor(
-            service.update_password_no_auth, action_monitors
+        self.global_revoke_login_session = auth_group.global_scope(
+            GlobalRevokeLoginSessionAction, service.global_revoke_login_session
         )
-        self.resolve_access_key_scope = ActionProcessor(
-            service.resolve_access_key_scope, action_monitors
+        self.global_unblock_user = auth_group.global_scope(
+            GlobalUnblockUserAction, service.global_unblock_user
         )
-        self.resolve_user_scope = ActionProcessor(service.resolve_user_scope, action_monitors)
-        self.resolve_user_id_by_access_key = ActionProcessor(
-            service.resolve_user_id_by_access_key, action_monitors
+        self.signup = user_group.anonymous_global(SignupAction, service.signup)
+        self.logout = user_group.single_entity(LogoutAction, service.logout)
+        self.signout = user_group.single_entity(SignoutAction, service.signout)
+        self.update_full_name = user_group.single_entity(
+            UpdateFullNameAction, service.update_full_name
         )
-        self.admin_search_login_sessions = ActionProcessor(
-            service.admin_search_login_sessions, action_monitors
+        self.update_password = user_group.single_entity(
+            UpdatePasswordAction, service.update_password
         )
-        self.search_login_sessions = ActionProcessor(service.search_login_sessions, action_monitors)
-        self.admin_search_login_history = ActionProcessor(
-            service.admin_search_login_history, action_monitors
+        self.get_ssh_keypair = user_group.single_entity(
+            GetSSHKeypairAction, service.get_ssh_keypair
         )
-        self.search_login_history = ActionProcessor(service.search_login_history, action_monitors)
-        self.admin_revoke_login_session = ActionProcessor(
-            service.admin_revoke_login_session, action_monitors
+        self.generate_ssh_keypair = user_group.single_entity(
+            GenerateSSHKeypairAction, service.generate_ssh_keypair
         )
-        self.my_revoke_login_session = ActionProcessor(
-            service.my_revoke_login_session, action_monitors
+        self.upload_ssh_keypair = user_group.single_entity(
+            UploadSSHKeypairAction, service.upload_ssh_keypair
         )
-        self.admin_unblock_user = ActionProcessor(service.admin_unblock_user, action_monitors)
+        self.revoke_login_session = user_group.single_entity(
+            RevokeLoginSessionAction, service.revoke_login_session
+        )
+        self.resolve_user_id_by_access_key = user_group.lookup_ops(ResolveUserIDByAccessKeyAction)
+        self.login_sessions = user_group.field_group(
+            FieldGroupMeta(LOGIN_SESSION_FIELD_TYPE),
+            LoginSessionData,
+            LookupLoginSessionOwnerAction,
+            LookupBulkLoginSessionOwnerAction,
+        )
+        self.login_history = user_group.field_group(
+            FieldGroupMeta(LOGIN_HISTORY_FIELD_TYPE),
+            LoginHistoryData,
+            LookupLoginHistoryOwnerAction,
+            LookupBulkLoginHistoryOwnerAction,
+        )
+        self.search_login_sessions = self.login_sessions.search_ops(SearchLoginSessionsAction)
+        self.search_login_history = self.login_history.search_ops(SearchLoginHistoryAction)
+        self.global_search_login_sessions = self.login_sessions.global_search_ops(
+            GlobalSearchLoginSessionsAction
+        )
+        self.global_search_login_history = self.login_history.global_search_ops(
+            GlobalSearchLoginHistoryAction
+        )

@@ -131,7 +131,7 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
 from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
 from ai.backend.manager.services.auth.actions.resolve_user_scope import (
-    ResolveUserScopeAction,
+    PublicResolveUserScopeAction,
 )
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
@@ -326,8 +326,8 @@ class VFolderHandler:
             ctx.user_email,
             ctx.access_key,
         )
-        user_scope = await self._auth.resolve_user_scope.wait_for_complete(
-            ResolveUserScopeAction(
+        user_scope = await self._auth.public_resolve_user_scope.run(
+            PublicResolveUserScopeAction(
                 requester_uuid=ctx.user_uuid,
                 requester_role=ctx.user_role,
                 requester_domain=ctx.user_domain,

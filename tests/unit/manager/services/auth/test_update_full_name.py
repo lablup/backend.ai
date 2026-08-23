@@ -1,7 +1,9 @@
 from unittest.mock import AsyncMock
+from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UserNotFound
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
@@ -44,7 +46,7 @@ async def test_update_full_name_successful(
 ) -> None:
     """Test successfully updating full name for existing user"""
     action = UpdateFullNameAction(
-        user_id="12345678-1234-5678-1234-567812345678",
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         email="user@example.com",
         domain_name="default",
         full_name="New Full Name",
@@ -67,7 +69,7 @@ async def test_update_full_name_fails_for_nonexistent_user(
 ) -> None:
     """Test updating full name fails for non-existent user"""
     action = UpdateFullNameAction(
-        user_id="12345678-1234-5678-1234-567812345678",
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         email="nonexistent@example.com",
         domain_name="default",
         full_name="Some Name",
@@ -93,7 +95,7 @@ async def test_update_full_name_repository_call(
 ) -> None:
     """Test that update full name calls repository with correct parameters"""
     action = UpdateFullNameAction(
-        user_id="12345678-1234-5678-1234-567812345678",
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         email="test@example.com",
         domain_name="test-domain",
         full_name="Test User Full Name",

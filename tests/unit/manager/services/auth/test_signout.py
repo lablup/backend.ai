@@ -3,6 +3,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.user import UserRole, UserStatus
@@ -45,7 +46,7 @@ async def test_signout_successful_with_valid_credentials(
 ) -> None:
     """Test successful signout with valid credentials"""
     action = SignoutAction(
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
         password="correct_password",
@@ -73,7 +74,7 @@ async def test_signout_fails_when_not_account_owner(
 ) -> None:
     """Test signout fails when requester is not the account owner"""
     action = SignoutAction(
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
         password="password",
@@ -90,7 +91,7 @@ async def test_signout_fails_with_invalid_credentials(
 ) -> None:
     """Test signout fails with invalid credentials"""
     action = SignoutAction(
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
         password="wrong_password",

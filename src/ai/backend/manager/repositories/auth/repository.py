@@ -5,24 +5,19 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
-    LoginHistoryData,
     LoginSessionData,
 )
 from ai.backend.manager.data.auth.types import (
     GroupMembershipData,
     UserCreationData,
 )
-from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import (
@@ -31,7 +26,6 @@ from ai.backend.manager.repositories.auth.db_source.db_source import (
     CredentialVerificationResult,
     LoginSessionCreationResult,
 )
-from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 
 auth_repository_resilience = Resilience(
@@ -100,10 +94,6 @@ class AuthRepository:
     @auth_repository_resilience.apply()
     async def get_delegation_target_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
         return await self._db_source.fetch_user_info_by_access_key(access_key)
-
-    @auth_repository_resilience.apply()
-    async def get_user_id_by_access_key(self, access_key: AccessKey) -> UserID:
-        return await self._db_source.fetch_user_id_by_access_key(access_key)
 
     @auth_repository_resilience.apply()
     async def get_delegation_target_by_email(self, email: str) -> tuple[UUID, UserRole, str]:
@@ -195,21 +185,6 @@ class AuthRepository:
         return await self._db_source.delete_sessions_by_user(user_id, domain_name, result)
 
     @auth_repository_resilience.apply()
-    async def admin_search_login_sessions(
-        self,
-        querier: BatchQuerier,
-    ) -> SearchResult[LoginSessionData]:
-        return await self._db_source.admin_search_login_sessions(querier)
-
-    @auth_repository_resilience.apply()
-    async def search_login_sessions(
-        self,
-        scope: OperationScope,
-        querier: BatchQuerier,
-    ) -> SearchResult[LoginSessionData]:
-        return await self._db_source.search_login_sessions(scope, querier)
-
-    @auth_repository_resilience.apply()
     async def get_login_session_by_id(self, session_id: UUID) -> LoginSessionData:
         return await self._db_source.fetch_login_session_by_id(session_id)
 
@@ -227,20 +202,3 @@ class AuthRepository:
         fail_reason: str | None = None,
     ) -> None:
         await self._db_source.record_login_history(user_id, domain_name, result, fail_reason)
-
-    # --- Login History ---
-
-    @auth_repository_resilience.apply()
-    async def admin_search_login_history(
-        self,
-        querier: BatchQuerier,
-    ) -> SearchResult[LoginHistoryData]:
-        return await self._db_source.admin_search_login_history(querier)
-
-    @auth_repository_resilience.apply()
-    async def search_login_history(
-        self,
-        scope: OperationScope,
-        querier: BatchQuerier,
-    ) -> SearchResult[LoginHistoryData]:
-        return await self._db_source.search_login_history(scope, querier)

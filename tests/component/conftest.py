@@ -46,9 +46,10 @@ from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyS
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.auth import AUTH_ENTITY_TYPE
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.defs import (
@@ -83,13 +84,8 @@ from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import ProcessorDependencies
+from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import SingleEntityActionRBACValidator
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.api.rest.app import build_root_app, mount_registries
 from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
@@ -161,7 +157,6 @@ from ai.backend.manager.repositories.user_resource_policy.repository import (
 )
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
@@ -1429,6 +1424,7 @@ def appproxy_client_pool() -> AppProxyClientPool:
 @pytest.fixture()
 def auth_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
     config_provider: ManagerConfigProvider,
     hook_plugin_ctx: HookPluginContext,
     valkey_clients: ValkeyClients,
@@ -1456,16 +1452,9 @@ def auth_processors(
         ssh_key_validator=SSHKeyValidator(),
     )
     return AuthProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(
-                scope=MagicMock(spec=ScopeActionRBACValidator),
-                single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
-                bulk=MagicMock(spec=BulkActionRBACValidator),
-            ),
-        ),
+        processor_registry.group(GroupMeta(AUTH_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        service,
     )
 
 

@@ -320,7 +320,7 @@ class AdminRegisterSSHKeypairAction(_KeypairOfUserAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "register_ssh_keypair"
+        return "admin_register_ssh_keypair"
 
 
 @dataclass(frozen=True)
@@ -342,7 +342,7 @@ class AdminDeleteSSHKeypairAction(_KeypairOfUserAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "delete_ssh_keypair"
+        return "admin_delete_ssh_keypair"
 
 
 @dataclass(frozen=True)
@@ -364,7 +364,7 @@ class AdminGetSSHKeypairAction(_KeypairOfUserAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "get_ssh_keypair"
+        return "admin_get_ssh_keypair"
 
 
 @dataclass(frozen=True)
