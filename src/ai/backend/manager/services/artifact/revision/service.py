@@ -94,10 +94,6 @@ from ai.backend.manager.services.artifact.revision.actions.disassociate_with_sto
     DisassociateWithStorageAction,
     DisassociateWithStorageActionResult,
 )
-from ai.backend.manager.services.artifact.revision.actions.get import (
-    GetArtifactRevisionAction,
-    GetArtifactRevisionActionResult,
-)
 from ai.backend.manager.services.artifact.revision.actions.get_download_progress import (
     GetDownloadProgressAction,
     GetDownloadProgressActionResult,
@@ -212,12 +208,6 @@ class ArtifactRevisionService:
                 )
             )
             return vfs_storage_data.host, storage_namespace.id, vfs_storage_data.name
-
-    async def get(self, action: GetArtifactRevisionAction) -> GetArtifactRevisionActionResult:
-        revision = await self._artifact_repository.get_artifact_revision_by_id(
-            action.artifact_revision_id
-        )
-        return GetArtifactRevisionActionResult(revision=revision)
 
     async def get_readme(
         self, action: GetArtifactRevisionReadmeAction

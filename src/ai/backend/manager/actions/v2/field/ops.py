@@ -9,9 +9,9 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
 from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
 from ai.backend.manager.actions.v2.ops.base import (
+    FieldGetOpsAction,
     FieldPartialBulkPurgeOpsAction,
     FieldPurgeOpsAction,
-    GetOpsAction,
     UpdateOpsAction,
 )
 from ai.backend.manager.models.base import Base
@@ -31,7 +31,7 @@ class GetFieldOpsAction[
     TOwnerID: EntityIdentifier,
     TRow: Base,
     TData: FieldData,
-](BaseSingleFieldAction[TFieldID, TOwnerID], GetOpsAction[TRow, TData], ABC):
+](BaseSingleFieldAction[TFieldID, TOwnerID], FieldGetOpsAction[TRow, TData], ABC):
     """A read of one field row, authorized against the entity owning it."""
 
     @override

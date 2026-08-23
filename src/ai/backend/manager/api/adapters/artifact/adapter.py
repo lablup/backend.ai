@@ -301,7 +301,7 @@ class ArtifactAdapter(BaseAdapter):
         action_result = await self._processors.artifact.revision.get.run(
             GetArtifactRevisionAction(artifact_revision_id=ArtifactRevisionID(artifact_revision_id))
         )
-        return self._revision_data_to_dto(action_result.revision)
+        return self._revision_data_to_dto(action_result.data)
 
     async def scan(
         self,

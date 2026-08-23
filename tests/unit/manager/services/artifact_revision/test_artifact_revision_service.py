@@ -75,9 +75,6 @@ from ai.backend.manager.services.artifact.revision.actions.delegate_import_revis
 from ai.backend.manager.services.artifact.revision.actions.disassociate_with_storage import (
     DisassociateWithStorageAction,
 )
-from ai.backend.manager.services.artifact.revision.actions.get import (
-    GetArtifactRevisionAction,
-)
 from ai.backend.manager.services.artifact.revision.actions.get_download_progress import (
     GetDownloadProgressAction,
 )
@@ -208,25 +205,6 @@ class TestArtifactRevisionService:
             updated_at=now,
             digest=None,
             verification_result=None,
-        )
-
-    async def test_get_artifact_revision(
-        self,
-        artifact_revision_service: ArtifactRevisionService,
-        mock_artifact_repository: MagicMock,
-        sample_artifact_revision_data: ArtifactRevisionData,
-    ) -> None:
-        """Test getting an artifact revision by ID"""
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            return_value=sample_artifact_revision_data
-        )
-
-        action = GetArtifactRevisionAction(artifact_revision_id=sample_artifact_revision_data.id)
-        result = await artifact_revision_service.get(action)
-
-        assert result.revision == sample_artifact_revision_data
-        mock_artifact_repository.get_artifact_revision_by_id.assert_called_once_with(
-            sample_artifact_revision_data.id
         )
 
     async def test_get_artifact_revision_readme(

@@ -39,6 +39,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     EntityWithFieldsCreateOpsAction,
     FieldAtomicCreateOpsAction,
     FieldCreateOpsAction,
+    FieldGetOpsAction,
     FieldPartialBulkPurgeOpsAction,
     FieldPurgeOpsAction,
     FieldUpsertOpsAction,
@@ -129,6 +130,20 @@ class GetService[TData]:
 
     async def execute(self, action: GetOpsAction[Any, TData]) -> EntityOpsResult[TData]:
         return EntityOpsResult(data=await self._repository.get(action.to_querier()))
+
+
+class FieldGetService[TFieldData: FieldData]:
+    """Reads the field row the action's querier names."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: FieldGetOpsAction[Any, TFieldData]
+    ) -> EntityOpsResult[TFieldData]:
+        return EntityOpsResult(data=await self._repository.get_field(action.to_querier()))
 
 
 class BulkOwnedFieldGetService[TFieldData: FieldData]:

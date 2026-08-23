@@ -19,7 +19,11 @@ from ai.backend.manager.models.specs.lookup import (
     FieldOwnerKeyLookup,
     FieldOwnerLookup,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier, OwnedFieldQuerier
+from ai.backend.manager.models.specs.querier import (
+    DataQuerier,
+    FieldQuerier,
+    OwnedFieldQuerier,
+)
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
 from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
 
@@ -116,6 +120,19 @@ class V2ReadOps(V2OpsBase):
                 )
             designated[owner_id] = querier.to_data(row)
         return designated
+
+    async def query_field_data[TRow: Base, TData: FieldData](
+        self, querier: FieldQuerier[TRow, TData]
+    ) -> TData | None:
+        """Fetch one field row by its own id and return it as its ``data/`` type."""
+        row_class = querier.row_class()
+        result = await self._sess.execute(
+            sa.select(row_class).where(querier.target_id_column() == querier.target_id_value())
+        )
+        row = result.scalar_one_or_none()
+        if row is None:
+            return None
+        return querier.to_data(row)
 
     async def search_with_scopes[TRow: Base, TData](
         self,
