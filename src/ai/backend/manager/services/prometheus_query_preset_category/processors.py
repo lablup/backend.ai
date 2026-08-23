@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
@@ -16,6 +17,9 @@ from ai.backend.manager.actions.v2.single_entity.processor import (
 )
 from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.actions.bulk_get import (
+    PublicBulkGetCategoriesAction,
 )
 from ai.backend.manager.services.prometheus_query_preset_category.actions.create import (
     CreateCategoryAction,
@@ -42,6 +46,10 @@ class PrometheusQueryPresetCategoryProcessors:
         GetCategoryAction,
         EntityOpsResult[PrometheusQueryPresetCategoryData],
     ]
+    public_bulk_get_categories: PartialBulkActionProcessor[
+        PublicBulkGetCategoriesAction,
+        PrometheusQueryPresetCategoryData,
+    ]
     public_search_categories: PublicActionProcessor[
         SearchCategoriesAction,
         BatchOpsResult[PrometheusQueryPresetCategoryData],
@@ -54,5 +62,8 @@ class PrometheusQueryPresetCategoryProcessors:
     def __init__(self, group: ProcessorGroup[PrometheusQueryPresetCategoryData]) -> None:
         self.global_create_category = group.global_create_ops(CreateCategoryAction)
         self.public_get_category = group.public_get_ops(GetCategoryAction)
+        self.public_bulk_get_categories = group.public_partial_bulk_get_ops(
+            PublicBulkGetCategoriesAction
+        )
         self.public_search_categories = group.public_search_ops(SearchCategoriesAction)
         self.purge_category = group.entity_purge_ops(PurgeCategoryAction)

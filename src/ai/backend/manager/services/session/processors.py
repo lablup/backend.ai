@@ -1,20 +1,20 @@
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
-from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.field.bulk_processor import BulkFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import PublicActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
-from ai.backend.manager.data.session.types import SessionEntityData
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
+from ai.backend.manager.data.session.types import SessionEntityData, SessionTerminationStatus
 from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
     BatchGetKernelResourceAllocationAction,
     BatchGetKernelResourceAllocationActionResult,
 )
 from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
     BatchGetSessionResourceAllocationAction,
-    BatchGetSessionResourceAllocationActionResult,
 )
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
@@ -142,7 +142,6 @@ from ai.backend.manager.services.session.actions.start_service import (
 )
 from ai.backend.manager.services.session.actions.terminate_sessions import (
     TerminateSessionsAction,
-    TerminateSessionsActionResult,
 )
 from ai.backend.manager.services.session.actions.update_session import (
     UpdateSessionAction,
@@ -206,8 +205,8 @@ class SessionProcessors:
         ResolveSessionNameAction, ResolveSessionNameActionResult
     ]
     search_kernels: ScopeActionProcessor[SearchKernelsAction, SearchKernelsActionResult]
-    batch_get_session_resource_allocation: BulkActionProcessor[
-        BatchGetSessionResourceAllocationAction, BatchGetSessionResourceAllocationActionResult
+    batch_get_session_resource_allocation: PartialBulkActionProcessor[
+        BatchGetSessionResourceAllocationAction, ResourceAllocationAggregate
     ]
     batch_get_kernel_resource_allocation: BulkFieldActionProcessor[
         BatchGetKernelResourceAllocationAction, BatchGetKernelResourceAllocationActionResult
@@ -220,7 +219,9 @@ class SessionProcessors:
         ShutdownServiceAction, ShutdownServiceActionResult
     ]
     start_service: SingleEntityActionProcessor[StartServiceAction, StartServiceActionResult]
-    terminate_sessions: BulkActionProcessor[TerminateSessionsAction, TerminateSessionsActionResult]
+    terminate_sessions: PartialBulkActionProcessor[
+        TerminateSessionsAction, SessionTerminationStatus
+    ]
     upload_files: SingleEntityActionProcessor[UploadFilesAction, UploadFilesActionResult]
     get_session: SingleEntityActionProcessor[GetSessionAction, GetSessionActionResult]
     update_session: SingleEntityActionProcessor[UpdateSessionAction, UpdateSessionActionResult]
@@ -283,7 +284,7 @@ class SessionProcessors:
         self.search_kernels = group.scope(SearchKernelsAction, service.search_kernels)
         # Bulk read for GraphQL DataLoaders; ids come from already-authorized
         # session/kernel nodes, so no per-target RBAC re-validation is applied.
-        self.batch_get_session_resource_allocation = group.bulk(
+        self.batch_get_session_resource_allocation = group.partial_bulk(
             BatchGetSessionResourceAllocationAction, service.batch_get_session_resource_allocation
         )
         self.batch_get_kernel_resource_allocation = group.atomic_bulk_field(
@@ -295,7 +296,9 @@ class SessionProcessors:
         self.search_sessions_in_project = group.scope(
             SearchSessionsInProjectAction, service.search_in_project
         )
-        self.terminate_sessions = group.bulk(TerminateSessionsAction, service.terminate_sessions)
+        self.terminate_sessions = group.partial_bulk(
+            TerminateSessionsAction, service.terminate_sessions
+        )
 
         # Actions without RBAC validation (name-based, no session_id at construction)
         self.destroy_session = group.single_entity(DestroySessionAction, service.destroy_session)

@@ -40,6 +40,7 @@ from ai.backend.manager.models.specs.purger import (
     FieldPurger,
 )
 from ai.backend.manager.models.specs.querier import (
+    BulkEntityQuerier,
     DataQuerier,
     FieldQuerier,
     OwnedFieldQuerier,
@@ -77,6 +78,17 @@ class OpsRepository[TData]:
                     f"{querier.row_class().__name__} {querier.entity_id_value()} not found"
                 )
             return data
+
+    async def bulk_get(
+        self, querier: BulkEntityQuerier[Any, TData], entity_ids: Sequence[EntityIdentifier]
+    ) -> Mapping[EntityIdentifier, TData]:
+        """Read the named entities; one that is gone is absent instead of raising.
+
+        Unlike :meth:`get`, the run answers for each id separately, so a missing row is
+        one failed item rather than a failed run.
+        """
+        async with self._ops.read_ops() as r:
+            return await r.query_bulk_data(querier, entity_ids)
 
     async def get_field[TFieldData: FieldData](
         self, querier: FieldQuerier[Any, TFieldData]

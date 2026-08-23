@@ -3,7 +3,8 @@
 from unittest.mock import MagicMock
 
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
-    VirtualScopeBulkActionRBACValidator,
+    VirtualScopeAtomicBulkActionRBACValidator,
+    VirtualScopePartialBulkActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualScopeScopeActionRBACValidator,
@@ -23,5 +24,6 @@ def mock_virtual_scope_rbac_validators() -> VirtualScopeRBACValidators:
     return VirtualScopeRBACValidators(
         scope=MagicMock(spec=VirtualScopeScopeActionRBACValidator),
         single_entity=MagicMock(spec=VirtualScopeSingleEntityActionRBACValidator),
-        bulk=MagicMock(spec=VirtualScopeBulkActionRBACValidator),
+        partial_bulk=MagicMock(spec=VirtualScopePartialBulkActionRBACValidator),
+        atomic_bulk=MagicMock(spec=VirtualScopeAtomicBulkActionRBACValidator),
     )

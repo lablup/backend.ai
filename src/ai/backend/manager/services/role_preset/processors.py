@@ -6,13 +6,13 @@ from ai.backend.common.data.entity.role_permission_preset import (
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
-from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
-from ai.backend.manager.actions.v2.field.bulk_processor import BulkFieldActionProcessor
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.field.bulk_processor import (
+    PartialBulkFieldActionProcessor,
+)
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
-    BulkFieldOpsResult,
-    BulkOpsResult,
     CreatedEntityWithFieldsOpsResult,
     EntityOpsResult,
     FieldsOpsResult,
@@ -69,10 +69,10 @@ class RolePresetProcessors:
     get: SingleEntityActionProcessor[GetRolePresetAction, EntityOpsResult[RolePresetData]]
     search: GlobalActionProcessor[SearchRolePresetsAction, BatchOpsResult[RolePresetData]]
     update: SingleEntityActionProcessor[UpdateRolePresetAction, EntityOpsResult[RolePresetData]]
-    bulk_delete: BulkActionProcessor[BulkDeleteRolePresetsAction, BulkOpsResult[RolePresetData]]
-    bulk_restore: BulkActionProcessor[BulkRestoreRolePresetsAction, BulkOpsResult[RolePresetData]]
+    bulk_delete: PartialBulkActionProcessor[BulkDeleteRolePresetsAction, RolePresetData]
+    bulk_restore: PartialBulkActionProcessor[BulkRestoreRolePresetsAction, RolePresetData]
     purge: SingleEntityActionProcessor[PurgeRolePresetAction, EntityOpsResult[RolePresetData]]
-    bulk_purge: BulkActionProcessor[BulkPurgeRolePresetsAction, BulkOpsResult[RolePresetData]]
+    bulk_purge: PartialBulkActionProcessor[BulkPurgeRolePresetsAction, RolePresetData]
 
     # Permission entries: field rows of a preset, answered for by the preset owning them
     search_permission_presets: ScopeActionProcessor[
@@ -81,8 +81,8 @@ class RolePresetProcessors:
     bulk_add_permissions: SingleEntityActionProcessor[
         BulkAddRolePermissionPresetsAction, FieldsOpsResult[RolePermissionPresetData]
     ]
-    bulk_remove_permissions: BulkFieldActionProcessor[
-        BulkRemoveRolePermissionPresetsAction, BulkFieldOpsResult[RolePermissionPresetData]
+    bulk_remove_permissions: PartialBulkFieldActionProcessor[
+        BulkRemoveRolePermissionPresetsAction, RolePermissionPresetData
     ]
 
     def __init__(

@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
-    VirtualScopeBulkActionRBACValidator,
+    VirtualScopeAtomicBulkActionRBACValidator,
+    VirtualScopePartialBulkActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualScopeScopeActionRBACValidator,
@@ -39,4 +40,5 @@ class VirtualScopeRBACValidators:
 
     scope: VirtualScopeScopeActionRBACValidator
     single_entity: VirtualScopeSingleEntityActionRBACValidator
-    bulk: VirtualScopeBulkActionRBACValidator
+    partial_bulk: VirtualScopePartialBulkActionRBACValidator
+    atomic_bulk: VirtualScopeAtomicBulkActionRBACValidator

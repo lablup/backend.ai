@@ -35,7 +35,8 @@ from ai.backend.manager.actions.v2.bulk.monitor.audit_log import BulkActionAudit
 from ai.backend.manager.actions.v2.bulk.monitor.prometheus import BulkActionPrometheusMonitor
 from ai.backend.manager.actions.v2.bulk.monitor.reporter import BulkActionReporterMonitor
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
-    VirtualScopeBulkActionRBACValidator,
+    VirtualScopeAtomicBulkActionRBACValidator,
+    VirtualScopePartialBulkActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.global_scope.monitor.audit_log import (
     GlobalActionAuditLogMonitor,
@@ -362,7 +363,10 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             single_entity=VirtualScopeSingleEntityActionRBACValidator(
                 permission_controller_repository, config_provider
             ),
-            bulk=VirtualScopeBulkActionRBACValidator(
+            partial_bulk=VirtualScopePartialBulkActionRBACValidator(
+                permission_controller_repository, config_provider
+            ),
+            atomic_bulk=VirtualScopeAtomicBulkActionRBACValidator(
                 permission_controller_repository, config_provider
             ),
         )
@@ -381,7 +385,8 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 ),
                 v2_validators=v2_validators.ActionValidators(
                     single_entity=[virtual_scope_rbac_validators.single_entity],
-                    bulk=[virtual_scope_rbac_validators.bulk],
+                    partial_bulk=[virtual_scope_rbac_validators.partial_bulk],
+                    atomic_bulk=[virtual_scope_rbac_validators.atomic_bulk],
                     scope=[virtual_scope_rbac_validators.scope],
                 ),
             ),

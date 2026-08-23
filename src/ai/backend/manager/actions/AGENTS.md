@@ -93,11 +93,45 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   run is recorded as one failure, a `PartialBulk*` base answers per target and the run
   itself succeeds. No base is unmarked.
 - A read carries it on the factory instead, because the base names the operation rather
-  than the fate: `atomic_*` when every target shares the run's outcome. No factory
-  passing an atomic judge is unmarked.
+  than the fate: `atomic_bulk_*` when every target shares the run's outcome.
 - `Bulk` in a name means the bulk shape — the caller named the targets, so each is
   answered for. A many-row write whose target is a single scope, a single owner, or
   the system is not bulk-shaped.
+- A read of several named entities is partial for the same reason a write is: an entity
+  the caller may not read is one failed item, not a failed run. Wire it through
+  `partial_bulk_get_ops`, or `public_partial_bulk_get_ops` where the entity's single get
+  is public and nothing is denied.
+- Every bulk name carries its mark — `partial_bulk` / `atomic_bulk` on the factories,
+  the action bases and the validators alike. Nothing bulk-shaped is unmarked, so
+  neither has to be inferred from a default.
+- A partial shape inherits `BasePartialBulkAction` and re-states itself over the ids
+  that passed, so the operation keeps the one-argument signature every generic service
+  has. An atomic shape stays on `BaseBulkAction`: narrowing all-or-nothing is not it.
+- Reserve atomic for the runs that mean it — a permission definition, anything whose
+  targets must all go through or none. Partial is what a bulk run normally is.
+- `ActionValidators.partial_bulk` answers per entity; `atomic_bulk` refuses the run.
+  A partial shape takes the partial ones — an entity the caller may not reach is one
+  failed item. Only a shape that cannot narrow gates atomically, and it says so.
+- A field row is denied through its owner: the check is per owner, so a denied one
+  takes every row it owns out of the run. Which rows those are is known only after the
+  owner lookup, so that narrowing happens in the processor.
+- A partial run answers with `PartialBulkResult`, one item per entity the caller named
+  and in that order. Fixed rather than per domain: completing and ordering the answer
+  is the processor's job, and it cannot do that for a shape only the domain knows.
+- What a domain has to say per entity goes in the item's value — a session's four
+  termination states are that value, not four lists. A result keyed finer than the
+  entity (a pair, say) is not this shape.
+- The item carries the exception; `BulkEntityResult` carries the audit row's columns.
+  Two readers, two types — do NOT fold them together, and classify a failure only
+  where the run knows which step it came from.
+- The result tells a denial apart from an id matching no row, and an adapter keeps them
+  apart: a miss stays null and a denial is raised at the field that asked for it. The
+  no-leakage rule under Gates covers keys, which a caller can guess; these ids the
+  caller already holds.
+- An item answers in one of four ways, and the two axes are separate: whether the
+  operation ran for that entity (a denied one it never saw), and what came back if it
+  did — a value, nothing, or a failure. `nothing` is not a failure: only the domain
+  knows whether an absent value is the correct answer or a miss.
 
 ## Soft delete
 

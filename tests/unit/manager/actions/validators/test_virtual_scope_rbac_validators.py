@@ -48,7 +48,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
-    VirtualScopeBulkActionRBACValidator,
+    VirtualScopeAtomicBulkActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.validator.rbac import (
@@ -491,8 +491,8 @@ def single_entity_validator(
 @pytest.fixture
 def bulk_validator(
     repository: PermissionControllerRepository,
-) -> VirtualScopeBulkActionRBACValidator:
-    return VirtualScopeBulkActionRBACValidator(repository, _make_config_provider())
+) -> VirtualScopeAtomicBulkActionRBACValidator:
+    return VirtualScopeAtomicBulkActionRBACValidator(repository, _make_config_provider())
 
 
 @pytest.fixture
@@ -880,10 +880,10 @@ class TestUpsertRequiresBothCreateAndUpdate:
             )
 
 
-class TestVirtualScopeBulkActionRBACValidator:
+class TestVirtualScopeAtomicBulkActionRBACValidator:
     async def test_superadmin_bypasses_check(
         self,
-        bulk_validator: VirtualScopeBulkActionRBACValidator,
+        bulk_validator: VirtualScopeAtomicBulkActionRBACValidator,
         bulk_vfolder_action: _BulkVfolderUpdateAction,
         trigger_meta: BaseActionTriggerMeta,
         superadmin_user: UserData,
@@ -902,7 +902,7 @@ class TestVirtualScopeBulkActionRBACValidator:
 
     async def test_all_targets_granted_passes(
         self,
-        bulk_validator: VirtualScopeBulkActionRBACValidator,
+        bulk_validator: VirtualScopeAtomicBulkActionRBACValidator,
         bulk_vfolder_action: _BulkVfolderUpdateAction,
         trigger_meta: BaseActionTriggerMeta,
         user_with_all_bulk_vfolders_granted: UserData,
@@ -920,7 +920,7 @@ class TestVirtualScopeBulkActionRBACValidator:
 
     async def test_any_denied_target_rejects_whole_action(
         self,
-        bulk_validator: VirtualScopeBulkActionRBACValidator,
+        bulk_validator: VirtualScopeAtomicBulkActionRBACValidator,
         bulk_vfolder_action: _BulkVfolderUpdateAction,
         trigger_meta: BaseActionTriggerMeta,
         user_with_partial_bulk_membership: UserData,
@@ -940,7 +940,7 @@ class TestVirtualScopeBulkActionRBACValidator:
 
     async def test_entity_cap_clips_granted_permission(
         self,
-        bulk_validator: VirtualScopeBulkActionRBACValidator,
+        bulk_validator: VirtualScopeAtomicBulkActionRBACValidator,
         trigger_meta: BaseActionTriggerMeta,
         user_with_read_capped_bulk_vfolder: UserData,
     ) -> None:
@@ -952,7 +952,7 @@ class TestVirtualScopeBulkActionRBACValidator:
 
     async def test_empty_targets_passes(
         self,
-        bulk_validator: VirtualScopeBulkActionRBACValidator,
+        bulk_validator: VirtualScopeAtomicBulkActionRBACValidator,
         trigger_meta: BaseActionTriggerMeta,
         regular_user_without_permission: UserData,
     ) -> None:

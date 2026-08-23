@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import defaultdict
 from collections.abc import Sequence
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -100,7 +101,11 @@ from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggreg
 from ai.backend.manager.data.session.compute_schedule import ComputeScheduleKernelResult
 from ai.backend.manager.data.session.draft import KernelResourceInput
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
-from ai.backend.manager.data.session.types import SessionData, SessionStatus
+from ai.backend.manager.data.session.types import (
+    SessionData,
+    SessionStatus,
+    SessionTerminationStatus,
+)
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.kernel.conditions import KernelConditions
@@ -519,9 +524,7 @@ class SessionAdapter(BaseAdapter):
         action_result = await self._processors.session.batch_get_session_resource_allocation.run(
             BatchGetSessionResourceAllocationAction(session_ids=list(session_ids))
         )
-        return [
-            self._aggregate_to_allocation_dto(action_result.data.get(sid)) for sid in session_ids
-        ]
+        return [self._aggregate_to_allocation_dto(item.value) for item in action_result.items]
 
     async def batch_resource_allocation_by_kernel(
         self, kernel_ids: Sequence[KernelId]
@@ -1004,11 +1007,15 @@ class SessionAdapter(BaseAdapter):
             forced=input.forced,
         )
         result = await self._processors.session.terminate_sessions.run(action)
+        by_state: dict[SessionTerminationStatus, list[SessionId]] = defaultdict(list)
+        for item in result.items:
+            if item.value is not None:
+                by_state[item.value].append(SessionId(item.entity_id))
         return TerminateSessionsPayload(
-            cancelled=result.cancelled,
-            terminating=result.terminating,
-            force_terminated=result.force_terminated,
-            skipped=result.skipped,
+            cancelled=by_state[SessionTerminationStatus.CANCELLED],
+            terminating=by_state[SessionTerminationStatus.TERMINATING],
+            force_terminated=by_state[SessionTerminationStatus.FORCE_TERMINATED],
+            skipped=by_state[SessionTerminationStatus.SKIPPED],
         )
 
     async def exclude_idle_checks(

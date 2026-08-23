@@ -5,7 +5,7 @@ from typing import Any, override
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.common.data.entity.types import EntityIdentifier as OwnerEntityID
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction, BasePartialBulkAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
 from ai.backend.manager.actions.v2.ops.backend import OpsBackendAction
@@ -26,6 +26,7 @@ from ai.backend.manager.models.specs.purger import (
     FieldPurger,
 )
 from ai.backend.manager.models.specs.querier import (
+    BulkEntityQuerier,
     DataQuerier,
     FieldQuerier,
     OwnedFieldQuerier,
@@ -104,6 +105,8 @@ __all__ = (
     "GetGlobalOpsAction",
     "OwnedFieldGetOpsAction",
     "BulkGetOwnedFieldOpsAction",
+    "EntityPartialBulkGetOpsAction",
+    "PartialBulkGetEntityOpsAction",
 )
 
 
@@ -157,6 +160,20 @@ class OwnedFieldGetOpsAction[TOwnerID: EntityIdentifier, TRow: Base, TData: Fiel
         The same entities ``entity_ids()`` reports, narrowed to the type the querier
         keys on.
         """
+        raise NotImplementedError
+
+
+class EntityPartialBulkGetOpsAction[TRow: Base, TData](OpsBackendAction):
+    """A read of the entities the caller named, keyed by their own ids.
+
+    Carries a :class:`BulkEntityQuerier` for the reason :class:`GetOpsAction` carries a
+    ``DataQuerier``: the ids alone say neither which table to read nor how a row
+    becomes data.
+    """
+
+    @abstractmethod
+    def to_querier(self) -> BulkEntityQuerier[TRow, TData]:
+        """Return the read spec this action executes."""
         raise NotImplementedError
 
 
@@ -618,6 +635,21 @@ class BulkGetOwnedFieldOpsAction[TOwnerID: EntityIdentifier, TRow: Base, TData: 
         return ActionOperationType.GET
 
 
+class PartialBulkGetEntityOpsAction[TRow: Base, TData](
+    BasePartialBulkAction, EntityPartialBulkGetOpsAction[TRow, TData], ABC
+):
+    """A read over the entities the caller named, each answered for on its own.
+
+    Partial rather than atomic: an id the caller may not read and one that matches no
+    row are both a failed item, and the two are told apart by the error each carries.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+
 class SearchGlobalOpsAction[TRow: Base, TData](
     BaseGlobalAction, GlobalSearchOpsAction[TRow, TData], ABC
 ):
@@ -782,7 +814,7 @@ class PurgeEntityOpsAction[TRow: Base, TData](
 
 
 class PartialBulkPurgeGlobalEntityOpsAction[TRow: Base, TData](
-    BaseBulkAction, GlobalEntityPartialBulkPurgeOpsAction[TRow, TData], ABC
+    BasePartialBulkAction, GlobalEntityPartialBulkPurgeOpsAction[TRow, TData], ABC
 ):
     """A hard delete over the global entities the caller named."""
 
@@ -793,7 +825,7 @@ class PartialBulkPurgeGlobalEntityOpsAction[TRow: Base, TData](
 
 
 class PartialBulkPurgeEntityOpsAction[TRow: Base, TData](
-    BaseBulkAction, EntityPartialBulkPurgeOpsAction[TRow, TData], ABC
+    BasePartialBulkAction, EntityPartialBulkPurgeOpsAction[TRow, TData], ABC
 ):
     """A hard delete over the entities the caller named."""
 
@@ -926,7 +958,7 @@ class RestoreSingleEntityOpsAction[TRow: Base, TData](
 
 
 class UpdatePartialBulkOpsAction[TRow: Base, TData](
-    BaseBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
+    BasePartialBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
 ):
     """A write over the entities the caller named. A bulk soft delete carries this too."""
 
@@ -937,7 +969,7 @@ class UpdatePartialBulkOpsAction[TRow: Base, TData](
 
 
 class DeletePartialBulkOpsAction[TRow: Base, TData](
-    BaseBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
+    BasePartialBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
 ):
     """A soft delete over the entities the caller named."""
 
@@ -948,7 +980,7 @@ class DeletePartialBulkOpsAction[TRow: Base, TData](
 
 
 class RestorePartialBulkOpsAction[TRow: Base, TData](
-    BaseBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
+    BasePartialBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
 ):
     """A restore over the entities the caller named."""
 

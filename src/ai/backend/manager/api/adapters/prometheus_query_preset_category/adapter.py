@@ -47,33 +47,39 @@ from ai.backend.manager.models.prometheus_query_preset_category.orders import (
 from ai.backend.manager.models.prometheus_query_preset_category.searchers import (
     PrometheusQueryPresetCategorySearcher,
 )
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.services.prometheus_query_preset_category.actions import (
     CreateCategoryAction,
     GetCategoryAction,
     PurgeCategoryAction,
     SearchCategoriesAction,
 )
+from ai.backend.manager.services.prometheus_query_preset_category.actions.bulk_get import (
+    PublicBulkGetCategoriesAction,
+)
 
 
 class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
     """Adapter for prometheus query preset category domain operations."""
 
-    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[CategoryNode | None]:
+    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[CategoryNode | Exception | None]:
+        """Batch load categories by id for DataLoader use.
+
+        One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read.
+        """
         if not ids:
             return []
-        searcher = PrometheusQueryPresetCategorySearcher(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[PrometheusQueryPresetCategoryConditions.by_ids(ids)],
-        )
-        action_result = (
-            await self._processors.prometheus_query_preset_category.public_search_categories.run(
-                SearchCategoriesAction(searcher=searcher)
+        entity_ids = [PrometheusQueryPresetCategoryID(value) for value in ids]
+        result = (
+            await self._processors.prometheus_query_preset_category.public_bulk_get_categories.run(
+                PublicBulkGetCategoriesAction(ids=entity_ids)
             )
         )
-        category_map = {item.id: self._data_to_dto(item) for item in action_result.items}
         return [
-            category_map.get(PrometheusQueryPresetCategoryID(category_id)) for category_id in ids
+            self._data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
         ]
 
     async def create(self, input: CreateCategoryInput) -> CreateCategoryPayload:

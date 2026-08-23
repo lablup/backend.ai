@@ -41,6 +41,9 @@ from ai.backend.manager.models.condition_utils import combine_conditions_or, neg
 from ai.backend.manager.services.app_config.actions.definition.admin_search import (
     AdminSearchAppConfigDefinitionsAction,
 )
+from ai.backend.manager.services.app_config.actions.definition.bulk_get import (
+    BulkGetAppConfigDefinitionsAction,
+)
 from ai.backend.manager.services.app_config.actions.definition.create import (
     CreateAppConfigDefinitionAction,
 )
@@ -85,25 +88,24 @@ class AppConfigDefinitionAdapter(BaseAdapter):
 
     async def batch_load_by_ids(
         self, ids: Sequence[AppConfigDefinitionID]
-    ) -> list[AppConfigDefinitionNode | None]:
-        """Batch load app config definitions by id for DataLoader use.
+    ) -> list[AppConfigDefinitionNode | Exception | None]:
+        """Batch load registered config names by id for DataLoader use.
 
-        Returns nodes in the same order as the input ids, with None for missing ones.
+        One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read.
         """
         if not ids:
             return []
-        searcher = self._build_searcher(
-            AppConfigDefinitionSearcher,
-            conditions=[AppConfigDefinitionConditions.by_ids(list(ids))],
-            orders=[],
-            pagination_spec=_get_app_config_definition_pagination_spec(),
-            limit=len(ids),
+        entity_ids = [AppConfigDefinitionID(value) for value in ids]
+        result = await self._processors.app_config.definition_bulk_get.run(
+            BulkGetAppConfigDefinitionsAction(ids=entity_ids)
         )
-        action_result = await self._processors.app_config.definition_global_search.run(
-            AdminSearchAppConfigDefinitionsAction(searcher=searcher)
-        )
-        node_map = {node.id: node for node in map(self._data_to_node, action_result.items)}
-        return [node_map.get(definition_id) for definition_id in ids]
+        return [
+            self._data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def admin_search(
         self, input: SearchAppConfigDefinitionsInput

@@ -36,6 +36,9 @@ from ai.backend.manager.models.object_storage.orders import ObjectStorageOrders
 from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.models.object_storage.updaters import ObjectStorageUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.services.object_storage.actions.bulk_get import (
+    BulkGetObjectStoragesAction,
+)
 from ai.backend.manager.services.object_storage.actions.create import CreateObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.get import GetObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
@@ -137,22 +140,26 @@ class ObjectStorageAdapter(BaseAdapter):
             offset=input.offset if input.offset is not None else 0,
         )
 
-    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[ObjectStorageNode | None]:
-        """Batch load object storages by IDs for DataLoader use.
+    async def batch_load_by_ids(
+        self, ids: Sequence[UUID]
+    ) -> list[ObjectStorageNode | Exception | None]:
+        """Batch load object storages by id for DataLoader use.
 
-        Returns ObjectStorageNode DTOs in the same order as the input ids list.
+        One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read.
         """
         if not ids:
             return []
-        searcher = ObjectStorageSearcher(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[ObjectStorageConditions.by_ids(ids)],
+        entity_ids = [ObjectStorageID(value) for value in ids]
+        result = await self._processors.object_storage.bulk_get.run(
+            BulkGetObjectStoragesAction(ids=entity_ids)
         )
-        action_result = await self._processors.object_storage.global_search_object_storages.run(
-            SearchObjectStoragesAction(searcher=searcher)
-        )
-        storage_map = {item.id: self._data_to_dto(item) for item in action_result.items}
-        return [storage_map.get(ObjectStorageID(storage_id)) for storage_id in ids]
+        return [
+            self._data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def get(self, storage_id: UUID) -> ObjectStorageNode:
         """Retrieve a single object storage by ID."""

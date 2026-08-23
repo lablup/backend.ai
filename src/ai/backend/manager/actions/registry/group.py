@@ -34,14 +34,24 @@ from ai.backend.manager.actions.types import (
     ActionKind,
     ActionOperationType,
 )
-from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction, BasePartialBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
+from ai.backend.manager.actions.v2.bulk.partial_processor import (
+    PartialBulkActionProcessor,
+    PublicPartialBulkActionProcessor,
+)
 from ai.backend.manager.actions.v2.bulk.processor import (
     BulkActionProcessor,
     PartialEntityResultJudge,
 )
-from ai.backend.manager.actions.v2.bulk.result import BasePartialBulkActionResult
-from ai.backend.manager.actions.v2.bulk.validator import BulkActionValidator
+from ai.backend.manager.actions.v2.bulk.result import (
+    BasePartialBulkActionResult,
+    PartialBulkResult,
+)
+from ai.backend.manager.actions.v2.bulk.validator import (
+    AtomicBulkActionValidator,
+    PartialBulkActionValidator,
+)
 from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
 from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.field.bulk_processor import (
@@ -94,6 +104,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     GetSingleEntityOpsAction,
     LookupEntityOpsAction,
     OperationScopeOpsAction,
+    PartialBulkGetEntityOpsAction,
     PartialBulkPurgeEntityOpsAction,
     PartialBulkPurgeGlobalEntityOpsAction,
     PurgeEntityOpsAction,
@@ -108,7 +119,6 @@ from ai.backend.manager.actions.v2.ops.base import (
 )
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
-    BulkOpsResult,
     CreatedEntityOpsResult,
     CreatedEntityWithFieldsOpsResult,
     EntitiesOpsResult,
@@ -159,6 +169,7 @@ from ai.backend.manager.services.ops.service import (
     GlobalUpsertService,
     LookupService,
     PartialBulkDeleteService,
+    PartialBulkGetService,
     PartialBulkRestoreService,
     PartialBulkUpdateService,
     RestoreService,
@@ -291,20 +302,46 @@ class ProcessorGroup[TData: EntityData]:
             validators=(),
         )
 
-    def bulk[TAction: BaseBulkAction, TResult: BasePartialBulkActionResult](
+    def partial_bulk[TAction: BasePartialBulkAction, TValue](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[PartialBulkResult[TValue]]],
+        *,
+        atomic_validators: Sequence[AtomicBulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> PartialBulkActionProcessor[TAction, TValue]:
+        """Several entities read or written by a service, answered for one by one.
+
+        The service answers with the standard result, so the processor is the one that
+        completes and orders it. Gated atomically for now: nothing narrows until the
+        permission check answers per entity.
+        """
+        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.CUSTOM)
+        return PartialBulkActionProcessor(
+            func,
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            atomic_validators=(*self._deps.validators.atomic_bulk, *atomic_validators),
+        )
+
+    def legacy_partial_bulk[TAction: BaseBulkAction, TResult: BasePartialBulkActionResult](
         self,
         action_cls: type[TAction],
         func: Callable[[TAction], Awaitable[TResult]],
         *,
-        validators: Sequence[BulkActionValidator] = (),
+        validators: Sequence[AtomicBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
     ) -> BulkActionProcessor[TAction, TResult]:
+        """The same, for a service whose answer is keyed finer than the entity.
+
+        Only the idle-check writes are left here: they answer per (session, checker)
+        pair, which the standard result cannot key. Wire nothing new through this.
+        """
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.CUSTOM)
         return BulkActionProcessor(
             func,
             PartialEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
-            validators=(*self._deps.validators.bulk, *validators),
+            validators=(*self._deps.validators.atomic_bulk, *validators),
         )
 
     def atomic_bulk_field[TAction: BaseBulkFieldAction[Any, Any], TResult](
@@ -313,7 +350,7 @@ class ProcessorGroup[TData: EntityData]:
         bulk_owner_lookup_action_cls: type[LookupBulkFieldOwnerOpsAction[Any, Any]],
         func: Callable[[TAction], Awaitable[TResult]],
         *,
-        validators: Sequence[BulkActionValidator] = (),
+        validators: Sequence[AtomicBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
     ) -> BulkFieldActionProcessor[TAction, TResult]:
         """Several field rows read by a service, answered for by the entities owning them.
@@ -336,14 +373,14 @@ class ProcessorGroup[TData: EntityData]:
         bulk_owner_lookup: OwnerBulkLookupProcessor = BulkLookupActionProcessor(
             BulkFieldOwnerLookupService(self._deps.repository).execute,
             monitors=self._deps.monitors.bulk_lookup,
-            post_validators=self._deps.validators.bulk,
+            post_validators=self._deps.validators.atomic_bulk,
         )
         return BulkFieldActionProcessor(
             func,
             bulk_owner_lookup,
             AtomicFieldResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
-            validators=(*self._deps.validators.bulk, *validators),
+            validators=(*self._deps.validators.atomic_bulk, *validators),
         )
 
     def public[TAction: BaseGlobalAction, TResult](
@@ -521,7 +558,7 @@ class ProcessorGroup[TData: EntityData]:
         bulk_owner_lookup: OwnerBulkLookupProcessor = BulkLookupActionProcessor(
             BulkFieldOwnerLookupService(self._deps.repository).execute,
             monitors=self._deps.monitors.bulk_lookup,
-            post_validators=self._deps.validators.bulk,
+            post_validators=self._deps.validators.atomic_bulk,
         )
         return LookupFieldGroup(
             self._deps,
@@ -547,6 +584,46 @@ class ProcessorGroup[TData: EntityData]:
             GetService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.single_entity, *monitors),
             validators=(*self._deps.validators.single_entity, *validators),
+        )
+
+    def partial_bulk_get_ops[TAction: PartialBulkGetEntityOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        partial_validators: Sequence[PartialBulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> PartialBulkActionProcessor[TAction, TData]:
+        """Read the entities the caller named, one permission check per entity.
+
+        Where a search narrowed to a list of ids checks the scope it looked in, this
+        checks each id, and answers for the ones it denied beside the ones that
+        matched no row.
+        """
+        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return PartialBulkActionProcessor(
+            PartialBulkGetService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            partial_validators=(*self._deps.validators.partial_bulk, *partial_validators),
+        )
+
+    def public_partial_bulk_get_ops[TAction: PartialBulkGetEntityOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        atomic_validators: Sequence[AtomicBulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> PartialBulkActionProcessor[TAction, TData]:
+        """The same read for entities every authenticated caller may see.
+
+        Wired where the entity's single get is ``public_get_ops``: naming the rows by
+        id costs no permission, so nothing is denied and only misses fail.
+        """
+        self._record(action_cls, ActionKind.BULK, ActionGate.PUBLIC, ActionBacking.GENERIC)
+        return PublicPartialBulkActionProcessor(
+            action_cls,
+            PartialBulkGetService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            atomic_validators=atomic_validators,
         )
 
     def scope_search_ops[TAction: OperationScopeOpsAction[Any, Any]](
@@ -767,30 +844,28 @@ class ProcessorGroup[TData: EntityData]:
         self,
         action_cls: type[TAction],
         *,
-        validators: Sequence[BulkActionValidator] = (),
+        validators: Sequence[PartialBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
-    ) -> BulkActionProcessor[TAction, BulkOpsResult[TData]]:
+    ) -> PartialBulkActionProcessor[TAction, TData]:
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
-        return BulkActionProcessor(
+        return PartialBulkActionProcessor(
             GlobalPartialBulkPurgeService(self._deps.repository).execute,
-            PartialEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
-            validators=(*self._deps.validators.bulk, *validators),
+            partial_validators=(*self._deps.validators.partial_bulk, *validators),
         )
 
     def entity_partial_bulk_purge_ops[TAction: PartialBulkPurgeEntityOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
-        validators: Sequence[BulkActionValidator] = (),
+        validators: Sequence[PartialBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
-    ) -> BulkActionProcessor[TAction, BulkOpsResult[TData]]:
+    ) -> PartialBulkActionProcessor[TAction, TData]:
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
-        return BulkActionProcessor(
+        return PartialBulkActionProcessor(
             EntityPartialBulkPurgeService(self._deps.repository).execute,
-            PartialEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
-            validators=(*self._deps.validators.bulk, *validators),
+            partial_validators=(*self._deps.validators.partial_bulk, *validators),
         )
 
     def global_upsert_ops[TAction: UpsertGlobalOpsAction[Any, Any]](
@@ -917,45 +992,42 @@ class ProcessorGroup[TData: EntityData]:
         self,
         action_cls: type[TAction],
         *,
-        validators: Sequence[BulkActionValidator] = (),
+        validators: Sequence[PartialBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
-    ) -> BulkActionProcessor[TAction, BulkOpsResult[TData]]:
+    ) -> PartialBulkActionProcessor[TAction, TData]:
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
-        return BulkActionProcessor(
+        return PartialBulkActionProcessor(
             PartialBulkUpdateService(self._deps.repository).execute,
-            PartialEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
-            validators=(*self._deps.validators.bulk, *validators),
+            partial_validators=(*self._deps.validators.partial_bulk, *validators),
         )
 
     def partial_bulk_delete_ops[TAction: DeletePartialBulkOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
-        validators: Sequence[BulkActionValidator] = (),
+        validators: Sequence[PartialBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
-    ) -> BulkActionProcessor[TAction, BulkOpsResult[TData]]:
+    ) -> PartialBulkActionProcessor[TAction, TData]:
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
-        return BulkActionProcessor(
+        return PartialBulkActionProcessor(
             PartialBulkDeleteService(self._deps.repository).execute,
-            PartialEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
-            validators=(*self._deps.validators.bulk, *validators),
+            partial_validators=(*self._deps.validators.partial_bulk, *validators),
         )
 
     def partial_bulk_restore_ops[TAction: RestorePartialBulkOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
-        validators: Sequence[BulkActionValidator] = (),
+        validators: Sequence[PartialBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
-    ) -> BulkActionProcessor[TAction, BulkOpsResult[TData]]:
+    ) -> PartialBulkActionProcessor[TAction, TData]:
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
-        return BulkActionProcessor(
+        return PartialBulkActionProcessor(
             PartialBulkRestoreService(self._deps.repository).execute,
-            PartialEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
-            validators=(*self._deps.validators.bulk, *validators),
+            partial_validators=(*self._deps.validators.partial_bulk, *validators),
         )
 
     def scope_batch_update_ops[TAction: BatchUpdateScopeOpsAction[Any, Any]](

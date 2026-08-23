@@ -9,7 +9,7 @@ from .result import (
     BulkActionResultMeta,
     BulkEntityResult,
 )
-from .validator import BulkActionValidator
+from .validator import AtomicBulkActionValidator
 
 __all__ = (
     "BaseBulkAction",
@@ -19,5 +19,5 @@ __all__ = (
     "BulkActionProcessor",
     "BulkActionProcessResult",
     "BulkActionResultMeta",
-    "BulkActionValidator",
+    "AtomicBulkActionValidator",
 )

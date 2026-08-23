@@ -72,7 +72,11 @@ class ComputeSessionsHandler:
             allocation_result = await self._session.batch_get_session_resource_allocation.run(
                 BatchGetSessionResourceAllocationAction(session_ids=session_ids)
             )
-            allocations = allocation_result.data
+            allocations = {
+                SessionId(item.entity_id): item.value
+                for item in allocation_result.items
+                if item.value is not None
+            }
 
         # Step 4: Convert to DTOs
         items = [

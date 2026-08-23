@@ -21,12 +21,14 @@ from ai.backend.manager.actions.v2.bulk.processor import (
     AtomicEntityResultJudge,
     BulkActionProcessor,
 )
-from ai.backend.manager.actions.v2.bulk.validator import BulkActionValidator
+from ai.backend.manager.actions.v2.bulk.validator import (
+    AtomicBulkActionValidator,
+    PartialBulkActionValidator,
+)
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
 from ai.backend.manager.actions.v2.field.bulk_processor import (
-    BulkFieldActionProcessor,
     OwnerBulkLookupProcessor,
-    PartialFieldResultJudge,
+    PartialBulkFieldActionProcessor,
 )
 from ai.backend.manager.actions.v2.field.ops import (
     DeleteFieldOpsAction,
@@ -56,7 +58,6 @@ from ai.backend.manager.actions.v2.ops.base import (
 )
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
-    BulkFieldOpsResult,
     CreatedFieldOpsResult,
     EntityOpsResult,
     FieldsOpsResult,
@@ -156,7 +157,7 @@ class FieldGroup[TFieldData: FieldData]:
         self,
         action_cls: type[TAction],
         *,
-        validators: Sequence[BulkActionValidator] = (),
+        validators: Sequence[AtomicBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
     ) -> BulkActionProcessor[TAction, ScopedFieldsOpsResult[TFieldData]]:
         """A page of the field rows owned by the entities the caller named.
@@ -169,14 +170,14 @@ class FieldGroup[TFieldData: FieldData]:
             SearchFieldsService(self._deps.repository).execute,
             AtomicEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
-            validators=(*self._deps.validators.bulk, *validators),
+            validators=(*self._deps.validators.atomic_bulk, *validators),
         )
 
     def atomic_bulk_get_ops[TAction: BulkGetOwnedFieldOpsAction[Any, Any, Any]](
         self,
         action_cls: type[TAction],
         *,
-        validators: Sequence[BulkActionValidator] = (),
+        validators: Sequence[AtomicBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
     ) -> BulkActionProcessor[TAction, OwnedFieldsOpsResult[Any, TFieldData]]:
         """The one row each entity the caller named designates.
@@ -189,7 +190,7 @@ class FieldGroup[TFieldData: FieldData]:
             BulkOwnedFieldGetService(self._deps.repository).execute,
             AtomicEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
-            validators=(*self._deps.validators.bulk, *validators),
+            validators=(*self._deps.validators.atomic_bulk, *validators),
         )
 
     def global_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](
@@ -389,14 +390,18 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
         self,
         action_cls: type[TAction],
         *,
-        validators: Sequence[BulkActionValidator] = (),
+        validators: Sequence[PartialBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
-    ) -> BulkFieldActionProcessor[TAction, BulkFieldOpsResult[TFieldData]]:
+    ) -> PartialBulkFieldActionProcessor[TAction, TFieldData]:
+        """Remove the rows the caller named, one permission check per owning entity.
+
+        An owner the caller may not write takes its rows out of the run and puts them
+        back into the answer as denied items.
+        """
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
-        return BulkFieldActionProcessor(
+        return PartialBulkFieldActionProcessor(
             FieldPartialBulkPurgeService(self._deps.repository).execute,
             self._bulk_owner_lookup,
-            PartialFieldResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
-            validators=(*self._deps.validators.bulk, *validators),
+            partial_validators=(*self._deps.validators.partial_bulk, *validators),
         )

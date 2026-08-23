@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.v2.common import (
     ResourceSlotEntryInfo,
     ResourceSlotEntryInput,
@@ -26,9 +27,21 @@ from ai.backend.common.dto.manager.v2.session.types import (
 )
 from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.types import ClusterMode, SessionResult, SessionTypes
+from ai.backend.manager.actions.v2.bulk.result import (
+    PartialBulkEntityResult,
+    PartialBulkResult,
+)
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
-from ai.backend.manager.data.session.types import SessionData, SessionStatus
+from ai.backend.manager.data.session.types import (
+    SessionData,
+    SessionStatus,
+    SessionTerminationStatus,
+)
+from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
+    BatchGetSessionResourceAllocationAction,
+)
 
 
 def _create_session_data(
@@ -171,6 +184,18 @@ class TestSessionDataToNode:
         assert len(node.resource.allocation.used.entries) == 0
 
 
+async def _no_allocations(
+    action: BatchGetSessionResourceAllocationAction,
+) -> PartialBulkResult[ResourceAllocationAggregate]:
+    """The read answers for every session named, each holding nothing."""
+    return PartialBulkResult(
+        items=[
+            PartialBulkEntityResult[ResourceAllocationAggregate].nothing(SessionID(sid))
+            for sid in action.session_ids
+        ]
+    )
+
+
 class TestEnqueueActionBuilding:
     """Tests for adapter.enqueue() action construction."""
 
@@ -180,10 +205,8 @@ class TestEnqueueActionBuilding:
         result = MagicMock()
         result.session_data = _create_session_data()
         processors.session.enqueue_session.run = AsyncMock(return_value=result)
-        allocation_result = MagicMock()
-        allocation_result.data = {}
         processors.session.batch_get_session_resource_allocation.run = AsyncMock(
-            return_value=allocation_result
+            side_effect=_no_allocations
         )
         return processors
 
@@ -335,11 +358,13 @@ class TestTerminateActionBuilding:
     @pytest.fixture
     def mock_processors(self) -> MagicMock:
         processors = MagicMock()
-        result = MagicMock()
-        result.cancelled = []
-        result.terminating = [uuid4()]
-        result.force_terminated = []
-        result.skipped = []
+        result = PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[SessionTerminationStatus].succeeded(
+                    SessionID(uuid4()), SessionTerminationStatus.TERMINATING
+                )
+            ]
+        )
         processors.session.terminate_sessions.run = AsyncMock(return_value=result)
         return processors
 

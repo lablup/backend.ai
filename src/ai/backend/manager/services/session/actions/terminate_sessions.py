@@ -1,23 +1,22 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
-from typing import override
+from dataclasses import dataclass, replace
+from typing import Self, override
 
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.types import SessionId
-from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
-from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
-from ai.backend.manager.actions.v2.bulk.result import BasePartialBulkActionResult, BulkEntityResult
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.bulk.base import BasePartialBulkAction
 
 
 @dataclass
-class TerminateSessionsAction(BaseBulkAction):
+class TerminateSessionsAction(BasePartialBulkAction):
     """Terminate the sessions the caller named.
 
     Every named session is answered for on its own, which is what the bulk shape
-    says; a denial on one fails the run.
+    says, and the answer carries which of the four states it ended in.
     """
 
     session_ids: list[SessionId]
@@ -37,29 +36,10 @@ class TerminateSessionsAction(BaseBulkAction):
     def entity_ids(self) -> Sequence[EntityIdentifier]:
         return [SessionID(sid) for sid in self.session_ids]
 
-
-@dataclass
-class TerminateSessionsActionResult(BasePartialBulkActionResult):
-    """Result of bulk session termination."""
-
-    cancelled: list[SessionId] = field(default_factory=list)
-    terminating: list[SessionId] = field(default_factory=list)
-    force_terminated: list[SessionId] = field(default_factory=list)
-    skipped: list[SessionId] = field(default_factory=list)
-
     @override
-    def entity_results(self) -> Sequence[BulkEntityResult]:
-        def entry(sid: SessionId, description: str) -> BulkEntityResult:
-            return BulkEntityResult(
-                entity_id=SessionID(sid),
-                status=OperationStatus.SUCCESS,
-                description=description,
-                error_code=None,
-            )
-
-        return [
-            *(entry(sid, "cancelled") for sid in self.cancelled),
-            *(entry(sid, "terminating") for sid in self.terminating),
-            *(entry(sid, "force-terminated") for sid in self.force_terminated),
-            *(entry(sid, "skipped") for sid in self.skipped),
-        ]
+    def narrowed_to(self, entity_ids: Sequence[EntityIdentifier]) -> Self:
+        allowed = frozenset(entity_ids)
+        return replace(
+            self,
+            session_ids=[sid for sid in self.session_ids if SessionID(sid) in allowed],
+        )

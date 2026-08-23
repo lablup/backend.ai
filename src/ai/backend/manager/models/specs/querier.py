@@ -69,6 +69,29 @@ class DataQuerier[TRow: Base, TData](ABC):
         raise NotImplementedError
 
 
+class BulkEntityQuerier[TRow: Base, TData](ABC):
+    """Reads the entities the caller named, keyed by their own ids.
+
+    Plural :class:`DataQuerier`. The ids are the whole query — nothing to condition,
+    order or page — so the spec owns it and ops adds no clause of its own.
+    """
+
+    @abstractmethod
+    def row_class(self) -> type[TRow]:
+        """Return the ORM class the rows are read from."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        """Return the column that carries the entity id, which the read keys on."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert one fetched row into its ``data/`` type."""
+        raise NotImplementedError
+
+
 class OwnedFieldQuerier[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](ABC):
     """The one field row each named entity designates.
 

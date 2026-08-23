@@ -10,6 +10,7 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationSpec,
     build_pagination,
 )
+from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -34,6 +35,17 @@ class BaseAdapter(BaseFilterAdapter):
 
     def __init__(self, processors: Processors) -> None:
         self._processors = processors
+
+    def batch_load_failure(self, error: Exception | None) -> Exception | None:
+        """What a DataLoader is handed for an id a bulk read returned no data for.
+
+        An id matching no row stays ``None``; a denial is raised at the resolver
+        awaiting it, so a caller is never told a row is missing when it is one they may
+        not read.
+        """
+        if error is None or isinstance(error, EntityNotFoundError):
+            return None
+        return error
 
     def _build_querier(
         self,
