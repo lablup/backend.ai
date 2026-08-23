@@ -17,4 +17,4 @@ class ReplicaGroupRepositories:
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
         """Create replica group repositories."""
-        return cls(repository=ReplicaGroupRepository(args.db, args.v2_ops_provider))
+        return cls(repository=ReplicaGroupRepository(args.db, args.reconcile_ops_provider))

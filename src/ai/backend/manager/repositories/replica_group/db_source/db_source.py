@@ -52,8 +52,8 @@ from ai.backend.manager.repositories.base import (
     execute_batch_querier,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.ops.v2.reconcile_write import ReconcileTransition
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.write import ReconcileTransition
 from ai.backend.manager.repositories.replica_group.types import (
     ApplyWritesResult,
     AutoscaleReconcileFetch,
@@ -111,12 +111,14 @@ def _scale_in_termination_priority() -> sa.ColumnElement[int]:
 class ReplicaGroupDBSource:
     _db: ExtendedAsyncSAEngine
     _ops: DBOpsProvider
-    _v2_ops: V2DBOpsProvider
+    _reconcile_ops: ReconcileOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
+    def __init__(
+        self, db: ExtendedAsyncSAEngine, reconcile_ops_provider: ReconcileOpsProvider
+    ) -> None:
         self._db = db
         self._ops = DBOpsProvider(db)
-        self._v2_ops = v2_ops_provider
+        self._reconcile_ops = reconcile_ops_provider
 
     async def search_deploy_scheduling_views(
         self,
@@ -378,7 +380,7 @@ class ReplicaGroupDBSource:
         updated_endpoint_ids: set[DeploymentID] = set()
         if not group_updaters and not endpoint_updaters:
             return ApplyWritesResult(updated_group_ids, updated_endpoint_ids)
-        async with self._v2_ops.write_ops() as w:
+        async with self._reconcile_ops.write_ops() as w:
             for group_updater in group_updaters:
                 group_data = await w.update_data(group_updater)
                 if group_data is not None:
@@ -413,7 +415,7 @@ class ReplicaGroupDBSource:
             )
         primary_by_deployment = {row.id: row.primary_replica_group_id for row in endpoint_rows}
         endpoint_by_deployment = {row.id: row for row in endpoint_rows}
-        async with self._v2_ops.write_ops() as w:
+        async with self._reconcile_ops.write_ops() as w:
             reuse_updaters: list[ReplicaGroupDeployUpdater] = []
             endpoint_updaters: list[EndpointReplicaGroupUpdater] = []
             for setup in setups:
@@ -474,7 +476,7 @@ class ReplicaGroupDBSource:
         async with self._db.begin_readonly_session_read_committed() as read_sess:
             creators = await self._build_route_creators(read_sess, apply.create_instructions)
             drain_updater = await self._build_drain_updater(read_sess, apply.drain_instructions)
-        async with self._v2_ops.write_ops() as w:
+        async with self._reconcile_ops.write_ops() as w:
             if creators:
                 await w.atomic_create_fields(creators)
             if drain_updater is not None:
@@ -487,7 +489,7 @@ class ReplicaGroupDBSource:
         self,
         apply: ReplicaGroupLifecycleReconcileApply,
     ) -> None:
-        async with self._v2_ops.write_ops() as w:
+        async with self._reconcile_ops.write_ops() as w:
             await w.apply_transitions([
                 self._to_ops_transition(transition) for transition in apply.transitions
             ])

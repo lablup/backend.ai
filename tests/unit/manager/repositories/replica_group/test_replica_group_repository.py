@@ -70,7 +70,7 @@ from ai.backend.manager.models.virtual_scope.entity_membership import EntityMemb
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.replica_group import ReplicaGroupRepository
 from ai.backend.manager.repositories.replica_group.types import (
     GroupRolloutSetup,
@@ -338,7 +338,7 @@ class TestReplicaGroupRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ReplicaGroupRepository:
         return ReplicaGroupRepository(
-            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+            db=db_with_cleanup, reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup)
         )
 
     async def test_setup_target_groups_gives_a_fresh_group_its_placement_group(

@@ -49,7 +49,7 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.testutils.db import TableOrORM, with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -329,7 +329,7 @@ class TestLegacyExtraMountsHydration:
     ) -> DeploymentRepository:
         return DeploymentRepository(
             db=db_with_cleanup,
-            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+            reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup),
             storage_manager=AsyncMock(),
             valkey_stat=AsyncMock(),
             valkey_live=AsyncMock(),

@@ -195,8 +195,8 @@ from ai.backend.manager.repositories.deployment.types import (
     RouteSessionInfo,
     RouteSessionKernelInfo,
 )
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.ops.v2.reconcile_write import ReconcileTransition
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.write import ReconcileTransition
 from ai.backend.manager.types import OptionalState
 from ai.backend.manager.utils import query_userinfo_from_session
 
@@ -238,17 +238,17 @@ class DeploymentDBSource:
     """Database source for deployment-related operations."""
 
     _db: ExtendedAsyncSAEngine
-    _v2_ops: V2DBOpsProvider
+    _reconcile_ops: ReconcileOpsProvider
     _storage_manager: StorageSessionManager
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
-        v2_ops_provider: V2DBOpsProvider,
+        reconcile_ops_provider: ReconcileOpsProvider,
         storage_manager: StorageSessionManager,
     ) -> None:
         self._db = db
-        self._v2_ops = v2_ops_provider
+        self._reconcile_ops = reconcile_ops_provider
         self._storage_manager = storage_manager
 
     @actxmgr
@@ -330,7 +330,7 @@ class DeploymentDBSource:
             )
         else:
             policy_creator = DeploymentPolicyCreator.build_default()
-        async with self._v2_ops.write_ops() as w:
+        async with self._reconcile_ops.write_ops() as w:
             deployment = await w.create_entity(creator)
             deployment_id = DeploymentID(deployment.id)
             await w.create_field(deployment_id, policy_creator)
@@ -721,7 +721,7 @@ class DeploymentDBSource:
         Raises:
             EndpointNotFound: If the endpoint does not exist
         """
-        async with self._v2_ops.write_ops() as w:
+        async with self._reconcile_ops.write_ops() as w:
             result = await w.update_data(updater)
         if result is None:
             raise EndpointNotFound(f"Endpoint {updater.deployment_id} not found")
@@ -788,7 +788,7 @@ class DeploymentDBSource:
         if not batch_updaters:
             return 0
 
-        async with self._v2_ops.write_ops() as w:
+        async with self._reconcile_ops.write_ops() as w:
             total_updated = 0
             # 1. Execute all status updates
             for batch_updater in batch_updaters:
@@ -1026,7 +1026,7 @@ class DeploymentDBSource:
         The creator is built at the upper layer (service/action) and injected here.
         This method only executes the creator.
         """
-        async with self._v2_ops.write_ops() as w:
+        async with self._reconcile_ops.write_ops() as w:
             route = await w.create_field(deployment_id, creator)
             return route.id
 
@@ -1071,7 +1071,7 @@ class DeploymentDBSource:
         The spec is built at the upper layer (service/action) and injected here.
         This method only executes it.
         """
-        async with self._v2_ops.write_ops() as w:
+        async with self._reconcile_ops.write_ops() as w:
             return await w.update_data(updater) is not None
 
     async def update_route_status(
@@ -1788,7 +1788,7 @@ class DeploymentDBSource:
         if not batch_updaters:
             return 0
 
-        async with self._v2_ops.write_ops() as w:
+        async with self._reconcile_ops.write_ops() as w:
             total_updated = 0
             for batch_updater in batch_updaters:
                 updated = await w.batch_update_in_global(batch_updater)
@@ -2695,7 +2695,7 @@ class DeploymentDBSource:
         After creating a new revision, old revisions beyond the limit should be deleted.
         This requires adding a `revision_history_limit` column to EndpointRow.
         """
-        async with self._v2_ops.write_ops() as w:
+        async with self._reconcile_ops.write_ops() as w:
             return await w.create_field(deployment_id, creator)
 
     async def create_revision_with_next_number(
@@ -2713,7 +2713,7 @@ class DeploymentDBSource:
         """
         for remaining_attempts in reversed(range(_REVISION_NUMBER_ATTEMPTS)):
             try:
-                async with self._v2_ops.write_ops() as w:
+                async with self._reconcile_ops.write_ops() as w:
                     return await w.create_field(endpoint_id, creator)
             except UniqueConstraintViolationError:
                 if remaining_attempts == 0:
@@ -2861,7 +2861,7 @@ class DeploymentDBSource:
         Raises:
             EndpointNotFound: If the endpoint does not exist.
         """
-        async with self._v2_ops.write_ops() as w:
+        async with self._reconcile_ops.write_ops() as w:
             result = await w.update_data(updater)
         if result is None:
             raise EndpointNotFound(f"Endpoint {updater.deployment_id} not found")
@@ -3045,7 +3045,7 @@ class DeploymentDBSource:
         upserter: DeploymentPolicyUpserter,
     ) -> DeploymentPolicyUpsertResult:
         """Create or update a deployment policy using ON CONFLICT."""
-        async with self._v2_ops.write_ops() as w:
+        async with self._reconcile_ops.write_ops() as w:
             data = await w.upsert_field_entity(deployment_id, upserter)
             return DeploymentPolicyUpsertResult(
                 data=data,
@@ -3246,7 +3246,7 @@ class DeploymentDBSource:
         Returns:
             Number of deployments whose revision was swapped.
         """
-        async with self._v2_ops.write_ops() as w:
+        async with self._reconcile_ops.write_ops() as w:
             if rollout:
                 await w.atomic_create_fields(rollout)
             if drain is not None:

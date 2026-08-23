@@ -56,7 +56,7 @@ from ai.backend.manager.repositories.deployment.types import (
     DeploymentHistoryToCreate,
     RouteHistoryToCreate,
 )
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -414,7 +414,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
 
         return DeploymentRepository(
             db=db_with_cleanup,
-            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+            reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -856,7 +856,7 @@ class TestUpdateRouteStatusBulkWithHistory:
 
         return DeploymentRepository(
             db=db_with_cleanup,
-            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+            reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -1152,7 +1152,7 @@ class TestDeploymentHistoryMergeLogic:
 
         return DeploymentRepository(
             db=db_with_cleanup,
-            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+            reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -1491,7 +1491,7 @@ class TestRouteHistoryMergeLogic:
 
         return DeploymentRepository(
             db=db_with_cleanup,
-            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+            reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,

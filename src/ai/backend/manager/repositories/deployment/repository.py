@@ -112,7 +112,7 @@ from ai.backend.manager.repositories.deployment.types import (
     RouteSessionInfo,
     RouteSessionKernelInfo,
 )
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 
 from .db_source import DeploymentDBSource
 from .storage_source import DeploymentStorageSource
@@ -157,7 +157,7 @@ class DeploymentRepository:
     """Repository for deployment-related operations."""
 
     _db_source: DeploymentDBSource
-    _v2_ops: V2DBOpsProvider
+    _reconcile_ops: ReconcileOpsProvider
     _storage_source: DeploymentStorageSource
     _valkey_stat: ValkeyStatClient
     _valkey_live: ValkeyLiveClient
@@ -166,14 +166,14 @@ class DeploymentRepository:
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
-        v2_ops_provider: V2DBOpsProvider,
+        reconcile_ops_provider: ReconcileOpsProvider,
         storage_manager: StorageSessionManager,
         valkey_stat: ValkeyStatClient,
         valkey_live: ValkeyLiveClient,
         valkey_schedule: ValkeyScheduleClient,
     ) -> None:
-        self._db_source = DeploymentDBSource(db, v2_ops_provider, storage_manager)
-        self._v2_ops = v2_ops_provider
+        self._db_source = DeploymentDBSource(db, reconcile_ops_provider, storage_manager)
+        self._reconcile_ops = reconcile_ops_provider
         self._storage_source = DeploymentStorageSource(storage_manager)
         self._valkey_stat = valkey_stat
         self._valkey_live = valkey_live
@@ -1550,7 +1550,7 @@ class DeploymentRepository:
         self, deployment_id: DeploymentID, creator: EndpointTokenCreator
     ) -> ModelDeploymentAccessTokenData:
         """Register an access token under the deployment it grants access to."""
-        async with self._v2_ops.write_ops() as w:
+        async with self._reconcile_ops.write_ops() as w:
             return await w.create_field(deployment_id, creator)
 
     @deployment_repository_resilience.apply()
