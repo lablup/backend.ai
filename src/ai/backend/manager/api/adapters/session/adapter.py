@@ -11,6 +11,7 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
@@ -533,7 +534,9 @@ class SessionAdapter(BaseAdapter):
         if not kernel_ids:
             return []
         action_result = await self._processors.session.batch_get_kernel_resource_allocation.run(
-            BatchGetKernelResourceAllocationAction(kernel_ids=list(kernel_ids))
+            BatchGetKernelResourceAllocationAction(
+                kernel_ids=[KernelID(kernel_id) for kernel_id in kernel_ids]
+            )
         )
         return [
             self._aggregate_to_allocation_dto(action_result.data.get(kid)) for kid in kernel_ids

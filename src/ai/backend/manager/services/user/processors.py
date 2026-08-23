@@ -293,7 +293,7 @@ class UserProcessors:
             LookupKeypairOwnerAction,
             LookupBulkKeypairOwnerAction,
         )
-        self.get_default_keypairs = self.keypair_group.bulk_get_ops(GetDefaultKeypairsAction)
+        self.get_default_keypairs = self.keypair_group.atomic_bulk_get_ops(GetDefaultKeypairsAction)
         self.error_log = ErrorLogProcessors(
             group.field_group(
                 FieldGroupMeta(ERROR_LOG_FIELD_TYPE),

@@ -1,6 +1,7 @@
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
+from ai.backend.manager.actions.v2.field.bulk_processor import BulkFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import PublicActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
@@ -104,6 +105,9 @@ from ai.backend.manager.services.session.actions.list_files import (
     ListFilesActionResult,
 )
 from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
+    LookupBulkKernelOwnerAction,
+)
 from ai.backend.manager.services.session.actions.match_sessions import (
     MatchSessionsAction,
     MatchSessionsActionResult,
@@ -205,7 +209,7 @@ class SessionProcessors:
     batch_get_session_resource_allocation: BulkActionProcessor[
         BatchGetSessionResourceAllocationAction, BatchGetSessionResourceAllocationActionResult
     ]
-    batch_get_kernel_resource_allocation: BulkActionProcessor[
+    batch_get_kernel_resource_allocation: BulkFieldActionProcessor[
         BatchGetKernelResourceAllocationAction, BatchGetKernelResourceAllocationActionResult
     ]
     search_sessions: ScopeActionProcessor[SearchSessionsAction, SearchSessionsActionResult]
@@ -282,8 +286,10 @@ class SessionProcessors:
         self.batch_get_session_resource_allocation = group.bulk(
             BatchGetSessionResourceAllocationAction, service.batch_get_session_resource_allocation
         )
-        self.batch_get_kernel_resource_allocation = group.bulk(
-            BatchGetKernelResourceAllocationAction, service.batch_get_kernel_resource_allocation
+        self.batch_get_kernel_resource_allocation = group.atomic_bulk_field(
+            BatchGetKernelResourceAllocationAction,
+            LookupBulkKernelOwnerAction,
+            service.batch_get_kernel_resource_allocation,
         )
         self.search_sessions = group.scope(SearchSessionsAction, service.search)
         self.search_sessions_in_project = group.scope(

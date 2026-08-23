@@ -26,6 +26,7 @@ from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
 from ai.backend.manager.actions.v2.field.bulk_processor import (
     BulkFieldActionProcessor,
     OwnerBulkLookupProcessor,
+    PartialFieldResultJudge,
 )
 from ai.backend.manager.actions.v2.field.ops import (
     DeleteFieldOpsAction,
@@ -55,6 +56,7 @@ from ai.backend.manager.actions.v2.ops.base import (
 )
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    BulkFieldOpsResult,
     CreatedFieldOpsResult,
     EntityOpsResult,
     FieldsOpsResult,
@@ -150,7 +152,7 @@ class FieldGroup[TFieldData: FieldData]:
             validators=(*self._deps.validators.scope, *validators),
         )
 
-    def bulk_scoped_search_ops[TAction: BulkScopedSearchOpsAction[Any, Any]](
+    def atomic_bulk_scoped_search_ops[TAction: BulkScopedSearchOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -170,7 +172,7 @@ class FieldGroup[TFieldData: FieldData]:
             validators=(*self._deps.validators.bulk, *validators),
         )
 
-    def bulk_get_ops[TAction: BulkGetOwnedFieldOpsAction[Any, Any, Any]](
+    def atomic_bulk_get_ops[TAction: BulkGetOwnedFieldOpsAction[Any, Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -179,7 +181,7 @@ class FieldGroup[TFieldData: FieldData]:
     ) -> BulkActionProcessor[TAction, OwnedFieldsOpsResult[Any, TFieldData]]:
         """The one row each entity the caller named designates.
 
-        Bulk-shaped like :meth:`bulk_scoped_search_ops`, and answers one row per owner
+        Bulk-shaped like :meth:`atomic_bulk_scoped_search_ops`, and answers one row per owner
         rather than a page. Nothing is looked up: the owners are already named.
         """
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
@@ -389,11 +391,12 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
         *,
         validators: Sequence[BulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
-    ) -> BulkFieldActionProcessor[TAction, TFieldData]:
+    ) -> BulkFieldActionProcessor[TAction, BulkFieldOpsResult[TFieldData]]:
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
         return BulkFieldActionProcessor(
             FieldPartialBulkPurgeService(self._deps.repository).execute,
             self._bulk_owner_lookup,
+            PartialFieldResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.bulk, *validators),
         )
