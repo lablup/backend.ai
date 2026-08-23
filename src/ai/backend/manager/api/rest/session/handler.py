@@ -103,7 +103,7 @@ from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
 )
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
-    ResolveAccessKeyScopeAction,
+    PublicResolveAccessKeyScopeAction,
 )
 from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
 from ai.backend.manager.services.project.processors import ProjectProcessors
@@ -596,8 +596,8 @@ class SessionHandler:
 
         validated_config = await self._normalize_legacy_mounts(validated_config)
 
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -713,8 +713,8 @@ class SessionHandler:
                 )
 
         domain_name = params.domain or request["user"]["domain_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -785,8 +785,8 @@ class SessionHandler:
         params = body.parsed
 
         domain_name = params.domain or request["user"]["domain_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -834,8 +834,8 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         params = query.parsed
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -872,8 +872,8 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         params = body.parsed
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -918,8 +918,8 @@ class SessionHandler:
     async def get_info(self, ctx: RequestCtx) -> APIResponse:
         request = ctx.request
         session_name = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -983,8 +983,8 @@ class SessionHandler:
         params = query.parsed
         session_name = request.match_info["session_name"]
         user_role = cast(UserRole, request["user"]["role"])
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1031,8 +1031,8 @@ class SessionHandler:
         request = ctx.request
         params = body.parsed
         session_name = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1070,8 +1070,8 @@ class SessionHandler:
     async def interrupt(self, ctx: RequestCtx) -> web.Response:
         request = ctx.request
         session_name = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1110,8 +1110,8 @@ class SessionHandler:
         request = ctx.request
         params = body.parsed
         session_name = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1183,8 +1183,8 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1220,8 +1220,8 @@ class SessionHandler:
         request = ctx.request
         reader = await request.multipart()
         session_name = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1261,8 +1261,8 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1300,8 +1300,8 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1339,8 +1339,8 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1379,8 +1379,8 @@ class SessionHandler:
         params = body.parsed
         session_name = request.match_info["session_name"]
         new_name = params.session_name
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1417,8 +1417,8 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name: str = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1457,8 +1457,8 @@ class SessionHandler:
         request = ctx.request
         params = body.parsed
         session_name: str = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1502,8 +1502,8 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         session_name: str = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1543,8 +1543,8 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         session_name: str = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1584,8 +1584,8 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name: str = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1618,8 +1618,8 @@ class SessionHandler:
     async def get_direct_access_info(self, ctx: RequestCtx) -> APIResponse:
         request = ctx.request
         session_name = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1651,8 +1651,8 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name: str = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -1730,8 +1730,8 @@ class SessionHandler:
     async def get_dependency_graph(self, ctx: RequestCtx) -> APIResponse:
         request = ctx.request
         root_session_name = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],

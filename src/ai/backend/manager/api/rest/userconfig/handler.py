@@ -34,7 +34,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
-    ResolveAccessKeyScopeAction,
+    PublicResolveAccessKeyScopeAction,
 )
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.user.actions.bootstrap_script import (
@@ -67,8 +67,8 @@ class UserConfigHandler:
         self._user = user
 
     async def _owner_access_key(self, ctx: UserContext, owner: str | None) -> AccessKey:
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=ctx.access_key,
                 requester_role=ctx.user_role,
                 requester_domain=ctx.user_domain,

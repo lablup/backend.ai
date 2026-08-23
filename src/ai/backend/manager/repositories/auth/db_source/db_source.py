@@ -13,24 +13,19 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError, UserNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
-    LoginHistoryData,
     LoginSessionData,
     LoginSessionStatus,
 )
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserCreationData, UserData
-from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.errors.auth import (
-    AccessKeyNotFound,
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
@@ -39,10 +34,9 @@ from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.user import KeyPairNotFound, UserCreationBadRequest
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
-from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
-from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import (
     UserRole,
@@ -54,7 +48,7 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
-from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.ops.rbac.provider import FullUserCreation, RBACOpsProvider
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec, UserScopeCreation
 
@@ -288,15 +282,6 @@ class AuthDBSource:
             if row is None:
                 raise ValueError("Unknown owner access key")
             return row.domain_name, row.role
-
-    @auth_db_source_resilience.apply()
-    async def fetch_user_id_by_access_key(self, access_key: AccessKey) -> UserID:
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(KeyPairRow.user).where(KeyPairRow.access_key == access_key)
-            user_id = await db_session.scalar(query)
-            if user_id is None:
-                raise AccessKeyNotFound("Unknown access key")
-            return UserID(user_id)
 
     @auth_db_source_resilience.apply()
     async def fetch_user_info_by_email(self, email: str) -> tuple[UUID, UserRole, str]:
@@ -664,41 +649,6 @@ class AuthDBSource:
             return deleted_tokens
 
     @auth_db_source_resilience.apply()
-    async def admin_search_login_sessions(
-        self,
-        querier: BatchQuerier,
-    ) -> SearchResult[LoginSessionData]:
-        """Search all login sessions without scope restriction (admin only)."""
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(LoginSessionRow)
-            result = await execute_batch_querier(db_session, query, querier)
-            items = [row.LoginSessionRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    @auth_db_source_resilience.apply()
-    async def search_login_sessions(
-        self,
-        scope: OperationScope,
-        querier: BatchQuerier,
-    ) -> SearchResult[LoginSessionData]:
-        """Search login sessions within a given scope."""
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(LoginSessionRow)
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-            items = [row.LoginSessionRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    @auth_db_source_resilience.apply()
     async def fetch_login_session_by_id(self, session_id: UUID) -> LoginSessionData:
         """Fetch a single login session by its ID.
 
@@ -753,40 +703,3 @@ class AuthDBSource:
             )
             await conn.commit()
             return session_token
-
-    # --- Login History ---
-
-    @auth_db_source_resilience.apply()
-    async def admin_search_login_history(
-        self,
-        querier: BatchQuerier,
-    ) -> SearchResult[LoginHistoryData]:
-        """Search all login history without scope restriction (admin only)."""
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(LoginHistoryRow)
-            result = await execute_batch_querier(db_session, query, querier)
-            items = [row.LoginHistoryRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    @auth_db_source_resilience.apply()
-    async def search_login_history(
-        self,
-        scope: OperationScope,
-        querier: BatchQuerier,
-    ) -> SearchResult[LoginHistoryData]:
-        """Search login history within a given scope."""
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(LoginHistoryRow)
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-            items = [row.LoginHistoryRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )

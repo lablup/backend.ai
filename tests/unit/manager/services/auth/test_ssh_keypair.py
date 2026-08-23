@@ -3,6 +3,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.errors.keypair import InvalidSSHPrivateKey, SSHKeypairMismatch
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.repositories.auth.repository import AuthRepository
@@ -59,7 +60,7 @@ async def test_get_ssh_keypair_existing_key(
 ) -> None:
     """Test getting existing SSH public key"""
     action = GetSSHKeypairAction(
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         access_key="AKIA1234567890ABCDEF",
     )
 
@@ -79,7 +80,7 @@ async def test_get_ssh_keypair_nonexistent_key(
 ) -> None:
     """Test getting non-existing SSH public key returns empty string"""
     action = GetSSHKeypairAction(
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         access_key="AKIANONEXISTENT",
     )
 
@@ -98,7 +99,7 @@ async def test_generate_ssh_keypair(
 ) -> None:
     """Test SSH keypair generation"""
     action = GenerateSSHKeypairAction(
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         access_key="AKIA1234567890ABCDEF",
     )
 
@@ -131,7 +132,7 @@ async def test_upload_ssh_keypair_valid_keys(
 ) -> None:
     """Test uploading valid SSH keypair"""
     action = UploadSSHKeypairAction(
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         access_key="AKIA1234567890ABCDEF",
         public_key="ssh-rsa AAAAB3NzaC1yc2EUPLOADED...",
         private_key="-----BEGIN RSA PRIVATE KEY-----\nUPLOADED...\n-----END RSA PRIVATE KEY-----",
@@ -164,7 +165,7 @@ async def test_upload_ssh_keypair_invalid_keys(
 ) -> None:
     """Test uploading invalid SSH keypair propagates the validator error"""
     action = UploadSSHKeypairAction(
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         access_key="AKIA1234567890ABCDEF",
         public_key="invalid-public-key",
         private_key="invalid-private-key",
@@ -186,7 +187,7 @@ async def test_upload_ssh_keypair_mismatch(
 ) -> None:
     """Test that a keypair mismatch from the validator propagates and skips the write"""
     action = UploadSSHKeypairAction(
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         access_key="AKIATEST",
         public_key="bad-key",
         private_key="bad-key",

@@ -86,7 +86,7 @@ from ai.backend.manager.models.runtime_variant.conditions import RuntimeVariantC
 from ai.backend.manager.models.runtime_variant.searchers import RuntimeVariantSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
-    ResolveAccessKeyScopeAction,
+    PublicResolveAccessKeyScopeAction,
 )
 from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
     CreateLegacyDeploymentAction,
@@ -644,8 +644,8 @@ class ServiceHandler:
         request: Any,
         params: NewServiceRequestModel,
     ) -> ValidateModelServiceActionResult:
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],

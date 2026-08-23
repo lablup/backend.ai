@@ -16,12 +16,12 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.exception import UserNotFound
-from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.project.types import ProjectData
-from ai.backend.manager.errors.auth import AccessKeyNotFound, GroupMembershipNotFoundError
+from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -582,23 +582,6 @@ class TestAuthRepository:
         now_utc = datetime.now(UTC)
         time_diff = abs((now_utc - result).total_seconds())
         assert time_diff < 1.0
-
-    async def test_get_user_id_by_access_key_success(
-        self,
-        auth_repository: AuthRepository,
-        sample_user_data: UserTestData,
-    ) -> None:
-        result = await auth_repository.get_user_id_by_access_key(
-            AccessKey(sample_user_data.access_key)
-        )
-
-        assert result == sample_user_data.uuid
-
-    async def test_get_user_id_by_access_key_not_found(
-        self, auth_repository: AuthRepository
-    ) -> None:
-        with pytest.raises(AccessKeyNotFound):
-            await auth_repository.get_user_id_by_access_key(AccessKey("AKIANONEXISTENT"))
 
     async def test_create_user_with_keypair_writes_the_domain_id_from_the_name(
         self,

@@ -30,6 +30,7 @@ from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE
 from ai.backend.common.data.entity.artifact_registry import ARTIFACT_REGISTRY_ENTITY_TYPE
 from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_FIELD_TYPE
 from ai.backend.common.data.entity.audit_log import AUDIT_LOG_FIELD_TYPE
+from ai.backend.common.data.entity.auth import AUTH_ENTITY_TYPE
 from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
@@ -106,6 +107,7 @@ from ai.backend.manager.services.artifact.revision.actions.lookup_owner import (
 from ai.backend.manager.services.artifact.revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
+from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment_revision_preset.processors import (
@@ -284,6 +286,11 @@ def test_every_defined_v2_action_is_wired() -> None:
     DomainProcessors(registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), MagicMock(), [])
     ProjectProcessors(registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), MagicMock())
     UserProcessors(
+        registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        MagicMock(),
+    )
+    AuthProcessors(
+        registry.group(GroupMeta(AUTH_ENTITY_TYPE)),
         registry.group(GroupMeta(USER_ENTITY_TYPE)),
         MagicMock(),
     )

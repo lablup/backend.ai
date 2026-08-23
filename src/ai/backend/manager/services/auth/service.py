@@ -69,44 +69,33 @@ from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
     GenerateSSHKeypairAction,
     GenerateSSHKeypairActionResult,
 )
-from ai.backend.manager.services.auth.actions.get_role import GetRoleAction, GetRoleActionResult
+from ai.backend.manager.services.auth.actions.get_role import (
+    PublicGetRoleAction,
+    PublicGetRoleActionResult,
+)
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
     GetSSHKeypairActionResult,
 )
 from ai.backend.manager.services.auth.actions.logout import LogoutAction, LogoutActionResult
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
-    ResolveAccessKeyScopeAction,
-    ResolveAccessKeyScopeResult,
-)
-from ai.backend.manager.services.auth.actions.resolve_user_id_by_access_key import (
-    ResolveUserIDByAccessKeyAction,
-    ResolveUserIDByAccessKeyResult,
+    PublicResolveAccessKeyScopeAction,
+    PublicResolveAccessKeyScopeResult,
 )
 from ai.backend.manager.services.auth.actions.resolve_user_scope import (
-    ResolveUserScopeAction,
-    ResolveUserScopeResult,
+    PublicResolveUserScopeAction,
+    PublicResolveUserScopeResult,
 )
 from ai.backend.manager.services.auth.actions.revoke_login_session import (
-    AdminRevokeLoginSessionAction,
-    MyRevokeLoginSessionAction,
+    GlobalRevokeLoginSessionAction,
+    RevokeLoginSessionAction,
     RevokeLoginSessionActionResult,
-)
-from ai.backend.manager.services.auth.actions.search_login_history import (
-    AdminSearchLoginHistoryAction,
-    SearchLoginHistoryAction,
-    SearchLoginHistoryActionResult,
-)
-from ai.backend.manager.services.auth.actions.search_login_sessions import (
-    AdminSearchLoginSessionsAction,
-    SearchLoginSessionsAction,
-    SearchLoginSessionsActionResult,
 )
 from ai.backend.manager.services.auth.actions.signout import SignoutAction, SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupAction, SignupActionResult
 from ai.backend.manager.services.auth.actions.unblock_user import (
-    AdminUnblockUserAction,
-    AdminUnblockUserActionResult,
+    GlobalUnblockUserAction,
+    GlobalUnblockUserActionResult,
 )
 from ai.backend.manager.services.auth.actions.update_full_name import (
     UpdateFullNameAction,
@@ -170,7 +159,7 @@ class AuthService:
         self._group_repository = group_repository
         self._ssh_key_validator = ssh_key_validator
 
-    async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
+    async def get_role(self, action: PublicGetRoleAction) -> PublicGetRoleActionResult:
         group_role = None
         if action.group_id is not None:
             if action.is_superadmin:
@@ -189,7 +178,7 @@ class AuthService:
                         object_name="project (user group)",
                     ) from e
 
-        return GetRoleActionResult(
+        return PublicGetRoleActionResult(
             global_role="superadmin" if action.is_superadmin else "user",
             domain_role="admin" if action.is_admin else "user",
             group_role=group_role,
@@ -566,8 +555,8 @@ class AuthService:
         await self._valkey_session_client.delete_login_session(action.session_token)
         return LogoutActionResult(success=True)
 
-    async def admin_revoke_login_session(
-        self, action: AdminRevokeLoginSessionAction
+    async def global_revoke_login_session(
+        self, action: GlobalRevokeLoginSessionAction
     ) -> RevokeLoginSessionActionResult:
         session_token = await self._auth_repository.delete_login_session_by_id(
             action.session_id, LoginAttemptResult.REVOKED_BY_ADMIN
@@ -575,8 +564,8 @@ class AuthService:
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
 
-    async def my_revoke_login_session(
-        self, action: MyRevokeLoginSessionAction
+    async def revoke_login_session(
+        self, action: RevokeLoginSessionAction
     ) -> RevokeLoginSessionActionResult:
         session_data = await self._auth_repository.get_login_session_by_id(action.session_id)
         if session_data.user_id != action.user_id:
@@ -587,11 +576,11 @@ class AuthService:
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
 
-    async def admin_unblock_user(
-        self, action: AdminUnblockUserAction
-    ) -> AdminUnblockUserActionResult:
+    async def global_unblock_user(
+        self, action: GlobalUnblockUserAction
+    ) -> GlobalUnblockUserActionResult:
         await self._valkey_session_client.clear_login_block(action.username)
-        return AdminUnblockUserActionResult(success=True)
+        return GlobalUnblockUserActionResult(success=True)
 
     async def signout(self, action: SignoutAction) -> SignoutActionResult:
         if action.email != action.requester_email:
@@ -724,7 +713,6 @@ class AuthService:
                 ssh_public_key=pubkey,
                 ssh_private_key=privkey,
             ),
-            user_id=action.user_id,
         )
 
     async def upload_ssh_keypair(
@@ -741,18 +729,17 @@ class AuthService:
                 ssh_public_key=pubkey,
                 ssh_private_key=privkey,
             ),
-            user_id=action.user_id,
         )
 
     async def resolve_access_key_scope(
-        self, action: ResolveAccessKeyScopeAction
-    ) -> ResolveAccessKeyScopeResult:
+        self, action: PublicResolveAccessKeyScopeAction
+    ) -> PublicResolveAccessKeyScopeResult:
         requester_ak = AccessKey(action.requester_access_key)
         if (
             action.owner_access_key is None
             or action.owner_access_key == action.requester_access_key
         ):
-            return ResolveAccessKeyScopeResult(
+            return PublicResolveAccessKeyScopeResult(
                 requester_access_key=requester_ak,
                 owner_access_key=requester_ak,
             )
@@ -775,20 +762,16 @@ class AuthService:
             )
         except RuntimeError as e:
             raise GenericForbidden(str(e)) from e
-        return ResolveAccessKeyScopeResult(
+        return PublicResolveAccessKeyScopeResult(
             requester_access_key=requester_ak,
             owner_access_key=owner_ak,
         )
 
-    async def resolve_user_id_by_access_key(
-        self, action: ResolveUserIDByAccessKeyAction
-    ) -> ResolveUserIDByAccessKeyResult:
-        user_id = await self._auth_repository.get_user_id_by_access_key(action.access_key)
-        return ResolveUserIDByAccessKeyResult(user_id=user_id)
-
-    async def resolve_user_scope(self, action: ResolveUserScopeAction) -> ResolveUserScopeResult:
+    async def resolve_user_scope(
+        self, action: PublicResolveUserScopeAction
+    ) -> PublicResolveUserScopeResult:
         if action.owner_user_email is None:
-            return ResolveUserScopeResult(
+            return PublicResolveUserScopeResult(
                 owner_uuid=action.requester_uuid,
                 owner_role=action.requester_role,
             )
@@ -813,38 +796,10 @@ class AuthService:
             )
         except RuntimeError as e:
             raise GenericForbidden(str(e)) from e
-        return ResolveUserScopeResult(
+        return PublicResolveUserScopeResult(
             owner_uuid=owner_uuid,
             owner_role=owner_role,
         )
-
-    async def admin_search_login_sessions(
-        self, action: AdminSearchLoginSessionsAction
-    ) -> SearchLoginSessionsActionResult:
-        result = await self._auth_repository.admin_search_login_sessions(querier=action.querier)
-        return SearchLoginSessionsActionResult(result=result)
-
-    async def search_login_sessions(
-        self, action: SearchLoginSessionsAction
-    ) -> SearchLoginSessionsActionResult:
-        result = await self._auth_repository.search_login_sessions(
-            scope=action.scope, querier=action.querier
-        )
-        return SearchLoginSessionsActionResult(result=result)
-
-    async def admin_search_login_history(
-        self, action: AdminSearchLoginHistoryAction
-    ) -> SearchLoginHistoryActionResult:
-        result = await self._auth_repository.admin_search_login_history(querier=action.querier)
-        return SearchLoginHistoryActionResult(result=result)
-
-    async def search_login_history(
-        self, action: SearchLoginHistoryAction
-    ) -> SearchLoginHistoryActionResult:
-        result = await self._auth_repository.search_login_history(
-            scope=action.scope, querier=action.querier
-        )
-        return SearchLoginHistoryActionResult(result=result)
 
     async def _check_password_age(self, user: RowMapping, auth_config: AuthConfig | None) -> None:
         if (

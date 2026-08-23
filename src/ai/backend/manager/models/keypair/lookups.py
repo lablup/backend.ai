@@ -12,8 +12,10 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.specs.lookup import (
+    DataLookup,
     FieldOwnerKeyLookup,
     FieldOwnerLookup,
 )
@@ -45,3 +47,22 @@ class KeypairAccessKeyOwnerLookup(FieldOwnerKeyLookup[UserID]):
     @override
     def to_entity_id(self, value: UUID) -> UserID:
         return UserID(value)
+
+
+@dataclass
+class KeypairAccessKeyUserLookup(DataLookup[KeyPairRow, UserID]):
+    """Resolves an access key into the user it authenticates as."""
+
+    access_key: AccessKey
+
+    @override
+    def row_class(self) -> type[KeyPairRow]:
+        return KeyPairRow
+
+    @override
+    def conditions(self) -> Sequence[QueryCondition]:
+        return [lambda: KeyPairRow.access_key == self.access_key]
+
+    @override
+    def to_entity_id(self, row: KeyPairRow) -> UserID:
+        return UserID(row.user)

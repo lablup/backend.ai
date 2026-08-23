@@ -3,6 +3,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import RejectedByHook
@@ -50,7 +51,7 @@ async def test_update_password_successful(
     """Test successful password update"""
     action = UpdatePasswordAction(
         request=MagicMock(),
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
         old_password="old_password",
@@ -92,7 +93,7 @@ async def test_update_password_fails_when_new_passwords_dont_match(
     """Test password update fails when new passwords don't match"""
     action = UpdatePasswordAction(
         request=MagicMock(),
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
         old_password="old_password",
@@ -133,7 +134,7 @@ async def test_update_password_fails_with_incorrect_old_password(
     """Test password update fails with incorrect old password"""
     action = UpdatePasswordAction(
         request=MagicMock(),
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
         old_password="wrong_old_password",
@@ -169,7 +170,7 @@ async def test_update_password_with_hook_rejection(
     """Test password update fails when hook rejects password format"""
     action = UpdatePasswordAction(
         request=MagicMock(),
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
         old_password="correct_old_password",
@@ -206,7 +207,7 @@ async def test_update_password_repository_call(
     """Test that password update calls repository with correct parameters"""
     action = UpdatePasswordAction(
         request=MagicMock(),
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="test-domain",
         email="update@example.com",
         old_password="old_pass",
