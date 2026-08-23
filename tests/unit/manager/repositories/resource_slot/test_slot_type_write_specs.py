@@ -311,8 +311,6 @@ class TestResourceSlotTypePurger:
                     version="26.9.0",
                     scaling_group="conflict-sgroup",
                     resource_group_id=resource_group_id,
-                    available_slots=ResourceSlot(),
-                    occupied_slots=ResourceSlot(),
                     addr="tcp://127.0.0.1:6011",
                     architecture="x86_64",
                 )

@@ -64,6 +64,11 @@ class KernelRowFromSpec(CreatorSpec[KernelRow]):
     image_info: ImageInfo | None
     enqueue_time: datetime
 
+    def requested_slots(self) -> ResourceSlot:
+        return ResourceSlotEntry.inputs_to_resource_slot(
+            self.kernel_spec.execution_spec.resource_input.resources
+        )
+
     @override
     def build_row(self) -> KernelRow:
         execution = self.kernel_spec.execution_spec
@@ -71,9 +76,6 @@ class KernelRowFromSpec(CreatorSpec[KernelRow]):
         environ_payload = [f"{k}={v}" for k, v in (execution.environ or {}).items()]
         resource_opts_payload = execution.resource_input.resource_opts.model_dump(exclude_none=True)
         resolved_mounts = list(self.kernel_spec.vfolder_mounts)
-        requested_slots = ResourceSlotEntry.inputs_to_resource_slot(
-            execution.resource_input.resources
-        )
 
         return KernelRow(
             session_id=self.spec.resource_spec.identity.session_id,
@@ -102,8 +104,6 @@ class KernelRowFromSpec(CreatorSpec[KernelRow]):
             status_history={
                 KernelStatus.PENDING.name: self.enqueue_time.isoformat(),
             },
-            occupied_slots=ResourceSlot(),
-            requested_slots=requested_slots,
             occupied_shares={},
             resource_opts=resource_opts_payload,
             environ=environ_payload,
@@ -137,8 +137,7 @@ class SessionRowFromSpec(CreatorSpec[SessionRow]):
     ``batch_timeout``) are sourced from the main kernel's execution
     spec. ``images`` / ``image_ids`` are deduplicated from each
     kernel's resolved :class:`ImageInfo`, with the main kernel's image
-    placed first. ``requested_slots`` aggregates every kernel's
-    resource request.
+    placed first.
     """
 
     spec: SessionSpec
@@ -153,7 +152,6 @@ class SessionRowFromSpec(CreatorSpec[SessionRow]):
 
         session_images: list[str] = []
         session_image_ids: list[UUID] = []
-        requested_slots = ResourceSlot()
         for kernel in kernel_specs:
             image_id = kernel.execution_spec.resource_input.image_id
             image_info = self.image_infos.get(image_id) if image_id is not None else None
@@ -164,9 +162,6 @@ class SessionRowFromSpec(CreatorSpec[SessionRow]):
                         session_images.insert(0, image_info.canonical)
                     else:
                         session_images.append(image_info.canonical)
-            requested_slots += ResourceSlotEntry.inputs_to_resource_slot(
-                kernel.execution_spec.resource_input.resources
-            )
 
         main_mounts = list(main_kernel.vfolder_mounts) if main_kernel else []
         session_requested_starts_at = main_kernel.execution_spec.starts_at if main_kernel else None
@@ -209,8 +204,6 @@ class SessionRowFromSpec(CreatorSpec[SessionRow]):
             status_history={
                 SessionStatus.PENDING.name: self.enqueue_time.isoformat(),
             },
-            requested_slots=requested_slots,
-            occupying_slots=ResourceSlot(),
             vfolder_mounts=main_mounts,
             environ=session_environ,
             tag=spec.resource_spec.classification.tag,

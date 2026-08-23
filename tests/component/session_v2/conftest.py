@@ -42,7 +42,7 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext
-from ai.backend.common.types import ResourceSlot, SessionTypes
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
@@ -378,8 +378,6 @@ async def _seed_session(
                 status=status,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -403,8 +401,6 @@ async def _seed_session(
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -609,8 +605,6 @@ async def agent_factory(
                     scaling_group=resource_group_name,
                     resource_group_id=resource_group_id,
                     schedulable=True,
-                    available_slots=ResourceSlot(available_slots),
-                    occupied_slots=ResourceSlot(),
                     addr=f"10.0.0.{len(created_ids) + 1}:6001",
                     version="26.0.0",
                     architecture="x86_64",

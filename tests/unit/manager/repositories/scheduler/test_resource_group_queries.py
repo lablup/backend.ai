@@ -9,12 +9,11 @@ import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from datetime import timedelta
-from decimal import Decimal
 
 import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.types import AgentId, ResourceSlot
+from ai.backend.common.types import AgentId
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
@@ -71,11 +70,6 @@ async def _make_agent(
                 region="local",
                 scaling_group=resource_group,
                 resource_group_id=resource_group_id,
-                available_slots=ResourceSlot({
-                    "cpu": Decimal("10"),
-                    "mem": Decimal("10240"),
-                }),
-                occupied_slots=ResourceSlot(),
                 addr="127.0.0.1:6001",
                 version="1.0.0",
                 architecture="x86_64",

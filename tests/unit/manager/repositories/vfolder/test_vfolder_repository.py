@@ -1516,8 +1516,6 @@ class TestVfolderRepositoryDeleteForever:
                     scaling_group_name=sgroup_name,
                     group_id=group_id,
                     user_uuid=user_id,
-                    occupying_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
                     status=SessionStatus.RUNNING,
                     vfolder_mounts=[mount],
                 )
@@ -1611,8 +1609,6 @@ class TestVfolderRepositoryDeleteForever:
                     scaling_group_name=sgroup_name,
                     group_id=group_id,
                     user_uuid=user_id,
-                    occupying_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
                     status=SessionStatus.RUNNING,
                     vfolder_mounts=[],
                 )
@@ -1627,8 +1623,6 @@ class TestVfolderRepositoryDeleteForever:
                     scaling_group=sgroup_name,
                     resource_group_id=sgroup_id,
                     cluster_role=DEFAULT_ROLE,
-                    occupied_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
                     repl_in_port=0,
                     repl_out_port=0,
                     stdin_port=0,

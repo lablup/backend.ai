@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.types import HostPortPair, ResourceSlot
+from ai.backend.common.types import HostPortPair
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.agent.handler import AgentHandler
@@ -125,8 +125,6 @@ async def agent_fixture(
                 scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 schedulable=True,
-                available_slots=ResourceSlot({"cpu": "4", "mem": "8589934592"}),
-                occupied_slots=ResourceSlot(),
                 addr="tcp://127.0.0.1:6011",
                 version="24.12.0",
                 architecture="x86_64",

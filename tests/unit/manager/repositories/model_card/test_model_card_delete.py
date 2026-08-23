@@ -356,8 +356,6 @@ class TestModelCardDelete:
                 scaling_group_name=test_scaling_group.name,
                 group_id=test_group.id,
                 user_uuid=test_user.uuid,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 status=SessionStatus.RUNNING,
                 vfolder_mounts=[
                     VFolderMount(

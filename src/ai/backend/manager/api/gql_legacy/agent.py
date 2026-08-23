@@ -110,8 +110,6 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
     "first_contact": ("first_contact", None),
     "lost_at": ("lost_at", None),
     "version": ("version", None),
-    "available_slots": ("available_slots", None),
-    "occupied_slots": ("occupied_slots", None),
 }
 
 
@@ -514,8 +512,6 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
         "first_contact": ("first_contact", None),
         "lost_at": ("lost_at", None),
         "version": ("version", None),
-        "available_slots": ("available_slots", None),
-        "occupied_slots": ("occupied_slots", None),
     }
 
     @classmethod
@@ -765,8 +761,6 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
         "status": ("status", None),
         "scaling_group": ("scaling_group", None),
         "schedulable": ("schedulable", None),
-        "available_slots": ("available_slots", None),
-        "occupied_slots": ("occupied_slots", None),
     }
 
     @classmethod

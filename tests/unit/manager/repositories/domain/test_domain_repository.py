@@ -435,8 +435,6 @@ class TestDomainRepository:
                 scaling_group_name=sgroup_name,
                 resource_group_id=sgroup_id,
                 user_uuid=user_uuid,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 vfolder_mounts={},
             )
             session.add(sess)
@@ -450,8 +448,6 @@ class TestDomainRepository:
                 resource_group_id=sgroup_id,
                 cluster_role="main",
                 status=KernelStatus.RUNNING,
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,

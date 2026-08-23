@@ -262,8 +262,6 @@ class TestSessionRepository:
                 starts_at=None,
                 startup_command=None,
                 callback_url=None,
-                occupying_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
-                requested_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
                 vfolder_mounts=[],
                 environ=None,
                 bootstrap_script=None,
@@ -312,8 +310,6 @@ class TestSessionRepository:
                 created_at=now,
                 terminated_at=None,
                 starts_at=None,
-                occupied_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
-                requested_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
                 occupied_shares={},
                 environ=None,
                 vfolder_mounts=[],
@@ -468,8 +464,6 @@ class TestSessionRepository:
                     starts_at=None,
                     startup_command=None,
                     callback_url=None,
-                    occupying_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
                     vfolder_mounts=[],
                     environ=None,
                     bootstrap_script=None,
@@ -755,8 +749,6 @@ class TestBatchLoadSessionAllocations:
                 starts_at=None,
                 startup_command=None,
                 callback_url=None,
-                occupying_slots=ResourceSlot(),  # Empty! (post-Phase 3)
-                requested_slots=ResourceSlot({"cpu": "2", "mem": "2147483648"}),
                 vfolder_mounts=[],
                 environ=None,
                 bootstrap_script=None,
@@ -803,8 +795,6 @@ class TestBatchLoadSessionAllocations:
                 created_at=now,
                 terminated_at=None,
                 starts_at=None,
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot({"cpu": "2", "mem": "2147483648"}),
                 occupied_shares={},
                 environ=None,
                 vfolder_mounts=[],
@@ -863,8 +853,6 @@ class TestBatchLoadSessionAllocations:
             stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
             session_row = await db_sess.scalar(stmt)
             assert session_row is not None
-            # The deprecated JSONB column is empty (post-Phase 3)
-            assert session_row.occupying_slots == ResourceSlot()
 
             aggregates = await batch_load_session_allocations(db_sess, [session_id])
 

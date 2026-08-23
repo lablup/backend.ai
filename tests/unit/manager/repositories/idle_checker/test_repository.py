@@ -22,7 +22,6 @@ from ai.backend.common.data.idle_checker.types import (
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.types import (
     ClusterMode,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -160,8 +159,6 @@ def _expired_check_session_row(
         starts_at=datetime(2026, 1, 1, tzinfo=UTC),
         startup_command=None,
         callback_url=None,
-        occupying_slots=ResourceSlot({"cpu": "1"}),
-        requested_slots=ResourceSlot({"cpu": "1"}),
         vfolder_mounts=[],
         environ=None,
         bootstrap_script=None,
