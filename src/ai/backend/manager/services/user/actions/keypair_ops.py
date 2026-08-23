@@ -8,13 +8,15 @@ first, through the key owner lookup.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import override
 
+from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE, UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.ops.base import BulkGetOwnedFieldOpsAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
@@ -25,8 +27,10 @@ from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairC
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
+from ai.backend.manager.models.keypair.updaters import KeypairUpdater
 from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.services.user.actions.lookup_keypair_owner import LookupKeypairOwnerAction
+from ai.backend.manager.types import OptionalState
 
 
 @dataclass(frozen=True)
@@ -61,32 +65,53 @@ class IssueMyKeypairActionResult:
 
 
 @dataclass(frozen=True)
-class RevokeMyKeypairAction(_KeypairOfUserAction):
-    """Revoke one of a user\'s keypairs. The row leaves the table."""
+class _KeypairFieldAction(BaseSingleFieldAction[KeyPairID, UserID]):
+    """Base for an operation on one keypair, answered for by the user owning it."""
 
-    access_key: str
+    keypair_id: KeyPairID
+
+    @override
+    def to_owner_lookup_action(self) -> LookupKeypairOwnerAction:
+        return LookupKeypairOwnerAction(keypair_id=self.keypair_id)
+
+
+@dataclass(frozen=True)
+class GetKeypairAction(_KeypairFieldAction):
+    """Read one keypair."""
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
+        return ActionOperationType.GET
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "revoke_keypair"
+        return "get_keypair"
 
 
 @dataclass(frozen=True)
-class RevokeMyKeypairActionResult:
-    success: bool
+class GetKeypairActionResult:
+    keypair: KeyPairData
 
 
 @dataclass(frozen=True)
-class UpdateMyKeypairAction(_KeypairOfUserAction):
-    """Edit one of a user\'s keypairs."""
+class UpdateKeypairAction(_KeypairFieldAction):
+    """Edit one keypair."""
 
-    updater: Updater[KeyPairRow]
+    is_active: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
+    is_admin: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
+    resource_policy: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    rate_limit: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+
+    def to_updater(self) -> KeypairUpdater:
+        return KeypairUpdater(
+            keypair_id=self.keypair_id,
+            is_active=self.is_active,
+            is_admin=self.is_admin,
+            resource_policy=self.resource_policy,
+            rate_limit=self.rate_limit,
+        )
 
     @override
     @classmethod
@@ -100,7 +125,27 @@ class UpdateMyKeypairAction(_KeypairOfUserAction):
 
 
 @dataclass(frozen=True)
-class UpdateMyKeypairActionResult:
+class UpdateKeypairActionResult:
+    keypair: KeyPairData
+
+
+@dataclass(frozen=True)
+class PurgeKeypairAction(_KeypairFieldAction):
+    """Remove one keypair. The row leaves the table."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "purge_keypair"
+
+
+@dataclass(frozen=True)
+class PurgeKeypairActionResult:
     keypair: KeyPairData
 
 
@@ -212,50 +257,6 @@ class AdminCreateKeypairActionResult:
 
 
 @dataclass(frozen=True)
-class AdminUpdateKeypairAction(_KeypairOfUserAction):
-    """Edit any keypair."""
-
-    updater: Updater[KeyPairRow]
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-    @override
-    @classmethod
-    def action_name(cls) -> str:
-        return "admin_update_keypair"
-
-
-@dataclass(frozen=True)
-class AdminUpdateKeypairActionResult:
-    keypair: KeyPairData
-
-
-@dataclass(frozen=True)
-class AdminDeleteKeypairAction(_KeypairOfUserAction):
-    """Remove any keypair. The row leaves the table."""
-
-    access_key: str
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-    @override
-    @classmethod
-    def action_name(cls) -> str:
-        return "admin_delete_keypair"
-
-
-@dataclass(frozen=True)
-class AdminDeleteKeypairActionResult:
-    access_key: str
-
-
-@dataclass(frozen=True)
 class AdminSearchKeypairsAction(BaseGlobalAction):
     """Read keypairs across every user."""
 
@@ -280,28 +281,6 @@ class AdminSearchKeypairsAction(BaseGlobalAction):
 @dataclass(frozen=True)
 class AdminSearchKeypairsActionResult:
     result: SearchResult[KeyPairData]
-
-
-@dataclass(frozen=True)
-class AdminGetKeypairAction(_KeypairOfUserAction):
-    """Read one keypair by access key."""
-
-    access_key: str
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
-
-    @override
-    @classmethod
-    def action_name(cls) -> str:
-        return "admin_get_keypair"
-
-
-@dataclass(frozen=True)
-class AdminGetKeypairActionResult:
-    keypair: KeyPairData
 
 
 @dataclass(frozen=True)

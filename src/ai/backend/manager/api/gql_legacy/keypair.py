@@ -565,6 +565,10 @@ class ModifyKeyPair(graphene.Mutation):  # type: ignore[misc]
         set_if_set(props, data, "rate_limit")
         # props.concurrency_limit is always ignored
         update_query = sa.update(keypairs).values(data).where(keypairs.c.access_key == access_key)
+        if data.get("is_active") is False:
+            # An inactive default keypair locks its user out, so the marker is a
+            # precondition carried in the statement.
+            update_query = update_query.where(sa.not_(keypairs.c.is_default))
         return await simple_db_mutate(cls, ctx, update_query)
 
 
@@ -593,5 +597,11 @@ class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
                 return DeleteKeyPair(
                     False, "the keypair is used as the default access key by a user"
                 )
-        delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
+        # The marker is re-evaluated inside the DELETE, so a keypair that becomes the
+        # default after the read above is not removed.
+        delete_query = (
+            sa.delete(keypairs)
+            .where(keypairs.c.access_key == access_key)
+            .where(sa.not_(keypairs.c.is_default))
+        )
         return await simple_db_mutate(cls, ctx, delete_query)

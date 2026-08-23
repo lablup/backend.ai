@@ -11,6 +11,7 @@ import msgpack
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -31,9 +32,12 @@ from ai.backend.manager.data.user.types import (
     UserSearchResult,
 )
 from ai.backend.manager.errors.user import KeyPairNotFound
+from ai.backend.manager.models.keypair.creators import KeypairCreator
+from ai.backend.manager.models.keypair.purgers import NonDefaultKeypairPurger
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
-from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.keypair.row import generate_keypair_data
 from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
+from ai.backend.manager.models.keypair.updaters import KeypairUpdater
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.models.user import UserRow
@@ -301,19 +305,59 @@ class UserRepository:
         return await self._db_source.search_users_by_role(scope, querier)
 
     @user_repository_resilience.apply()
-    async def issue_my_keypair(self, user_uuid: UUID) -> GeneratedKeyPairData:
-        """Issue a new keypair for the current user."""
-        return await self._db_source.issue_my_keypair(user_uuid)
+    async def issue_my_keypair(self, user_id: UserID) -> GeneratedKeyPairData:
+        """Issue a new keypair for a user, following the one they authorize with."""
+        creator = await self._db_source.keypair_settings_to_inherit(user_id)
+        return await self._create_keypair(user_id, creator)
 
     @user_repository_resilience.apply()
-    async def revoke_my_keypair(self, user_uuid: UUID, access_key: str) -> None:
-        """Revoke a keypair owned by the current user."""
-        await self._db_source.revoke_my_keypair(user_uuid, access_key)
+    async def admin_create_keypair(
+        self, user_id: UserID, creator: KeyPairCreator
+    ) -> GeneratedKeyPairData:
+        """Issue a keypair for a named user."""
+        return await self._create_keypair(user_id, creator)
+
+    async def _create_keypair(
+        self, user_id: UserID, creator: KeyPairCreator
+    ) -> GeneratedKeyPairData:
+        async with self._v2_ops.write_ops() as w:
+            keypair = await w.create_field(
+                user_id,
+                KeypairCreator(
+                    secrets=generate_keypair_data(),
+                    is_active=creator.is_active,
+                    is_admin=creator.is_admin,
+                    resource_policy=creator.resource_policy,
+                    rate_limit=creator.rate_limit,
+                ),
+            )
+        return GeneratedKeyPairData(keypair=keypair)
 
     @user_repository_resilience.apply()
-    async def update_my_keypair(self, user_uuid: UUID, updater: Updater[KeyPairRow]) -> KeyPairData:
-        """Update a keypair owned by the current user."""
-        return await self._db_source.update_my_keypair(user_uuid, updater)
+    async def keypair(self, keypair_id: KeyPairID) -> KeyPairData:
+        """Read one keypair by its id."""
+        return await self._db_source.keypair(keypair_id)
+
+    @user_repository_resilience.apply()
+    async def purge_keypair(self, keypair_id: KeyPairID) -> KeyPairData | None:
+        """Remove one keypair unless it is the key its user authorizes with.
+
+        ``None`` when nothing was removed — the row is gone, or the guard refused.
+        """
+        async with self._v2_ops.write_ops() as w:
+            return await w.purge_guarded_field_entity(
+                NonDefaultKeypairPurger(keypair_id=keypair_id)
+            )
+
+    @user_repository_resilience.apply()
+    async def update_keypair(self, updater: KeypairUpdater) -> KeyPairData | None:
+        """Write one keypair's settings unless the write would deactivate the key its
+        user authorizes with.
+
+        ``None`` when nothing was written — the row is gone, or the guard refused.
+        """
+        async with self._v2_ops.write_ops() as w:
+            return await w.update_guarded_data(updater)
 
     @user_repository_resilience.apply()
     async def switch_default_access_key(self, user_id: UserID, access_key: AccessKey) -> None:
@@ -336,23 +380,6 @@ class UserRepository:
             SearchResult with matching keypairs and pagination info.
         """
         return await self._db_source.search_my_keypairs(scope, querier)
-
-    @user_repository_resilience.apply()
-    async def admin_create_keypair(
-        self, user_id: UUID, creator: KeyPairCreator
-    ) -> GeneratedKeyPairData:
-        """Admin creates a keypair for a given user."""
-        return await self._db_source.admin_create_keypair(user_id, creator)
-
-    @user_repository_resilience.apply()
-    async def admin_update_keypair(self, updater: Updater[KeyPairRow]) -> KeyPairData:
-        """Admin updates any keypair by access key."""
-        return await self._db_source.admin_update_keypair(updater)
-
-    @user_repository_resilience.apply()
-    async def admin_delete_keypair(self, access_key: str) -> None:
-        """Admin deletes any keypair by access key."""
-        await self._db_source.admin_delete_keypair(access_key)
 
     @user_repository_resilience.apply()
     async def admin_search_keypairs(

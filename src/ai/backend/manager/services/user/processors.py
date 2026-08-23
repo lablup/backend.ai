@@ -5,10 +5,12 @@ from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
+from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    FieldKeyLookupOpsResult,
     FieldOwnerLookupOpsResult,
     LookupOpsResult,
     OwnedFieldsOpsResult,
@@ -54,33 +56,32 @@ from ai.backend.manager.services.user.actions.get_user import (
 from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminCreateKeypairAction,
     AdminCreateKeypairActionResult,
-    AdminDeleteKeypairAction,
-    AdminDeleteKeypairActionResult,
     AdminDeleteSSHKeypairAction,
     AdminDeleteSSHKeypairActionResult,
-    AdminGetKeypairAction,
-    AdminGetKeypairActionResult,
     AdminGetSSHKeypairAction,
     AdminGetSSHKeypairActionResult,
     AdminRegisterSSHKeypairAction,
     AdminRegisterSSHKeypairActionResult,
     AdminSearchKeypairsAction,
     AdminSearchKeypairsActionResult,
-    AdminUpdateKeypairAction,
-    AdminUpdateKeypairActionResult,
     GetDefaultKeypairsAction,
+    GetKeypairAction,
+    GetKeypairActionResult,
     IssueMyKeypairAction,
     IssueMyKeypairActionResult,
-    RevokeMyKeypairAction,
-    RevokeMyKeypairActionResult,
+    PurgeKeypairAction,
+    PurgeKeypairActionResult,
     SearchMyKeypairsAction,
     SearchMyKeypairsActionResult,
     SwitchDefaultAccessKeyAction,
     SwitchDefaultAccessKeyActionResult,
-    UpdateMyKeypairAction,
-    UpdateMyKeypairActionResult,
+    UpdateKeypairAction,
+    UpdateKeypairActionResult,
 )
 from ai.backend.manager.services.user.actions.lookup import LookupUserAction
+from ai.backend.manager.services.user.actions.lookup_keypair import (
+    LookupKeypairByAccessKeyAction,
+)
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupBulkKeypairOwnerAction,
     LookupKeypairOwnerAction,
@@ -148,33 +149,22 @@ class UserProcessors:
     user_month_stats: SingleEntityActionProcessor[UserMonthStatsAction, UserMonthStatsActionResult]
     admin_month_stats: GlobalActionProcessor[AdminMonthStatsAction, AdminMonthStatsActionResult]
     issue_my_keypair: SingleEntityActionProcessor[IssueMyKeypairAction, IssueMyKeypairActionResult]
-    revoke_my_keypair: SingleEntityActionProcessor[
-        RevokeMyKeypairAction, RevokeMyKeypairActionResult
-    ]
+    lookup_keypair: LookupActionProcessor[LookupKeypairByAccessKeyAction, FieldKeyLookupOpsResult]
+    get_keypair: SingleFieldActionProcessor[GetKeypairAction, GetKeypairActionResult]
+    purge_keypair: SingleFieldActionProcessor[PurgeKeypairAction, PurgeKeypairActionResult]
     switch_default_access_key: SingleEntityActionProcessor[
         SwitchDefaultAccessKeyAction, SwitchDefaultAccessKeyActionResult
     ]
     get_default_keypairs: BulkActionProcessor[
         GetDefaultKeypairsAction, OwnedFieldsOpsResult[UserID, KeyPairData]
     ]
-    update_my_keypair: SingleEntityActionProcessor[
-        UpdateMyKeypairAction, UpdateMyKeypairActionResult
-    ]
+    update_keypair: SingleFieldActionProcessor[UpdateKeypairAction, UpdateKeypairActionResult]
     search_my_keypairs: ScopeActionProcessor[SearchMyKeypairsAction, SearchMyKeypairsActionResult]
     admin_create_keypair: SingleEntityActionProcessor[
         AdminCreateKeypairAction, AdminCreateKeypairActionResult
     ]
-    admin_update_keypair: SingleEntityActionProcessor[
-        AdminUpdateKeypairAction, AdminUpdateKeypairActionResult
-    ]
-    admin_delete_keypair: SingleEntityActionProcessor[
-        AdminDeleteKeypairAction, AdminDeleteKeypairActionResult
-    ]
     admin_search_keypairs: GlobalActionProcessor[
         AdminSearchKeypairsAction, AdminSearchKeypairsActionResult
-    ]
-    admin_get_keypair: SingleEntityActionProcessor[
-        AdminGetKeypairAction, AdminGetKeypairActionResult
     ]
     admin_register_ssh_keypair: SingleEntityActionProcessor[
         AdminRegisterSSHKeypairAction, AdminRegisterSSHKeypairActionResult
@@ -235,14 +225,8 @@ class UserProcessors:
         self.issue_my_keypair = group.single_entity(
             IssueMyKeypairAction, user_service.issue_my_keypair
         )
-        self.revoke_my_keypair = group.single_entity(
-            RevokeMyKeypairAction, user_service.revoke_my_keypair
-        )
         self.switch_default_access_key = group.single_entity(
             SwitchDefaultAccessKeyAction, user_service.switch_default_access_key
-        )
-        self.update_my_keypair = group.single_entity(
-            UpdateMyKeypairAction, user_service.update_my_keypair
         )
         self.search_my_keypairs = group.scope(
             SearchMyKeypairsAction, user_service.search_my_keypairs
@@ -250,17 +234,8 @@ class UserProcessors:
         self.admin_create_keypair = group.single_entity(
             AdminCreateKeypairAction, user_service.admin_create_keypair
         )
-        self.admin_update_keypair = group.single_entity(
-            AdminUpdateKeypairAction, user_service.admin_update_keypair
-        )
-        self.admin_delete_keypair = group.single_entity(
-            AdminDeleteKeypairAction, user_service.admin_delete_keypair
-        )
         self.admin_search_keypairs = group.global_scope(
             AdminSearchKeypairsAction, user_service.admin_search_keypairs
-        )
-        self.admin_get_keypair = group.single_entity(
-            AdminGetKeypairAction, user_service.admin_get_keypair
         )
         self.admin_register_ssh_keypair = group.single_entity(
             AdminRegisterSSHKeypairAction, user_service.admin_register_ssh_keypair
@@ -294,6 +269,16 @@ class UserProcessors:
             LookupBulkKeypairOwnerAction,
         )
         self.get_default_keypairs = self.keypair_group.atomic_bulk_get_ops(GetDefaultKeypairsAction)
+        self.lookup_keypair = group.key_field_lookup_ops(LookupKeypairByAccessKeyAction)
+        self.get_keypair = self.keypair_group.single_field(
+            GetKeypairAction, user_service.get_keypair
+        )
+        self.update_keypair = self.keypair_group.single_field(
+            UpdateKeypairAction, user_service.update_keypair
+        )
+        self.purge_keypair = self.keypair_group.single_field(
+            PurgeKeypairAction, user_service.purge_keypair
+        )
         self.error_log = ErrorLogProcessors(
             group.field_group(
                 FieldGroupMeta(ERROR_LOG_FIELD_TYPE),

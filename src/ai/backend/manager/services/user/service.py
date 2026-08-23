@@ -18,7 +18,7 @@ from ai.backend.manager.data.user.types import (
     UserInfoContext,
 )
 from ai.backend.manager.errors.storage import DotfileCreationFailed
-from ai.backend.manager.errors.user import UserPurgeFailure
+from ai.backend.manager.errors.user import KeyPairForbidden, UserPurgeFailure
 from ai.backend.manager.models.domain.row import verify_dotfile_name
 from ai.backend.manager.models.keypair.updaters import (
     KeypairBootstrapScriptUpdater,
@@ -61,30 +61,26 @@ from ai.backend.manager.services.user.actions.get_user import (
 from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminCreateKeypairAction,
     AdminCreateKeypairActionResult,
-    AdminDeleteKeypairAction,
-    AdminDeleteKeypairActionResult,
     AdminDeleteSSHKeypairAction,
     AdminDeleteSSHKeypairActionResult,
-    AdminGetKeypairAction,
-    AdminGetKeypairActionResult,
     AdminGetSSHKeypairAction,
     AdminGetSSHKeypairActionResult,
     AdminRegisterSSHKeypairAction,
     AdminRegisterSSHKeypairActionResult,
     AdminSearchKeypairsAction,
     AdminSearchKeypairsActionResult,
-    AdminUpdateKeypairAction,
-    AdminUpdateKeypairActionResult,
+    GetKeypairAction,
+    GetKeypairActionResult,
     IssueMyKeypairAction,
     IssueMyKeypairActionResult,
-    RevokeMyKeypairAction,
-    RevokeMyKeypairActionResult,
+    PurgeKeypairAction,
+    PurgeKeypairActionResult,
     SearchMyKeypairsAction,
     SearchMyKeypairsActionResult,
     SwitchDefaultAccessKeyAction,
     SwitchDefaultAccessKeyActionResult,
-    UpdateMyKeypairAction,
-    UpdateMyKeypairActionResult,
+    UpdateKeypairAction,
+    UpdateKeypairActionResult,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
@@ -301,21 +297,34 @@ class UserService:
         return AdminMonthStatsActionResult(stats=stats)
 
     async def issue_my_keypair(self, action: IssueMyKeypairAction) -> IssueMyKeypairActionResult:
-        generated = await self._user_repository.issue_my_keypair(user_uuid=action.user_id)
+        generated = await self._user_repository.issue_my_keypair(user_id=action.user_id)
         return IssueMyKeypairActionResult(generated_data=generated)
 
-    async def revoke_my_keypair(self, action: RevokeMyKeypairAction) -> RevokeMyKeypairActionResult:
-        await self._user_repository.revoke_my_keypair(
-            user_uuid=action.user_id, access_key=action.access_key
-        )
-        return RevokeMyKeypairActionResult(success=True)
+    async def get_keypair(self, action: GetKeypairAction) -> GetKeypairActionResult:
+        keypair = await self._user_repository.keypair(action.keypair_id)
+        return GetKeypairActionResult(keypair=keypair)
 
-    async def update_my_keypair(self, action: UpdateMyKeypairAction) -> UpdateMyKeypairActionResult:
-        keypair_data = await self._user_repository.update_my_keypair(
-            user_uuid=action.user_id,
-            updater=action.updater,
+    async def update_keypair(self, action: UpdateKeypairAction) -> UpdateKeypairActionResult:
+        """Write the keypair's settings. Nothing written means the row is gone or the
+        guard refused; one more read tells the two apart."""
+        written = await self._user_repository.update_keypair(action.to_updater())
+        if written is not None:
+            return UpdateKeypairActionResult(keypair=written)
+        await self._user_repository.keypair(action.keypair_id)
+        raise KeyPairForbidden(
+            "Cannot deactivate the default access key. Switch the default access key first."
         )
-        return UpdateMyKeypairActionResult(keypair=keypair_data)
+
+    async def purge_keypair(self, action: PurgeKeypairAction) -> PurgeKeypairActionResult:
+        """Remove the keypair. Nothing removed is told apart the same way a refused
+        edit is."""
+        removed = await self._user_repository.purge_keypair(action.keypair_id)
+        if removed is not None:
+            return PurgeKeypairActionResult(keypair=removed)
+        await self._user_repository.keypair(action.keypair_id)
+        raise KeyPairForbidden(
+            "Cannot delete the default access key. Switch the default access key first."
+        )
 
     async def switch_default_access_key(
         self, action: SwitchDefaultAccessKeyAction
@@ -343,33 +352,12 @@ class UserService:
         )
         return AdminCreateKeypairActionResult(generated_data=generated)
 
-    async def admin_update_keypair(
-        self, action: AdminUpdateKeypairAction
-    ) -> AdminUpdateKeypairActionResult:
-        """Admin updates any keypair."""
-        keypair_data = await self._user_repository.admin_update_keypair(
-            updater=action.updater,
-        )
-        return AdminUpdateKeypairActionResult(keypair=keypair_data)
-
-    async def admin_delete_keypair(
-        self, action: AdminDeleteKeypairAction
-    ) -> AdminDeleteKeypairActionResult:
-        """Admin deletes any keypair."""
-        await self._user_repository.admin_delete_keypair(access_key=action.access_key)
-        return AdminDeleteKeypairActionResult(access_key=action.access_key)
-
     async def admin_search_keypairs(
         self, action: AdminSearchKeypairsAction
     ) -> AdminSearchKeypairsActionResult:
         """Admin search all keypairs."""
         result = await self._user_repository.admin_search_keypairs(querier=action.querier)
         return AdminSearchKeypairsActionResult(result=result)
-
-    async def admin_get_keypair(self, action: AdminGetKeypairAction) -> AdminGetKeypairActionResult:
-        """Admin retrieves a single keypair by access key."""
-        keypair_data = await self._user_repository.admin_get_keypair(access_key=action.access_key)
-        return AdminGetKeypairActionResult(keypair=keypair_data)
 
     # ------------------------------------------------------------------ admin SSH keypair operations
 

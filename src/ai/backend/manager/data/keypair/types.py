@@ -12,7 +12,8 @@ class KeyPairCreator:
     is_active: bool
     is_admin: bool
     resource_policy: str
-    rate_limit: int
+    # None leaves the column to its default rather than writing NULL.
+    rate_limit: int | None = None
 
 
 @dataclass

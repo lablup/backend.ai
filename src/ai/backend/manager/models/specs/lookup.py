@@ -124,3 +124,31 @@ class FieldOwnerKeyLookup[TOwnerID: EntityIdentifier](ABC):
     def to_entity_id(self, value: UUID) -> TOwnerID:
         """Convert the selected value into the owning entity's identifier."""
         raise NotImplementedError
+
+
+class FieldKeyLookup[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](ABC):
+    """Resolves a field row's caller-facing key into that row's id and its owner's.
+
+    An operation naming a field row takes the row's id, but a request carries an access
+    key or a name instead. This is the step between: one query answers both, because the
+    id is what the operation names the row by and the owner is what this run itself is
+    recorded against.
+
+    A query rather than conditions, for the same reason :class:`FieldOwnerKeyLookup` is
+    one: an owner reached through a join is expressible.
+    """
+
+    @abstractmethod
+    def build_query(self) -> sa.sql.Select[Any]:
+        """Build the query selecting the field row's id and its owner's, in that order."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_field_id(self, value: UUID) -> TFieldID:
+        """Convert the first selected value into the field row's identifier."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_entity_id(self, value: UUID) -> TOwnerID:
+        """Convert the second selected value into the owning entity's identifier."""
+        raise NotImplementedError

@@ -23,7 +23,7 @@ and is read through an entity's permission like a field, while belonging to neit
 | Operation | Roots | Why |
 |---|---|---|
 | creator | `GlobalEntityCreator` / `EntityCreator` / `RoleManagedEntityCreator` / `FieldCreator` / `SidecarCreator` | only a create settles what a row belongs to |
-| purger | `EntityPurger` / `FieldPurger` | removing an entity removes what it left in the graph |
+| purger | `EntityPurger` / `FieldPurger` / `GuardedFieldPurger` | removing an entity removes what it left in the graph; a field row splits further on how it is picked: by id, or by id behind a precondition |
 | updater | `DataUpdater` / `GuardedDataUpdater` | an update never changes what a row belongs to, so the roots split on how the row is picked: by id, or by id behind a precondition |
 
 The roots are deliberately unrelated. Do NOT extract a common base across them

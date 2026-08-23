@@ -52,6 +52,14 @@ class V2UpdateWriteOps(V2WriteOpsBase):
         row_class = updater.row_class
         table = row_class.__table__
         values = updater.build_values()
+        if not values:
+            # Nothing to set: read the current row so callers can tell "nothing to
+            # change" apart from "row not found", as the plain update does.
+            existing = await self._sess.execute(
+                sa.select(row_class).where(updater.target_id_column() == updater.target_id_value())
+            )
+            row = existing.scalar_one_or_none()
+            return None if row is None else updater.to_data(row)
         stmt = (
             sa.update(table)
             .values(values)
