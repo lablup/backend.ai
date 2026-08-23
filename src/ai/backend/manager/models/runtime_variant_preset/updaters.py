@@ -1,20 +1,28 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
 
+from sqlalchemy.orm import InstrumentedAttribute
+
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
     UIOption,
 )
+from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.repositories.base.updater import UpdaterSpec
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
-class RuntimeVariantPresetUpdaterSpec(UpdaterSpec[RuntimeVariantPresetRow]):
+class RuntimeVariantPresetUpdater(DataUpdater[RuntimeVariantPresetRow, RuntimeVariantPresetData]):
+    preset_id: RuntimeVariantPresetID
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
     rank: OptionalState[int] = field(default_factory=OptionalState[int].nop)
@@ -37,6 +45,19 @@ class RuntimeVariantPresetUpdaterSpec(UpdaterSpec[RuntimeVariantPresetRow]):
         return RuntimeVariantPresetRow
 
     @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return RuntimeVariantPresetRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
+        return self.preset_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
     def build_values(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
         self.name.update_dict(to_update, "name")
@@ -51,3 +72,7 @@ class RuntimeVariantPresetUpdaterSpec(UpdaterSpec[RuntimeVariantPresetRow]):
         self.display_name.update_dict(to_update, "display_name")
         self.ui_option.update_dict(to_update, "ui_option")
         return to_update
+
+    @override
+    def to_data(self, row: RuntimeVariantPresetRow) -> RuntimeVariantPresetData:
+        return row.to_data()
