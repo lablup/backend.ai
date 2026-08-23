@@ -22,6 +22,7 @@ from ai.backend.manager.errors.repository import (
 )
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.specs import updater as specs_updater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchPurger,
@@ -211,15 +212,14 @@ class WriteOps(ReadOps):
         return creator.to_data(result.row)
 
     async def update_data[TRow: Base, TData](
-        self, updater: DataUpdater[TRow, TData]
+        self, updater: specs_updater.DataUpdater[TRow, TData]
     ) -> TData | None:
-        """Update a single row by primary key and return it as its ``data/`` type."""
-        result = await execute_updater(
-            self._sess, Updater(spec=updater, pk_value=updater.target_id_value())
-        )
-        if result is None:
-            return None
-        return updater.to_data(result.row)
+        """Update a single row by the id the spec names, returning its ``data/`` type.
+
+        For the transition: a caller whose transaction still runs legacy specs beside
+        this one reaches the v2 update here.
+        """
+        return await V2WriteOps(self._sess).update_data(updater)
 
     async def purge_data[TRow: Base, TData](self, purger: DataPurger[TRow, TData]) -> TData | None:
         """Delete a single row by primary key and return it as its ``data/`` type."""
