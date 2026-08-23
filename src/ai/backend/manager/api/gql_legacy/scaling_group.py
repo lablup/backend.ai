@@ -396,29 +396,33 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
     async def resolve_resource_allocation_limit_for_sessions(
         self, info: graphene.ResolveInfo
     ) -> dict[str, Any]:
-        from ai.backend.manager.models.agent import AgentRow
+        from ai.backend.manager.data.agent.types import AgentStatus
+        from ai.backend.manager.models.agent.row import AgentRow
+        from ai.backend.manager.models.resource_slot import AgentResourceRow
 
         # TODO: Allow admins to set which value to return here among "min", "max", "custom"
         graph_ctx: GraphQueryContext = info.context
-        agent_list = await AgentRow.get_schedulable_agents_by_sgroup(self.name, db=graph_ctx.db)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id)
+            query = (
+                sa.select(
+                    AgentResourceRow.slot_name,
+                    sa.func.max(AgentResourceRow.capacity).label("max_capacity"),
+                )
+                .select_from(j)
+                .where(
+                    (AgentRow.scaling_group == self.name)
+                    & (AgentRow.status == AgentStatus.ALIVE)
+                    & (AgentRow.schedulable == sa.true())
+                )
+                .group_by(AgentResourceRow.slot_name)
+            )
+            result = await db_session.execute(query)
 
-        def _compare_each_resource_and_get_max(
-            val1: ResourceSlot, val2: ResourceSlot | None
-        ) -> ResourceSlot:
-            if val2 is None:
-                return val1
-            return_val = ResourceSlot()
-            val1.sync_keys(val2)
-            for key in val1:
-                return_val[key] = max(val1[key], val2[key])
-            return return_val
-
-        result: ResourceSlot | None = None
-        for agent_row in agent_list:
-            result = _compare_each_resource_and_get_max(agent_row.available_slots, result)
-        if result is None:
-            return {}
-        return {k: v for k, v in result.to_json().items() if v != "0"}
+            max_slots = ResourceSlot()
+            for row in result:
+                max_slots[row.slot_name] = row.max_capacity
+        return {k: v for k, v in max_slots.to_json().items() if v != "0"}
 
     # TODO: Replace this field with a generic resource slot query API
     async def resolve_own_session_occupied_resource_slots(

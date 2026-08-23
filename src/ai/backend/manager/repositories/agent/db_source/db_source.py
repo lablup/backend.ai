@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Collection
 from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
@@ -98,7 +99,14 @@ class AgentDBSource:
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
         async with self._db.begin_session_read_committed() as session:
             query = (
-                sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
+                sa.select(AgentRow)
+                .where(AgentRow.id == upsert_data.metadata.id)
+                .options(
+                    selectinload(AgentRow.agent_resource_rows).joinedload(
+                        AgentResourceRow.slot_type_row
+                    )
+                )
+                .with_for_update()
             )
             row: AgentRow | None = await session.scalar(query)
             agent_data = row.to_heartbeat_update_data() if row is not None else None
@@ -258,14 +266,19 @@ class AgentDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def upsert_agent_resource_capacity(
+    async def sync_agent_resource_capacity(
         self,
+        agent_id: AgentId,
         bulk_upserter: BulkUpserter[AgentResourceRow],
+        reported_slot_names: Collection[str],
     ) -> int:
-        """Bulk UPSERT agent resource capacity rows.
+        """Bulk UPSERT agent resource capacity rows and drop the slots the agent
+        no longer reports.
 
         On INSERT: sets capacity (used defaults to 0).
         On CONFLICT: updates capacity only.
+        Rows for unreported slots are deleted only when nothing holds them, so a
+        slot that still carries an allocation survives until it is released.
 
         Returns:
             Number of rows upserted.
@@ -275,5 +288,14 @@ class AgentDBSource:
                 db_sess,
                 bulk_upserter,
                 index_elements=["agent_id", "slot_name"],
+            )
+            await db_sess.execute(
+                sa.delete(AgentResourceRow).where(
+                    (AgentResourceRow.agent_id == str(agent_id))
+                    & AgentResourceRow.slot_name.not_in(reported_slot_names)
+                    & (AgentResourceRow.used == 0)
+                    & (AgentResourceRow.reserved == 0)
+                    & (AgentResourceRow.prereserved == 0)
+                )
             )
             return result.upserted_count

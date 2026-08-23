@@ -142,7 +142,9 @@ class AgentRepository:
                     for q in quantities
                 ]
             )
-            await self._db_source.upsert_agent_resource_capacity(bulk_upserter)
+            await self._db_source.sync_agent_resource_capacity(
+                agent_id, bulk_upserter, [q.slot_name for q in quantities]
+            )
 
         return upsert_result
 
