@@ -32,7 +32,6 @@ from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
     Permission,
-    RBACElementRef,
     RBACElementType,
     RelationType,
     RoleSource,
@@ -119,9 +118,14 @@ from ai.backend.manager.models.vfolder import (
     vfolders,
 )
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
+from ai.backend.manager.models.vfolder.creators import VFolderCreator
 from ai.backend.manager.models.vfolder.scopes import (
     ProjectVFolderOperationScope,
     UserVFolderOperationScope,
+)
+from ai.backend.manager.models.vfolder.updaters import (
+    VFolderAttributeUpdater,
+    VFolderSoftDeleteUpdater,
 )
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.base import (
@@ -129,10 +133,6 @@ from ai.backend.manager.repositories.base import (
     execute_batch_querier,
 )
 from ai.backend.manager.repositories.base.integrity import match_integrity_error
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    execute_rbac_entity_creator,
-)
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityPurger,
     execute_rbac_entity_purger,
@@ -145,8 +145,7 @@ from ai.backend.manager.repositories.base.rbac.revoker import (
     RBACRevoker,
     execute_rbac_revoker,
 )
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
-from ai.backend.manager.repositories.vfolder.creators import VFolderCreatorSpec
+from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.repositories.vfolder.purge_guards import find_active_vfolder_references
 from ai.backend.manager.repositories.vfolder.types import (
     BulkVFolderPurgeResult,
@@ -485,19 +484,7 @@ class VfolderRepository:
         Returns the created VFolderData.
         """
         async with self._db.begin_session() as session:
-            # Determine scope based on ownership type
-            element_type: RBACElementType
-            scope_id: str
-            match params.ownership_type:
-                case VFolderOwnershipType.USER:
-                    element_type = RBACElementType.USER
-                    scope_id = str(params.user)
-                case VFolderOwnershipType.GROUP:
-                    element_type = RBACElementType.PROJECT
-                    scope_id = str(params.group)
-
-            # Create VFolderCreatorSpec from params
-            spec = VFolderCreatorSpec(
+            creator = VFolderCreator(
                 id=params.id,
                 name=params.name,
                 domain_name=params.domain_name,
@@ -515,15 +502,7 @@ class VfolderRepository:
                 status=params.status,
             )
 
-            # Use RBACEntityCreator for atomic entity + scope association creation
-            rbac_creator = RBACEntityCreator(
-                spec=spec,
-                element_type=RBACElementType.VFOLDER,
-                scope_ref=RBACElementRef(element_type=element_type, element_id=scope_id),
-                additional_scope_refs=[],
-            )
-            result = await execute_rbac_entity_creator(session, rbac_creator)
-            created_row = result.row
+            created = await V2WriteOps(session).create_entity(creator)
 
             # Create owner permission if requested (legacy compatibility)
             if create_owner_permission and params.user:
@@ -554,19 +533,18 @@ class VfolderRepository:
                 )
                 await execute_rbac_granter(session, granter)
 
-            return created_row.to_data()
+            return created
 
     @vfolder_repository_resilience.apply()
-    async def trash_vfolder(self, updater: Updater[VFolderRow]) -> VFolderData:
+    async def trash_vfolder(self, updater: VFolderSoftDeleteUpdater) -> VFolderData:
         """Soft-delete a single vfolder by setting its status to DELETE_PENDING.
 
-        Checks that no active sessions are mounting the vfolder before
-        proceeding. Uses ``execute_updater`` with PK-based WHERE; returns the
-        updated row or raises ``VFolderNotFound`` if no matching row exists.
+        Rejects the update while an active session mounts the vfolder; raises
+        ``VFolderNotFound`` if no matching row exists.
         """
         async with self._db.begin_session() as session:
             # Pre-check: reject if any session is currently mounting this vfolder
-            vfolder_row = await self._get_vfolder_by_id(session, uuid.UUID(str(updater.pk_value)))
+            vfolder_row = await self._get_vfolder_by_id(session, updater.vfolder_id)
             if vfolder_row is None:
                 raise VFolderNotFound()
             mount_sessions = await get_sessions_by_mounted_folder(
@@ -578,26 +556,26 @@ class VfolderRepository:
                     "Cannot delete the vfolder. "
                     f"The vfolder(id: {vfolder_row.id}) is mounted on sessions(ids: {session_ids})."
                 )
-            # Expire the pre-loaded ORM identity so execute_updater's
-            # RETURNING clause produces a fresh row with updated status.
+            # Expire the pre-loaded ORM identity so the RETURNING clause produces
+            # a fresh row with updated status.
             await session.refresh(vfolder_row)
             session.expunge(vfolder_row)
-            result = await execute_updater(session, updater)
-            if result is None:
+            data = await V2WriteOps(session).update_data(updater)
+            if data is None:
                 raise VFolderNotFound()
-            return self._vfolder_row_to_data(result.row)
+            return data
 
     @vfolder_repository_resilience.apply()
-    async def update_vfolder_attribute(self, updater: Updater[VFolderRow]) -> VFolderData:
+    async def update_vfolder_attribute(self, updater: VFolderAttributeUpdater) -> VFolderData:
         """
         Update VFolder attributes.
         Returns updated VFolderData.
         """
         async with self._db.begin_session() as session:
-            result = await execute_updater(session, updater)
-            if result is None:
+            data = await V2WriteOps(session).update_data(updater)
+            if data is None:
                 raise VFolderNotFound()
-            return self._vfolder_row_to_data(result.row)
+            return data
 
     @vfolder_repository_resilience.apply()
     async def move_vfolders_to_trash(self, vfolder_ids: list[uuid.UUID]) -> list[VFolderData]:

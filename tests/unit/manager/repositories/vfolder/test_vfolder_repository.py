@@ -17,6 +17,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     BinarySize,
@@ -97,11 +98,13 @@ from ai.backend.manager.models.vfolder import (
     VFolderPermissionRow,
     VFolderRow,
 )
+from ai.backend.manager.models.vfolder.updaters import VFolderSoftDeleteUpdater
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.repositories.vfolder.updaters import VFolderTrashUpdaterSpec
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -174,6 +177,9 @@ class TestVfolderRepository:
                 ResourcePresetRow,
                 VFolderPermissionRow,
                 AssociationScopesEntitiesRow,
+                VirtualScopeRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
                 ObjectPermissionRow,
                 PermissionRow,
             ],
@@ -322,6 +328,16 @@ class TestVfolderRepository:
                 type=ProjectType.MODEL_STORE,
             )
             db_sess.add(group)
+            await db_sess.flush()
+            # Creating a vfolder enrolls it in the owning project's virtual scope,
+            # which the real project-create path provisions.
+            db_sess.add(
+                VirtualScopeRow(
+                    id=uuid.uuid4(),
+                    scope_type=PROJECT_SCOPE_TYPE,
+                    scope_id=ProjectID(group_uuid),
+                )
+            )
             await db_sess.flush()
 
         yield group_uuid
@@ -2038,7 +2054,7 @@ class TestVFolderRepositoryTrashAndRestore:
         vfolder_repository: VfolderRepository,
         ready_vfolder: uuid.UUID,
     ) -> None:
-        updater = Updater(spec=VFolderTrashUpdaterSpec(), pk_value=ready_vfolder)
+        updater = VFolderSoftDeleteUpdater(vfolder_id=VFolderUUID(ready_vfolder))
         result = await vfolder_repository.trash_vfolder(updater)
 
         assert result.id == ready_vfolder
@@ -2048,7 +2064,7 @@ class TestVFolderRepositoryTrashAndRestore:
         self,
         vfolder_repository: VfolderRepository,
     ) -> None:
-        updater = Updater(spec=VFolderTrashUpdaterSpec(), pk_value=uuid.uuid4())
+        updater = VFolderSoftDeleteUpdater(vfolder_id=VFolderUUID(uuid.uuid4()))
         with pytest.raises(VFolderNotFound):
             await vfolder_repository.trash_vfolder(updater)
 
@@ -2062,7 +2078,7 @@ class TestVFolderRepositoryTrashAndRestore:
     ) -> None:
         """Trash then restore -> status back to READY."""
         # First trash it
-        updater = Updater(spec=VFolderTrashUpdaterSpec(), pk_value=ready_vfolder)
+        updater = VFolderSoftDeleteUpdater(vfolder_id=VFolderUUID(ready_vfolder))
         trashed = await vfolder_repository.trash_vfolder(updater)
         assert trashed.status == VFolderOperationStatus.DELETE_PENDING
 
