@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
@@ -14,6 +15,9 @@ from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,
 )
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
+from ai.backend.manager.services.storage_namespace.actions.bulk_get import (
+    BulkGetStorageNamespacesAction,
+)
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.lookup import (
     LookupStorageNamespaceAction,
@@ -43,6 +47,7 @@ class StorageNamespaceProcessors:
     global_get_namespaces: GlobalActionProcessor[
         GetNamespacesAction, BatchOpsResult[StorageNamespaceData]
     ]
+    bulk_get: PartialBulkActionProcessor[BulkGetStorageNamespacesAction, StorageNamespaceData]
     lookup: LookupActionProcessor[LookupStorageNamespaceAction, LookupOpsResult[StorageNamespaceID]]
     unregister: SingleEntityActionProcessor[
         UnregisterNamespaceAction, EntityOpsResult[StorageNamespaceData]
@@ -52,5 +57,6 @@ class StorageNamespaceProcessors:
         self.global_register = group.global_create_ops(RegisterNamespaceAction)
         self.global_search = group.global_search_ops(SearchStorageNamespacesAction)
         self.global_get_namespaces = group.global_search_ops(GetNamespacesAction)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetStorageNamespacesAction)
         self.lookup = group.lookup_ops(LookupStorageNamespaceAction)
         self.unregister = group.entity_purge_ops(UnregisterNamespaceAction)

@@ -16,7 +16,7 @@ from ai.backend.manager.data.prometheus_query_preset_category.types import (
 from ai.backend.manager.models.prometheus_query_preset_category.row import (
     PrometheusQueryPresetCategoryRow,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
 @dataclass
@@ -37,6 +37,24 @@ class PrometheusQueryPresetCategoryQuerier(
     @override
     def entity_id_value(self) -> PrometheusQueryPresetCategoryID:
         return self.category_id
+
+    @override
+    def to_data(self, row: PrometheusQueryPresetCategoryRow) -> PrometheusQueryPresetCategoryData:
+        return row.to_data()
+
+
+class BulkPrometheusQueryPresetCategoryQuerier(
+    BulkEntityQuerier[PrometheusQueryPresetCategoryRow, PrometheusQueryPresetCategoryData]
+):
+    """The categories the caller named."""
+
+    @override
+    def row_class(self) -> type[PrometheusQueryPresetCategoryRow]:
+        return PrometheusQueryPresetCategoryRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return PrometheusQueryPresetCategoryRow.id
 
     @override
     def to_data(self, row: PrometheusQueryPresetCategoryRow) -> PrometheusQueryPresetCategoryData:

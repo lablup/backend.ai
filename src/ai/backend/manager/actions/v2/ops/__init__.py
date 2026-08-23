@@ -64,7 +64,6 @@ from .base import (
 )
 from .result import (
     BatchOpsResult,
-    BulkOpsResult,
     CreatedEntityOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
@@ -133,7 +132,6 @@ __all__ = (
     "UpsertFieldOpsAction",
     "UpsertGlobalOpsAction",
     "BatchOpsResult",
-    "BulkOpsResult",
     "CreatedEntityOpsResult",
     "EntitiesOpsResult",
     "EntityOpsResult",

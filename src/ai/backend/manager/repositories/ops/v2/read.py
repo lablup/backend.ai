@@ -21,6 +21,7 @@ from ai.backend.manager.models.specs.lookup import (
     FieldOwnerLookup,
 )
 from ai.backend.manager.models.specs.querier import (
+    BulkEntityQuerier,
     DataQuerier,
     FieldQuerier,
     OwnedFieldQuerier,
@@ -44,6 +45,27 @@ class V2ReadOps(V2OpsBase):
         if row is None:
             return None
         return querier.to_data(row)
+
+    async def query_bulk_data[TRow: Base, TData](
+        self,
+        querier: BulkEntityQuerier[TRow, TData],
+        entity_ids: Sequence[EntityIdentifier],
+    ) -> Mapping[EntityIdentifier, TData]:
+        """Read the named entities, keyed by the ids the caller passed.
+
+        An id matching no row is absent rather than an error: the caller decides
+        whether that is a miss or one failed item among many.
+        """
+        if not entity_ids:
+            return {}
+        id_column = querier.entity_id_column()
+        rows = (
+            await self._sess.scalars(
+                sa.select(querier.row_class()).where(id_column.in_(entity_ids))
+            )
+        ).all()
+        found = {getattr(row, id_column.key): querier.to_data(row) for row in rows}
+        return {entity_id: found[entity_id] for entity_id in entity_ids if entity_id in found}
 
     async def lookup_entity_id[TRow: Base, TEntityID: EntityIdentifier](
         self, lookup: DataLookup[TRow, TEntityID]

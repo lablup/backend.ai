@@ -57,5 +57,9 @@ class IdleCheckerProcessors:
         self.create = GlobalActionProcessor(service.create, action_monitors)
         self.update = GlobalActionProcessor(service.update, action_monitors)
         self.purge = GlobalActionProcessor(service.purge, action_monitors)
-        self.exclude_sessions = group.bulk(ExcludeSessionIdleChecksAction, service.exclude_sessions)
-        self.include_sessions = group.bulk(IncludeSessionIdleChecksAction, service.include_sessions)
+        self.exclude_sessions = group.legacy_partial_bulk(
+            ExcludeSessionIdleChecksAction, service.exclude_sessions
+        )
+        self.include_sessions = group.legacy_partial_bulk(
+            IncludeSessionIdleChecksAction, service.include_sessions
+        )

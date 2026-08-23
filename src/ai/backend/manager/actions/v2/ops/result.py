@@ -22,8 +22,6 @@ from ai.backend.common.data.entity.types import (
     FieldData,
     FieldIdentifier,
 )
-from ai.backend.manager.actions.run_status import ActionRunStatus
-from ai.backend.manager.actions.v2.bulk.result import BasePartialBulkActionResult, BulkEntityResult
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupActionResult
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 
@@ -39,7 +37,6 @@ __all__ = (
     "FieldOwnerLookupOpsResult",
     "FieldKeyLookupOpsResult",
     "EntitiesOpsResult",
-    "BulkOpsResult",
     "BatchOpsResult",
     "ScopedBatchOpsResult",
 )
@@ -134,53 +131,6 @@ class FieldKeyLookupOpsResult(BaseLookupActionResult):
 
 
 @dataclass
-class BulkOpsResult[TData](BasePartialBulkActionResult):
-    """How each entity a bulk write named fared.
-
-    The bulk shape is the one that reports per entity: the caller named them, so each
-    one's fate is answered against that expectation rather than the run carrying a
-    single verdict. A partial success says SUCCESS for what went through and ERROR for
-    the rest.
-
-    Needs no :class:`EntityData`, unlike the scope and lookup results: the ids are the
-    ones the caller passed in, not something to recover from what came back.
-    """
-
-    successes: dict[EntityIdentifier, TData]
-    errors: dict[EntityIdentifier, Exception]
-
-    @override
-    def entity_results(self) -> Sequence[BulkEntityResult]:
-        """Successes first, then errors — not the caller's order.
-
-        Classification is :class:`ActionRunStatus`'s, the same one the processors use to
-        turn a raised exception into audit-visible fields, so a bulk entity's error
-        reads exactly like a single run's.
-        """
-        success_status = ActionRunStatus.success()
-        results = [
-            BulkEntityResult(
-                entity_id=entity_id,
-                status=success_status.status,
-                description=success_status.description,
-                error_code=success_status.error_code,
-            )
-            for entity_id in self.successes
-        ]
-        for entity_id, exception in self.errors.items():
-            failure = ActionRunStatus.of_failure(exception, during_validation=False)
-            results.append(
-                BulkEntityResult(
-                    entity_id=entity_id,
-                    status=failure.status,
-                    description=failure.description,
-                    error_code=failure.error_code,
-                )
-            )
-        return results
-
-
-@dataclass
 class EntitiesOpsResult[TData: EntityData](BaseScopeActionResult):
     """Every entity a scope-shaped write touched.
 
@@ -200,9 +150,9 @@ class EntitiesOpsResult[TData: EntityData](BaseScopeActionResult):
 class BulkFieldOpsResult[TData]:
     """How each field row a bulk write named fared.
 
-    Keyed by the field rows the caller named, unlike :class:`BulkOpsResult`: the answer
-    the caller expects is per row. What the run is recorded against is the entity owning
-    each row, which the processor resolves.
+    Keyed by the field rows the caller named, unlike :class:`PartialBulkResult`: the
+    answer the caller expects is per row. What the run is recorded against is the entity
+    owning each row, which the processor resolves.
     """
 
     successes: dict[FieldIdentifier, TData]

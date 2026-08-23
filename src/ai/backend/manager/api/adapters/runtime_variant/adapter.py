@@ -34,7 +34,9 @@ from ai.backend.manager.models.runtime_variant.orders import RuntimeVariantOrder
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.runtime_variant.searchers import RuntimeVariantSearcher
 from ai.backend.manager.models.runtime_variant.updaters import RuntimeVariantUpdater
-from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.services.runtime_variant.actions.bulk_get import (
+    PublicBulkGetRuntimeVariantsAction,
+)
 from ai.backend.manager.services.runtime_variant.actions.create import CreateRuntimeVariantAction
 from ai.backend.manager.services.runtime_variant.actions.get import GetRuntimeVariantAction
 from ai.backend.manager.services.runtime_variant.actions.lookup import (
@@ -57,18 +59,26 @@ def _runtime_variant_pagination_spec() -> PaginationSpec:
 
 
 class RuntimeVariantAdapter(BaseAdapter):
-    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[RuntimeVariantNode | None]:
+    async def batch_load_by_ids(
+        self, ids: Sequence[UUID]
+    ) -> list[RuntimeVariantNode | Exception | None]:
+        """Batch load runtime variants by id for DataLoader use.
+
+        One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read.
+        """
         if not ids:
             return []
-        searcher = RuntimeVariantSearcher(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[RuntimeVariantConditions.by_ids(ids)],
+        entity_ids = [RuntimeVariantID(value) for value in ids]
+        result = await self._processors.runtime_variant.public_bulk_get.run(
+            PublicBulkGetRuntimeVariantsAction(ids=entity_ids)
         )
-        result = await self._processors.runtime_variant.public_search.run(
-            SearchRuntimeVariantsAction(searcher=searcher)
-        )
-        variant_map = {item.id: self._data_to_node(item) for item in result.items}
-        return [variant_map.get(RuntimeVariantID(variant_id)) for variant_id in ids]
+        return [
+            self._data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def search(
         self,

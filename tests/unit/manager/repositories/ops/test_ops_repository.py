@@ -56,7 +56,7 @@ from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.purger import DataBatchPurger
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
@@ -155,6 +155,22 @@ class _PresetQuerier(DataQuerier[RolePresetRow, RolePresetData]):
     @override
     def entity_id_value(self) -> RolePresetID:
         return RolePresetID(self.target)
+
+    @override
+    def to_data(self, row: RolePresetRow) -> RolePresetData:
+        return row.to_data()
+
+
+class _PresetBulkQuerier(BulkEntityQuerier[RolePresetRow, RolePresetData]):
+    """The plural read: the ids come with the call, so the spec carries none."""
+
+    @override
+    def row_class(self) -> type[RolePresetRow]:
+        return RolePresetRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
@@ -324,6 +340,36 @@ class TestGet:
     async def test_missing_row_raises(self, repository: OpsRepository[RolePresetData]) -> None:
         with pytest.raises(EntityNotFoundError):
             await repository.get(_PresetQuerier(target=uuid.uuid4()))
+
+
+class TestBulkGet:
+    async def test_every_named_row_comes_back_keyed_by_its_id(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        other = await repository.create_global_entity(
+            _PresetCreator(name="analysts", scope_type=RBACScopeType.PROJECT)
+        )
+
+        found = await repository.bulk_get(_PresetBulkQuerier(), [preset.id, other.id])
+
+        assert {key: value.name for key, value in found.items()} == {
+            preset.id: "default",
+            other.id: "analysts",
+        }
+
+    async def test_a_missing_id_is_absent_rather_than_raising(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        absent = RolePresetID(uuid.uuid4())
+
+        found = await repository.bulk_get(_PresetBulkQuerier(), [preset.id, absent])
+
+        assert list(found) == [preset.id]
+
+    async def test_no_ids_reads_nothing(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        assert await repository.bulk_get(_PresetBulkQuerier(), []) == {}
 
 
 class TestLookup:

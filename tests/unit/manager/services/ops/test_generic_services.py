@@ -1422,7 +1422,7 @@ async def test_partial_bulk_update_answers_for_every_named_entity(
 
     result = await service.execute(_BulkUpdateAction(updaters=updaters))
 
-    assert list(result.successes) == [stored.id]
+    assert list(result.values()) == [stored.id]
     repository.partial_bulk_update.assert_awaited_once_with(updaters)
 
 
@@ -1434,7 +1434,7 @@ async def test_partial_bulk_delete_writes_through_the_update_path(
 
     result = await service.execute(_BulkUpdateAction(updaters=updaters))
 
-    assert list(result.successes) == [stored.id]
+    assert list(result.values()) == [stored.id]
     repository.partial_bulk_update.assert_awaited_once_with(updaters)
 
 
@@ -1446,7 +1446,7 @@ async def test_partial_bulk_purge_answers_for_every_named_entity(
 
     result = await service.execute(_BulkPurgeAction(purgers=purgers))
 
-    assert list(result.successes) == [stored.id]
+    assert list(result.values()) == [stored.id]
     repository.partial_bulk_purge_entities.assert_awaited_once_with(purgers)
 
 
@@ -1524,7 +1524,7 @@ async def test_global_partial_bulk_purge_answers_for_every_named_entity(
 
     result = await service.execute(_BulkPurgeGlobalAction(purgers=purgers))
 
-    assert list(result.successes) == [stored.id]
+    assert list(result.values()) == [stored.id]
     repository.partial_bulk_purge_entities.assert_awaited_once_with(purgers)
 
 

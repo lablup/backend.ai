@@ -237,6 +237,19 @@ class SessionData(EntityData):
         return SessionID(self.id)
 
 
+class SessionTerminationStatus(StrEnum):
+    """What a termination request did to one session.
+
+    Session-only, so it stays here rather than beside the bulk result: what a bulk
+    run's per-entity value means is the domain's to declare.
+    """
+
+    CANCELLED = "cancelled"
+    TERMINATING = "terminating"
+    FORCE_TERMINATED = "force-terminated"
+    SKIPPED = "skipped"
+
+
 @dataclass(frozen=True)
 class SessionEntityData(EntityData):
     """A session as its own row states it.

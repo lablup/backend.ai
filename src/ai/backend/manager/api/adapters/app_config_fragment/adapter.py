@@ -64,6 +64,9 @@ from ai.backend.manager.models.condition_utils import combine_conditions_or, neg
 from ai.backend.manager.services.app_config.actions.fragment.admin_search import (
     AdminSearchAppConfigFragmentAction,
 )
+from ai.backend.manager.services.app_config.actions.fragment.bulk_get import (
+    BulkGetAppConfigFragmentsAction,
+)
 from ai.backend.manager.services.app_config.actions.fragment.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
 )
@@ -176,43 +179,36 @@ class AppConfigFragmentAdapter(BaseAdapter):
             )
         )
         return BulkPurgeAppConfigFragmentPayload(
-            items=[fragment.id for fragment in action_result.successes.values()],
+            items=[item.value.id for item in action_result.items if item.value is not None],
             failed=[
                 AppConfigFragmentBulkErrorInfo(
-                    id=AppConfigFragmentID(entity_id), message=str(error)
+                    id=AppConfigFragmentID(item.entity_id), message=str(item.error)
                 )
-                for entity_id, error in action_result.errors.items()
+                for item in action_result.items
+                if item.error is not None
             ],
         )
 
     async def batch_load_by_ids(
         self, fragment_ids: Sequence[AppConfigFragmentID]
-    ) -> list[AppConfigFragmentNode | None]:
-        """Batch load fragments by id for the GraphQL DataLoader, scoped to the current user.
+    ) -> list[AppConfigFragmentNode | Exception | None]:
+        """Batch load config fragments by id for DataLoader use.
 
-        A scoped search at the caller's own ``user`` scope, narrowed to ``fragment_ids``.
-        Returns nodes in the order of ``fragment_ids``, with ``None`` for ids not visible in
-        that scope. Calls ``current_user()`` internally — the caller does not pass a scope.
+        One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read.
         """
         if not fragment_ids:
             return []
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
-        searcher = self._build_searcher(
-            AppConfigFragmentSearcher,
-            conditions=[AppConfigFragmentConditions.by_ids(list(fragment_ids))],
-            orders=[],
-            pagination_spec=_get_app_config_fragment_pagination_spec(),
-            limit=len(fragment_ids),
+        entity_ids = [AppConfigFragmentID(value) for value in fragment_ids]
+        result = await self._processors.app_config.fragment_bulk_get.run(
+            BulkGetAppConfigFragmentsAction(ids=entity_ids)
         )
-        action_result = await self._processors.app_config.fragment_scoped_search.run(
-            ScopedSearchAppConfigFragmentAction(owner=UserID(me.user_id), searcher=searcher)
-        )
-        node_map = {node.id: node for node in map(self._fragment_to_node, action_result.items)}
-        return [node_map.get(fragment_id) for fragment_id in fragment_ids]
-
-    # --- read fragments by config name (one scope, RBAC-authorized) ---
+        return [
+            self._fragment_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def scoped_app_config_fragments_by_names(
         self, input: ScopedAppConfigFragmentsByNamesInput

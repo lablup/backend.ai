@@ -7,7 +7,7 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
-from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
+from ai.backend.manager.actions.v2.field.bulk_base import BasePartialBulkFieldAction
 from ai.backend.manager.actions.v2.ops.base import (
     FieldGetOpsAction,
     FieldPartialBulkPurgeOpsAction,
@@ -102,7 +102,7 @@ class PartialBulkPurgeFieldOpsAction[
     TRow: Base,
     TData: FieldData,
 ](
-    BaseBulkFieldAction[TFieldID, TOwnerID],
+    BasePartialBulkFieldAction[TFieldID, TOwnerID],
     FieldPartialBulkPurgeOpsAction[TFieldID, TRow, TData],
     ABC,
 ):

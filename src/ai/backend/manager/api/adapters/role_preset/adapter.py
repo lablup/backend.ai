@@ -226,12 +226,15 @@ class RolePresetAdapter(BaseAdapter):
             BulkDeleteRolePresetsAction(ids=input.role_preset_ids)
         )
         return BulkDeleteRolePresetsPayload(
-            items=[self._data_to_node(d) for d in result.successes.values()],
+            items=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
             failed=[
                 BulkRolePresetFailureInfo(
-                    role_preset_id=RolePresetID(preset_id), message=str(exception)
+                    role_preset_id=RolePresetID(item.entity_id), message=str(item.error)
                 )
-                for preset_id, exception in result.errors.items()
+                for item in result.items
+                if item.error is not None
             ],
         )
 
@@ -243,12 +246,15 @@ class RolePresetAdapter(BaseAdapter):
             BulkRestoreRolePresetsAction(ids=input.role_preset_ids)
         )
         return BulkRestoreRolePresetsPayload(
-            items=[self._data_to_node(d) for d in result.successes.values()],
+            items=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
             failed=[
                 BulkRolePresetFailureInfo(
-                    role_preset_id=RolePresetID(preset_id), message=str(exception)
+                    role_preset_id=RolePresetID(item.entity_id), message=str(item.error)
                 )
-                for preset_id, exception in result.errors.items()
+                for item in result.items
+                if item.error is not None
             ],
         )
 
@@ -258,12 +264,15 @@ class RolePresetAdapter(BaseAdapter):
             BulkPurgeRolePresetsAction(ids=input.role_preset_ids)
         )
         return BulkPurgeRolePresetsPayload(
-            items=[self._data_to_node(d) for d in result.successes.values()],
+            items=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
             failed=[
                 BulkRolePresetFailureInfo(
-                    role_preset_id=RolePresetID(preset_id), message=str(exception)
+                    role_preset_id=RolePresetID(item.entity_id), message=str(item.error)
                 )
-                for preset_id, exception in result.errors.items()
+                for item in result.items
+                if item.error is not None
             ],
         )
 
