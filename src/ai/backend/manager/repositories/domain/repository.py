@@ -16,8 +16,6 @@ from ai.backend.manager.errors.resource import DomainDeletionFailed
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.purgers import DomainKernelPurger, DomainPurger
 from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater, DomainUpdater
-from ai.backend.manager.models.project.creators import ProjectCreator
-from ai.backend.manager.models.project.row import ProjectType
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.db_source import DomainDBSource
@@ -47,23 +45,6 @@ class DomainRepository:
         self._db = db
         self._db_source = DomainDBSource(db)
         self._v2_ops = v2_ops_provider
-
-    @domain_repository_resilience.apply()
-    async def create_domain(self, creator: DomainCreator) -> DomainData:
-        """Register a domain together with the model-store project every domain has."""
-        async with self._v2_ops.write_ops() as w:
-            data = await w.create_role_managed_entity(creator)
-            await w.create_role_managed_entity(
-                ProjectCreator(
-                    name="model-store",
-                    domain_id=data.id,
-                    domain_name=data.name,
-                    description="Model Store",
-                    resource_policy="default",
-                    type=ProjectType.MODEL_STORE,
-                )
-            )
-            return data
 
     @domain_repository_resilience.apply()
     async def purge_domain(self, domain_id: DomainID, domain_name: str) -> DomainData:

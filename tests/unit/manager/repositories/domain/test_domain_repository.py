@@ -462,7 +462,7 @@ class TestDomainRepository:
             await session.commit()
         return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
-    async def test_create_domain_success(
+    async def test_create_domain_node_success(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
@@ -477,7 +477,7 @@ class TestDomainRepository:
             assert result.first() is None
 
         # Create domain
-        created_domain = await domain_repository.create_domain(sample_domain_creator)
+        created_domain = await domain_repository.create_domain_node(sample_domain_creator)
 
         assert created_domain.name == sample_domain_creator.name
         assert created_domain.description == sample_domain_creator.description
@@ -494,22 +494,14 @@ class TestDomainRepository:
             assert domain_row is not None
             assert domain_row.name == sample_domain_creator.name
 
-            # Verify model-store group was created
-            result = await conn.execute(
-                sa.select(groups).where(groups.c.domain_name == sample_domain_creator.name)
-            )
-            group_row = result.first()
-            assert group_row is not None
-            assert group_row.name == "model-store"
-
-    async def test_create_domain_duplicate_name(
+    async def test_create_domain_node_duplicate_name(
         self,
         domain_repository: DomainRepository,
         sample_domain_creator: DomainCreator,
     ) -> None:
         """Test domain creation with duplicate name"""
         # Create domain first
-        await domain_repository.create_domain(sample_domain_creator)
+        await domain_repository.create_domain_node(sample_domain_creator)
 
         # Try to create another domain with same name
         duplicate_creator = DomainCreator(
@@ -519,7 +511,7 @@ class TestDomainRepository:
         )
 
         with pytest.raises(InvalidAPIParameters):
-            await domain_repository.create_domain(duplicate_creator)
+            await domain_repository.create_domain_node(duplicate_creator)
 
     async def test_purge_domain_success(
         self,
@@ -559,7 +551,7 @@ class TestDomainRepository:
         with pytest.raises(DomainDeletionFailed):
             await domain_repository.purge_domain(DomainID(uuid.uuid4()), "nonexistent-domain")
 
-    async def test_create_domain_with_all_fields(
+    async def test_create_domain_node_with_all_fields(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
@@ -586,7 +578,7 @@ class TestDomainRepository:
             dotfiles=b"comprehensive dotfiles configuration",
         )
 
-        created_domain = await domain_repository.create_domain(comprehensive_creator)
+        created_domain = await domain_repository.create_domain_node(comprehensive_creator)
 
         assert created_domain.name == "comprehensive-domain"
         assert created_domain.description == "Comprehensive domain with all features"

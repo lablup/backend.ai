@@ -53,6 +53,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     GlobalEntityPartialBulkPurgeOpsAction,
     GlobalEntityUpsertOpsAction,
     GlobalEntityWithFieldsCreateOpsAction,
+    GlobalRoleManagedEntityCreateOpsAction,
     GlobalSearchOpsAction,
     LookupOpsAction,
     PartialBulkUpdateOpsAction,
@@ -397,6 +398,22 @@ class RoleManagedEntityCreateService[TData: EntityData]:
 
     async def execute(
         self, action: RoleManagedEntityCreateOpsAction[Any, TData]
+    ) -> CreatedEntityOpsResult[TData]:
+        return CreatedEntityOpsResult(
+            data=await self._repository.create_role_managed_entity(action.to_creator())
+        )
+
+
+class GlobalRoleManagedEntityCreateService[TData: EntityData]:
+    """Inserts the top-level role-managed entity row, preset roles included."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: GlobalRoleManagedEntityCreateOpsAction[Any, TData]
     ) -> CreatedEntityOpsResult[TData]:
         return CreatedEntityOpsResult(
             data=await self._repository.create_role_managed_entity(action.to_creator())

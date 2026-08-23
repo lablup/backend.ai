@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.domain import DomainName
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.domain import (
     CreateDomainRequest,
     CreateDomainResponse,
@@ -31,7 +30,6 @@ from ai.backend.common.dto.manager.domain import (
 )
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.domain.types import UserInfo
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.domain_request import (
     GetDomainPathParam,
@@ -39,6 +37,7 @@ from ai.backend.manager.dto.domain_request import (
 )
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.updaters import DomainSoftDeleteUpdater
+from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
@@ -46,11 +45,13 @@ from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
 from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
+from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 
 from .adapter import DomainAdapter
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.domain.processors import DomainProcessors
+    from ai.backend.manager.services.project.processors import ProjectProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -58,8 +59,9 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class DomainHandler:
     """Domain API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, domain: DomainProcessors) -> None:
+    def __init__(self, *, domain: DomainProcessors, project: ProjectProcessors) -> None:
         self._domain = domain
+        self._project = project
         self._adapter = DomainAdapter()
 
     # ------------------------------------------------------------------
@@ -85,17 +87,18 @@ class DomainHandler:
             allowed_docker_registries=body.parsed.allowed_docker_registries,
             integration_name=body.parsed.integration_id,  # v1 DTO uses integration_id
         )
-        user_info = UserInfo(
-            id=ctx.user_uuid,
-            role=UserRole.SUPERADMIN,
-            domain_name=ctx.user_domain,
+        action_result = await self._domain.create_domain.run(CreateDomainAction(creator=creator))
+        domain_data = action_result.data
+        await self._project.create_project.run(
+            CreateProjectAction(
+                domain_id=domain_data.id,
+                creator=ProjectCreator.model_store(
+                    domain_id=domain_data.id, domain_name=domain_data.name
+                ),
+            )
         )
 
-        action_result = await self._domain.create_domain.run(
-            CreateDomainAction(creator=creator, user_info=user_info)
-        )
-
-        resp = CreateDomainResponse(domain=self._adapter.convert_to_dto(action_result.domain_data))
+        resp = CreateDomainResponse(domain=self._adapter.convert_to_dto(domain_data))
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
     # ------------------------------------------------------------------

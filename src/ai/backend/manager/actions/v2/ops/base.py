@@ -49,6 +49,7 @@ __all__ = (
     "GlobalEntityWithFieldsCreateOpsAction",
     "EntityCreateOpsAction",
     "RoleManagedEntityCreateOpsAction",
+    "GlobalRoleManagedEntityCreateOpsAction",
     "FieldCreateOpsAction",
     "GlobalEntityAtomicCreateOpsAction",
     "EntityAtomicCreateOpsAction",
@@ -77,6 +78,7 @@ __all__ = (
     "CreateGlobalWithFieldsOpsAction",
     "CreateEntityOpsAction",
     "CreateRoleManagedEntityOpsAction",
+    "CreateGlobalRoleManagedEntityOpsAction",
     "CreateFieldOpsAction",
     "AtomicCreateGlobalEntityOpsAction",
     "AtomicCreateEntityOpsAction",
@@ -278,6 +280,16 @@ class EntityWithFieldsCreateOpsAction[TRow: Base, TData, TFieldRow: Base, TField
 class RoleManagedEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
     """Carries the role-managed entity insert spec: the entity create plus the
     preset-role provisioning the combined spec declares."""
+
+    @abstractmethod
+    def to_creator(self) -> RoleManagedEntityCreator[TRow, TData]:
+        """Return the insert spec this action executes."""
+        raise NotImplementedError
+
+
+class GlobalRoleManagedEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
+    """Carries the role-managed entity insert spec of an entity that goes under no
+    other scope: the row, its preset roles, and no membership to join."""
 
     @abstractmethod
     def to_creator(self) -> RoleManagedEntityCreator[TRow, TData]:
@@ -677,6 +689,21 @@ class CreateRoleManagedEntityOpsAction[TRow: Base, TData](
     BaseScopeAction, RoleManagedEntityCreateOpsAction[TRow, TData], ABC
 ):
     """An insert of one role-managed entity row."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+
+class CreateGlobalRoleManagedEntityOpsAction[TRow: Base, TData](
+    BaseGlobalAction, GlobalRoleManagedEntityCreateOpsAction[TRow, TData], ABC
+):
+    """An insert of one role-managed entity row that belongs under no other scope.
+
+    Global-shaped rather than scope-shaped: a top-level entity has no parent scope to
+    target, and the SUPERADMIN gate is what answers for creating one.
+    """
 
     @override
     @classmethod
