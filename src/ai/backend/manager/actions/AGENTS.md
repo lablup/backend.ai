@@ -70,17 +70,23 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   lookup action, bulk lookup action)` hands out. It builds the owner lookups itself:
   they are not operations a domain wires, only the step every field operation runs
   first.
+- The exception is `ProcessorGroup.atomic_bulk_field(action, bulk lookup action, func)`: that
+  sub-group is typed by the `FieldData` its ops operations return, and a read backed by
+  a service returns its own result. It builds the same owner lookup.
 - Every group comes from an area: `registry.concern(ConcernMeta(Concern.<AREA>)).group(...)`.
   The areas are the `Concern` members, so wiring a new domain is a choice among them.
 - Register all new wiring in `tests/unit/manager/actions/test_registry_catalog.py`.
 - Read the wired list with `backend.ai mgr ops list`. Do NOT transcribe it into a
   document (`KNOWLEDGE.md`).
 
-## Many-row writes
+## Many-row runs
 
 - The failure mode is named, never an argument: an `AtomicCreate*` base raises and the
   run is recorded as one failure, a `PartialBulk*` base answers per target and the run
   itself succeeds. No base is unmarked.
+- A read carries it on the factory instead, because the base names the operation rather
+  than the fate: `atomic_*` when every target shares the run's outcome. No factory
+  passing an atomic judge is unmarked.
 - `Bulk` in a name means the bulk shape — the caller named the targets, so each is
   answered for. A many-row write whose target is a single scope, a single owner, or
   the system is not bulk-shaped.

@@ -27,4 +27,4 @@ class AuditLogProcessors:
 
     def __init__(self, group: FieldGroup[AuditLogData]) -> None:
         self.global_search = group.global_search_ops(SearchAuditLogsAction)
-        self.scoped_search = group.bulk_scoped_search_ops(ScopedSearchAuditLogsAction)
+        self.scoped_search = group.atomic_bulk_scoped_search_ops(ScopedSearchAuditLogsAction)

@@ -17,6 +17,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import noload, selectinload
 
+from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -43,7 +44,9 @@ from ai.backend.manager.models.minilang.queryfilter import (
 )
 from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.user import UserRole, users
-from ai.backend.manager.services.metric.actions.live_stat import ContainerLiveStatAction
+from ai.backend.manager.services.metric.actions.batch_get_kernel_live_stats import (
+    BatchGetKernelLiveStatsAction,
+)
 
 from .base import (
     BigInt,
@@ -75,8 +78,8 @@ async def _batch_load_kernel_live_stat(
 ) -> list[dict[str, Any] | None]:
     if not kernel_ids:
         return []
-    action_result = await ctx.processors.metric.query_container_live_stat.wait_for_complete(
-        ContainerLiveStatAction(kernel_ids=list(kernel_ids))
+    action_result = await ctx.processors.metric.batch_get_kernel_live_stats.run(
+        BatchGetKernelLiveStatsAction(kernel_ids=[KernelID(kernel_id) for kernel_id in kernel_ids])
     )
     converted = LegacyLiveStatConverter.convert(kernel_ids, action_result.stats)
     return [converted.get(kid) for kid in kernel_ids]

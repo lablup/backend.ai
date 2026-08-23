@@ -657,7 +657,11 @@ def create_processors(
             resource_group_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
             services.resource_group,
         ),
-        metric=MetricProcessors(services.metric, action_monitors, validators),
+        metric=MetricProcessors(
+            metric_groups.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)),
+            session_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            services.metric,
+        ),
         model_serving=ModelServingProcessors(
             deployment_groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), services.model_serving
         ),

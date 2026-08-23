@@ -43,6 +43,7 @@ from ai.backend.common.types import (
     BinarySize,
     ContainerId,
     ImageAlias,
+    KernelId,
     ResourceSlotEntry,
     SessionId,
     SessionTypes,
@@ -1556,9 +1557,9 @@ class SessionService:
         self, action: BatchGetKernelResourceAllocationAction
     ) -> BatchGetKernelResourceAllocationActionResult:
         """Aggregate resource_allocations per kernel (requested/used/allocated)."""
-        data = await self._session_repository.batch_get_resource_allocation_by_kernel(
-            action.kernel_ids
-        )
+        data = await self._session_repository.batch_get_resource_allocation_by_kernel([
+            KernelId(kernel_id) for kernel_id in action.kernel_ids
+        ])
         return BatchGetKernelResourceAllocationActionResult(data=data)
 
     async def enqueue_session(self, action: EnqueueSessionAction) -> EnqueueSessionActionResult:

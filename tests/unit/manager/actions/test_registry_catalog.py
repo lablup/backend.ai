@@ -122,6 +122,7 @@ from ai.backend.manager.services.keypair_resource_policy.processors import (
 from ai.backend.manager.services.login_client_type.processors import (
     LoginClientTypeProcessors,
 )
+from ai.backend.manager.services.metric.processors import MetricProcessors
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
     ModelServingAutoScalingProcessors,
@@ -268,6 +269,11 @@ def test_every_defined_v2_action_is_wired() -> None:
     PrometheusQueryPresetCategoryProcessors(
         registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE))
     )
+    MetricProcessors(
+        registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)),
+        registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        MagicMock(),
+    )
     RuntimeVariantPresetProcessors(
         registry.group(GroupMeta(RUNTIME_VARIANT_PRESET_ENTITY_TYPE)), MagicMock()
     )
@@ -344,7 +350,9 @@ def test_every_defined_v2_action_is_wired() -> None:
         registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), MagicMock()
     )
 
-    wired = sorted(cls.action_name() for cls in registry.wired_actions())
+    # One action class may be wired more than once -- an owner lookup is built by every
+    # field operation that runs it first -- and the catalog is which classes are wired.
+    wired = sorted({cls.action_name() for cls in registry.wired_actions()})
     defined = sorted(cls.action_name() for cls in _concrete_v2_action_classes())
 
     assert wired == defined

@@ -42,8 +42,11 @@ from ai.backend.manager.actions.v2.bulk.processor import (
 )
 from ai.backend.manager.actions.v2.bulk.result import BasePartialBulkActionResult
 from ai.backend.manager.actions.v2.bulk.validator import BulkActionValidator
+from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
 from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.field.bulk_processor import (
+    AtomicFieldResultJudge,
+    BulkFieldActionProcessor,
     OwnerBulkLookupProcessor,
 )
 from ai.backend.manager.actions.v2.field.lookup import (
@@ -295,6 +298,45 @@ class ProcessorGroup[TData: EntityData]:
         return BulkActionProcessor(
             func,
             PartialEntityResultJudge(),
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            validators=(*self._deps.validators.bulk, *validators),
+        )
+
+    def atomic_bulk_field[TAction: BaseBulkFieldAction[Any, Any], TResult](
+        self,
+        action_cls: type[TAction],
+        bulk_owner_lookup_action_cls: type[LookupBulkFieldOwnerOpsAction[Any, Any]],
+        func: Callable[[TAction], Awaitable[TResult]],
+        *,
+        validators: Sequence[BulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> BulkFieldActionProcessor[TAction, TResult]:
+        """Several field rows read by a service, answered for by the entities owning them.
+
+        Reached from this group rather than the one :meth:`field_group` hands out: that
+        one is typed by the ``FieldData`` its ops operations return, and a read backed by
+        a service returns its own result instead. The owner lookup is built here for the
+        same reason it is built there -- it is the step the operation runs first, not an
+        operation a domain wires.
+
+        The run stands or falls as one, so every owner read shares its outcome.
+        """
+        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.CUSTOM)
+        self._record(
+            bulk_owner_lookup_action_cls,
+            ActionKind.LOOKUP,
+            ActionGate.PERMISSION,
+            ActionBacking.GENERIC,
+        )
+        bulk_owner_lookup: OwnerBulkLookupProcessor = BulkLookupActionProcessor(
+            BulkFieldOwnerLookupService(self._deps.repository).execute,
+            monitors=self._deps.monitors.bulk_lookup,
+            post_validators=self._deps.validators.bulk,
+        )
+        return BulkFieldActionProcessor(
+            func,
+            bulk_owner_lookup,
+            AtomicFieldResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.bulk, *validators),
         )

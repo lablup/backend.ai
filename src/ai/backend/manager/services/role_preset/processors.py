@@ -11,6 +11,7 @@ from ai.backend.manager.actions.v2.field.bulk_processor import BulkFieldActionPr
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    BulkFieldOpsResult,
     BulkOpsResult,
     CreatedEntityWithFieldsOpsResult,
     EntityOpsResult,
@@ -81,7 +82,7 @@ class RolePresetProcessors:
         BulkAddRolePermissionPresetsAction, FieldsOpsResult[RolePermissionPresetData]
     ]
     bulk_remove_permissions: BulkFieldActionProcessor[
-        BulkRemoveRolePermissionPresetsAction, RolePermissionPresetData
+        BulkRemoveRolePermissionPresetsAction, BulkFieldOpsResult[RolePermissionPresetData]
     ]
 
     def __init__(
