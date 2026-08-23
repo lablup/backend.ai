@@ -60,10 +60,12 @@ from ai.backend.manager.errors.artifact_registry import (
 )
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.storage import UnsupportedStorageTypeError
+from ai.backend.manager.models.artifact_revision.queriers import ArtifactRevisionQuerier
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
@@ -93,10 +95,6 @@ from ai.backend.manager.services.artifact.revision.actions.delegate_import_revis
 from ai.backend.manager.services.artifact.revision.actions.disassociate_with_storage import (
     DisassociateWithStorageAction,
     DisassociateWithStorageActionResult,
-)
-from ai.backend.manager.services.artifact.revision.actions.get import (
-    GetArtifactRevisionAction,
-    GetArtifactRevisionActionResult,
 )
 from ai.backend.manager.services.artifact.revision.actions.get_download_progress import (
     GetDownloadProgressAction,
@@ -145,6 +143,7 @@ class ArtifactRevisionService:
     def __init__(
         self,
         artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
         artifact_registry_repository: ArtifactRegistryRepository,
         object_storage_repository: ObjectStorageRepository,
         vfs_storage_repository: VFSStorageRepository,
@@ -158,6 +157,7 @@ class ArtifactRevisionService:
         background_task_manager: BackgroundTaskManager,
     ) -> None:
         self._artifact_repository = artifact_repository
+        self._revision_ops = revision_ops
         self._artifact_registry_repository = artifact_registry_repository
         self._object_storage_repository = object_storage_repository
         self._vfs_storage_repository = vfs_storage_repository
@@ -213,12 +213,6 @@ class ArtifactRevisionService:
             )
             return vfs_storage_data.host, storage_namespace.id, vfs_storage_data.name
 
-    async def get(self, action: GetArtifactRevisionAction) -> GetArtifactRevisionActionResult:
-        revision = await self._artifact_repository.get_artifact_revision_by_id(
-            action.artifact_revision_id
-        )
-        return GetArtifactRevisionActionResult(revision=revision)
-
     async def get_readme(
         self, action: GetArtifactRevisionReadmeAction
     ) -> GetArtifactRevisionReadmeActionResult:
@@ -231,8 +225,8 @@ class ArtifactRevisionService:
     async def get_verification_result(
         self, action: GetArtifactRevisionVerificationResultAction
     ) -> GetArtifactRevisionVerificationResultActionResult:
-        revision = await self._artifact_repository.get_artifact_revision_by_id(
-            action.artifact_revision_id
+        revision = await self._revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=action.artifact_revision_id)
         )
         return GetArtifactRevisionVerificationResultActionResult(
             verification_result=revision.verification_result
@@ -242,8 +236,8 @@ class ArtifactRevisionService:
         self, action: GetDownloadProgressAction
     ) -> GetDownloadProgressActionResult:
         # 1. Get artifact_revision info
-        revision = await self._artifact_repository.get_artifact_revision_by_id(
-            action.artifact_revision_id
+        revision = await self._revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=action.artifact_revision_id)
         )
 
         # 2. Get artifact info to extract model_id and revision
@@ -378,8 +372,8 @@ class ArtifactRevisionService:
 
     async def cancel_import(self, action: CancelImportAction) -> CancelImportActionResult:
         await self._artifact_repository.reset_artifact_revision_status(action.artifact_revision_id)
-        revision_data = await self._artifact_repository.get_artifact_revision_by_id(
-            action.artifact_revision_id
+        revision_data = await self._revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=action.artifact_revision_id)
         )
         return CancelImportActionResult(result=revision_data)
 
@@ -387,8 +381,8 @@ class ArtifactRevisionService:
         self, action: ImportArtifactRevisionAction
     ) -> ImportArtifactRevisionActionResult:
         try:
-            revision_data = await self._artifact_repository.get_artifact_revision_by_id(
-                action.artifact_revision_id
+            revision_data = await self._revision_ops.get_field(
+                ArtifactRevisionQuerier(revision_id=action.artifact_revision_id)
             )
             artifact = await self._artifact_repository.get_artifact_by_id(revision_data.artifact_id)
 
@@ -608,8 +602,8 @@ class ArtifactRevisionService:
     async def cleanup(
         self, action: CleanupArtifactRevisionAction
     ) -> CleanupArtifactRevisionActionResult:
-        revision_data = await self._artifact_repository.get_artifact_revision_by_id(
-            action.artifact_revision_id
+        revision_data = await self._revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=action.artifact_revision_id)
         )
 
         if revision_data.status in [ArtifactStatus.SCANNED, ArtifactStatus.PULLING]:
@@ -686,8 +680,8 @@ class ArtifactRevisionService:
             )
         )
 
-        artifact_revision = await self._artifact_repository.get_artifact_revision_by_id(
-            revision_data.id
+        artifact_revision = await self._revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=revision_data.id)
         )
         return CleanupArtifactRevisionActionResult(result=artifact_revision)
 
@@ -747,7 +741,9 @@ class ArtifactRevisionService:
         # Update remote_status to SCANNED for all revisions before delegation
         result_revisions: list[ArtifactRevisionData] = []
         for revision_id in action.artifact_revision_ids:
-            revision_data = await self._artifact_repository.get_artifact_revision_by_id(revision_id)
+            revision_data = await self._revision_ops.get_field(
+                ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(revision_id))
+            )
             result_revisions.append(revision_data)
 
         # Pass delegatee_reservoir_id to delegator_reservoir_id for the remote call

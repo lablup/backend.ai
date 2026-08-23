@@ -53,10 +53,6 @@ class ArtifactRepository:
         return await self._db_source.get_artifact_by_id(artifact_id)
 
     @artifact_repository_resilience.apply()
-    async def get_artifact_revision_by_id(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
-        return await self._db_source.get_artifact_revision_by_id(revision_id)
-
-    @artifact_repository_resilience.apply()
     async def get_model_artifact(self, model_id: str, registry_id: uuid.UUID) -> ArtifactData:
         return await self._db_source.get_model_artifact(model_id, registry_id)
 

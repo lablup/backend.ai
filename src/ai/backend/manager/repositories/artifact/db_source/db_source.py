@@ -70,18 +70,6 @@ class ArtifactDBSource:
                 raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
             return row.to_dataclass()
 
-    async def get_artifact_revision_by_id(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            result = await db_sess.execute(
-                sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.id == revision_id)
-            )
-            row = result.scalar_one_or_none()
-            if row is None:
-                raise ArtifactRevisionNotFoundError(
-                    f"Artifact revision with ID {revision_id} not found"
-                )
-            return row.to_dataclass()
-
     async def get_model_artifact(self, model_id: str, registry_id: uuid.UUID) -> ArtifactData:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(

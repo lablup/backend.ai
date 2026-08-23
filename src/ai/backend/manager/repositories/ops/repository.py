@@ -38,7 +38,11 @@ from ai.backend.manager.models.specs.purger import (
     EntityPurger,
     FieldPurger,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier, OwnedFieldQuerier
+from ai.backend.manager.models.specs.querier import (
+    DataQuerier,
+    FieldQuerier,
+    OwnedFieldQuerier,
+)
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
 from ai.backend.manager.models.specs.types import BulkResultWithFailures, EntityWithFieldsResult
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
@@ -70,6 +74,18 @@ class OpsRepository[TData]:
             if data is None:
                 raise EntityNotFoundError(
                     f"{querier.row_class().__name__} {querier.entity_id_value()} not found"
+                )
+            return data
+
+    async def get_field[TFieldData: FieldData](
+        self, querier: FieldQuerier[Any, TFieldData]
+    ) -> TFieldData:
+        """Read one field row by its own id, raising if it is gone."""
+        async with self._ops.read_ops() as r:
+            data = await r.query_field_data(querier)
+            if data is None:
+                raise EntityNotFoundError(
+                    f"{querier.row_class().__name__} {querier.target_id_value()} not found"
                 )
             return data
 

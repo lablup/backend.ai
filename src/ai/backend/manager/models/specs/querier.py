@@ -1,4 +1,5 @@
-"""Single-row read spec of the v2 lineage: fetch by the entity id."""
+"""Single-row read specs of the v2 lineage, keyed by the entity id, the owner, or the
+field row's own id."""
 
 from __future__ import annotations
 
@@ -8,7 +9,7 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
-from ai.backend.common.data.entity.types import EntityIdentifier, FieldData
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.manager.models.base import Base
 
 
@@ -93,4 +94,34 @@ class OwnedFieldQuerier[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData
     @abstractmethod
     def to_data(self, row: TRow) -> TData:
         """Convert the designated row into its ``data/`` type."""
+        raise NotImplementedError
+
+
+class FieldQuerier[TRow: Base, TData: FieldData](ABC):
+    """Reads one field row by its own id.
+
+    Separate from :class:`DataQuerier` because a field row's id is no
+    ``EntityIdentifier``: it names a row, not an entity, and what the read is authorized
+    against is the owner the lookup reads. Keyed the way :class:`~...purger.FieldPurger`
+    keys its delete.
+    """
+
+    @abstractmethod
+    def row_class(self) -> type[TRow]:
+        """Return the ORM class the row is read from."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        """Return the column carrying the field id, which the read keys on."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def target_id_value(self) -> FieldIdentifier:
+        """Return the id of the field row to read."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert the fetched row into its ``data/`` type."""
         raise NotImplementedError

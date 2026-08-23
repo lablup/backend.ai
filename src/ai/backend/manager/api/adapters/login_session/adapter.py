@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.login_session import LoginSessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.login_session.request import (
     AdminRevokeLoginSessionInput,
@@ -119,14 +120,8 @@ class LoginSessionAdapter(BaseAdapter):
 
     async def my_revoke(self, input: MyRevokeLoginSessionInput) -> RevokeLoginSessionPayload:
         """Revoke a login session owned by the current user."""
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
         action_result = await self._processors.auth.revoke_login_session.run(
-            RevokeLoginSessionAction(
-                user_id=UserID(me.user_id),
-                session_id=input.session_id,
-            )
+            RevokeLoginSessionAction(session_id=LoginSessionID(input.session_id))
         )
         return RevokeLoginSessionPayload(success=action_result.success)
 

@@ -76,10 +76,10 @@ from ai.backend.manager.services.ops.service import (
     DeleteService,
     FieldAtomicCreateService,
     FieldCreateService,
+    FieldGetService,
     FieldPartialBulkPurgeService,
     FieldPurgeService,
     FieldUpsertService,
-    GetService,
     GlobalSearchService,
     RestoreService,
     SearchFieldsService,
@@ -293,7 +293,7 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
             action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
         )
         return SingleFieldActionProcessor(
-            GetService(self._deps.repository).execute,
+            FieldGetService(self._deps.repository).execute,
             self._owner_lookup,
             monitors=(*self._deps.monitors.single_entity, *monitors),
             validators=(*self._deps.validators.single_entity, *validators),

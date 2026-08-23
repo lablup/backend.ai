@@ -8,10 +8,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.auth.login_session_types import (
-    LoginAttemptResult,
-    LoginSessionData,
-)
+from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.auth.types import (
     GroupMembershipData,
     UserCreationData,
@@ -183,10 +180,6 @@ class AuthRepository:
         self, user_id: UUID, domain_name: str, result: LoginAttemptResult
     ) -> list[str]:
         return await self._db_source.delete_sessions_by_user(user_id, domain_name, result)
-
-    @auth_repository_resilience.apply()
-    async def get_login_session_by_id(self, session_id: UUID) -> LoginSessionData:
-        return await self._db_source.fetch_login_session_by_id(session_id)
 
     @auth_repository_resilience.apply()
     async def delete_login_session_by_id(self, session_id: UUID, result: LoginAttemptResult) -> str:

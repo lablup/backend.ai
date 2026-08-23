@@ -6,6 +6,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     AnonymousGlobalActionProcessor,
     GlobalActionProcessor,
@@ -139,7 +140,7 @@ class AuthProcessors:
     upload_ssh_keypair: SingleEntityActionProcessor[
         UploadSSHKeypairAction, UploadSSHKeypairActionResult
     ]
-    revoke_login_session: SingleEntityActionProcessor[
+    revoke_login_session: SingleFieldActionProcessor[
         RevokeLoginSessionAction, RevokeLoginSessionActionResult
     ]
     resolve_user_id_by_access_key: LookupActionProcessor[
@@ -201,9 +202,6 @@ class AuthProcessors:
         self.upload_ssh_keypair = user_group.single_entity(
             UploadSSHKeypairAction, service.upload_ssh_keypair
         )
-        self.revoke_login_session = user_group.single_entity(
-            RevokeLoginSessionAction, service.revoke_login_session
-        )
         self.resolve_user_id_by_access_key = user_group.lookup_ops(ResolveUserIDByAccessKeyAction)
         self.login_sessions = user_group.field_group(
             FieldGroupMeta(LOGIN_SESSION_FIELD_TYPE),
@@ -216,6 +214,9 @@ class AuthProcessors:
             LoginHistoryData,
             LookupLoginHistoryOwnerAction,
             LookupBulkLoginHistoryOwnerAction,
+        )
+        self.revoke_login_session = self.login_sessions.single_field(
+            RevokeLoginSessionAction, service.revoke_login_session
         )
         self.search_login_sessions = self.login_sessions.search_ops(SearchLoginSessionsAction)
         self.search_login_history = self.login_history.search_ops(SearchLoginHistoryAction)

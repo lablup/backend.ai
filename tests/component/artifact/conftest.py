@@ -37,6 +37,8 @@ from ai.backend.manager.repositories.artifact.repository import ArtifactReposito
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
@@ -121,6 +123,7 @@ def artifact_revision_processors(
     vfolder_repository = VfolderRepository(database_engine)
     service = ArtifactRevisionService(
         artifact_repository=artifact_repository,
+        revision_ops=OpsRepository(V2DBOpsProvider(database_engine)),
         artifact_registry_repository=artifact_registry_repository,
         object_storage_repository=object_storage_repository,
         vfs_storage_repository=vfs_storage_repository,

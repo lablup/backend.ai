@@ -400,6 +400,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         object_storage=ObjectStorageService(
             artifact_repository=repositories.artifact.repository,
+            revision_ops=OpsRepository(repositories.v2_ops_provider),
             object_storage_repository=repositories.object_storage.repository,
             storage_namespace_repository=repositories.storage_namespace.repository,
             storage_manager=args.storage_manager,
@@ -426,6 +427,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         artifact_revision=ArtifactRevisionService(
             artifact_repository=repositories.artifact.repository,
+            revision_ops=OpsRepository(repositories.v2_ops_provider),
             artifact_registry_repository=repositories.artifact_registry.repository,
             storage_manager=args.storage_manager,
             object_storage_repository=repositories.object_storage.repository,

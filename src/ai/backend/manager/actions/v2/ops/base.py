@@ -25,7 +25,11 @@ from ai.backend.manager.models.specs.purger import (
     EntityPurger,
     FieldPurger,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier, OwnedFieldQuerier
+from ai.backend.manager.models.specs.querier import (
+    DataQuerier,
+    FieldQuerier,
+    OwnedFieldQuerier,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.models.specs.upserter import (
@@ -37,6 +41,7 @@ from ai.backend.manager.models.specs.upserter import (
 __all__ = (
     "OpsBackendAction",
     "GetOpsAction",
+    "FieldGetOpsAction",
     "LookupOpsAction",
     "SearchOpsAction",
     "GlobalSearchOpsAction",
@@ -110,6 +115,20 @@ class GetOpsAction[TRow: Base, TData](OpsBackendAction):
 
     @abstractmethod
     def to_querier(self) -> DataQuerier[TRow, TData]:
+        """Return the read spec this action executes."""
+        raise NotImplementedError
+
+
+class FieldGetOpsAction[TRow: Base, TData: FieldData](OpsBackendAction):
+    """A read of one field row named by its own id.
+
+    Carries a :class:`FieldQuerier` rather than a ``DataQuerier``: the id names a row,
+    not an entity, and the entity the read is checked against comes from the owner
+    lookup the shape names.
+    """
+
+    @abstractmethod
+    def to_querier(self) -> FieldQuerier[TRow, TData]:
         """Return the read spec this action executes."""
         raise NotImplementedError
 
