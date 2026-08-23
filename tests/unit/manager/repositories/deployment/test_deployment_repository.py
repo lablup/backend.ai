@@ -23,6 +23,7 @@ from ai.backend.common.data.entity.deployment_revision import DeploymentRevision
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
@@ -31,7 +32,7 @@ from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.schema.deployment import BlueGreenSpec, IntOrPercent, RollingUpdateSpec
 from ai.backend.common.types import (
     AccessKey,
@@ -57,7 +58,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.image.types import ImageType
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
@@ -67,10 +67,19 @@ from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
+from ai.backend.manager.models.endpoint.creators import (
+    DeploymentCreator,
+    DeploymentMetadataFields,
+    DeploymentNetworkFields,
+    DeploymentReplicaFields,
+)
+from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
@@ -95,6 +104,8 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.creators import ReplicaCreator
+from ai.backend.manager.models.routing.updaters import ReplicaUpdater
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import (
     SessionResult,
@@ -113,26 +124,7 @@ from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRo
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base.purger import Purger, PurgerSpec
 from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.creators import (
-    DeploymentCreatorSpec,
-    DeploymentMetadataFields,
-    DeploymentNetworkFields,
-    DeploymentReplicaFields,
-    DeploymentRevisionCreatorSpec,
-    RouteCreatorSpec,
-)
-from ai.backend.manager.repositories.deployment.updaters import (
-    DeploymentMetadataUpdaterSpec,
-    DeploymentUpdaterSpec,
-    ReplicaSpecUpdaterSpec,
-    RouteStatusUpdaterSpec,
-    RouteUpdaterSpec,
-)
-from ai.backend.manager.repositories.deployment.upserters import DeploymentPolicyUpserterSpec
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
@@ -1781,8 +1773,7 @@ class TestDeploymentRevisionOperations:
     ) -> ModelRevisionData:
         """Create a single test revision."""
 
-        spec = DeploymentRevisionCreatorSpec(
-            deployment_id=test_endpoint_id,
+        spec = DeploymentRevisionCreator(
             revision_number=1,
             image_id=ImageID(test_image_id),
             resource_group=test_scaling_group_name,
@@ -1803,16 +1794,7 @@ class TestDeploymentRevisionOperations:
             runtime_variant_id=test_runtime_variant_id,
             extra_mounts=[],
         )
-        return await deployment_repository.create_revision(
-            RBACEntityCreator(
-                spec=spec,
-                element_type=RBACElementType.DEPLOYMENT_REVISION,
-                scope_ref=RBACElementRef(
-                    element_type=RBACElementType.MODEL_DEPLOYMENT,
-                    element_id=str(test_endpoint_id),
-                ),
-            )
-        )
+        return await deployment_repository.create_revision(test_endpoint_id, spec)
 
     @pytest.fixture
     async def test_multiple_revisions(
@@ -1827,8 +1809,7 @@ class TestDeploymentRevisionOperations:
         """Create multiple test revisions (revision 1, 2, 3)."""
         revisions: list[ModelRevisionData] = []
         for rev_num in [1, 2, 3]:
-            spec = DeploymentRevisionCreatorSpec(
-                deployment_id=test_endpoint_id,
+            spec = DeploymentRevisionCreator(
                 revision_number=rev_num,
                 image_id=ImageID(test_image_id),
                 resource_group=test_scaling_group_name,
@@ -1849,16 +1830,7 @@ class TestDeploymentRevisionOperations:
                 runtime_variant_id=test_runtime_variant_id,
                 extra_mounts=[],
             )
-            revision = await deployment_repository.create_revision(
-                RBACEntityCreator(
-                    spec=spec,
-                    element_type=RBACElementType.DEPLOYMENT_REVISION,
-                    scope_ref=RBACElementRef(
-                        element_type=RBACElementType.MODEL_DEPLOYMENT,
-                        element_id=str(test_endpoint_id),
-                    ),
-                )
-            )
+            revision = await deployment_repository.create_revision(test_endpoint_id, spec)
             revisions.append(revision)
         return revisions
 
@@ -1875,8 +1847,7 @@ class TestDeploymentRevisionOperations:
         """Create 5 test revisions for pagination tests."""
         revisions: list[ModelRevisionData] = []
         for rev_num in range(1, 6):
-            spec = DeploymentRevisionCreatorSpec(
-                deployment_id=test_endpoint_id,
+            spec = DeploymentRevisionCreator(
                 revision_number=rev_num,
                 image_id=ImageID(test_image_id),
                 resource_group=test_scaling_group_name,
@@ -1897,16 +1868,7 @@ class TestDeploymentRevisionOperations:
                 runtime_variant_id=test_runtime_variant_id,
                 extra_mounts=[],
             )
-            revision = await deployment_repository.create_revision(
-                RBACEntityCreator(
-                    spec=spec,
-                    element_type=RBACElementType.DEPLOYMENT_REVISION,
-                    scope_ref=RBACElementRef(
-                        element_type=RBACElementType.MODEL_DEPLOYMENT,
-                        element_id=str(test_endpoint_id),
-                    ),
-                )
-            )
+            revision = await deployment_repository.create_revision(test_endpoint_id, spec)
             revisions.append(revision)
         return revisions
 
@@ -1919,9 +1881,8 @@ class TestDeploymentRevisionOperations:
         test_runtime_variant_id: RuntimeVariantID,
         test_scaling_group_name: str,
     ) -> None:
-        """Test creating a deployment revision using RBACEntityCreator."""
-        spec = DeploymentRevisionCreatorSpec(
-            deployment_id=test_endpoint_id,
+        """Test creating a deployment revision."""
+        spec = DeploymentRevisionCreator(
             revision_number=1,
             image_id=ImageID(test_image_id),
             resource_group=test_scaling_group_name,
@@ -1942,16 +1903,9 @@ class TestDeploymentRevisionOperations:
             runtime_variant_id=test_runtime_variant_id,
             extra_mounts=[],
         )
-        creator = RBACEntityCreator(
-            spec=spec,
-            element_type=RBACElementType.DEPLOYMENT_REVISION,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.MODEL_DEPLOYMENT,
-                element_id=str(test_endpoint_id),
-            ),
-        )
+        creator = spec
 
-        result = await deployment_repository.create_revision(creator)
+        result = await deployment_repository.create_revision(test_endpoint_id, creator)
 
         assert result.id is not None
         assert result.cluster_config.mode == ClusterMode.SINGLE_NODE
@@ -2134,16 +2088,10 @@ class TestDeploymentRevisionOperations:
         new_name = "updated-deployment-name"
         new_replica_count = 5
 
-        updater = Updater(
-            spec=DeploymentUpdaterSpec(
-                metadata=DeploymentMetadataUpdaterSpec(
-                    name=OptionalState.update(new_name),
-                ),
-                replica_spec=ReplicaSpecUpdaterSpec(
-                    replica_count=OptionalState.update(new_replica_count),
-                ),
-            ),
-            pk_value=test_endpoint_id,
+        updater = DeploymentUpdater(
+            deployment_id=test_endpoint_id,
+            name=OptionalState.update(new_name),
+            replica_count=OptionalState.update(new_replica_count),
         )
         deployment_info = await deployment_repository.update_endpoint(updater)
 
@@ -2465,15 +2413,14 @@ class TestDeploymentPolicyOperations:
         test_endpoint_id: DeploymentID,
     ) -> DeploymentPolicyData:
         """Create a single test deployment policy via upsert."""
-        spec = DeploymentPolicyUpserterSpec(
-            deployment_id=test_endpoint_id,
+        spec = DeploymentPolicyUpserter(
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(
                 max_surge=IntOrPercent(count=1),
                 max_unavailable=IntOrPercent(count=0),
             ),
         )
-        result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
+        result = await deployment_repository.upsert_deployment_policy(test_endpoint_id, spec)
         return result.data
 
     async def test_upsert_deployment_policy_insert(
@@ -2482,13 +2429,12 @@ class TestDeploymentPolicyOperations:
         test_endpoint_id: DeploymentID,
     ) -> None:
         """Test upserting a deployment policy (insert path)."""
-        spec = DeploymentPolicyUpserterSpec(
-            deployment_id=test_endpoint_id,
+        spec = DeploymentPolicyUpserter(
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=60),
         )
 
-        result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
+        result = await deployment_repository.upsert_deployment_policy(test_endpoint_id, spec)
 
         assert result.data.id is not None
         assert result.data.endpoint == test_endpoint_id
@@ -2505,13 +2451,12 @@ class TestDeploymentPolicyOperations:
         test_deployment_policy_data: DeploymentPolicyData,
     ) -> None:
         """Test upserting a deployment policy (update path)."""
-        spec = DeploymentPolicyUpserterSpec(
-            deployment_id=test_endpoint_id,
+        spec = DeploymentPolicyUpserter(
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
         )
 
-        result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
+        result = await deployment_repository.upsert_deployment_policy(test_endpoint_id, spec)
 
         assert result.data.endpoint == test_endpoint_id
         assert result.data.strategy == DeploymentStrategy.BLUE_GREEN
@@ -2794,13 +2739,8 @@ class TestSearchDeploymentPolicies:
         ]
         for eid, (strategy, spec) in zip(sample_endpoint_ids, strategies, strict=False):
             result = await deployment_repository.upsert_deployment_policy(
-                Upserter(
-                    spec=DeploymentPolicyUpserterSpec(
-                        deployment_id=eid,
-                        strategy=strategy,
-                        strategy_spec=spec,
-                    )
-                )
+                eid,
+                DeploymentPolicyUpserter(strategy=strategy, strategy_spec=spec),
             )
             policies.append(result.data)
         return policies
@@ -3219,9 +3159,8 @@ class TestRouteOperations:
         test_group_id: uuid.UUID,
         test_replica_group_id: ReplicaGroupID,
     ) -> None:
-        """Test creating a route using Creator with RouteCreatorSpec."""
-        spec = RouteCreatorSpec(
-            deployment_id=test_endpoint_id,
+        """Test creating a route with ReplicaCreator."""
+        spec = ReplicaCreator(
             session_owner_id=test_user_uuid,
             domain=test_domain.domain_name,
             project_id=test_group_id,
@@ -3232,16 +3171,7 @@ class TestRouteOperations:
             traffic_ratio=1.0,
             traffic_status=RouteTrafficStatus.ACTIVE,
         )
-        creator = RBACEntityCreator(
-            spec=spec,
-            element_type=RBACElementType.ROUTING,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.MODEL_DEPLOYMENT,
-                element_id=str(test_endpoint_id),
-            ),
-        )
-
-        route_id = await deployment_repository.create_route(creator)
+        route_id = await deployment_repository.create_route(test_endpoint_id, spec)
 
         assert route_id is not None
         assert isinstance(route_id, uuid.UUID)
@@ -3256,10 +3186,9 @@ class TestRouteOperations:
         test_group_id: uuid.UUID,
         test_replica_group_id: ReplicaGroupID,
     ) -> None:
-        """Test updating route status using RouteStatusUpdaterSpec."""
+        """Test updating route status."""
         # Create a route first
-        spec = RouteCreatorSpec(
-            deployment_id=test_endpoint_id,
+        spec = ReplicaCreator(
             session_owner_id=test_user_uuid,
             domain=test_domain.domain_name,
             project_id=test_group_id,
@@ -3268,23 +3197,13 @@ class TestRouteOperations:
             termination_grace_period=30.0,
             replica_group_id=test_replica_group_id,
         )
-        creator = RBACEntityCreator(
-            spec=spec,
-            element_type=RBACElementType.ROUTING,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.MODEL_DEPLOYMENT,
-                element_id=str(test_endpoint_id),
-            ),
-        )
-        route_id = await deployment_repository.create_route(creator)
+        route_id = await deployment_repository.create_route(test_endpoint_id, spec)
 
         # Update the route status
-        updater = Updater(
-            spec=RouteStatusUpdaterSpec(
-                status=OptionalState.update(RouteStatus.RUNNING),
-                traffic_status=OptionalState.update(RouteTrafficStatus.INACTIVE),
-            ),
-            pk_value=route_id,
+        updater = ReplicaUpdater(
+            replica_id=ReplicaID(route_id),
+            status=OptionalState.update(RouteStatus.RUNNING),
+            traffic_status=OptionalState.update(RouteTrafficStatus.INACTIVE),
         )
         result = await deployment_repository.update_route(updater)
 
@@ -3308,10 +3227,9 @@ class TestRouteOperations:
         test_group_id: uuid.UUID,
         test_replica_group_id: ReplicaGroupID,
     ) -> None:
-        """Test updating route using unified RouteUpdaterSpec."""
+        """Test updating route using the unified update spec."""
         # Create a route first
-        spec = RouteCreatorSpec(
-            deployment_id=test_endpoint_id,
+        spec = ReplicaCreator(
             session_owner_id=test_user_uuid,
             domain=test_domain.domain_name,
             project_id=test_group_id,
@@ -3320,24 +3238,14 @@ class TestRouteOperations:
             termination_grace_period=30.0,
             replica_group_id=test_replica_group_id,
         )
-        creator = RBACEntityCreator(
-            spec=spec,
-            element_type=RBACElementType.ROUTING,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.MODEL_DEPLOYMENT,
-                element_id=str(test_endpoint_id),
-            ),
-        )
-        route_id = await deployment_repository.create_route(creator)
+        route_id = await deployment_repository.create_route(test_endpoint_id, spec)
 
         # Update the route using unified spec (excluding session to avoid FK constraint)
-        updater = Updater(
-            spec=RouteUpdaterSpec(
-                status=OptionalState.update(RouteStatus.RUNNING),
-                traffic_status=OptionalState.update(RouteTrafficStatus.ACTIVE),
-                traffic_ratio=OptionalState.update(0.5),
-            ),
-            pk_value=route_id,
+        updater = ReplicaUpdater(
+            replica_id=ReplicaID(route_id),
+            status=OptionalState.update(RouteStatus.RUNNING),
+            traffic_status=OptionalState.update(RouteTrafficStatus.ACTIVE),
+            traffic_ratio=OptionalState.update(0.5),
         )
         result = await deployment_repository.update_route(updater)
 
@@ -3358,11 +3266,9 @@ class TestRouteOperations:
     ) -> None:
         """Test that update_route returns False for nonexistent route."""
         nonexistent_id = uuid.uuid4()
-        updater = Updater(
-            spec=RouteStatusUpdaterSpec(
-                status=OptionalState.update(RouteStatus.RUNNING),
-            ),
-            pk_value=nonexistent_id,
+        updater = ReplicaUpdater(
+            replica_id=ReplicaID(nonexistent_id),
+            status=OptionalState.update(RouteStatus.RUNNING),
         )
 
         result = await deployment_repository.update_route(updater)
@@ -3645,31 +3551,23 @@ class TestDeploymentRepositoryDuplicateName:
         resource_group: ResourceGroupRow,
         user: UserRow,
         image_id: uuid.UUID | None = None,
-    ) -> RBACEntityCreator[EndpointRow]:
-        """Helper to create RBACEntityCreator for endpoint creation."""
+    ) -> DeploymentCreator:
+        """Helper to build the creator for endpoint creation."""
         user_id = user.uuid
-        spec = DeploymentCreatorSpec(
+        return DeploymentCreator(
             metadata=DeploymentMetadataFields(
                 name=name,
                 domain=domain.name,
-                project_id=group.id,
+                project_id=ProjectID(group.id),
                 resource_group=resource_group.name,
                 created_user_id=user_id,
-                session_owner_id=user_id,
+                session_owner_id=UserID(user_id),
                 revision_history_limit=10,
                 tag=None,
             ),
             replica=DeploymentReplicaFields(replica_count=1, desired_replica_count=1),
             network=DeploymentNetworkFields(open_to_public=False, url=None),
             options=DeploymentOptions(),
-            revision=None,
-        )
-        return RBACEntityCreator(
-            spec=spec,
-            element_type=RBACElementType.MODEL_DEPLOYMENT,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.PROJECT, element_id=str(group.id)
-            ),
         )
 
     async def test_create_endpoint_succeeds_with_different_name(

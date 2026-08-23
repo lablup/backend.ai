@@ -1,4 +1,4 @@
-"""CreatorSpec for deployment revision creation."""
+"""Creator specs for the deployment_revisions table."""
 
 from __future__ import annotations
 
@@ -6,9 +6,12 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any, override
 
+import sqlalchemy as sa
+
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -17,23 +20,25 @@ from ai.backend.common.types import (
     MountPermission,
     ResourceSlot,
 )
-from ai.backend.manager.errors.common import InternalServerError
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.data.deployment.types import ModelRevisionData
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
 from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
-from ai.backend.manager.repositories.base import CreatorSpec
+from ai.backend.manager.models.specs.creator import FieldCreator
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
-class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
-    """CreatorSpec for deployment revision creation.
+class DeploymentRevisionCreator(
+    FieldCreator[DeploymentID, DeploymentRevisionRow, ModelRevisionData]
+):
+    """Takes one revision of a deployment's spec.
 
-    When using create_revision(), revision_number must be set explicitly.
-    When using create_revision_with_next_number(), revision_number can be
-    left as None — the repository will assign it atomically.
+    ``revision_number`` left unset is computed inside the INSERT as one past the
+    deployment's last revision. Concurrent inserts can land on the same value, which
+    the unique constraint rejects — the caller retries.
     """
 
-    deployment_id: DeploymentID
     image_id: ImageID
     resource_group: str
     resource_slots: ResourceSlot
@@ -59,17 +64,34 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     revision_preset_id: DeploymentPresetID | None = None
     revision_number: int | None = None
 
-    def with_revision_number(self, revision_number: int) -> DeploymentRevisionCreatorSpec:
+    def with_revision_number(self, revision_number: int) -> DeploymentRevisionCreator:
         """Return a copy with the given revision_number."""
         return replace(self, revision_number=revision_number)
 
+    def _next_revision_number(self, owner_id: DeploymentID) -> Any:
+        return (
+            sa.select(sa.func.coalesce(sa.func.max(DeploymentRevisionRow.revision_number), 0) + 1)
+            .where(DeploymentRevisionRow.endpoint == owner_id)
+            .scalar_subquery()
+        )
+
     @override
-    def build_row(self) -> DeploymentRevisionRow:
-        if self.revision_number is None:
-            raise InternalServerError("revision_number must be set before building a row")
+    def field_id(self, row: DeploymentRevisionRow) -> DeploymentRevisionID:
+        return DeploymentRevisionID(row.id)
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_row(self, owner_id: DeploymentID) -> DeploymentRevisionRow:
         row = DeploymentRevisionRow(
-            endpoint=self.deployment_id,
-            revision_number=self.revision_number,
+            endpoint=owner_id,
+            revision_number=(
+                self.revision_number
+                if self.revision_number is not None
+                else self._next_revision_number(owner_id)
+            ),
             image=self.image_id,
             model=self.model_vfolder_id,
             model_mount_destination=self.model_mount_destination,
@@ -99,3 +121,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
             for slot_name, quantity in self.resource_slots.items()
         ]
         return row
+
+    @override
+    def to_data(self, row: DeploymentRevisionRow) -> ModelRevisionData:
+        return row.to_data()

@@ -82,39 +82,37 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
+from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry, RoutingData
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import DeploymentContext
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
+from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
+from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
+from ai.backend.manager.models.endpoint.creators import DeploymentCreator, EndpointTokenCreator
 from ai.backend.manager.models.endpoint.scopes import ProjectDeploymentOperationScope
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scheduling_history import (
-    RouteHistoryRow,
+from ai.backend.manager.models.endpoint.updaters import (
+    DeploymentUpdater,
+    EndpointLifecycleBatchUpdater,
 )
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.creators import ReplicaCreator
+from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater, ReplicaUpdater
+from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import Purger, PurgerResult
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import (
-    BatchUpdater,
-    Updater,
-)
-from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment.types import (
+    DeploymentHistoryToCreate,
     RouteData,
+    RouteHistoryToCreate,
     RouteServiceDiscoveryInfo,
     RouteSessionInfo,
     RouteSessionKernelInfo,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.scheduling_history.creators import DeploymentHistoryCreatorSpec
 
 from .db_source import DeploymentDBSource
 from .storage_source import DeploymentStorageSource
@@ -159,6 +157,7 @@ class DeploymentRepository:
     """Repository for deployment-related operations."""
 
     _db_source: DeploymentDBSource
+    _v2_ops: V2DBOpsProvider
     _storage_source: DeploymentStorageSource
     _valkey_stat: ValkeyStatClient
     _valkey_live: ValkeyLiveClient
@@ -173,7 +172,7 @@ class DeploymentRepository:
         valkey_live: ValkeyLiveClient,
         valkey_schedule: ValkeyScheduleClient,
     ) -> None:
-        self._db_source = DeploymentDBSource(db, storage_manager)
+        self._db_source = DeploymentDBSource(db, v2_ops_provider, storage_manager)
         self._v2_ops = v2_ops_provider
         self._storage_source = DeploymentStorageSource(storage_manager)
         self._valkey_stat = valkey_stat
@@ -185,13 +184,13 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_endpoint(
         self,
-        creator: RBACEntityCreator[EndpointRow],
+        creator: DeploymentCreator,
         policy_config: DeploymentPolicyConfig | None = None,
     ) -> DeploymentInfo:
         """Create a new endpoint and return DeploymentInfo.
 
         Args:
-            creator: Creator containing DeploymentCreatorSpec with resolved image_id
+            creator: Creator of the deployment row
             policy_config: Optional deployment policy configuration
 
         Returns:
@@ -222,13 +221,13 @@ class DeploymentRepository:
     async def get_modified_endpoint(
         self,
         endpoint_id: DeploymentID,
-        updater: Updater[EndpointRow],
+        updater: DeploymentUpdater,
     ) -> DeploymentInfo:
         """Get modified endpoint without applying changes.
 
         Args:
             endpoint_id: ID of the endpoint to modify
-            updater: Updater containing spec with partial updates
+            updater: Updater carrying the partial updates
 
         Returns:
             DeploymentInfo: Modified deployment information
@@ -241,12 +240,12 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def update_endpoint_with_spec(
         self,
-        updater: Updater[EndpointRow],
+        updater: DeploymentUpdater,
     ) -> DeploymentInfo:
-        """Update endpoint using an Updater.
+        """Update endpoint using an update spec.
 
         Args:
-            updater: Updater containing spec and endpoint_id
+            updater: Update spec carrying the endpoint id
 
         Returns:
             DeploymentInfo: Updated deployment information
@@ -272,9 +271,9 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def update_endpoint_lifecycle_bulk_with_history(
         self,
-        batch_updaters: Sequence[BatchUpdater[EndpointRow]],
+        batch_updaters: Sequence[EndpointLifecycleBatchUpdater],
         *,
-        new_history_specs: Sequence[DeploymentHistoryCreatorSpec],
+        new_histories: Sequence[DeploymentHistoryToCreate],
         merge_history_ids: Sequence[uuid.UUID],
     ) -> int:
         """Update lifecycle status and record history in same transaction.
@@ -282,14 +281,14 @@ class DeploymentRepository:
         The coordinator decides merge vs create; this is a pure writer.
 
         Args:
-            batch_updaters: BatchUpdaters for endpoint-status updates.
-            new_history_specs: Specs to INSERT.
+            batch_updaters: Batch update specs for endpoint-status updates.
+            new_histories: History rows to INSERT, each under its deployment.
             merge_history_ids: Existing history-row ids whose
                 ``attempts`` should be incremented.
         """
         return await self._db_source.update_endpoint_lifecycle_bulk_with_history(
             batch_updaters,
-            new_history_specs=new_history_specs,
+            new_histories=new_histories,
             merge_history_ids=merge_history_ids,
         )
 
@@ -711,8 +710,8 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def update_route_status_bulk_with_history(
         self,
-        batch_updaters: Sequence[BatchUpdater[RoutingRow]],
-        bulk_creator: BulkCreator[RouteHistoryRow],
+        batch_updaters: Sequence[ReplicaBatchUpdater],
+        histories: Sequence[RouteHistoryToCreate],
     ) -> int:
         """Update route status and record history in same transaction.
 
@@ -720,14 +719,14 @@ class DeploymentRepository:
         in a single transaction.
 
         Args:
-            batch_updaters: Sequence of BatchUpdaters for status updates
-            bulk_creator: BulkCreator containing all history records
+            batch_updaters: Batch update specs for status updates
+            histories: The transition of each replica, under its deployment
 
         Returns:
             Total number of rows updated
         """
         return await self._db_source.update_route_status_bulk_with_history(
-            batch_updaters, bulk_creator
+            batch_updaters, histories
         )
 
     @deployment_repository_resilience.apply()
@@ -1264,15 +1263,16 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_revision(
         self,
-        creator: RBACEntityCreator[DeploymentRevisionRow],
+        deployment_id: DeploymentID,
+        creator: DeploymentRevisionCreator,
     ) -> ModelRevisionData:
         """Create a new deployment revision."""
-        return await self._db_source.create_revision(creator)
+        return await self._db_source.create_revision(deployment_id, creator)
 
     @deployment_repository_resilience.apply()
     async def create_revision_with_next_number(
         self,
-        creator: RBACEntityCreator[DeploymentRevisionRow],
+        creator: DeploymentRevisionCreator,
         endpoint_id: DeploymentID,
     ) -> ModelRevisionData:
         """Atomically read the latest revision number and create a new revision.
@@ -1363,9 +1363,9 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def update_endpoint(
         self,
-        updater: Updater[EndpointRow],
+        updater: DeploymentUpdater,
     ) -> DeploymentInfo:
-        """Update an endpoint using the provided updater spec.
+        """Update an endpoint using the provided update spec.
 
         Returns:
             DeploymentInfo: The updated endpoint information.
@@ -1411,10 +1411,11 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def upsert_deployment_policy(
         self,
-        upserter: Upserter[DeploymentPolicyRow],
+        deployment_id: DeploymentID,
+        upserter: DeploymentPolicyUpserter,
     ) -> DeploymentPolicyUpsertResult:
         """Create or update a deployment policy using ON CONFLICT."""
-        return await self._db_source.upsert_deployment_policy(upserter)
+        return await self._db_source.upsert_deployment_policy(deployment_id, upserter)
 
     @deployment_repository_resilience.apply()
     async def get_deployment_policy(
@@ -1452,26 +1453,24 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_route(
         self,
-        creator: RBACEntityCreator[RoutingRow],
+        deployment_id: DeploymentID,
+        creator: ReplicaCreator,
     ) -> uuid.UUID:
-        """Create a new route using the provided creator.
-
-        The Creator contains a RouteCreatorSpec that defines the route properties.
+        """Create a new route under the deployment it serves.
 
         Returns:
             UUID of the newly created route.
         """
-        return await self._db_source.create_route(creator)
+        return await self._db_source.create_route(deployment_id, creator)
 
     @deployment_repository_resilience.apply()
     async def update_route(
         self,
-        updater: Updater[RoutingRow],
+        updater: ReplicaUpdater,
     ) -> bool:
-        """Update a route using the provided updater.
+        """Update a route using the provided update spec.
 
-        The Updater contains a RouteUpdaterSpec or RouteStatusUpdaterSpec
-        that defines which fields to update.
+        The spec names the route and the fields to update.
 
         Returns:
             True if the route was updated, False if not found.
@@ -1628,15 +1627,15 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def apply_strategy_mutations(
         self,
-        rollout: Sequence[RBACEntityCreator[RoutingRow]],
-        drain: BatchUpdater[RoutingRow] | None,
+        rollout: Sequence[FieldToCreate[DeploymentID, RoutingRow, RoutingData]],
+        drain: ReplicaBatchUpdater | None,
         completed_ids: set[DeploymentID],
     ) -> int:
         """Apply route mutations from a strategy evaluation cycle.
 
         Performs route rollout/drain and revision swap in a single transaction.
         Sub-step transitions are handled by the coordinator via
-        ``EndpointLifecycleBatchUpdaterSpec``.
+        ``EndpointLifecycleBatchUpdater``.
 
         Returns:
             Number of deployments whose revision was swapped.

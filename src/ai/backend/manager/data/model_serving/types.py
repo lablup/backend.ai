@@ -14,6 +14,7 @@ from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.types import FieldData
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.session.types import MountOption as MountOptionDTO
@@ -112,7 +113,7 @@ class EndpointData:
 
 
 @dataclass
-class RoutingData:
+class RoutingData(FieldData):
     id: uuid.UUID
     endpoint: uuid.UUID
     session: uuid.UUID | None
@@ -135,7 +136,7 @@ class EndpointTokenData:
 
 
 @dataclass
-class EndpointAutoScalingRuleData:
+class EndpointAutoScalingRuleData(FieldData):
     id: uuid.UUID
     metric_source: AutoScalingMetricSource
     metric_name: str

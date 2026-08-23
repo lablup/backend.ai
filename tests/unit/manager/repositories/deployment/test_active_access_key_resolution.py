@@ -24,6 +24,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.db_source.db_source import DeploymentDBSource
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
@@ -73,6 +74,7 @@ class TestResolveUserAndActiveAccessKey:
     def db_source(self, db: ExtendedAsyncSAEngine) -> DeploymentDBSource:
         return DeploymentDBSource(
             db=db,
+            v2_ops_provider=V2DBOpsProvider(db),
             storage_manager=MagicMock(spec=StorageSessionManager),
         )
 

@@ -1,7 +1,7 @@
 """Data containers for model serving operations.
 
-Note: These are data containers, not CreatorSpec implementations.
-For row creation, use EndpointCreatorSpec from repositories/model_serving/creators.py
+These are data containers, not write specs; row creation goes through the specs in
+``models/endpoint/creators.py``.
 """
 
 from __future__ import annotations

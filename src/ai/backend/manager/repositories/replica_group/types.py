@@ -11,11 +11,12 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.schema.deployment import TargetGroupSpec
+from ai.backend.manager.data.deployment.types import ReplicaGroupData
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.scheduling_history.creators import (
-    ReplicaGroupHistoryCreatorSpec,
+from ai.backend.manager.models.replica_group_history.creators import (
+    ReplicaGroupHistoryCreator,
 )
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.views.replica_group import (
     ReplicaGroupAutoscaleReconcileView,
     ReplicaGroupLifecycleReconcileView,
@@ -56,8 +57,9 @@ class ReplicaGroupReconcileTransition:
     conditions to find the latest prior history); the history creator carries sub_steps.
     """
 
-    history_spec: ReplicaGroupHistoryCreatorSpec
-    status_updater: Updater[ReplicaGroupRow] | None = None
+    deployment_id: DeploymentID
+    history_creator: ReplicaGroupHistoryCreator
+    status_updater: DataUpdater[ReplicaGroupRow, ReplicaGroupData] | None = None
 
 
 @dataclass

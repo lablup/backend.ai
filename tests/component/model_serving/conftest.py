@@ -44,7 +44,7 @@ def model_serving_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ModelServingProcessors:
     """Real ModelServingProcessors with real service and repository."""
-    ms_repo = ModelServingRepository(database_engine)
+    ms_repo = ModelServingRepository(database_engine, V2DBOpsProvider(database_engine))
     deployment_repo = DeploymentRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
@@ -80,7 +80,7 @@ def auto_scaling_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ModelServingAutoScalingProcessors:
     """Real ModelServingAutoScalingProcessors with real AutoScalingService."""
-    repo = ModelServingRepository(database_engine)
+    repo = ModelServingRepository(database_engine, V2DBOpsProvider(database_engine))
     service = AutoScalingService(repository=repo)
     return ModelServingAutoScalingProcessors(
         processor_registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), service

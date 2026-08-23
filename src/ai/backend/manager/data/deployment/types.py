@@ -22,6 +22,7 @@ from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import (
@@ -36,7 +37,11 @@ from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
 from ai.backend.manager.data.session.options import HandlerOptions
 
 if TYPE_CHECKING:
-    from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
+    from ai.backend.common.schema.deployment import (
+        BlueGreenSpec,
+        ReplicaGroupRolloutSpec,
+        RollingUpdateSpec,
+    )
     from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 
 from ai.backend.common.types import (
@@ -1084,7 +1089,7 @@ class PresetAttributionData:
 
 
 @dataclass
-class ModelRevisionData:
+class ModelRevisionData(FieldData):
     # Identity
     id: DeploymentRevisionID
     deployment_id: DeploymentID
@@ -1451,7 +1456,26 @@ class AutoScalingRuleSearchResult:
 
 
 @dataclass
-class DeploymentPolicyData:
+class ReplicaGroupData(FieldData):
+    """Data class for ReplicaGroupRow."""
+
+    id: ReplicaGroupID
+    deployment_id: DeploymentID
+    current_revision_id: DeploymentRevisionID | None
+    target_revision_id: DeploymentRevisionID | None
+    desired_current_replica_count: int
+    desired_target_replica_count: int
+    traffic_weight: int
+    session_group_id: SessionGroupID
+    lifecycle: ReplicaGroupLifecycle
+    scaling_status: ReplicaGroupScalingStatus
+    rollout: ReplicaGroupRolloutSpec
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class DeploymentPolicyData(FieldData):
     """Data class for DeploymentPolicyRow."""
 
     id: UUID

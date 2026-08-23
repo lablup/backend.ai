@@ -4,7 +4,7 @@ Two entry points are provided because the v2 and legacy paths emit
 different finalized shapes:
 
 - :meth:`DeploymentRevisionValidator.validate` —
-  v2 ``add_revision`` builds a :class:`DeploymentRevisionCreatorSpec` and
+  v2 ``add_revision`` builds a :class:`DeploymentRevisionCreator` and
   validates it right before persistence.
 - :meth:`DeploymentRevisionValidator.validate_legacy_revision_spec` —
   legacy paths (``build_creator_from_legacy_draft``,
@@ -25,8 +25,8 @@ from dataclasses import dataclass, field
 from ai.backend.common.types import SlotName
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import ModelRevisionSpec
-from ai.backend.manager.repositories.deployment.creators.revision import (
-    DeploymentRevisionCreatorSpec,
+from ai.backend.manager.models.deployment_revision.creators import (
+    DeploymentRevisionCreator,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -49,10 +49,10 @@ class DeploymentRevisionValidatorRule(ABC):
     @abstractmethod
     def validate(
         self,
-        spec: DeploymentRevisionCreatorSpec,
+        spec: DeploymentRevisionCreator,
         context: DeploymentRevisionValidationContext,
     ) -> None:
-        """Validate the v2 :class:`DeploymentRevisionCreatorSpec`."""
+        """Validate the v2 :class:`DeploymentRevisionCreator`."""
         raise NotImplementedError
 
     @abstractmethod
@@ -75,11 +75,11 @@ class DeploymentRevisionValidator:
 
     def validate(
         self,
-        spec: DeploymentRevisionCreatorSpec,
+        spec: DeploymentRevisionCreator,
         context: DeploymentRevisionValidationContext,
     ) -> None:
         for rule in self._rules:
-            log.debug("Applying DeploymentRevisionCreatorSpec validation rule: {}", rule.name())
+            log.debug("Applying DeploymentRevisionCreator validation rule: {}", rule.name())
             rule.validate(spec, context)
 
     def validate_legacy_revision_spec(

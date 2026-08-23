@@ -20,6 +20,10 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.scheduling_history.creators import (
+    DeploymentHistoryCreator,
+    RouteHistoryCreator,
+)
 
 
 @dataclass
@@ -136,3 +140,19 @@ class RouteServiceDiscoveryInfo:
     kernel_port: int
     session_owner: uuid.UUID
     project: uuid.UUID
+
+
+@dataclass
+class RouteHistoryToCreate:
+    """One replica transition to record, under the deployment it serves."""
+
+    deployment_id: DeploymentID
+    creator: RouteHistoryCreator
+
+
+@dataclass
+class DeploymentHistoryToCreate:
+    """One deployment transition to record, under the deployment it is about."""
+
+    deployment_id: DeploymentID
+    creator: DeploymentHistoryCreator

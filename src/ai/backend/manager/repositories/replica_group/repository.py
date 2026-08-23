@@ -13,12 +13,17 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import ReplicaGroupHandlerCategory
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    ReplicaGroupData,
+    ReplicaGroupHandlerCategory,
+)
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.updater import BulkUpdaterResult, Updater
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.replica_group.types import (
     ApplyWritesResult,
     AutoscaleReconcileFetch,
@@ -60,8 +65,8 @@ class ReplicaGroupRepository:
 
     _db_source: ReplicaGroupDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = ReplicaGroupDBSource(db)
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
+        self._db_source = ReplicaGroupDBSource(db, v2_ops_provider)
 
     @replica_group_repository_resilience.apply()
     async def search_deploy_scheduling_views(
@@ -102,13 +107,6 @@ class ReplicaGroupRepository:
         return await self._db_source.fetch_autoscale_reconcile_views(querier, category)
 
     @replica_group_repository_resilience.apply()
-    async def update_replica_groups(
-        self,
-        updaters: Sequence[Updater[ReplicaGroupRow]],
-    ) -> BulkUpdaterResult[ReplicaGroupRow]:
-        return await self._db_source.update_replica_groups(updaters)
-
-    @replica_group_repository_resilience.apply()
     async def current_time(self) -> datetime:
         return await self._db_source.current_time()
 
@@ -120,8 +118,8 @@ class ReplicaGroupRepository:
     async def apply_writes(
         self,
         *,
-        group_updaters: Sequence[Updater[ReplicaGroupRow]],
-        endpoint_updaters: Sequence[Updater[EndpointRow]],
+        group_updaters: Sequence[DataUpdater[ReplicaGroupRow, ReplicaGroupData]],
+        endpoint_updaters: Sequence[DataUpdater[EndpointRow, DeploymentInfo]],
     ) -> ApplyWritesResult:
         return await self._db_source.apply_writes(
             group_updaters=group_updaters,
