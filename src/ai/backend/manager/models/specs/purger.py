@@ -117,17 +117,18 @@ class GuardedFieldPurger[TRow: Base, TData: FieldData](ABC):
         raise NotImplementedError
 
 
-class FieldBatchPurger[TRow: Base, TData](ABC):
-    """Delete spec for every field row a subquery selects, converting each deleted row
-    to data so the operation can report what it actually removed.
+class FieldBatchPurger[TOwnerID: EntityIdentifier, TRow: Base, TData](ABC):
+    """Delete spec for the field rows of one owner that a subquery selects, converting
+    each deleted row to data so the operation can report what it actually removed.
 
     A field row holds nothing in the RBAC graph, so the delete is the whole operation —
-    the batch counterpart of :class:`FieldPurger`.
+    the batch counterpart of :class:`FieldPurger`. Bounded by the owner rather than by a
+    scope, as every field write is: what authorizes the rows is the entity owning them.
     """
 
     @abstractmethod
-    def build_subquery(self) -> sa.sql.Select[tuple[TRow]]:
-        """Build the subquery selecting the rows to delete."""
+    def build_subquery(self, owner_id: TOwnerID) -> sa.sql.Select[tuple[TRow]]:
+        """Build the subquery selecting the owner's rows to delete."""
         raise NotImplementedError
 
     @abstractmethod

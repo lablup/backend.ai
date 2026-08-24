@@ -53,19 +53,16 @@ class DeploymentPresetPurger(
         return row.to_data()
 
 
-class PresetResourceSlotBatchPurger(FieldBatchPurger[PresetResourceSlotRow, ResourceSlotEntryData]):
+class PresetResourceSlotBatchPurger(
+    FieldBatchPurger[DeploymentPresetID, PresetResourceSlotRow, ResourceSlotEntryData]
+):
     """Clear every slot row of one preset, so an update can restate the whole set."""
 
-    _preset_id: DeploymentPresetID
-
-    def __init__(self, preset_id: DeploymentPresetID) -> None:
-        self._preset_id = preset_id
-
     @override
-    def build_subquery(self) -> sa.sql.Select[tuple[PresetResourceSlotRow]]:
-        return sa.select(PresetResourceSlotRow).where(
-            PresetResourceSlotRow.preset_id == self._preset_id
-        )
+    def build_subquery(
+        self, owner_id: DeploymentPresetID
+    ) -> sa.sql.Select[tuple[PresetResourceSlotRow]]:
+        return sa.select(PresetResourceSlotRow).where(PresetResourceSlotRow.preset_id == owner_id)
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:

@@ -35,8 +35,8 @@ from ai.backend.manager.models.specs.lookup import (
     FieldOwnerLookup,
 )
 from ai.backend.manager.models.specs.purger import (
+    EntityBatchPurger,
     EntityPurger,
-    FieldBatchPurger,
     FieldPurger,
 )
 from ai.backend.manager.models.specs.querier import (
@@ -426,16 +426,16 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.batch_update_in_global(updater)
 
-    async def batch_purge_field_entities_in_scopes(
-        self, scopes: Sequence[OperationScope], purger: FieldBatchPurger[Any, TData]
+    async def batch_purge_entities_in_scopes(
+        self, scopes: Sequence[OperationScope], purger: EntityBatchPurger[Any, TData]
     ) -> list[TData]:
         """Delete every selected row within ``scopes``, which must not be empty."""
         async with self._ops.write_ops() as w:
-            return await w.batch_purge_field_entities_in_scopes(scopes, purger)
+            return await w.batch_purge_entities_in_scopes(scopes, purger)
 
-    async def batch_purge_field_entities_in_global(
-        self, purger: FieldBatchPurger[Any, TData]
+    async def batch_purge_entities_in_global(
+        self, purger: EntityBatchPurger[Any, TData]
     ) -> list[TData]:
         """Delete every selected row across the table; caller holds the authority."""
         async with self._ops.write_ops() as w:
-            return await w.batch_purge_field_entities_in_global(purger)
+            return await w.batch_purge_entities_in_global(purger)

@@ -107,7 +107,7 @@ def model_card_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ModelCardProcessors:
     """Real ModelCardProcessors with real RBAC enforcement."""
-    repo = ModelCardRepository(database_engine)
+    repo = ModelCardRepository(database_engine, V2DBOpsProvider(database_engine))
     service = ModelCardService(repo, storage_manager)
     return ModelCardProcessors(processor_registry.group(GroupMeta(MODEL_CARD_ENTITY_TYPE)), service)
 

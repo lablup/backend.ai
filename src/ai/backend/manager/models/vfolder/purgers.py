@@ -10,7 +10,9 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.manager.models.specs.purger import FieldBatchPurger
+from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
+from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
+from ai.backend.manager.models.specs.purger import EntityBatchPurger, FieldBatchPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.vfolder.row import (
     VFolderInvitationRow,
@@ -19,13 +21,18 @@ from ai.backend.manager.models.vfolder.row import (
 
 
 @dataclass
-class VFolderInvitationBatchPurger(FieldBatchPurger[VFolderInvitationRow, VFolderUUID]):
-    """Clears the invitations of the vfolders going away.
+class VFolderInvitationBatchPurger(EntityBatchPurger[VFolderInvitationRow, VFolderInvitationID]):
+    """Clears the invitations of the vfolders going away, each with its graph.
 
-    Invitations stand outside the RBAC graph, so nothing is torn down with them.
+    An invitation is an entity of its own — the invitee acts on it while holding no
+    permission on the folder — so what it left in the graph goes with it.
     """
 
     vfolder_ids: Sequence[UUID]
+
+    @override
+    def entity_id(self, row: VFolderInvitationRow) -> VFolderInvitationID:
+        return VFolderInvitationID(row.id)
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[VFolderInvitationRow]]:
@@ -38,46 +45,44 @@ class VFolderInvitationBatchPurger(FieldBatchPurger[VFolderInvitationRow, VFolde
         return ()
 
     @override
-    def to_data(self, row: VFolderInvitationRow) -> VFolderUUID:
-        return row.id
+    def to_data(self, row: VFolderInvitationRow) -> VFolderInvitationID:
+        return VFolderInvitationID(row.id)
 
 
 @dataclass
-class VFolderPermissionBatchPurger(FieldBatchPurger[VFolderPermissionRow, VFolderUUID]):
+class VFolderPermissionBatchPurger(
+    FieldBatchPurger[VFolderUUID, VFolderPermissionRow, VFolderPermissionID]
+):
     """Clears the per-user permission rows of the vfolders going away.
 
     Permission rows stand outside the RBAC graph, so nothing is torn down with them.
     """
 
-    vfolder_ids: Sequence[UUID]
-
     @override
-    def build_subquery(self) -> sa.sql.Select[tuple[VFolderPermissionRow]]:
-        return sa.select(VFolderPermissionRow).where(
-            VFolderPermissionRow.vfolder.in_(self.vfolder_ids)
-        )
+    def build_subquery(self, owner_id: VFolderUUID) -> sa.sql.Select[tuple[VFolderPermissionRow]]:
+        return sa.select(VFolderPermissionRow).where(VFolderPermissionRow.vfolder == owner_id)
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
         return ()
 
     @override
-    def to_data(self, row: VFolderPermissionRow) -> VFolderUUID:
-        return row.id
+    def to_data(self, row: VFolderPermissionRow) -> VFolderPermissionID:
+        return VFolderPermissionID(row.id)
 
 
 @dataclass
-class VFolderUserPermissionBatchPurger(FieldBatchPurger[VFolderPermissionRow, VFolderUUID]):
+class VFolderUserPermissionBatchPurger(
+    FieldBatchPurger[VFolderUUID, VFolderPermissionRow, VFolderPermissionID]
+):
     """Clears one user's mount permission on one vfolder."""
 
-    vfolder_id: UUID
     user_id: UUID
 
     @override
-    def build_subquery(self) -> sa.sql.Select[tuple[VFolderPermissionRow]]:
+    def build_subquery(self, owner_id: VFolderUUID) -> sa.sql.Select[tuple[VFolderPermissionRow]]:
         return sa.select(VFolderPermissionRow).where(
-            (VFolderPermissionRow.vfolder == self.vfolder_id)
-            & (VFolderPermissionRow.user == self.user_id)
+            (VFolderPermissionRow.vfolder == owner_id) & (VFolderPermissionRow.user == self.user_id)
         )
 
     @override
@@ -85,5 +90,5 @@ class VFolderUserPermissionBatchPurger(FieldBatchPurger[VFolderPermissionRow, VF
         return ()
 
     @override
-    def to_data(self, row: VFolderPermissionRow) -> VFolderUUID:
-        return row.id
+    def to_data(self, row: VFolderPermissionRow) -> VFolderPermissionID:
+        return VFolderPermissionID(row.id)

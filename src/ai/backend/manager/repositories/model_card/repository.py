@@ -21,6 +21,7 @@ from ai.backend.manager.repositories.model_card.types import (
     AvailablePresetsSearchResult,
 )
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 from .db_source.db_source import ModelCardDBSource
 
@@ -30,8 +31,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ModelCardRepository:
     _db_source: ModelCardDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = ModelCardDBSource(db)
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
+        self._db_source = ModelCardDBSource(db, v2_ops_provider)
 
     async def update(self, updater: ModelCardUpdater) -> ModelCardData:
         return await self._db_source.update(updater)

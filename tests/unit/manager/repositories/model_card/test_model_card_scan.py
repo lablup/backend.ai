@@ -56,6 +56,7 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.model_card.db_source.db_source import ModelCardDBSource
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -248,7 +249,7 @@ class TestModelCardScanResourceRequirements:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ModelCardDBSource:
-        return ModelCardDBSource(db_with_cleanup)
+        return ModelCardDBSource(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     def _build_scan_spec(
         self,

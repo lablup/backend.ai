@@ -76,14 +76,18 @@ joins nothing.
 - Enrollment writes graph edges only. Granting a joining user the target's auto_assign
   roles is an explicit ops primitive — never an implicit side effect keyed on the type.
 
-## A batch purge says which kind it removes
+## A batch purge says which kind it removes, and what bounds it
 
 - `EntityBatchPurger` tears down each deleted row's virtual scope, memberships and
   permissions, as `EntityPurger` does for one; `FieldBatchPurger` does not, because a
   field row holds nothing in the graph.
 - The two are unrelated roots, so an entity spec cannot flow through the field path and
   leave its graph rows behind. There is no unmarked batch purge.
-- `entity_id(row)` takes the row: a batch names a subquery, not an id.
+- What bounds the sweep follows the same axis every other write does: an entity batch is
+  bounded by the scopes the ops call names, a field batch by the owner it is given —
+  `build_subquery(owner_id)`, like `create_field(owner_id, ...)`. No field operation is
+  scoped, and this one is not either.
+- `EntityBatchPurger.entity_id(row)` takes the row: a batch names a subquery, not an id.
 
 ## Values left for the database to compute
 

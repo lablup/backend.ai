@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
-from typing import Any, cast
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 
@@ -13,8 +12,7 @@ from ai.backend.manager.errors.repository import (
 )
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.models.specs.purger import EntityBatchPurger, FieldBatchPurger
-from ai.backend.manager.models.specs.types import ConflictCheck
+from ai.backend.manager.models.specs.purger import EntityBatchPurger
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 
@@ -49,33 +47,6 @@ class V2BatchWriteOps(V2WriteOpsBase):
         endpoints or internal system operations only.
         """
         return await self._batch_update_returning(None, updater)
-
-    async def batch_purge_field_entities_in_scopes[TRow: Base, TData](
-        self, scopes: Sequence[OperationScope], purger: FieldBatchPurger[TRow, TData]
-    ) -> list[TData]:
-        """Delete every field row the spec selects within ``scopes``; at least one is
-        required. Scope conditions are injected into the selecting subquery."""
-        if not scopes:
-            raise EmptyOperationScopeError(
-                "batch_purge_field_entities_in_scopes requires at least one scope; use "
-                "batch_purge_field_entities_in_global for an explicit unscoped batch purge."
-            )
-        await self._validate_scope_existence(scopes)
-        return await self._batch_purge_returning(
-            self._scopes_condition(scopes),
-            purger.build_subquery,
-            purger.conflict_checks(),
-            purger.to_data,
-        )
-
-    async def batch_purge_field_entities_in_global[TRow: Base, TData](
-        self, purger: FieldBatchPurger[TRow, TData]
-    ) -> list[TData]:
-        """Delete every field row the spec selects across the table, with NO scope
-        filter. Same authority requirement as the global search."""
-        return await self._batch_purge_returning(
-            None, purger.build_subquery, purger.conflict_checks(), purger.to_data
-        )
 
     async def batch_purge_entities_in_scopes[TRow: Base, TData](
         self, scopes: Sequence[OperationScope], purger: EntityBatchPurger[TRow, TData]
@@ -138,41 +109,3 @@ class V2BatchWriteOps(V2WriteOpsBase):
                 self._parse_integrity_error(e), updater.integrity_error_checks
             )
         return [updater.to_data(row_class(**dict(r._mapping))) for r in result.fetchall()]
-
-    async def _batch_purge_returning[TRow: Base, TData](
-        self,
-        scope_condition: sa.ColumnElement[bool] | None,
-        build_subquery: Callable[[], sa.sql.Select[Any]],
-        conflict_checks: Sequence[ConflictCheck],
-        to_data: Callable[[TRow], TData],
-        batch_size: int = 1000,
-    ) -> list[TData]:
-        base_subquery = build_subquery()
-        entity = base_subquery.column_descriptions[0]["entity"]
-        table = sa.inspect(entity).local_table
-        pk_columns = list(table.primary_key.columns)
-        row_class = cast("type[TRow]", entity)
-
-        await self._validate_conflict_checks(conflict_checks)
-
-        removed: list[TData] = []
-        while True:
-            selecting = build_subquery()
-            if scope_condition is not None:
-                selecting = selecting.where(scope_condition)
-            sub = selecting.subquery()
-            pk_subquery = sa.select(*[sub.c[pk.key] for pk in pk_columns]).limit(batch_size)
-            stmt = (
-                sa.delete(table)
-                .where(sa.tuple_(*pk_columns).in_(pk_subquery))
-                .returning(*table.columns)
-            )
-            try:
-                result = await self._sess.execute(stmt)
-            except sa.exc.IntegrityError as e:
-                raise self._parse_integrity_error(e) from e
-            rows = result.fetchall()
-            removed.extend(to_data(row_class(**dict(r._mapping))) for r in rows)
-            if len(rows) < batch_size:
-                break
-        return removed

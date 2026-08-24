@@ -117,6 +117,7 @@ from ai.backend.manager.models.vfolder.scopes import (
 from ai.backend.manager.models.vfolder.updaters import (
     VFolderAttributeUpdater,
     VFolderSoftDeleteUpdater,
+    VFolderTrashUpdater,
 )
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.base import (
@@ -129,7 +130,6 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
     execute_rbac_entity_purger,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.repositories.vfolder.purge_guards import find_active_vfolder_references
 from ai.backend.manager.repositories.vfolder.types import (
     BulkVFolderPurgeResult,
@@ -524,28 +524,32 @@ class VfolderRepository:
         Rejects the update while an active session mounts the vfolder; raises
         ``VFolderNotFound`` if no matching row exists.
         """
-        async with self._db.begin_session() as session:
-            # Pre-check: reject if any session is currently mounting this vfolder
+        # The mount key pairs the quota scope with the folder id, so it is read off the
+        # row; the row's identity does not change, and the guard rides on the UPDATE.
+        async with self._db.begin_readonly_session_read_committed() as session:
             vfolder_row = await self._get_vfolder_by_id(session, updater.vfolder_id)
             if vfolder_row is None:
                 raise VFolderNotFound()
-            mount_sessions = await get_sessions_by_mounted_folder(
-                session, VFolderID.from_row(vfolder_row)
+            mount_key = str(VFolderID.from_row(vfolder_row))
+
+        async with self._v2_ops.write_ops() as w:
+            data = await w.update_guarded_data(
+                VFolderTrashUpdater(vfolder_id=updater.vfolder_id, mount_key=mount_key)
             )
-            if mount_sessions:
-                session_ids = [str(sid) for sid in mount_sessions]
-                raise VFolderDeletionNotAllowed(
-                    "Cannot delete the vfolder. "
-                    f"The vfolder(id: {vfolder_row.id}) is mounted on sessions(ids: {session_ids})."
-                )
-            # Expire the pre-loaded ORM identity so the RETURNING clause produces
-            # a fresh row with updated status.
-            await session.refresh(vfolder_row)
-            session.expunge(vfolder_row)
-            data = await V2WriteOps(session).update_data(updater)
-            if data is None:
-                raise VFolderNotFound()
+        if data is not None:
             return data
+
+        async with self._db.begin_readonly_session_read_committed() as session:
+            if await self._get_vfolder_by_id(session, updater.vfolder_id) is None:
+                raise VFolderNotFound()
+            mount_sessions = await get_sessions_by_mounted_folder(
+                session, VFolderID.from_str(mount_key)
+            )
+        session_ids = [str(sid) for sid in mount_sessions]
+        raise VFolderDeletionNotAllowed(
+            "Cannot delete the vfolder. "
+            f"The vfolder(id: {updater.vfolder_id}) is mounted on sessions(ids: {session_ids})."
+        )
 
     @vfolder_repository_resilience.apply()
     async def update_vfolder_attribute(self, updater: VFolderAttributeUpdater) -> VFolderData:
@@ -877,8 +881,8 @@ class VfolderRepository:
         Delete a VFolder permission entry.
         """
         async with self._v2_ops.write_ops() as w:
-            await w.batch_purge_field_entities_in_global(
-                VFolderUserPermissionBatchPurger(vfolder_id=vfolder_id, user_id=user_id)
+            await w.batch_purge_field_entities(
+                VFolderUUID(vfolder_id), VFolderUserPermissionBatchPurger(user_id=user_id)
             )
             await w.revoke_entities([VFolderUUID(vfolder_id)], UserID(user_id))
 

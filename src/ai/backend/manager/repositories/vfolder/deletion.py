@@ -11,6 +11,7 @@ from collections.abc import Sequence
 
 import aiotools
 
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
@@ -51,12 +52,13 @@ async def initiate_vfolder_deletion(
         return 0
 
     async with v2_ops_provider.write_ops() as w:
-        await w.batch_purge_field_entities_in_global(
+        await w.batch_purge_entities_in_global(
             VFolderInvitationBatchPurger(vfolder_ids=vfolder_ids)
         )
-        await w.batch_purge_field_entities_in_global(
-            VFolderPermissionBatchPurger(vfolder_ids=vfolder_ids)
-        )
+        for vfolder_id in vfolder_ids:
+            await w.batch_purge_field_entities(
+                VFolderUUID(vfolder_id), VFolderPermissionBatchPurger()
+            )
     await update_vfolder_status(
         db_engine,
         vfolder_ids,

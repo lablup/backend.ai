@@ -277,8 +277,8 @@ class TestDomainPurgersIntegration:
 
         # Purge kernels
         async with V2DBOpsProvider(db_with_cleanup).write_ops() as w:
-            purged = await w.batch_purge_field_entities_in_global(
-                DomainKernelPurger(name=domain_name)
+            purged = await w.batch_purge_field_entities(
+                sample_domain.domain_id, DomainKernelPurger(name=domain_name)
             )
             assert len(purged) == len(sample_kernels)
 

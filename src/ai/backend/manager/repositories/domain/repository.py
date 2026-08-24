@@ -50,7 +50,7 @@ class DomainRepository:
     async def purge_domain(self, domain_id: DomainID, domain_name: str) -> DomainData:
         """Remove a domain and the kernel rows it left, in one transaction."""
         async with self._v2_ops.write_ops() as w:
-            await w.batch_purge_field_entities_in_global(DomainKernelPurger(name=domain_name))
+            await w.batch_purge_field_entities(domain_id, DomainKernelPurger(name=domain_name))
             data = await w.purge_entity(DomainPurger(domain_id=domain_id, name=domain_name))
             if data is None:
                 raise DomainDeletionFailed(f"Failed to delete domain: {domain_name}")

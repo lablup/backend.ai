@@ -14,7 +14,11 @@ from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.creator import FieldCreator, FieldToCreate, NestedFieldCreator
-from ai.backend.manager.models.specs.purger import FieldPurger, GuardedFieldPurger
+from ai.backend.manager.models.specs.purger import (
+    FieldBatchPurger,
+    FieldPurger,
+    GuardedFieldPurger,
+)
 from ai.backend.manager.models.specs.upserter import FieldUpserter
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 
@@ -86,6 +90,18 @@ class V2FieldWriteOps(V2WriteOpsBase):
         # First creator's checks: all specs share the same creator subclass.
         await self._insert_rows(rows, creators[0].integrity_error_checks())
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
+
+    async def batch_purge_field_entities[TOwnerID: EntityIdentifier, TRow: Base, TData](
+        self, owner_id: TOwnerID, purger: FieldBatchPurger[TOwnerID, TRow, TData]
+    ) -> list[TData]:
+        """Delete the owner's field rows the spec selects, in chunks, returning what
+        was removed. Bounded by the owner, as every field write is."""
+        return await self._batch_purge_returning(
+            None,
+            lambda: purger.build_subquery(owner_id),
+            purger.conflict_checks(),
+            purger.to_data,
+        )
 
     async def purge_field_entity[TRow: Base, TData: FieldData](
         self, purger: FieldPurger[TRow, TData]
