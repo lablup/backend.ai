@@ -24,15 +24,6 @@ def register_v2_entity_invitation_routes(
     registry.add("POST", "/{invitation_id}/accept", handler.accept, middlewares=[auth_required])
     registry.add("POST", "/{invitation_id}/reject", handler.reject, middlewares=[auth_required])
     registry.add("DELETE", "/{invitation_id}", handler.cancel, middlewares=[auth_required])
-    registry.add(
-        "POST", "/my/received-search", handler.search_received, middlewares=[auth_required]
-    )
-    registry.add("POST", "/my/sent-search", handler.search_sent, middlewares=[auth_required])
-    registry.add(
-        "POST",
-        "/targets/{target_entity_type}/{target_entity_id}/search",
-        handler.search_by_target,
-        middlewares=[auth_required],
-    )
+    registry.add("POST", "/scoped/search", handler.scoped_search, middlewares=[auth_required])
 
     return registry

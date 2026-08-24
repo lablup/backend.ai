@@ -9,11 +9,9 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.entity_invitation import EntityInvitationID
 from ai.backend.common.dto.manager.v2.entity_invitation.request import (
     CreateEntityInvitationInput,
-    SearchEntityInvitationsInput,
+    ScopedSearchEntityInvitationsInput,
 )
 from ai.backend.manager.api.rest.v2.path_params import InvitationIdPathParam
-
-from .path_params import EntityTargetPathParam
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.entity_invitation.adapter import EntityInvitationAdapter
@@ -48,25 +46,9 @@ class V2EntityInvitationHandler:
         result = await self._adapter.cancel(EntityInvitationID(path.parsed.invitation_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def search_received(self, body: BodyParam[SearchEntityInvitationsInput]) -> APIResponse:
-        """The invitations addressed to the requester."""
-        result = await self._adapter.search_received(body.parsed)
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
-
-    async def search_sent(self, body: BodyParam[SearchEntityInvitationsInput]) -> APIResponse:
-        """The invitations the requester sent."""
-        result = await self._adapter.search_sent(body.parsed)
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
-
-    async def search_by_target(
-        self,
-        path: PathParam[EntityTargetPathParam],
-        body: BodyParam[SearchEntityInvitationsInput],
+    async def scoped_search(
+        self, body: BodyParam[ScopedSearchEntityInvitationsInput]
     ) -> APIResponse:
-        """The invitations offering one entity."""
-        result = await self._adapter.search_by_target(
-            path.parsed.target_entity_type,
-            EntityInvitationID(path.parsed.target_entity_id),
-            body.parsed,
-        )
+        """The invitations the named sides reach."""
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

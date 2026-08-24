@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.data.permission.types import OperationType
+from ai.backend.common.data.entity.entity_invitation import EntityInvitationID
+from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.entity_invitation.types import EntityInvitationStatusDTO
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 
 __all__ = (
     "EntityInvitationNode",
@@ -19,13 +21,13 @@ __all__ = (
 
 
 class EntityInvitationNode(BaseResponseModel):
-    id: UUID = Field(description="Invitation id")
-    inviter_user_id: UUID = Field(description="Who sent the offer")
+    id: EntityInvitationID = Field(description="Invitation id")
+    inviter_user_id: UserID = Field(description="Who sent the offer")
     invitee_email: str = Field(description="Address the offer goes to")
-    target_entity_type: str = Field(description="Type of the entity being offered")
-    target_entity_id: UUID = Field(description="Id of the entity being offered")
-    operations: list[OperationType] = Field(
-        description="Operations the offer allows; empty for no ceiling"
+    target_entity_type: EntityType = Field(description="Type of the entity being offered")
+    target_entity_id: EntityID = Field(description="Id of the entity being offered")
+    permissions: list[PermissionBitDTO] = Field(
+        description="Permissions the offer caps at; empty for no ceiling"
     )
     status: EntityInvitationStatusDTO = Field(description="Invitation status")
     created_at: datetime = Field(description="Creation timestamp")

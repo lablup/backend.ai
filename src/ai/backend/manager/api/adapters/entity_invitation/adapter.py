@@ -4,15 +4,16 @@ from collections.abc import Sequence
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.entity_invitation import EntityInvitationID
-from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
+from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.permission.types import OperationType, Permission
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.entity_invitation.request import (
     CreateEntityInvitationInput,
     EntityInvitationFilter,
     EntityInvitationOrderBy,
-    SearchEntityInvitationsInput,
+    EntityInvitationScopeItemDTO,
+    ScopedSearchEntityInvitationsInput,
 )
 from ai.backend.common.dto.manager.v2.entity_invitation.response import (
     EntityInvitationNode,
@@ -21,8 +22,10 @@ from ai.backend.common.dto.manager.v2.entity_invitation.response import (
 )
 from ai.backend.common.dto.manager.v2.entity_invitation.types import (
     EntityInvitationOrderField,
+    EntityInvitationSideDTO,
     EntityInvitationStatusDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -77,14 +80,14 @@ class EntityInvitationAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        target = RuntimeEntityID(EntityType(input.target_entity_type), input.target_entity_id)
+        target = RuntimeEntityID(input.target_entity_type, input.target_entity_id)
         result = await self._processors.entity_invitation.create.run(
             CreateEntityInvitationAction(
                 creator=EntityInvitationCreator(
                     inviter_user_id=UserID(me.user_id),
                     invitee_email=input.invitee_email,
                     target=target,
-                    permission_cap=self._to_permission_cap(input.operations),
+                    permission_cap=self._to_permission_cap(input.permissions),
                 )
             )
         )
@@ -124,30 +127,15 @@ class EntityInvitationAdapter(BaseAdapter):
         )
         return EntityInvitationPayload(invitation=self._to_node(result.data))
 
-    async def search_received(
-        self, input: SearchEntityInvitationsInput
+    async def scoped_search(
+        self, input: ScopedSearchEntityInvitationsInput
     ) -> SearchEntityInvitationsPayload:
-        return await self._search((ReceivedEntityInvitationScopeItem(user_id=self._me()),), input)
+        """Page through the invitations the named sides reach, combined with OR.
 
-    async def search_sent(
-        self, input: SearchEntityInvitationsInput
-    ) -> SearchEntityInvitationsPayload:
-        return await self._search((SentEntityInvitationScopeItem(user_id=self._me()),), input)
-
-    async def search_by_target(
-        self,
-        target_entity_type: str,
-        target_entity_id: EntityInvitationID,
-        input: SearchEntityInvitationsInput,
-    ) -> SearchEntityInvitationsPayload:
-        target = RuntimeEntityID(EntityType(target_entity_type), target_entity_id)
-        return await self._search((TargetEntityInvitationScopeItem(target=target),), input)
-
-    async def _search(
-        self,
-        items: Sequence[EntityInvitationScopeItem],
-        input: SearchEntityInvitationsInput,
-    ) -> SearchEntityInvitationsPayload:
+        The two sides answered for by the requester name nobody: whose invitations they
+        are comes from the caller's identity, not from what they sent.
+        """
+        items = [self._to_scope_item(item) for item in input.scope.items]
         searcher = self._build_searcher(
             EntityInvitationSearcher,
             conditions=self._convert_filter(input.filter) if input.filter else [],
@@ -170,30 +158,40 @@ class EntityInvitationAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
+    def _to_scope_item(self, item: EntityInvitationScopeItemDTO) -> EntityInvitationScopeItem:
+        match item.side:
+            case EntityInvitationSideDTO.RECEIVED:
+                return ReceivedEntityInvitationScopeItem(user_id=self._me())
+            case EntityInvitationSideDTO.SENT:
+                return SentEntityInvitationScopeItem(user_id=self._me())
+            case EntityInvitationSideDTO.TARGET:
+                entity_type = item.target_entity_type
+                entity_id = item.target_entity_id
+                if entity_type is None or entity_id is None:
+                    raise UnreachableError("A TARGET item naming nothing is refused when parsed")
+                return TargetEntityInvitationScopeItem(
+                    target=RuntimeEntityID(entity_type, entity_id)
+                )
+
     def _me(self) -> UserID:
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
         return UserID(me.user_id)
 
-    def _to_permission_cap(self, operations: Sequence[OperationType]) -> Permission | None:
+    def _to_permission_cap(self, permissions: Sequence[PermissionBitDTO]) -> Permission | None:
         """An empty list means no ceiling, which is what ``None`` says to the graph."""
-        if not operations:
+        if not permissions:
             return None
         cap = Permission.NONE
-        for operation in operations:
-            cap |= Permission.from_operation(operation)
+        for permission in permissions:
+            cap |= Permission[permission.name]
         return cap
 
-    def _to_operations(self, cap: Permission | None) -> list[OperationType]:
+    def _to_permission_dtos(self, cap: Permission | None) -> list[PermissionBitDTO]:
         if cap is None:
             return []
-        return [
-            operation
-            for operation in OperationType
-            if Permission.from_operation(operation) is not Permission.NONE
-            and cap & Permission.from_operation(operation)
-        ]
+        return [dto for dto in PermissionBitDTO if cap & Permission[dto.name]]
 
     def _convert_filter(self, filter: EntityInvitationFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
@@ -234,9 +232,9 @@ class EntityInvitationAdapter(BaseAdapter):
             id=data.id,
             inviter_user_id=data.inviter_user_id,
             invitee_email=data.invitee_email,
-            target_entity_type=str(data.target_entity_type),
+            target_entity_type=data.target_entity_type,
             target_entity_id=data.target_entity_id,
-            operations=self._to_operations(data.permission_cap),
+            permissions=self._to_permission_dtos(data.permission_cap),
             status=EntityInvitationStatusDTO(data.status),
             created_at=data.created_at,
             updated_at=data.updated_at,
