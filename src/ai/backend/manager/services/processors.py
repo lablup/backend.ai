@@ -126,6 +126,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.keypair_resource_policy.processors import (
         KeypairResourcePolicyProcessors,
     )
+    from ai.backend.manager.services.label.processors import (
+        LabelProcessors,
+    )
     from ai.backend.manager.services.login_client_type.processors import (
         LoginClientTypeProcessors,
     )
@@ -440,6 +443,7 @@ class Processors:
     deployment: DeploymentProcessors
     storage_namespace: StorageNamespaceProcessors
     audit_log: AuditLogProcessors
+    label: LabelProcessors
     idle_checker_assignment: IdleCheckerAssignmentProcessors
     scheduling_history: SchedulingHistoryProcessors
     service_catalog: ServiceCatalogProcessors
