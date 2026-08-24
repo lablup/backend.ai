@@ -78,8 +78,17 @@ class UserCreator(RoleManagedEntityCreator[UserRow, UserData]):
                 violation_type=NotNullViolationError,
                 error=UserCreationBadRequest(f"Domain '{self.domain_id}' does not exist."),
             ),
+            # Named, so only the domain's own keys answer as a missing domain: an
+            # unnamed check claimed every foreign key the row has, and a bad
+            # ``resource_policy`` was reported as a bad domain.
             IntegrityErrorCheck(
                 violation_type=ForeignKeyViolationError,
+                constraint_name="fk_users_domain_id_domains",
+                error=UserCreationBadRequest(f"Domain '{self.domain_id}' does not exist."),
+            ),
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                constraint_name="fk_users_domain_name_domains",
                 error=UserCreationBadRequest(f"Domain '{self.domain_id}' does not exist."),
             ),
         )
