@@ -333,7 +333,7 @@ class ArtifactRevisionService:
         self, action: SearchArtifactRevisionsAction
     ) -> SearchArtifactRevisionsActionResult:
         result = await self._artifact_repository.search_artifact_revisions(
-            querier=action.querier,
+            searcher=action.searcher,
         )
         return SearchArtifactRevisionsActionResult(
             data=result.items,

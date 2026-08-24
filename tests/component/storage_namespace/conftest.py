@@ -55,7 +55,7 @@ def object_storage_processors(
     config_provider: ManagerConfigProvider,
     processor_registry: ProcessorRegistry[Any],
 ) -> ObjectStorageProcessors:
-    artifact_repository = ArtifactRepository(database_engine)
+    artifact_repository = ArtifactRepository(database_engine, V2DBOpsProvider(database_engine))
     object_storage_repository = ObjectStorageRepository(database_engine)
     storage_namespace_repository = StorageNamespaceRepository(database_engine)
     service = ObjectStorageService(

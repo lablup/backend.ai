@@ -37,13 +37,14 @@ from ai.backend.manager.errors.artifact_registry import (
     ReservoirConnectionError,
 )
 from ai.backend.manager.errors.common import ServerMisconfiguredError
-from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.models.artifact.searchers import (
+    ArtifactSearcher,
+    ArtifactWithRevisionsSearcher,
+)
+from ai.backend.manager.models.artifact.updaters import ArtifactUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
-from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpec
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
@@ -201,7 +202,7 @@ class TestArtifactService:
         mock_artifact_repository: MagicMock,
         sample_artifact_data: ArtifactData,
     ) -> None:
-        """Test searching artifacts with querier"""
+        """Test searching artifacts"""
         mock_artifact_repository.search_artifacts = AsyncMock(
             return_value=ArtifactListResult(
                 items=[sample_artifact_data],
@@ -211,19 +212,19 @@ class TestArtifactService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactsAction(querier=querier)
+        action = SearchArtifactsAction(searcher=searcher)
         result = await artifact_service.search(action)
 
         assert result.data == [sample_artifact_data]
         assert result.total_count == 1
         assert result.has_next_page is False
         assert result.has_previous_page is False
-        mock_artifact_repository.search_artifacts.assert_called_once_with(querier=querier)
+        mock_artifact_repository.search_artifacts.assert_called_once_with(searcher=searcher)
 
     async def test_search_artifacts_empty_result(
         self,
@@ -240,12 +241,12 @@ class TestArtifactService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactsAction(querier=querier)
+        action = SearchArtifactsAction(searcher=searcher)
         result = await artifact_service.search(action)
 
         assert result.data == []
@@ -267,12 +268,12 @@ class TestArtifactService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactSearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactsAction(querier=querier)
+        action = SearchArtifactsAction(searcher=searcher)
         result = await artifact_service.search(action)
 
         assert result.total_count == 25
@@ -286,12 +287,9 @@ class TestArtifactService:
         sample_artifact_data: ArtifactData,
     ) -> None:
         """Test updating an artifact"""
-        updater_spec = ArtifactUpdaterSpec(
+        updater = ArtifactUpdater(
+            artifact_id=sample_artifact_data.id,
             description=TriState.update("Updated description"),
-        )
-        updater = Updater[ArtifactRow](
-            spec=updater_spec,
-            pk_value=sample_artifact_data.id,
         )
         updated_artifact = ArtifactData(
             id=sample_artifact_data.id,
@@ -1368,7 +1366,7 @@ class TestSearchArtifactsWithRevisionsAction:
         artifact_service: ArtifactService,
         mock_artifact_repository: MagicMock,
     ) -> None:
-        """BatchQuerier cursor-based pagination sets has_next_page/has_previous_page"""
+        """Cursor-based pagination sets has_next_page/has_previous_page"""
         now = datetime.now(UTC)
         rid = uuid4()
         item = ArtifactDataWithRevisions(
@@ -1396,12 +1394,12 @@ class TestSearchArtifactsWithRevisionsAction:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactWithRevisionsSearcher(
             pagination=OffsetPagination(limit=1, offset=5),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactsWithRevisionsAction(querier=querier)
+        action = SearchArtifactsWithRevisionsAction(searcher=searcher)
         result = await artifact_service.search_with_revisions(action)
 
         assert result.has_next_page is True
@@ -1424,12 +1422,12 @@ class TestSearchArtifactsWithRevisionsAction:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactWithRevisionsSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactsWithRevisionsAction(querier=querier)
+        action = SearchArtifactsWithRevisionsAction(searcher=searcher)
         result = await artifact_service.search_with_revisions(action)
 
         assert result.data == []

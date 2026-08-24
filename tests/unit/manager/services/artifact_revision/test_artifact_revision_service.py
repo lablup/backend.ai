@@ -39,10 +39,10 @@ from ai.backend.manager.errors.artifact import (
 )
 from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
 from ai.backend.manager.errors.common import ServerMisconfiguredError
+from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisionSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
@@ -245,7 +245,7 @@ class TestArtifactRevisionService:
         mock_revision_ops: MagicMock,
         sample_artifact_revision_data: ArtifactRevisionData,
     ) -> None:
-        """Test searching artifact revisions with querier"""
+        """Test searching artifact revisions"""
         mock_artifact_repository.search_artifact_revisions = AsyncMock(
             return_value=ArtifactRevisionListResult(
                 items=[sample_artifact_revision_data],
@@ -255,19 +255,21 @@ class TestArtifactRevisionService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactRevisionsAction(querier=querier)
+        action = SearchArtifactRevisionsAction(searcher=searcher)
         result = await artifact_revision_service.search_revision(action)
 
         assert result.data == [sample_artifact_revision_data]
         assert result.total_count == 1
         assert result.has_next_page is False
         assert result.has_previous_page is False
-        mock_artifact_repository.search_artifact_revisions.assert_called_once_with(querier=querier)
+        mock_artifact_repository.search_artifact_revisions.assert_called_once_with(
+            searcher=searcher
+        )
 
     async def test_search_artifact_revisions_empty_result(
         self,
@@ -285,12 +287,12 @@ class TestArtifactRevisionService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactRevisionsAction(querier=querier)
+        action = SearchArtifactRevisionsAction(searcher=searcher)
         result = await artifact_revision_service.search_revision(action)
 
         assert result.data == []
@@ -313,12 +315,12 @@ class TestArtifactRevisionService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactRevisionsAction(querier=querier)
+        action = SearchArtifactRevisionsAction(searcher=searcher)
         result = await artifact_revision_service.search_revision(action)
 
         assert result.total_count == 25

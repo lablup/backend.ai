@@ -5,13 +5,13 @@ from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactData
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.artifact.searchers import ArtifactSearcher
 from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 
 @dataclass
 class SearchArtifactsAction(ArtifactAction):
-    querier: BatchQuerier
+    searcher: ArtifactSearcher
 
     @override
     @classmethod

@@ -25,6 +25,7 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.artifact_revision.queriers import ArtifactRevisionQuerier
+from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisionSearcher
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -53,7 +54,6 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
@@ -357,7 +357,7 @@ class TestArtifactRevisionRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ArtifactRepository, None]:
         """Create ArtifactRepository instance with database"""
-        repo = ArtifactRepository(db_with_cleanup)
+        repo = ArtifactRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
         yield repo
 
     @pytest.fixture
@@ -438,7 +438,7 @@ class TestArtifactRevisionRepository:
         sample_revisions_for_filtering: dict[ArtifactStatus, uuid.UUID],
     ) -> None:
         """Test searching artifact revisions filtered by status returns only matching revisions"""
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 lambda: ArtifactRevisionRow.status == ArtifactStatus.AVAILABLE.value,
@@ -446,7 +446,7 @@ class TestArtifactRevisionRepository:
             orders=[],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         result_revision_ids = [revision.id for revision in result.items]
         assert sample_revisions_for_filtering[ArtifactStatus.AVAILABLE] in result_revision_ids
@@ -461,7 +461,7 @@ class TestArtifactRevisionRepository:
         """Test artifact_id filter condition on search_artifact_revisions."""
         fixture = sample_revisions_for_artifact_id_filtering
 
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 lambda: ArtifactRevisionRow.artifact_id == fixture.target_artifact_id,
@@ -469,7 +469,7 @@ class TestArtifactRevisionRepository:
             orders=[],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         assert result.total_count == len(fixture.target_revision_ids)
         result_ids = {r.id for r in result.items}
@@ -486,13 +486,13 @@ class TestArtifactRevisionRepository:
         sample_revisions_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching artifact revisions ordered by version ascending"""
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[ArtifactRevisionRow.version.asc()],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         result_versions = [revision.version for revision in result.items]
         assert result_versions == sorted(result_versions)
@@ -505,13 +505,13 @@ class TestArtifactRevisionRepository:
         sample_revisions_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching artifact revisions ordered by version descending"""
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[ArtifactRevisionRow.version.desc()],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         result_versions = [revision.version for revision in result.items]
         assert result_versions == sorted(result_versions, reverse=True)
@@ -524,13 +524,13 @@ class TestArtifactRevisionRepository:
         sample_revisions_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test searching artifact revisions ordered by size descending"""
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[ArtifactRevisionRow.size.desc()],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         result_sizes = [revision.size for revision in result.items if revision.size is not None]
         assert result_sizes == sorted(result_sizes, reverse=True)
@@ -545,13 +545,13 @@ class TestArtifactRevisionRepository:
         sample_revisions_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test first page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
@@ -562,13 +562,13 @@ class TestArtifactRevisionRepository:
         sample_revisions_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test second page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[],
             orders=[],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
@@ -579,13 +579,13 @@ class TestArtifactRevisionRepository:
         sample_revisions_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test last page of offset-based pagination with partial results"""
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=20),
             conditions=[],
             orders=[],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         assert len(result.items) == 5
         assert result.total_count == 25
@@ -603,7 +603,7 @@ class TestArtifactRevisionRepository:
         # Filter: only AVAILABLE revisions
         # Order: by version descending
         # Pagination: limit 3, offset 2
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=3, offset=2),
             conditions=[
                 lambda: ArtifactRevisionRow.status == ArtifactStatus.AVAILABLE.value,
@@ -611,7 +611,7 @@ class TestArtifactRevisionRepository:
             orders=[ArtifactRevisionRow.version.desc()],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         # Total AVAILABLE revisions: 8, so total_count should be 8
         assert result.total_count == 8

@@ -74,15 +74,15 @@ from ai.backend.manager.models.artifact.orders import (
     resolve_order,
 )
 from ai.backend.manager.models.artifact.row import ArtifactRow
+from ai.backend.manager.models.artifact.searchers import ArtifactSearcher
+from ai.backend.manager.models.artifact.updaters import ArtifactUpdater
 from ai.backend.manager.models.artifact_revision.conditions import ArtifactRevisionConditions
 from ai.backend.manager.models.artifact_revision.orders import ArtifactRevisionOrders
 from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
+from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisionSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpec
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.artifact.actions.delegate_scan import (
     DelegateScanArtifactsAction,
     DelegateScanArtifactsActionResult,
@@ -136,10 +136,8 @@ class ArtifactAdapter(BaseAdapter):
         input: AdminSearchArtifactsInput,
     ) -> AdminSearchArtifactsPayload:
         """Search artifacts (admin, no scope) with filters, orders, and pagination."""
-        querier = self.build_querier(input)
-
         action_result = await self._processors.artifact.search_artifacts.run(
-            SearchArtifactsAction(querier=querier)
+            SearchArtifactsAction(searcher=self.build_searcher(input))
         )
 
         return AdminSearchArtifactsPayload(
@@ -167,10 +165,12 @@ class ArtifactAdapter(BaseAdapter):
         orders.append(TIEBREAKER_ORDER)
 
         pagination = self._build_gql_pagination_artifacts(input)
-        querier = BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
-
         action_result = await self._processors.artifact.search_artifacts.run(
-            SearchArtifactsAction(querier=querier)
+            SearchArtifactsAction(
+                searcher=ArtifactSearcher(
+                    pagination=pagination, conditions=conditions, orders=orders
+                )
+            )
         )
 
         return AdminSearchArtifactsPayload(
@@ -198,10 +198,12 @@ class ArtifactAdapter(BaseAdapter):
         orders.append(ArtifactRevisionRow.id.asc())  # tiebreaker
 
         pagination = self._build_gql_pagination_revisions(input)
-        querier = BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
-
         action_result = await self._processors.artifact.revision.search_revision.run(
-            SearchArtifactRevisionsAction(querier=querier)
+            SearchArtifactRevisionsAction(
+                searcher=ArtifactRevisionSearcher(
+                    pagination=pagination, conditions=conditions, orders=orders
+                )
+            )
         )
 
         return AdminSearchArtifactRevisionsPayload(
@@ -219,13 +221,13 @@ class ArtifactAdapter(BaseAdapter):
         if not artifact_ids:
             return []
 
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=len(artifact_ids)),
-            conditions=[ArtifactConditions.by_ids(artifact_ids)],
-        )
-
         action_result = await self._processors.artifact.search_artifacts.run(
-            SearchArtifactsAction(querier=querier)
+            SearchArtifactsAction(
+                searcher=ArtifactSearcher(
+                    pagination=OffsetPagination(limit=len(artifact_ids)),
+                    conditions=[ArtifactConditions.by_ids(artifact_ids)],
+                )
+            )
         )
 
         artifact_map = {item.id: self._data_to_dto(item) for item in action_result.data}
@@ -241,13 +243,13 @@ class ArtifactAdapter(BaseAdapter):
         if not revision_ids:
             return []
 
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=len(revision_ids)),
-            conditions=[ArtifactRevisionConditions.by_ids(revision_ids)],
-        )
-
         action_result = await self._processors.artifact.revision.search_revision.run(
-            SearchArtifactRevisionsAction(querier=querier)
+            SearchArtifactRevisionsAction(
+                searcher=ArtifactRevisionSearcher(
+                    pagination=OffsetPagination(limit=len(revision_ids)),
+                    conditions=[ArtifactRevisionConditions.by_ids(revision_ids)],
+                )
+            )
         )
 
         revision_map = {item.id: self._revision_data_to_dto(item) for item in action_result.data}
@@ -266,7 +268,8 @@ class ArtifactAdapter(BaseAdapter):
         artifact_id: UUID,
     ) -> UpdateArtifactPayload:
         """Update artifact metadata (readonly flag and description)."""
-        spec = ArtifactUpdaterSpec(
+        updater = ArtifactUpdater(
+            artifact_id=ArtifactID(artifact_id),
             readonly=(
                 TriState.update(input.readonly)
                 if input.readonly is not None
@@ -278,7 +281,6 @@ class ArtifactAdapter(BaseAdapter):
                 else TriState[str].from_graphql(input.description)
             ),
         )
-        updater: Updater[ArtifactRow] = Updater(spec=spec, pk_value=artifact_id)
         action_result = await self._processors.artifact.update.run(
             UpdateArtifactAction(artifact_id=ArtifactID(artifact_id), updater=updater)
         )
@@ -470,13 +472,14 @@ class ArtifactAdapter(BaseAdapter):
         )
         return [self._data_with_revisions_to_dto(item) for item in action_result.result]
 
-    def build_querier(self, input: AdminSearchArtifactsInput) -> BatchQuerier:
-        """Build a BatchQuerier from the search input DTO."""
+    def build_searcher(self, input: AdminSearchArtifactsInput) -> ArtifactSearcher:
+        """Build an artifact searcher from the search input DTO."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else [DEFAULT_FORWARD_ORDER]
         orders.append(TIEBREAKER_ORDER)
-        pagination = self._build_pagination(input)
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return ArtifactSearcher(
+            pagination=self._build_pagination(input), conditions=conditions, orders=orders
+        )
 
     def _convert_gql_filter(
         self,

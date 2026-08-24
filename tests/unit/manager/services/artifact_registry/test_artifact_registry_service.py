@@ -27,11 +27,17 @@ from ai.backend.manager.data.reservoir_registry.types import (
     ReservoirRegistryListResult,
 )
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
+from ai.backend.manager.models.artifact_registries.searchers import ArtifactRegistrySearcher
+from ai.backend.manager.models.huggingface_registry.creators import HuggingFaceRegistryCreator
+from ai.backend.manager.models.huggingface_registry.searchers import (
+    HuggingFaceRegistrySearcher,
+)
+from ai.backend.manager.models.huggingface_registry.updaters import HuggingFaceRegistryUpdater
+from ai.backend.manager.models.reservoir_registry.creators import ReservoirRegistryCreator
+from ai.backend.manager.models.reservoir_registry.searchers import ReservoirRegistrySearcher
+from ai.backend.manager.models.reservoir_registry.updaters import ReservoirRegistryUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
@@ -164,12 +170,12 @@ class TestArtifactRegistryService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactRegistriesAction(querier=querier)
+        action = SearchArtifactRegistriesAction(searcher=searcher)
         result = await artifact_registry_service.search_artifact_registries(action)
 
         assert result.registries == [sample_registry_data]
@@ -177,7 +183,7 @@ class TestArtifactRegistryService:
         assert result.has_next_page is False
         assert result.has_previous_page is False
         mock_artifact_registry_repository.search_artifact_registries.assert_called_once_with(
-            querier=querier
+            searcher=searcher
         )
 
     async def test_search_artifact_registries_empty_result(
@@ -194,12 +200,12 @@ class TestArtifactRegistryService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactRegistriesAction(querier=querier)
+        action = SearchArtifactRegistriesAction(searcher=searcher)
         result = await artifact_registry_service.search_artifact_registries(action)
 
         assert result.registries == []
@@ -220,12 +226,12 @@ class TestArtifactRegistryService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactRegistriesAction(querier=querier)
+        action = SearchArtifactRegistriesAction(searcher=searcher)
         result = await artifact_registry_service.search_artifact_registries(action)
 
         assert result.total_count == 25
@@ -255,7 +261,7 @@ class TestCreateHuggingFaceRegistryAction:
             id=uuid4(), name="my-hf", url="https://huggingface.co", token="hf_token"
         )
         mock_huggingface_repository.create = AsyncMock(return_value=expected)
-        creator = MagicMock(spec=Creator)
+        creator = HuggingFaceRegistryCreator(url="https://huggingface.co", token="hf_token")
         meta = ArtifactRegistryCreatorMeta(name="my-hf")
 
         action = CreateHuggingFaceRegistryAction(creator=creator, meta=meta)
@@ -273,7 +279,9 @@ class TestCreateHuggingFaceRegistryAction:
             id=uuid4(), name="secure-hf", url="https://huggingface.co", token="hf_secret_api_key"
         )
         mock_huggingface_repository.create = AsyncMock(return_value=expected)
-        creator = MagicMock(spec=Creator)
+        creator = HuggingFaceRegistryCreator(
+            url="https://huggingface.co", token="hf_secret_api_key"
+        )
         meta = ArtifactRegistryCreatorMeta(name="secure-hf")
 
         action = CreateHuggingFaceRegistryAction(creator=creator, meta=meta)
@@ -386,8 +394,7 @@ class TestUpdateHuggingFaceRegistryAction:
             id=registry_id, name="updated-hf", url="https://huggingface.co", token="new_token"
         )
         mock_huggingface_repository.update = AsyncMock(return_value=updated)
-        updater = MagicMock(spec=Updater)
-        updater.pk_value = registry_id
+        updater = HuggingFaceRegistryUpdater(registry_id=ArtifactRegistryID(registry_id))
         meta = ArtifactRegistryModifierMeta()
 
         action = UpdateHuggingFaceRegistryAction(
@@ -466,16 +473,16 @@ class TestSearchHuggingFaceRegistriesAction:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = HuggingFaceRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0), conditions=[], orders=[]
         )
-        action = SearchHuggingFaceRegistriesAction(querier=querier)
+        action = SearchHuggingFaceRegistriesAction(searcher=searcher)
         result = await service.search_huggingface_registries(action)
 
         assert result.registries == [hf_data]
         assert result.total_count == 1
         assert result.has_next_page is False
-        mock_huggingface_repository.search_registries.assert_called_once_with(querier=querier)
+        mock_huggingface_repository.search_registries.assert_called_once_with(searcher=searcher)
 
 
 class TestGetHuggingFaceRegistriesAction:
@@ -537,7 +544,12 @@ class TestCreateReservoirRegistryAction:
             api_version="v1",
         )
         mock_reservoir_repository.create = AsyncMock(return_value=expected)
-        creator = MagicMock(spec=Creator)
+        creator = ReservoirRegistryCreator(
+            endpoint="https://reservoir.example.com",
+            access_key="ak",
+            secret_key="sk",
+            api_version="v1",
+        )
         meta = ArtifactRegistryCreatorMeta(name="my-reservoir")
 
         action = CreateReservoirRegistryAction(creator=creator, meta=meta)
@@ -670,8 +682,7 @@ class TestUpdateReservoirRegistryAction:
             api_version="v2",
         )
         mock_reservoir_repository.update = AsyncMock(return_value=updated)
-        updater = MagicMock(spec=Updater)
-        updater.pk_value = reservoir_id
+        updater = ReservoirRegistryUpdater(registry_id=ArtifactRegistryID(reservoir_id))
         meta = ArtifactRegistryModifierMeta()
 
         action = UpdateReservoirRegistryAction(
@@ -704,13 +715,11 @@ class TestDeleteReservoirRegistryAction:
         reservoir_id = uuid4()
         mock_reservoir_repository.delete = AsyncMock(return_value=reservoir_id)
 
-        action = DeleteReservoirRegistryAction(
-            registry_id=ArtifactRegistryID(reservoir_id), reservoir_id=reservoir_id
-        )
+        action = DeleteReservoirRegistryAction(registry_id=ArtifactRegistryID(reservoir_id))
         result = await service.delete_reservoir_registry(action)
 
         assert result.deleted_reservoir_id == reservoir_id
-        mock_reservoir_repository.delete.assert_called_once_with(reservoir_id)
+        mock_reservoir_repository.delete.assert_called_once_with(ArtifactRegistryID(reservoir_id))
 
 
 class TestSearchReservoirRegistriesAction:
@@ -745,15 +754,15 @@ class TestSearchReservoirRegistriesAction:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ReservoirRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0), conditions=[], orders=[]
         )
-        action = SearchReservoirRegistriesAction(querier=querier)
+        action = SearchReservoirRegistriesAction(searcher=searcher)
         result = await service.search_reservoir_registries(action)
 
         assert result.registries == [res_data]
         assert result.total_count == 1
-        mock_reservoir_repository.search_registries.assert_called_once_with(querier=querier)
+        mock_reservoir_repository.search_registries.assert_called_once_with(searcher=searcher)
 
     async def test_search_reservoir_registries_invalid_endpoint(
         self,
@@ -766,10 +775,10 @@ class TestSearchReservoirRegistriesAction:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ReservoirRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0), conditions=[], orders=[]
         )
-        action = SearchReservoirRegistriesAction(querier=querier)
+        action = SearchReservoirRegistriesAction(searcher=searcher)
         result = await service.search_reservoir_registries(action)
 
         assert result.registries == []
