@@ -8,7 +8,7 @@ advances across batches, and the per-tick budget defers the rest.
 
 ``sessions`` exercises the ordered kernels->sessions delete with the
 remaining-kernel / live-routing NOT EXISTS guards. The terminal-state filter is
-validated on the FK-free ``roles`` table via ``RetentionPurgerSpec`` directly;
+validated on the FK-free ``roles`` table via ``RetentionDrain`` directly;
 ``login`` and the invitation tables share that exact spec, so they are not
 duplicated here. deployments' specs are likewise exercised directly (its
 deployment_revisions FK chain makes a full sweep disproportionate); its
@@ -103,10 +103,9 @@ from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
-from ai.backend.manager.repositories.base import BatchPurger
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
+from ai.backend.manager.repositories.ops.v2.retention.write import RetentionDrain
 from ai.backend.manager.repositories.retention.db_source.db_source import RetentionDBSource
-from ai.backend.manager.repositories.retention.purgers import RetentionPurgerSpec
 from ai.backend.testutils.db import with_tables
 
 _NOW = datetime.now(UTC)
@@ -249,7 +248,7 @@ def _make_db_source(
     config_provider = MagicMock()
     config_provider.config.retention.batch_size = batch_size
     config_provider.config.retention.per_tick_budget = per_tick_budget
-    return RetentionDBSource(DBOpsProvider(engine), config_provider)
+    return RetentionDBSource(RetentionOpsProvider(engine), config_provider)
 
 
 async def _sweep_category(
@@ -503,17 +502,17 @@ class TestTerminalStateFilter:
                 RoleRow(name="active", status=RoleStatus.ACTIVE),
             ],
         )
-        spec = RetentionPurgerSpec(
+        spec = RetentionDrain(
             RoleRow,
             RoleRow.deleted_at,
             _THRESHOLD,
             conditions=(RoleRow.status == RoleStatus.DELETED,),
         )
 
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
 
-        assert result.deleted_count == 1
+        assert deleted_count == 1
         remaining = {name for (name,) in await self._role_names(db)}
         assert remaining == {"deleted-new", "active"}
 
@@ -1022,15 +1021,14 @@ class TestDeploymentsRetention:
             )
 
     async def _purge_endpoints(self, db: ExtendedAsyncSAEngine) -> int:
-        spec = RetentionPurgerSpec(
+        spec = RetentionDrain(
             EndpointRow,
             EndpointRow.destroyed_at,
             _THRESHOLD,
             conditions=(EndpointRow.lifecycle_stage == EndpointLifecycle.DESTROYED,),
         )
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
-        return result.deleted_count
+        async with RetentionOpsProvider(db).write_ops() as w:
+            return await w.drain(spec, batch_size=100)
 
     async def test_destroyed_endpoint_past_boundary_cascades_children(
         self, db: ExtendedAsyncSAEngine, scope: _Scope
@@ -1068,11 +1066,11 @@ class TestDeploymentsRetention:
         # A never-expiring token (NULL expires_at) is preserved.
         await self._add_token(db, scope, endpoint_id=DeploymentID(uuid.uuid4()), expires_at=None)
 
-        spec = RetentionPurgerSpec(EndpointTokenRow, EndpointTokenRow.expires_at, _THRESHOLD)
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
+        spec = RetentionDrain(EndpointTokenRow, EndpointTokenRow.expires_at, _THRESHOLD)
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
 
-        assert result.deleted_count == 1
+        assert deleted_count == 1
         assert await _count(db, EndpointTokenRow) == 2
 
     async def test_fk_less_child_deleted_by_destroyed_endpoint(
@@ -1090,7 +1088,7 @@ class TestDeploymentsRetention:
         await self._add_token(db, scope, endpoint_id=destroyed_id, expires_at=_NEW)
         await self._add_token(db, scope, endpoint_id=living_id, expires_at=_NEW)
 
-        spec = RetentionPurgerSpec(
+        spec = RetentionDrain(
             EndpointTokenRow,
             EndpointRow.destroyed_at,
             _THRESHOLD,
@@ -1098,10 +1096,10 @@ class TestDeploymentsRetention:
             source_key=EndpointRow.id,
             source_conditions=(EndpointRow.lifecycle_stage == EndpointLifecycle.DESTROYED,),
         )
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
 
-        assert result.deleted_count == 1  # only the destroyed endpoint's child
+        assert deleted_count == 1  # only the destroyed endpoint's child
         assert await _count(db, EndpointTokenRow) == 1  # the living endpoint's survives
 
 
@@ -1291,16 +1289,16 @@ class TestDeploymentsTerminalChildCleanup:
             db, scope, endpoint_id, status=RouteStatus.TERMINATED, updated_at=_NEW
         )
 
-        spec = RetentionPurgerSpec(
+        spec = RetentionDrain(
             RoutingRow,
             RoutingRow.updated_at,
             _THRESHOLD,
             conditions=(RoutingRow.status.in_(RouteStatus.terminal_statuses()),),
         )
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
 
-        assert result.deleted_count == 2  # terminated + failed-to-start, both old
+        assert deleted_count == 2  # terminated + failed-to-start, both old
         assert await _count(db, RoutingRow) == 2  # running + recently-terminated
         assert await _count(db, EndpointRow) == 1  # the live endpoint is untouched
 
@@ -1323,16 +1321,16 @@ class TestDeploymentsTerminalChildCleanup:
             db, endpoint_id, lifecycle=ReplicaGroupLifecycle.DRAINED, updated_at=_NEW
         )
 
-        spec = RetentionPurgerSpec(
+        spec = RetentionDrain(
             ReplicaGroupRow,
             ReplicaGroupRow.updated_at,
             _THRESHOLD,
             conditions=(ReplicaGroupRow.lifecycle.in_(ReplicaGroupLifecycle.terminal_statuses()),),
         )
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
 
-        assert result.deleted_count == 2  # drained + failed, both old
+        assert deleted_count == 2  # drained + failed, both old
         assert await _count(db, ReplicaGroupRow) == 2  # stable + recently-drained
         assert await _count(db, EndpointRow) == 1  # the live endpoint is untouched
 
@@ -1473,19 +1471,17 @@ class TestDeploymentsSessionGroupCleanup:
             )
         return session_id
 
-    def _deployment_specs(self) -> list[RetentionPurgerSpec[Base]]:
+    def _deployment_specs(self) -> list[RetentionDrain[Base]]:
         specs = RetentionDBSource._catalog(_THRESHOLD)[RetentionCategory.DEPLOYMENTS]
         return [spec for spec in specs if spec.row_class not in self._UNLOADED]
 
-    async def _drain(
-        self, db: ExtendedAsyncSAEngine, specs: Sequence[RetentionPurgerSpec[Base]]
-    ) -> int:
+    async def _drain(self, db: ExtendedAsyncSAEngine, specs: Sequence[RetentionDrain[Base]]) -> int:
         """Drain ``specs`` in order within one transaction, as the sweep does."""
         deleted = 0
-        async with DBOpsProvider(db).write_ops() as w:
+        async with RetentionOpsProvider(db).write_ops() as w:
             for spec in specs:
-                result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
-                deleted += result.deleted_count
+                deleted_count = await w.drain(spec, batch_size=100)
+                deleted += deleted_count
         return deleted
 
     async def test_group_of_terminal_replica_group_purged(

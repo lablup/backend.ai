@@ -11,10 +11,15 @@ from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.model_card_resource_requirement import (
     ModelCardResourceRequirementID,
 )
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.resource_slot import ModelCardResourceRequirementRow
-from ai.backend.manager.models.specs.purger import EntityPurger, FieldBatchPurger
+from ai.backend.manager.models.specs.purger import (
+    EntityBatchPurger,
+    EntityPurger,
+    FieldBatchPurger,
+)
 from ai.backend.manager.models.specs.types import ConflictCheck
 
 
@@ -66,3 +71,30 @@ class ModelCardResourceRequirementBatchPurger(
     @override
     def to_data(self, row: ModelCardResourceRequirementRow) -> ModelCardResourceRequirementID:
         return row.id
+
+
+@dataclass
+class ModelCardVFolderBatchPurger(EntityBatchPurger[ModelCardRow, ModelCardID]):
+    """Clears every card registered on one vfolder, each with its graph.
+
+    Used when a card delete takes its vfolder along: a sibling card left pointing
+    at a trashed vfolder would be orphaned.
+    """
+
+    vfolder_id: VFolderUUID
+
+    @override
+    def entity_id(self, row: ModelCardRow) -> ModelCardID:
+        return ModelCardID(row.id)
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[ModelCardRow]]:
+        return sa.select(ModelCardRow).where(ModelCardRow.vfolder == self.vfolder_id)
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: ModelCardRow) -> ModelCardID:
+        return ModelCardID(row.id)

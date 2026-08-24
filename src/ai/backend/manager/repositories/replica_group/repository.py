@@ -18,12 +18,11 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupData,
     ReplicaGroupHandlerCategory,
 )
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.specs.updater import DataUpdater
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.ops.v2.replica_group.provider import ReplicaGroupOpsProvider
 from ai.backend.manager.repositories.replica_group.types import (
     ApplyWritesResult,
     AutoscaleReconcileFetch,
@@ -65,48 +64,46 @@ class ReplicaGroupRepository:
 
     _db_source: ReplicaGroupDBSource
 
-    def __init__(
-        self, db: ExtendedAsyncSAEngine, reconcile_ops_provider: ReconcileOpsProvider
-    ) -> None:
-        self._db_source = ReplicaGroupDBSource(db, reconcile_ops_provider)
+    def __init__(self, ops_provider: ReplicaGroupOpsProvider) -> None:
+        self._db_source = ReplicaGroupDBSource(ops_provider)
 
     @replica_group_repository_resilience.apply()
     async def search_deploy_scheduling_views(
         self,
-        querier: BatchQuerier,
+        conditions: Sequence[QueryCondition],
     ) -> list[ReplicaGroupDeploySchedulingView]:
-        return await self._db_source.search_deploy_scheduling_views(querier)
+        return await self._db_source.search_deploy_scheduling_views(conditions)
 
     @replica_group_repository_resilience.apply()
     async def search_scaling_scheduling_views(
         self,
-        querier: BatchQuerier,
+        conditions: Sequence[QueryCondition],
     ) -> list[ReplicaGroupScalingSchedulingView]:
-        return await self._db_source.search_scaling_scheduling_views(querier)
+        return await self._db_source.search_scaling_scheduling_views(conditions)
 
     @replica_group_repository_resilience.apply()
     async def fetch_scaling_reconcile_views(
         self,
-        querier: BatchQuerier,
+        conditions: Sequence[QueryCondition],
         category: ReplicaGroupHandlerCategory,
     ) -> ScalingReconcileFetch:
-        return await self._db_source.fetch_scaling_reconcile_views(querier, category)
+        return await self._db_source.fetch_scaling_reconcile_views(conditions, category)
 
     @replica_group_repository_resilience.apply()
     async def fetch_lifecycle_reconcile_views(
         self,
-        querier: BatchQuerier,
+        conditions: Sequence[QueryCondition],
         category: ReplicaGroupHandlerCategory,
     ) -> LifecycleReconcileFetch:
-        return await self._db_source.fetch_lifecycle_reconcile_views(querier, category)
+        return await self._db_source.fetch_lifecycle_reconcile_views(conditions, category)
 
     @replica_group_repository_resilience.apply()
     async def fetch_autoscale_reconcile_views(
         self,
-        querier: BatchQuerier,
+        conditions: Sequence[QueryCondition],
         category: ReplicaGroupHandlerCategory,
     ) -> AutoscaleReconcileFetch:
-        return await self._db_source.fetch_autoscale_reconcile_views(querier, category)
+        return await self._db_source.fetch_autoscale_reconcile_views(conditions, category)
 
     @replica_group_repository_resilience.apply()
     async def current_time(self) -> datetime:

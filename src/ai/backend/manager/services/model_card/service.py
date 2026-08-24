@@ -9,8 +9,8 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.model_card.types import ResourceRequirementEntry, VFolderScanData
 from ai.backend.manager.errors.storage import ModelCardParseError
+from ai.backend.manager.models.model_card.upserters import ModelCardScanUpserter
 from ai.backend.manager.repositories.model_card.repository import ModelCardRepository
-from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
 from ai.backend.manager.services.model_card.actions.available_presets import (
     AvailablePresetsAction,
     AvailablePresetsActionResult,
@@ -78,7 +78,7 @@ class ModelCardService:
         if not vfolders:
             return ScanProjectModelCardsActionResult(created_count=0, updated_count=0, errors=[])
 
-        specs: list[ModelCardScanUpserterSpec] = []
+        specs: list[ModelCardScanUpserter] = []
         errors: list[str] = []
         seen_names: dict[str, VFolderScanData] = {}
 
@@ -113,7 +113,7 @@ class ModelCardService:
 
     async def _scan_vfolder(
         self, vf: VFolderScanData, requester_id: UUID
-    ) -> ModelCardScanUpserterSpec | None:
+    ) -> ModelCardScanUpserter | None:
         vfolder_id = VFolderID(vf.quota_scope_id, vf.id)
         proxy_name, volume_name = StorageSessionManager.get_proxy_and_volume(
             vf.host, _is_unmanaged(vf.unmanaged_path)
@@ -170,7 +170,7 @@ class ModelCardService:
                 for k, v in metadata.min_resource.items()
             ]
 
-        return ModelCardScanUpserterSpec(
+        return ModelCardScanUpserter(
             name=name,
             vfolder_id=vf.id,
             domain=vf.domain_name,

@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from typing import Self
+
 from ai.backend.manager.repositories.ops.v2.batch_write import V2BatchWriteOps
 from ai.backend.manager.repositories.ops.v2.dangling_field_write import V2DanglingFieldWriteOps
 from ai.backend.manager.repositories.ops.v2.entity_write import V2EntityWriteOps
@@ -33,3 +37,14 @@ class V2WriteOps(
     The reconcile transition is not among them: it belongs to
     ``repositories/ops/v2/reconciler/``, whose ops extend this class.
     """
+
+    @asynccontextmanager
+    async def savepoint(self) -> AsyncGenerator[Self]:
+        """Open a nested transaction on the same session and yield ops bound to it.
+
+        A failure inside the block rolls back to the savepoint and leaves the
+        enclosing transaction usable. Yields the same ops type, so a subclass
+        carrying a domain primitive keeps it inside the savepoint.
+        """
+        async with self._sess.begin_nested():
+            yield type(self)(self._sess)

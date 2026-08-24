@@ -104,9 +104,7 @@ from ai.backend.manager.models.vfolder.updaters import VFolderSoftDeleteUpdater
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
@@ -882,10 +880,7 @@ class TestVfolderRepositoryPurge:
         # Verify vfolder exists before purge
         assert await self._vfolder_exists(db_with_cleanup, vfolder_id)
 
-        purger = RBACEntityPurger(
-            spec=VFolderPurgerSpec(vfolder_id=vfolder_id),
-        )
-        result = await vfolder_repository.purge_vfolder(purger)
+        result = await vfolder_repository.purge_vfolder(VFolderUUID(vfolder_id))
 
         assert result.id == vfolder_id
 
@@ -898,12 +893,8 @@ class TestVfolderRepositoryPurge:
     ) -> None:
         """Test purge fails when vfolder doesn't exist."""
         non_existent_id = uuid.uuid4()
-        purger = RBACEntityPurger(
-            spec=VFolderPurgerSpec(vfolder_id=non_existent_id),
-        )
-
         with pytest.raises(VFolderNotFound):
-            await vfolder_repository.purge_vfolder(purger)
+            await vfolder_repository.purge_vfolder(VFolderUUID(non_existent_id))
 
     @pytest.mark.parametrize(
         "vfolder_in_db",
@@ -927,12 +918,8 @@ class TestVfolderRepositoryPurge:
         """Test purge fails when vfolder has non-purgable status."""
         vfolder_id = vfolder_in_db
 
-        purger = RBACEntityPurger(
-            spec=VFolderPurgerSpec(vfolder_id=vfolder_id),
-        )
-
         with pytest.raises(VFolderFilterStatusFailed):
-            await vfolder_repository.purge_vfolder(purger)
+            await vfolder_repository.purge_vfolder(VFolderUUID(vfolder_id))
 
         # Verify vfolder still exists in DB (not deleted)
         assert await self._vfolder_exists(db_with_cleanup, vfolder_id)
@@ -1030,12 +1017,8 @@ class TestVfolderRepositoryPurge:
         """
         vfolder_id = vfolder_in_db
 
-        purger = RBACEntityPurger(
-            spec=VFolderPurgerSpec(vfolder_id=vfolder_id),
-        )
-
         with pytest.raises(VFolderHasLinkedModelCard):
-            await vfolder_repository.purge_vfolder(purger)
+            await vfolder_repository.purge_vfolder(VFolderUUID(vfolder_id))
 
         assert await self._vfolder_exists(db_with_cleanup, vfolder_id)
         async with db_with_cleanup.begin_readonly_session() as session:

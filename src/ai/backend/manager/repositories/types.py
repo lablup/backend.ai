@@ -16,6 +16,8 @@ from ai.backend.manager.repositories.ops.v2.artifact_registry.provider import (
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.ops.v2.replica_group.provider import ReplicaGroupOpsProvider
+from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
 from ai.backend.manager.secret.pool import KeyProviderPool
 
 
@@ -26,6 +28,8 @@ class RepositoryArgs:
     v2_ops_provider: V2DBOpsProvider
     reconcile_ops_provider: ReconcileOpsProvider
     artifact_registry_ops_provider: ArtifactRegistryOpsProvider
+    replica_group_ops_provider: ReplicaGroupOpsProvider
+    retention_ops_provider: RetentionOpsProvider
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
     key_provider_pool: KeyProviderPool

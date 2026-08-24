@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_card.types import ResourceRequirementEntry
+from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
@@ -35,6 +36,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.upserters import ModelCardScanUpserter
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -54,8 +56,10 @@ from ai.backend.manager.models.resource_slot.row import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.model_card.db_source.db_source import ModelCardDBSource
-from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
@@ -66,7 +70,7 @@ if TYPE_CHECKING:
 class TestModelCardScanResourceRequirements:
     """Verify scan upsert syncs the normalized requirements table.
 
-    Background: ModelCardScanUpserterSpec previously skipped `min_resource`
+    Background: ModelCardScanUpserter previously skipped `min_resource`
     in build_insert_values/build_update_values, leaving the
     model_card_resource_requirements table empty even after a full scan.
     That caused search_available_presets's relational division to be
@@ -86,6 +90,9 @@ class TestModelCardScanResourceRequirements:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
                 RoleRow,
                 UserRoleRow,
                 UserRow,
@@ -220,6 +227,7 @@ class TestModelCardScanResourceRequirements:
                 allowed_vfolder_hosts={},
             )
             db_sess.add(group)
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.PROJECT.value, scope_id=group.id))
             await db_sess.flush()
         return group
 
@@ -249,7 +257,7 @@ class TestModelCardScanResourceRequirements:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ModelCardDBSource:
-        return ModelCardDBSource(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
+        return ModelCardDBSource(V2DBOpsProvider(db_with_cleanup))
 
     def _build_scan_spec(
         self,
@@ -260,8 +268,8 @@ class TestModelCardScanResourceRequirements:
         test_group: ProjectRow,
         test_vfolder: VFolderRow,
         min_resource: list[ResourceRequirementEntry],
-    ) -> ModelCardScanUpserterSpec:
-        return ModelCardScanUpserterSpec(
+    ) -> ModelCardScanUpserter:
+        return ModelCardScanUpserter(
             name=name,
             vfolder_id=test_vfolder.id,
             domain=test_domain.name,

@@ -313,7 +313,7 @@ class TestModelCardDelete:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ModelCardDBSource:
-        return ModelCardDBSource(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
+        return ModelCardDBSource(V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def mounted_vfolder(

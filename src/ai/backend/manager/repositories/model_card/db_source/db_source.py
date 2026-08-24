@@ -5,19 +5,13 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from decimal import Decimal, InvalidOperation
-from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.engine import CursorResult
-
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.entity.model_card import ModelCardID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.permission.types import RBACElementType, RelationType
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
 )
@@ -39,35 +33,34 @@ from ai.backend.manager.errors.resource import (
     ProjectNotFound,
 )
 from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed
-from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.deployment_revision_preset.conditions import (
+    DeploymentRevisionPresetConditions,
+)
+from ai.backend.manager.models.deployment_revision_preset.searchers import (
+    DeploymentPresetSearcher,
+)
 from ai.backend.manager.models.model_card.creators import ModelCardResourceRequirementCreator
 from ai.backend.manager.models.model_card.purgers import (
     ModelCardPurger,
     ModelCardResourceRequirementBatchPurger,
+    ModelCardVFolderBatchPurger,
 )
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.searchers import ModelCardSearcher
 from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
-from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
-from ai.backend.manager.models.resource_slot.row import (
-    ModelCardResourceRequirementRow,
-    PresetResourceSlotRow,
-)
+from ai.backend.manager.models.model_card.upserters import ModelCardScanUpserter
+from ai.backend.manager.models.project.queriers import ProjectQuerier
+from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
+from ai.backend.manager.models.session.searchers import LiveSessionsMountingVFolderSearcher
 from ai.backend.manager.models.specs.creator import FieldToCreate
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder.row import (
-    DEAD_VFOLDER_STATUSES,
-    VFolderRow,
-    get_sessions_by_mounted_folder,
-)
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.vfolder.queriers import VFolderQuerier
+from ai.backend.manager.models.vfolder.row import DEAD_VFOLDER_STATUSES, VFolderRow
+from ai.backend.manager.models.vfolder.searchers import VFolderScanTargetSearcher
 from ai.backend.manager.models.vfolder.updaters import VFolderSoftDeleteUpdater
-from ai.backend.manager.repositories.base.upserter import BulkUpserter, execute_bulk_upserter
 from ai.backend.manager.repositories.model_card.types import (
     AvailablePresetsSearchResult,
 )
-from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.types import TriState
@@ -76,11 +69,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ModelCardDBSource:
-    _db: ExtendedAsyncSAEngine
     _v2_ops: V2DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
-        self._db = db
+    def __init__(self, v2_ops_provider: V2DBOpsProvider) -> None:
         self._v2_ops = v2_ops_provider
 
     async def update(self, updater: ModelCardUpdater) -> ModelCardData:
@@ -110,13 +101,23 @@ class ModelCardDBSource:
         """
         if min_resource.is_nop():
             return
-
-        await w.batch_purge_field_entities(card_id, ModelCardResourceRequirementBatchPurger())
-
         if min_resource.is_nullify():
+            await self._replace_min_resource(w, card_id, [])
             return
+        await self._replace_min_resource(w, card_id, min_resource.value())
 
-        entries = min_resource.value()
+    async def _replace_min_resource(
+        self,
+        w: V2WriteOps,
+        card_id: ModelCardID,
+        entries: Sequence[ResourceRequirementEntry],
+    ) -> None:
+        """Delete-then-insert the card's requirement rows, so a re-run is idempotent.
+
+        Entries whose ``min_quantity`` is not a decimal are skipped with a warning
+        rather than failing the whole write.
+        """
+        await w.batch_purge_field_entities(card_id, ModelCardResourceRequirementBatchPurger())
         if not entries:
             return
 
@@ -150,8 +151,8 @@ class ModelCardDBSource:
         purger: ModelCardPurger,
         options: DeleteModelCardOptions,
     ) -> UUID:
-        async with self._db.begin_session() as session:
-            return await self._delete_card_in_session(session, purger, options)
+        async with self._v2_ops.write_ops() as w:
+            return await self._delete_card(w, purger, options)
 
     async def bulk_delete(
         self,
@@ -168,81 +169,72 @@ class ModelCardDBSource:
         failures: list[BulkModelCardDeleteFailure] = []
         if not purgers:
             return BulkModelCardDeleteResultData(successes=successes, failures=failures)
-        async with self._db.begin_session() as session:
+        async with self._v2_ops.write_ops() as w:
             for purger in purgers:
-                card_id = purger.card_id
                 try:
-                    async with session.begin_nested():
-                        deleted_id = await self._delete_card_in_session(session, purger, options)
+                    async with w.savepoint() as sp:
+                        deleted_id = await self._delete_card(sp, purger, options)
                     successes.append(deleted_id)
                 except Exception as exc:
-                    failures.append(BulkModelCardDeleteFailure(card_id=card_id, message=str(exc)))
+                    failures.append(
+                        BulkModelCardDeleteFailure(card_id=purger.card_id, message=str(exc))
+                    )
         return BulkModelCardDeleteResultData(successes=successes, failures=failures)
 
-    async def _delete_card_in_session(
+    async def _delete_card(
         self,
-        session: SASession,
+        w: V2WriteOps,
         purger: ModelCardPurger,
         options: DeleteModelCardOptions,
     ) -> UUID:
-        deleted = await V2WriteOps(session).purge_entity(purger)
+        deleted = await w.purge_entity(purger)
         if deleted is None:
             raise ModelCardNotFound()
         if options.delete_associated_vfolder:
             # The VFolder is going to trash, so any sibling model card pointing
             # at it would be orphaned. Reject up front if the vfolder is still
             # mounted, then hard-delete the siblings and flip the VFolder
-            # status atomically — this avoids wasted sibling deletions that
+            # status atomically -- this avoids wasted sibling deletions that
             # would only get rolled back on a mount-check failure.
-            vfolder_id = deleted.vfolder_id
-            await self._reject_if_vfolders_mounted(session, [vfolder_id])
-            sibling_result = await session.execute(
-                sa.delete(ModelCardRow).where(ModelCardRow.vfolder == vfolder_id)
+            vfolder_id = VFolderUUID(deleted.vfolder_id)
+            await self._reject_if_vfolder_mounted(w, vfolder_id)
+            siblings = await w.batch_purge_entities_in_global(
+                ModelCardVFolderBatchPurger(vfolder_id=vfolder_id)
             )
-            sibling_count = cast(CursorResult[Any], sibling_result).rowcount
-            if sibling_count:
+            if siblings:
                 # Deleting one card can fan out to N when the vfolder is shared
-                # — surface that for ops/debugging since the caller only asked
+                # -- surface that for ops/debugging since the caller only asked
                 # for a single id.
                 log.debug(
                     "model card delete: cascaded {} sibling card(s) on vfolder {} "
                     "alongside target {}",
-                    sibling_count,
+                    len(siblings),
                     vfolder_id,
                     deleted.id,
                 )
-            await V2WriteOps(session).update_data(
-                VFolderSoftDeleteUpdater(vfolder_id=VFolderUUID(vfolder_id))
-            )
+            await w.update_data(VFolderSoftDeleteUpdater(vfolder_id=vfolder_id))
         return deleted.id
 
-    async def _reject_if_vfolders_mounted(
-        self,
-        session: SASession,
-        vfolder_ids: Sequence[UUID],
-    ) -> None:
-        """Raise :class:`VFolderDeletionNotAllowed` if any VFolder is mounted on a live session.
+    async def _reject_if_vfolder_mounted(self, w: V2WriteOps, vfolder_id: VFolderUUID) -> None:
+        """Raise :class:`VFolderDeletionNotAllowed` if the VFolder is mounted on a live session.
 
-        Reuses :func:`get_sessions_by_mounted_folder` per-vfolder so the
-        rejection message matches :meth:`VFolderRepository.move_vfolders_to_trash`.
+        Matches the rejection :meth:`VFolderRepository.move_vfolders_to_trash` reports.
         """
-        if not vfolder_ids:
+        vfolder = await w.query_data(VFolderQuerier(vfolder_id=vfolder_id))
+        if vfolder is None:
             return
-        vfolder_rows = (
-            (await session.execute(sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))))
-            .scalars()
-            .all()
-        )
-        for vfolder_row in vfolder_rows:
-            mount_sessions = await get_sessions_by_mounted_folder(
-                session, VFolderID.from_row(vfolder_row)
+        mounted = await w.search_in_global(
+            LiveSessionsMountingVFolderSearcher(
+                pagination=NoPagination(),
+                vfolder_id=VFolderID(vfolder.quota_scope_id, vfolder.id),
             )
-            if mount_sessions:
-                session_ids = [str(session_id) for session_id in mount_sessions]
-                raise VFolderDeletionNotAllowed(
-                    "Cannot delete the vfolder. "
-                    f"The vfolder(id: {vfolder_row.id}) is mounted on sessions(ids: {session_ids})."
-                )
+        )
+        if mounted.items:
+            session_ids = [str(session_id) for session_id in mounted.items]
+            raise VFolderDeletionNotAllowed(
+                "Cannot delete the vfolder. "
+                f"The vfolder(id: {vfolder_id}) is mounted on sessions(ids: {session_ids})."
+            )
 
     async def search_available_presets(
         self,
@@ -255,212 +247,81 @@ class ModelCardDBSource:
         in model_card_resource_requirements, there exists a matching row in
         preset_resource_slots with quantity >= min_quantity.
         """
-        mcr = ModelCardResourceRequirementRow.__table__
-        prs = PresetResourceSlotRow.__table__
-        drp = DeploymentRevisionPresetRow.__table__
-
-        # Relational division: a preset is "available" iff for every required
-        # slot in model_card_resource_requirements there is a matching
-        # preset_resource_slot row whose quantity meets the requirement.
-        #
-        # Both sub-EXISTS clauses must correlate against the OUTER drp/mcr,
-        # otherwise SQLAlchemy injects fresh aliases into the inner FROM clause
-        # and the predicates degenerate into Cartesian-product matches that
-        # accept every preset.
-        satisfying_condition = ~sa.exists(
-            sa.select(sa.literal(1))
-            .select_from(mcr)
-            .correlate(drp)
-            .where(
-                mcr.c.model_card_id == model_card_id,
-                ~sa.exists(
-                    sa.select(sa.literal(1))
-                    .select_from(prs)
-                    .correlate(drp, mcr)
-                    .where(
-                        prs.c.preset_id == drp.c.id,
-                        prs.c.slot_name == mcr.c.slot_name,
-                        prs.c.quantity >= mcr.c.min_quantity,
-                    )
-                ),
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(
+                DeploymentPresetSearcher(
+                    pagination=OffsetPagination(
+                        limit=search_input.limit or 20, offset=search_input.offset or 0
+                    ),
+                    conditions=[
+                        DeploymentRevisionPresetConditions.satisfying_model_card(
+                            ModelCardID(model_card_id)
+                        )
+                    ],
+                )
             )
+        return AvailablePresetsSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
-        async with self._db.begin_readonly_session() as db_sess:
-            count_stmt = sa.select(sa.func.count()).select_from(drp).where(satisfying_condition)
-            total_count = (await db_sess.execute(count_stmt)).scalar() or 0
-
-            query = sa.select(DeploymentRevisionPresetRow).where(satisfying_condition)
-
-            offset = search_input.offset or 0
-            limit = search_input.limit or 20
-            query = query.offset(offset).limit(limit + 1)
-
-            result = await db_sess.execute(query)
-            rows = list(result.scalars().all())
-
-            has_next_page = len(rows) > limit
-            if has_next_page:
-                rows = rows[:limit]
-
-            return AvailablePresetsSearchResult(
-                items=[row.to_data() for row in rows],
-                total_count=total_count,
-                has_next_page=has_next_page,
-                has_previous_page=offset > 0,
-            )
-
     async def get_scan_target_vfolders(self, project_id: UUID) -> list[VFolderScanData]:
-        async with self._db.begin_readonly_session() as session:
-            project_stmt = sa.select(ProjectRow.type).where(ProjectRow.id == project_id)
-            project_type = (await session.execute(project_stmt)).scalar_one_or_none()
-            if project_type is None:
+        async with self._v2_ops.read_ops() as r:
+            project = await r.query_data(ProjectQuerier(project_id=ProjectID(project_id)))
+            if project is None:
                 raise ProjectNotFound(str(project_id))
-            if project_type != ProjectType.MODEL_STORE:
+            if project.type != ProjectType.MODEL_STORE:
                 raise InvalidProjectTypeForModelCard(
-                    extra_msg=f"Project {project_id} is type '{project_type}', expected 'model-store'"
+                    extra_msg=f"Project {project_id} is type '{project.type}', expected 'model-store'"
                 )
-            stmt = sa.select(VFolderRow).where(
-                sa.and_(
-                    VFolderRow.group == project_id,
-                    VFolderRow.usage_mode == VFolderUsageMode.MODEL,
-                    VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES),
+            result = await r.search_in_global(
+                VFolderScanTargetSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        lambda: sa.and_(
+                            VFolderRow.group == project_id,
+                            VFolderRow.usage_mode == VFolderUsageMode.MODEL,
+                            VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES),
+                        )
+                    ],
+                    project_id=ProjectID(project_id),
                 )
             )
-            rows = (await session.execute(stmt)).scalars().all()
-            return [
-                VFolderScanData(
-                    id=row.id,
-                    name=row.name,
-                    host=row.host,
-                    quota_scope_id=row.quota_scope_id,
-                    unmanaged_path=row.unmanaged_path,
-                    domain_name=row.domain_name,
-                    project_id=row.group,
-                )
-                for row in rows
-                if row.group is not None
-            ]
+            return result.items
 
     async def get_existing_card_names(self, project_id: UUID, domain: str) -> set[str]:
-        async with self._db.begin_readonly_session() as session:
-            stmt = sa.select(ModelCardRow.name).where(
-                sa.and_(
-                    ModelCardRow.project == project_id,
-                    ModelCardRow.domain == domain,
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(
+                ModelCardSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        lambda: sa.and_(
+                            ModelCardRow.project == project_id,
+                            ModelCardRow.domain == domain,
+                        )
+                    ],
                 )
             )
-            rows = (await session.scalars(stmt)).all()
-            return set(rows)
+            return {card.name for card in result.items}
 
     async def bulk_upsert_scan(
         self,
-        specs: Sequence[ModelCardScanUpserterSpec],
+        specs: Sequence[ModelCardScanUpserter],
         existing_names: set[str],
     ) -> tuple[int, int]:
+        """Register every scanned card and its requirement rows; (created, updated).
+
+        The upsert also provisions each card in the RBAC graph and enrolls it in its
+        project, idempotently. The requirement rows are replaced per card, so a
+        re-scan of the same input leaves the row count unchanged.
+        """
         if not specs:
             return 0, 0
-        async with self._db.begin_session() as session:
-            bulk_upserter: BulkUpserter[ModelCardRow] = BulkUpserter(specs=specs)
-            result = await execute_bulk_upserter(
-                session, bulk_upserter, index_elements=["name", "domain", "project"]
-            )
-            total = result.upserted_count
-            updated = sum(1 for s in specs if s.name in existing_names)
-            created = total - updated
-
-            # Resolve all upserted card ids by name so we can sync RBAC bindings
-            # and the normalized resource requirement child rows below.
-            all_card_rows = (
-                await session.execute(
-                    sa.select(ModelCardRow.id, ModelCardRow.name).where(
-                        sa.and_(
-                            ModelCardRow.name.in_({s.name for s in specs}),
-                            ModelCardRow.project == specs[0].project_id,
-                            ModelCardRow.domain == specs[0].domain,
-                        )
-                    )
-                )
-            ).all()
-            name_to_card_id: dict[str, UUID] = {row.name: row.id for row in all_card_rows}
-
-            # Bind all upserted model cards to their project scope in RBAC
-            # ON CONFLICT DO NOTHING ensures idempotency for existing bindings
-            new_names = {s.name for s in specs} - existing_names
-            if new_names:
-                new_card_rows = [row for row in all_card_rows if row.name in new_names]
-                if new_card_rows:
-                    assoc_values = [
-                        {
-                            "scope_type": RBACElementType.PROJECT.to_scope_type(),
-                            "scope_id": str(specs[0].project_id),
-                            "entity_type": RBACElementType.MODEL_CARD.to_entity_type(),
-                            "entity_id": str(row.id),
-                            "relation_type": RelationType.AUTO,
-                        }
-                        for row in new_card_rows
-                    ]
-                    await session.execute(
-                        pg_insert(AssociationScopesEntitiesRow)
-                        .values(assoc_values)
-                        .on_conflict_do_nothing()
-                    )
-
-            # Sync the normalized model_card_resource_requirements child rows.
-            # The bulk upserter only writes the model_cards table itself; without
-            # this step search_available_presets sees an empty requirements table
-            # and degrades into a vacuous-truth filter that returns every preset.
-            # Use delete-then-insert per card so re-scan stays idempotent (same
-            # input → same row count, no duplication).
-            await self._sync_model_card_resource_requirements(session, specs, name_to_card_id)
-
-            return created, updated
-
-    async def _sync_model_card_resource_requirements(
-        self,
-        session: SASession,
-        specs: Sequence[ModelCardScanUpserterSpec],
-        name_to_card_id: dict[str, UUID],
-    ) -> None:
-        """Replace child rows for every (model_card, slot) requirement.
-
-        Idempotent: re-running with the same specs leaves the row count
-        unchanged. Decimal-coerced values are stored in the Numeric column.
-        """
-        target_card_ids = [
-            name_to_card_id[spec.name] for spec in specs if spec.name in name_to_card_id
-        ]
-        if not target_card_ids:
-            return
-
-        # Drop the old set of requirements for the cards we are about to write.
-        await session.execute(
-            sa.delete(ModelCardResourceRequirementRow).where(
-                ModelCardResourceRequirementRow.model_card_id.in_(target_card_ids)
-            )
-        )
-
-        new_rows: list[dict[str, object]] = []
-        for spec in specs:
-            card_id = name_to_card_id.get(spec.name)
-            if card_id is None:
-                continue
-            for entry in spec.min_resource:
-                try:
-                    quantity = Decimal(entry.min_quantity)
-                except (InvalidOperation, ValueError):
-                    log.warning(
-                        "model card scan: skipping invalid min_quantity {!r} for card {} slot {}",
-                        entry.min_quantity,
-                        card_id,
-                        entry.slot_name,
-                    )
-                    continue
-                new_rows.append({
-                    "model_card_id": card_id,
-                    "slot_name": entry.slot_name,
-                    "min_quantity": quantity,
-                })
-
-        if new_rows:
-            await session.execute(sa.insert(ModelCardResourceRequirementRow).values(new_rows))
+        async with self._v2_ops.write_ops() as w:
+            cards = await w.atomic_upsert_entities(list(specs))
+            for spec, card in zip(specs, cards, strict=True):
+                await self._replace_min_resource(w, ModelCardID(card.id), spec.min_resource)
+        updated = sum(1 for spec in specs if spec.name in existing_names)
+        return len(specs) - updated, updated

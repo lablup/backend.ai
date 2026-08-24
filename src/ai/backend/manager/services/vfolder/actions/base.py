@@ -29,11 +29,9 @@ from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
     VFolderPermission,
     VFolderPermissionSetAlias,
-    VFolderRow,
     VFolderStatusSet,
 )
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.services.vfolder.types import (
     VFolderBaseInfo,
     VFolderOwnershipInfo,
@@ -315,8 +313,6 @@ class DeleteForeverVFolderActionResult:
 
 @dataclass
 class PurgeVFolderAction(VFolderAction):
-    purger: RBACEntityPurger[VFolderRow]
-
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
