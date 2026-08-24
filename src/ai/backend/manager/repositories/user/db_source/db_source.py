@@ -19,7 +19,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityRef, ScopeRef
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -78,6 +78,16 @@ from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.types import join_by_related_field
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.purgers import (
+    UserErrorLogPurger,
+    UserGroupAssociationPurger,
+    UserKeyPairPurger,
+    UserProjectRolePurger,
+    UserPurger,
+    UserScopeAssociationPurger,
+    UserSessionGroupPurger,
+    UserVFolderPermissionPurger,
+)
 from ai.backend.manager.models.user.scopes import (
     DomainUserOperationScope,
     ProjectUserOperationScope,
@@ -97,30 +107,17 @@ from ai.backend.manager.models.vfolder import (
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.rbac.entity_purger import (
-    RBACEntityBatchPurger,
-)
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
     FullUserCreation,
     RBACOpsProvider,
     RBACWriteOps,
-    ScopeBatchDeletion,
     ScopeUserMember,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.creators import (
     UserCreateSpec,
     UserScopeCreation,
-)
-from ai.backend.manager.repositories.user.purgers import (
-    UserBatchPurgerSpec,
-    create_user_error_log_purger,
-    create_user_group_association_purger,
-    create_user_keypair_purger,
-    create_user_project_role_purger,
-    create_user_session_group_purger,
-    create_user_vfolder_permission_purger,
 )
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -373,30 +370,18 @@ class UserDBSource:
 
     async def purge_user_by_uuid(self, user_uuid: UUID) -> None:
         """Completely purge user and all associated data by UUID."""
-        async with self._rbac_ops_provider.write_ops() as w:
-            await self._purge_user(w, user_uuid)
-
-    async def _purge_user(self, w: RBACWriteOps, user_uuid: UUID) -> None:
-        # Delete all user data in proper order using purger pattern
-        await w.batch_purge(create_user_error_log_purger(user_uuid))
-        await w.batch_purge(create_user_keypair_purger(user_uuid))
-        await w.batch_purge(create_user_vfolder_permission_purger(user_uuid))
-        await w.batch_purge(create_user_group_association_purger(user_uuid))
-        # Placement groups the user still owns: their deployments were either
-        # delegated (the groups moved with them) or deleted by now.
-        await w.batch_purge(create_user_session_group_purger(user_uuid))
-
-        # Finally delete the user itself as a scope: the row, its RBAC entries
-        # (association_scopes_entities and permission rows), and its virtual
-        # scope node (FK CASCADE removes its bindings and memberships).
-        await w.batch_delete_scopes(
-            ScopeBatchDeletion(
-                purger=RBACEntityBatchPurger(
-                    spec=UserBatchPurgerSpec(user_uuid=user_uuid), batch_size=1
-                ),
-                scopes=[ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid)],
-            )
-        )
+        user_id = UserID(user_uuid)
+        async with self._v2_ops.write_ops() as w:
+            await w.batch_purge_field_entities(user_id, UserErrorLogPurger())
+            await w.batch_purge_field_entities(user_id, UserKeyPairPurger())
+            await w.batch_purge_field_entities(user_id, UserVFolderPermissionPurger())
+            await w.batch_purge_field_entities(user_id, UserGroupAssociationPurger())
+            # Placement groups the user still owns: their deployments were either
+            # delegated (the groups moved with them) or deleted by now.
+            await w.batch_purge_entities_in_global(UserSessionGroupPurger(user_id=user_id))
+            await w.batch_purge_field_entities(user_id, UserScopeAssociationPurger())
+            # Finally the user itself as a scope: the row and the RBAC graph it left.
+            await w.purge_entity(UserPurger(user_id=user_id))
 
     async def check_user_vfolder_mounted_to_active_kernels(self, user_uuid: UUID) -> bool:
         """Check if user's vfolders are mounted to active kernels."""
@@ -703,10 +688,11 @@ class UserDBSource:
         Diff-based: only projects entering or leaving the target set are touched,
         preserving existing rows for unchanged memberships. Joining a project
         grants its ``auto_assign`` roles; member ops leave role mappings untouched
-        on removal, so the user's project-scoped roles are revoked here when
-        leaving a project.
+        on removal, so the roles of the projects left behind are revoked afterwards,
+        in a v2 transaction of their own.
         """
         member_ref = EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=UserID(user_uuid))
+        left_project_ids: list[ProjectID] = []
         async with self._rbac_ops_provider.write_ops() as w:
             target_result = await w.batch_query_in_global(
                 sa.select(ProjectRow.id).where(
@@ -733,7 +719,7 @@ class UserDBSource:
                     ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(project_id)),
                     [member_ref],
                 )
-                await w.batch_purge(create_user_project_role_purger(user_uuid, project_id))
+                left_project_ids.append(ProjectID(project_id))
             for project_id in target_project_ids - current_project_ids:
                 project_scope = ScopeRef(
                     scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(project_id)
@@ -745,6 +731,13 @@ class UserDBSource:
                         members=[ScopeUserMember(user_id=UserID(user_uuid))],
                     )
                 )
+
+        if left_project_ids:
+            async with self._v2_ops.write_ops() as v2:
+                for project_id in left_project_ids:
+                    await v2.batch_purge_field_entities(
+                        UserID(user_uuid), UserProjectRolePurger(project_id=project_id)
+                    )
 
     async def _get_user_uuid_by_email_with_conn(self, conn: AsyncConnection, email: str) -> UUID:
         """Get user UUID by email using an existing connection."""

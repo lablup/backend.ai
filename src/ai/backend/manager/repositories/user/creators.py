@@ -2,8 +2,10 @@
 
 The spec itself is :class:`ai.backend.manager.models.user.creators.UserCreator`.
 Creating a user provisions its default keypair and its domain/project enrollments in
-the same transaction, which the v2 ops have no primitive for, so the write still runs
-through the RBAC scope creation below.
+the same transaction, which the v2 ops have no primitive for, and the user's own
+owner role comes from :class:`UserSystemRoleSpec` rather than from a role preset, which
+the v2 role-managed create is the only source of. The write therefore still runs through
+the RBAC scope creation below.
 """
 
 from __future__ import annotations
