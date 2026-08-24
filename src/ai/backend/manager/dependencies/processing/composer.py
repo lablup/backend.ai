@@ -279,35 +279,62 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         audit_log_policy = AuditLogPolicy(
             setup_input.config_provider.config.audit_log.record_read_operations
         )
-        audit_log_monitor = AuditLogMonitor(audit_log_repository, audit_log_policy)
+        client_ip_masking_repository = setup_input.repositories.client_ip_masking.repository
+        audit_log_monitor = AuditLogMonitor(
+            audit_log_repository, audit_log_policy, client_ip_masking_repository
+        )
         action_monitors = ActionMonitors(
             legacy=[reporter_monitor, prometheus_monitor, audit_log_monitor],
             single_entity=[
                 SingleEntityActionReporterMonitor(reporter_hub),
                 SingleEntityActionPrometheusMonitor(),
-                SingleEntityActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+                SingleEntityActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
             ],
             bulk=[
                 BulkActionReporterMonitor(reporter_hub),
                 BulkActionPrometheusMonitor(),
-                BulkActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+                BulkActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
             ],
             scope=[
                 ScopeActionReporterMonitor(reporter_hub),
                 ScopeActionPrometheusMonitor(),
-                ScopeActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+                ScopeActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
             ],
             global_scope=[
                 GlobalActionReporterMonitor(reporter_hub),
                 GlobalActionPrometheusMonitor(),
-                GlobalActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+                GlobalActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
             ],
             lookup=[
                 LookupActionPrometheusMonitor(),
-                LookupActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+                LookupActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
             ],
             bulk_lookup=[
-                BulkLookupActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+                BulkLookupActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
             ],
         )
 

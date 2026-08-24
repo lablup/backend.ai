@@ -40,6 +40,7 @@ def auth_service(
     mock_user_repository: AsyncMock,
     mock_group_repository: AsyncMock,
     mock_ssh_key_validator: MagicMock,
+    mock_client_ip_masking_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
@@ -50,6 +51,7 @@ def auth_service(
         user_repository=mock_user_repository,
         group_repository=mock_group_repository,
         ssh_key_validator=mock_ssh_key_validator,
+        client_ip_masking_repository=mock_client_ip_masking_repository,
     )
 
 

@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from .domains_v2.artifact import V2ArtifactClient
     from .domains_v2.artifact_registry import V2ArtifactRegistryClient
     from .domains_v2.audit_log import V2AuditLogClient
+    from .domains_v2.client_ip_masking import V2ClientIPMaskingClient
     from .domains_v2.container_registry import V2ContainerRegistryClient
     from .domains_v2.deployment import V2DeploymentClient
     from .domains_v2.deployment_revision_preset import V2DeploymentRevisionPresetClient
@@ -213,6 +214,12 @@ class V2ClientRegistry:
         from .domains_v2.login_client_type import V2LoginClientTypeClient
 
         return V2LoginClientTypeClient(self._client)
+
+    @cached_property
+    def client_ip_masking(self) -> V2ClientIPMaskingClient:
+        from .domains_v2.client_ip_masking import V2ClientIPMaskingClient
+
+        return V2ClientIPMaskingClient(self._client)
 
     @cached_property
     def login_history(self) -> V2LoginHistoryClient:

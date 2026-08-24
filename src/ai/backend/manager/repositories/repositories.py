@@ -7,6 +7,9 @@ from ai.backend.manager.repositories.artifact_registry.repositories import (
     ArtifactRegistryRepositories,
 )
 from ai.backend.manager.repositories.auth.repositories import AuthRepositories
+from ai.backend.manager.repositories.client_ip_masking.repositories import (
+    ClientIPMaskingRepositories,
+)
 from ai.backend.manager.repositories.container_registry.repositories import (
     ContainerRegistryRepositories,
 )
@@ -101,6 +104,7 @@ class Repositories:
     resource_preset: ResourcePresetRepositories
     resource_slot: ResourceSlotRepositories
     runtime_variant: RuntimeVariantRepositories
+    client_ip_masking: ClientIPMaskingRepositories
     runtime_variant_preset: RuntimeVariantPresetRepositories
     deployment_revision_preset: DeploymentPresetRepositories
     model_card: ModelCardRepositories
@@ -148,6 +152,7 @@ class Repositories:
         resource_preset_repositories = ResourcePresetRepositories.create(args)
         resource_slot_repositories = ResourceSlotRepositories.create(args)
         runtime_variant_repositories = RuntimeVariantRepositories.create(args)
+        client_ip_masking_repositories = ClientIPMaskingRepositories.create(args)
         runtime_variant_preset_repositories = RuntimeVariantPresetRepositories.create(args)
         deployment_revision_preset_repositories = DeploymentPresetRepositories.create(args)
         model_card_repositories = ModelCardRepositories.create(args)
@@ -196,6 +201,7 @@ class Repositories:
             resource_preset=resource_preset_repositories,
             resource_slot=resource_slot_repositories,
             runtime_variant=runtime_variant_repositories,
+            client_ip_masking=client_ip_masking_repositories,
             runtime_variant_preset=runtime_variant_preset_repositories,
             deployment_revision_preset=deployment_revision_preset_repositories,
             model_card=model_card_repositories,

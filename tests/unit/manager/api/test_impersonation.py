@@ -121,7 +121,6 @@ class TestResolveEffectiveUser:
 
 class TestSetupUserContext:
     def test_pushes_effective_as_current_and_trigger_as_triggered(self) -> None:
-        request = _make_request()
         effective = UserData(
             user_id=uuid.uuid4(),
             is_authorized=True,
@@ -140,14 +139,13 @@ class TestSetupUserContext:
             domain_name="default",
             domain_id=DomainID(uuid.uuid4()),
         )
-        with _setup_user_context(request, effective, trigger):
+        with _setup_user_context(effective, trigger):
             assert current_user() == effective
             assert triggered_user() == trigger
         assert current_user() is None
         assert triggered_user() is None
 
     def test_none_identities_push_nothing(self) -> None:
-        request = _make_request()
-        with _setup_user_context(request, None, None):
+        with _setup_user_context(None, None):
             assert current_user() is None
             assert triggered_user() is None

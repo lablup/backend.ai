@@ -806,9 +806,10 @@ async def server_factory(
             dep_input,
         )
 
-        # Insert DI-based middlewares
+        # Insert DI-based middlewares.
+        # Same order as server_main(): request_id(0) → client_ip(1) → exception(2) → auth(3)
         root_app.middlewares.insert(
-            1,
+            2,
             build_exception_middleware(
                 error_monitor=r.monitoring.error_monitor,
                 stats_monitor=r.monitoring.stats_monitor,
@@ -816,7 +817,7 @@ async def server_factory(
             ),
         )
         root_app.middlewares.insert(
-            2,
+            3,
             build_auth_middleware(
                 db=r.infrastructure.db,
                 jwt_validator=r.system.jwt_validator,

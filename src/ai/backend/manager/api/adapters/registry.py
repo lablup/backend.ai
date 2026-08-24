@@ -18,6 +18,7 @@ from ai.backend.manager.api.adapters.app_config_fragment.adapter import (
 from ai.backend.manager.api.adapters.artifact.adapter import ArtifactAdapter
 from ai.backend.manager.api.adapters.artifact_registry.adapter import ArtifactRegistryAdapter
 from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
+from ai.backend.manager.api.adapters.client_ip_masking.adapter import ClientIPMaskingAdapter
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
@@ -103,6 +104,7 @@ class Adapters:
         idle_checker_assignment: IdleCheckerAssignmentAdapter,
         image: ImageAdapter,
         login_client_type: LoginClientTypeAdapter,
+        client_ip_masking: ClientIPMaskingAdapter,
         login_history: LoginHistoryAdapter,
         login_session: LoginSessionAdapter,
         notification: NotificationAdapter,
@@ -151,6 +153,7 @@ class Adapters:
         self.idle_checker_assignment = idle_checker_assignment
         self.image = image
         self.login_client_type = login_client_type
+        self.client_ip_masking = client_ip_masking
         self.login_history = login_history
         self.login_session = login_session
         self.notification = notification
@@ -218,6 +221,7 @@ class Adapters:
             idle_checker_assignment=IdleCheckerAssignmentAdapter(processors),
             image=ImageAdapter(processors),
             login_client_type=LoginClientTypeAdapter(processors),
+            client_ip_masking=ClientIPMaskingAdapter(processors),
             login_history=LoginHistoryAdapter(processors),
             login_session=LoginSessionAdapter(processors),
             notification=NotificationAdapter(processors),

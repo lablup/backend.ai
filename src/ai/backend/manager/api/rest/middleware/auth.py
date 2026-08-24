@@ -38,7 +38,6 @@ from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 from sqlalchemy.orm import load_only
 
-from ai.backend.common.contexts.client_ip import with_client_ip
 from ai.backend.common.contexts.user import with_triggered_user, with_user
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
@@ -803,7 +802,6 @@ async def _resolve_effective_user(
 
 
 def _setup_user_context(
-    request: web.Request,
     effective_user: UserData | None,
     trigger_user: UserData | None,
 ) -> ExitStack:
@@ -815,10 +813,6 @@ def _setup_user_context(
         stack.enter_context(with_log_context_fields({"user_id": str(effective_user.user_id)}))
     if trigger_user is not None:
         stack.enter_context(with_triggered_user(trigger_user))
-
-    client_ip = extract_client_ip(request)
-    if client_ip:
-        stack.enter_context(with_client_ip(client_ip))
 
     return stack
 
@@ -980,7 +974,7 @@ def build_auth_middleware(
             if authenticated_user is not None
             else None
         )
-        with _setup_user_context(request, effective_user, authenticated_user):
+        with _setup_user_context(effective_user, authenticated_user):
             return await handler(request)
 
     return _middleware

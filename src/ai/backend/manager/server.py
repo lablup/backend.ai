@@ -340,9 +340,9 @@ async def server_main(
         _error_monitor_ref = dep_resources.monitoring.error_monitor
 
         # Insert DI-based middlewares now that dependencies are available.
-        # Maintain order: request_id(0) → exception(1) → auth(2) → api → metric
+        # Maintain order: request_id(0) → client_ip(1) → exception(2) → auth(3) → api → metric
         root_app.middlewares.insert(
-            1,
+            2,
             build_exception_middleware(
                 error_monitor=dep_resources.monitoring.error_monitor,
                 stats_monitor=dep_resources.monitoring.stats_monitor,
@@ -350,7 +350,7 @@ async def server_main(
             ),
         )
         root_app.middlewares.insert(
-            2,
+            3,
             build_auth_middleware(
                 db=dep_resources.infrastructure.db,
                 jwt_validator=dep_resources.system.jwt_validator,

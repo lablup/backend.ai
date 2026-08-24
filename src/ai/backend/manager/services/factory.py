@@ -12,6 +12,7 @@ from ai.backend.common.data.entity.artifact_registry import ARTIFACT_REGISTRY_EN
 from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_FIELD_TYPE
 from ai.backend.common.data.entity.audit_log import AUDIT_LOG_FIELD_TYPE
 from ai.backend.common.data.entity.auth import AUTH_ENTITY_TYPE
+from ai.backend.common.data.entity.client_ip_masking import CLIENT_IP_MASKING_POLICY_ENTITY_TYPE
 from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
@@ -108,6 +109,7 @@ from ai.backend.manager.services.artifact_registry.service import ArtifactRegist
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
+from ai.backend.manager.services.client_ip_masking.processors import ClientIPMaskingProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
@@ -394,6 +396,7 @@ def create_services(args: ServiceArgs) -> Services:
             user_repository=repositories.user.repository,
             group_repository=repositories.project.repository,
             ssh_key_validator=args.ssh_key_validator,
+            client_ip_masking_repository=repositories.client_ip_masking.repository,
         ),
         notification=NotificationService(
             repository=repositories.notification.repository,
@@ -634,6 +637,9 @@ def create_processors(
         ),
         runtime_variant=RuntimeVariantProcessors(
             system_groups.group(GroupMeta(RUNTIME_VARIANT_ENTITY_TYPE))
+        ),
+        client_ip_masking=ClientIPMaskingProcessors(
+            system_groups.group(GroupMeta(CLIENT_IP_MASKING_POLICY_ENTITY_TYPE))
         ),
         runtime_variant_preset=RuntimeVariantPresetProcessors(
             system_groups.group(GroupMeta(RUNTIME_VARIANT_PRESET_ENTITY_TYPE)),

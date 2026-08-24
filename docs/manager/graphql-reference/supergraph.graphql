@@ -2017,6 +2017,11 @@ type AuditLogV2 implements Node
   status: AuditLogStatus!
 
   """
+  Added in 26.9.0. IP address of the request that produced this record, masked per the client IP masking policy. Null when the policy records none, or when the address was unavailable or unusable.
+  """
+  clientIp: String
+
+  """
   The user who triggered this audit log entry, resolved from triggered_by UUID.
   """
   user: UserV2
@@ -3053,6 +3058,122 @@ type ClearImages
 {
   ok: Boolean
   msg: String
+}
+
+"""
+Added in 26.9.0. Masking applied before a client IP is stored. 'none' keeps the address as observed, 'truncate' zeroes the host bits — keeping an IPv4 /24 and an IPv6 /48 — and 'drop' records no address at all.
+"""
+enum ClientIPMaskingMode
+  @join__type(graph: STRAWBERRY)
+{
+  NONE @join__enumValue(graph: STRAWBERRY)
+  TRUNCATE @join__enumValue(graph: STRAWBERRY)
+  DROP @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.9.0. The masking one target gets. A target with no policy falls back to the 'default' target, and no default means the address is recorded as observed.
+"""
+type ClientIPMaskingPolicy implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Which recorded client IP is governed."""
+  targetType: ClientIPMaskingTarget!
+
+  """Masking applied before the address is stored."""
+  mode: ClientIPMaskingMode!
+
+  """IPv4 bits 'truncate' keeps; null takes the built-in width of 24."""
+  ipv4Prefix: Int
+
+  """IPv6 bits 'truncate' keeps; null takes the built-in width of 48."""
+  ipv6Prefix: Int
+
+  """Timestamp when the policy was first written."""
+  createdAt: DateTime!
+
+  """Timestamp when the policy was last changed."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.9.0. Paginated list of client IP masking policies."""
+type ClientIPMaskingPolicyConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ClientIPMaskingPolicyEdge!]!
+
+  """Total number of policies matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ClientIPMaskingPolicyEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ClientIPMaskingPolicy!
+}
+
+"""Added in 26.9.0. Filter for client IP masking policies."""
+input ClientIPMaskingPolicyFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by the governed target."""
+  targetType: ClientIPMaskingTarget = null
+
+  """Filter by masking mode."""
+  mode: ClientIPMaskingMode = null
+}
+
+"""Added in 26.9.0. Order specification for client IP masking policies."""
+input ClientIPMaskingPolicyOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: ClientIPMaskingPolicyOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in 26.9.0. Order fields for client IP masking policies."""
+enum ClientIPMaskingPolicyOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  TARGET_TYPE @join__enumValue(graph: STRAWBERRY)
+  MODE @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.9.0. Payload carrying the settled client IP masking policy.
+"""
+type ClientIPMaskingPolicyPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The policy the operation left."""
+  policy: ClientIPMaskingPolicy!
+}
+
+"""Added in 26.9.0. Which recorded client IP a masking policy governs."""
+enum ClientIPMaskingTarget
+  @join__type(graph: STRAWBERRY)
+{
+  DEFAULT @join__enumValue(graph: STRAWBERRY)
+  LOGIN_HISTORY @join__enumValue(graph: STRAWBERRY)
+  AUDIT_LOGS @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.4.2. Input for cloning a virtual folder."""
@@ -10362,6 +10483,11 @@ type LoginHistoryV2 implements Node
   """Detailed reason for the login failure."""
   failReason: String
 
+  """
+  Added in 26.9.0. IP address of the request that produced this entry, masked per the client IP masking policy. Null when the policy records none, or when the address was unavailable or unusable.
+  """
+  clientIp: String
+
   """Timestamp when the login attempt occurred."""
   createdAt: DateTime!
 
@@ -13192,6 +13318,16 @@ type Mutation
 
   """Added in 26.4.2. Delete multiple runtime variants (superadmin only)."""
   adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Set the client IP masking one target gets (superadmin only).
+  """
+  adminUpsertClientIpMaskingPolicy(input: UpsertClientIPMaskingPolicyInput!): ClientIPMaskingPolicyPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Drop one target's client IP masking policy so it falls back to the default (superadmin only).
+  """
+  adminPurgeClientIpMaskingPolicy(id: UUID!): ClientIPMaskingPolicyPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.8.0. Create a retention policy (superadmin only)."""
   adminCreateRetentionPolicy(input: CreateRetentionPolicyInput!): CreateRetentionPolicyPayload @join__field(graph: STRAWBERRY)
@@ -16536,6 +16672,11 @@ type Query
 
   """Added in 26.4.2. Get a single runtime variant by ID."""
   runtimeVariant(id: UUID!): RuntimeVariant @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Read the client IP masking set for every target (superadmin only).
+  """
+  adminClientIpMaskingPolicies(filter: ClientIPMaskingPolicyFilter = null, orderBy: [ClientIPMaskingPolicyOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ClientIPMaskingPolicyConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.8.0. Search retention policies (superadmin only)."""
   adminRetentionPolicies(filter: RetentionPolicyFilter = null, orderBy: [RetentionPolicyOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RetentionPolicyConnection @join__field(graph: STRAWBERRY)
@@ -22430,6 +22571,25 @@ type UpsertAppConfigFragmentsPayload
 
   """Per-item failures, each naming the config name it targeted."""
   failed: [AppConfigFragmentUpsertError!]!
+}
+
+"""
+Added in 26.9.0. Set the masking one target gets, replacing the policy it already has.
+"""
+input UpsertClientIPMaskingPolicyInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Which recorded client IP to govern."""
+  targetType: ClientIPMaskingTarget!
+
+  """Masking applied before the address is stored."""
+  mode: ClientIPMaskingMode!
+
+  """IPv4 bits 'truncate' keeps; null takes the built-in width of 24."""
+  ipv4Prefix: Int = null
+
+  """IPv6 bits 'truncate' keeps; null takes the built-in width of 48."""
+  ipv6Prefix: Int = null
 }
 
 """
