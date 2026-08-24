@@ -57,9 +57,9 @@ from ai.backend.manager.models.image.conditions import (
 )
 from ai.backend.manager.models.image.orders import ImageAliasOrders, ImageOrders
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.image.updaters import ImageUpdate
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
@@ -262,7 +262,7 @@ class ImageAdapter(BaseAdapter):
 
     async def admin_update(self, input: UpdateImageInput) -> UpdateImagePayload:
         """Update an image by ID (superadmin only)."""
-        spec = ImageUpdaterSpec(
+        update = ImageUpdate(
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
@@ -321,7 +321,7 @@ class ImageAdapter(BaseAdapter):
             ),
         )
         result = await self._processors.image.update_image_by_id.run(
-            UpdateImageByIdAction(image_id=ImageID(input.image_id), updater_spec=spec)
+            UpdateImageByIdAction(image_id=ImageID(input.image_id), update=update)
         )
         return UpdateImagePayload(item=self._data_to_dto(result.image))
 

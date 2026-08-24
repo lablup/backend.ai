@@ -41,6 +41,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.testutils.db import with_tables
 
@@ -176,6 +177,7 @@ class TestImageRepositorySearch:
         mock_config = MagicMock()
         return ImageRepository(
             db=db_with_cleanup,
+            ops_provider=V2DBOpsProvider(db_with_cleanup),
             valkey_image=mock_valkey,
             config_provider=mock_config,
         )
@@ -476,6 +478,7 @@ class TestImageRepositoryLastUsedAt:
         mock_config = MagicMock()
         return ImageRepository(
             db=db_with_cleanup,
+            ops_provider=V2DBOpsProvider(db_with_cleanup),
             valkey_image=mock_valkey,
             config_provider=mock_config,
         )

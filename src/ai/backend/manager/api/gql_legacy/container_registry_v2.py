@@ -15,17 +15,10 @@ from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
+from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
+from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.container_registry.creators import ContainerRegistryCreatorSpec
-from ai.backend.manager.repositories.container_registry.purgers import (
-    ContainerRegistryPurgerSpec,
-)
-from ai.backend.manager.repositories.container_registry.updaters import (
-    ContainerRegistryUpdaterSpec,
-)
 from ai.backend.manager.services.container_registry.actions.create_container_registry import (
     CreateContainerRegistryAction,
 )
@@ -76,21 +69,19 @@ class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ign
         sanitized_allowed_groups: AllowedGroups | None = value_or_none(self.allowed_groups)
 
         return CreateContainerRegistryAction(
-            creator=Creator(
-                spec=ContainerRegistryCreatorSpec(
-                    url=self.url,
-                    type=self.type,
-                    registry_name=self.registry_name,
-                    is_global=value_or_none(self.is_global),
-                    project=value_or_none(self.project),
-                    username=value_or_none(self.username),
-                    password=value_or_none(self.password),
-                    ssl_verify=value_or_none(self.ssl_verify),
-                    extra=value_or_none(self.extra),
-                    allowed_groups=sanitized_allowed_groups.to_model()
-                    if sanitized_allowed_groups is not None
-                    else None,
-                )
+            creator=ContainerRegistryCreator(
+                url=self.url,
+                type=self.type,
+                registry_name=self.registry_name,
+                is_global=value_or_none(self.is_global),
+                project=value_or_none(self.project),
+                username=value_or_none(self.username),
+                password=value_or_none(self.password),
+                ssl_verify=value_or_none(self.ssl_verify),
+                extra=value_or_none(self.extra),
+                allowed_groups=sanitized_allowed_groups.to_model()
+                if sanitized_allowed_groups is not None
+                else None,
             )
         )
 
@@ -160,20 +151,18 @@ class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ign
             allowed_groups_state = TriState.nop()
 
         return UpdateContainerRegistryAction(
-            updater=Updater(
-                spec=ContainerRegistryUpdaterSpec(
-                    url=OptionalState.from_graphql(self.url),
-                    type=OptionalState.from_graphql(self.type),
-                    registry_name=OptionalState.from_graphql(self.registry_name),
-                    is_global=TriState.from_graphql(self.is_global),
-                    project=TriState.from_graphql(self.project),
-                    username=TriState.from_graphql(self.username),
-                    password=TriState.from_graphql(self.password),
-                    ssl_verify=TriState.from_graphql(self.ssl_verify),
-                    extra=TriState.from_graphql(self.extra),
-                    allowed_groups=allowed_groups_state,
-                ),
-                pk_value=registry_id,
+            updater=ContainerRegistryUpdater(
+                registry_id=ContainerRegistryID(registry_id),
+                url=OptionalState.from_graphql(self.url),
+                type=OptionalState.from_graphql(self.type),
+                registry_name=OptionalState.from_graphql(self.registry_name),
+                is_global=TriState.from_graphql(self.is_global),
+                project=TriState.from_graphql(self.project),
+                username=TriState.from_graphql(self.username),
+                password=TriState.from_graphql(self.password),
+                ssl_verify=TriState.from_graphql(self.ssl_verify),
+                extra=TriState.from_graphql(self.extra),
+                allowed_groups=allowed_groups_state,
             )
         )
 
@@ -240,9 +229,7 @@ class DeleteContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
 
         result = await ctx.processors.container_registry.delete_container_registry.run(
             DeleteContainerRegistryAction(
-                purger=Purger(
-                    spec=ContainerRegistryPurgerSpec(registry_id=ContainerRegistryID(reg_id))
-                )
+                purger=ContainerRegistryPurger(registry_id=ContainerRegistryID(reg_id))
             )
         )
         return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))

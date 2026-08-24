@@ -1,18 +1,12 @@
 import logging
 import uuid
-from typing import cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
-from ai.backend.common.data.entity.container_registry import (
-    CONTAINER_REGISTRY_ENTITY_TYPE,
-    CONTAINER_REGISTRY_SCOPE_TYPE,
-    ContainerRegistryID,
-)
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.types import EntityRef, ScopeRef
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -28,44 +22,32 @@ from ai.backend.manager.errors.image import (
     ContainerRegistryGroupsAssociationNotFound,
     ContainerRegistryNotFound,
 )
-from ai.backend.manager.models.association_container_registries_groups import (
-    AssociationContainerRegistriesGroupsRow,
-)
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
+from ai.backend.manager.models.container_registry.creators import (
+    ContainerRegistryCreator,
+    ContainerRegistryGroupCreator,
+)
+from ai.backend.manager.models.container_registry.purgers import (
+    ContainerRegistryProjectPurger,
+    ContainerRegistryProjectsPurger,
+    ContainerRegistryPurger,
+)
+from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import BatchPurger, Purger
 from ai.backend.manager.repositories.base.querier import (
     BatchQuerier,
-    Querier,
     execute_batch_querier,
 )
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.container_registry.creators import (
-    ContainerRegistryCreatorSpec,
-    ContainerRegistryGroupCreatorSpec,
-    ContainerRegistryScopeCreation,
+from ai.backend.manager.repositories.ops.v2.container_registry.provider import (
+    ContainerRegistryOpsProvider,
 )
-from ai.backend.manager.repositories.container_registry.purgers import (
-    ContainerRegistryGroupPurgerSpec,
-    ContainerRegistryPurgerSpec,
-)
-from ai.backend.manager.repositories.container_registry.updaters import (
-    ContainerRegistryUpdaterSpec,
-)
-from ai.backend.manager.repositories.ops.rbac.provider import (
-    EntityMembersAddition,
-    RBACOpsProvider,
-    RBACWriteOps,
-    ScopeDeletion,
-    ScopeEntityMember,
+from ai.backend.manager.repositories.ops.v2.container_registry.write import (
+    ContainerRegistryWriteOps,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -89,96 +71,70 @@ container_registry_repository_resilience = Resilience(
 
 class ContainerRegistryRepository:
     _db: ExtendedAsyncSAEngine
-    _rbac_ops_provider: RBACOpsProvider
+    _ops_provider: ContainerRegistryOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self, db: ExtendedAsyncSAEngine, ops_provider: ContainerRegistryOpsProvider
+    ) -> None:
         self._db = db
-        self._rbac_ops_provider = RBACOpsProvider(db)
+        self._ops_provider = ops_provider
 
     async def create_registry(
         self,
-        creator: Creator[ContainerRegistryRow],
+        creator: ContainerRegistryCreator,
     ) -> ContainerRegistryData:
-        """Create a container registry with its owner virtual scope.
+        """Create a container registry with its own virtual scope.
 
         The registry becomes a scope of its own so the entities it owns (images)
-        resolve through the virtual-scope chain; allowed projects are bound to
-        that virtual scope to reach them.
+        resolve through the virtual-scope chain; allowed projects are enrolled in
+        that scope to reach them.
         """
-        spec = cast(ContainerRegistryCreatorSpec, creator.spec)
-        async with self._rbac_ops_provider.write_ops() as w:
-            creation_result = await w.create_scope(ContainerRegistryScopeCreation(spec=spec))
-            container_registry_row = creation_result.row
-
-            if spec.has_allowed_groups:
-                allowed_groups = cast(AllowedGroupsModel, spec.allowed_groups)
-                await self._handle_allowed_groups_update(
-                    w, ContainerRegistryID(container_registry_row.id), allowed_groups
-                )
-
-            return container_registry_row.to_dataclass()
+        allowed_groups = creator.allowed_groups
+        async with self._ops_provider.write_ops() as w:
+            data = await w.create_global_entity(creator)
+            if allowed_groups is not None and allowed_groups.add:
+                await self._handle_allowed_groups_update(w, data.id, allowed_groups)
+            return data
 
     async def modify_registry(
         self,
-        updater: Updater[ContainerRegistryRow],
+        updater: ContainerRegistryUpdater,
     ) -> ContainerRegistryData:
-        updater.spec = cast(ContainerRegistryUpdaterSpec, updater.spec)
-        registry_id = ContainerRegistryID(cast(uuid.UUID, updater.pk_value))
-        async with self._rbac_ops_provider.write_ops() as w:
-            existing = await w.query(Querier(row_class=ContainerRegistryRow, pk_value=registry_id))
-            if existing is None:
-                raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
-
-            is_global_value = updater.spec.is_global.optional_value()
-            if is_global_value is True:
+        registry_id = updater.registry_id
+        async with self._ops_provider.write_ops() as w:
+            if updater.is_global.optional_value() is True:
                 await self._clear_all_allowed_groups(w, registry_id)
-            elif updater.spec.has_allowed_groups_update is True:
+            elif updater.has_allowed_groups_update:
                 await self._handle_allowed_groups_update(
-                    w, registry_id, updater.spec.allowed_groups.value()
+                    w, registry_id, updater.allowed_groups.value()
                 )
 
-            to_update = updater.spec.build_values()
-            if to_update == {}:  # means no fields to update or only allowed_groups updated
-                return existing.row.to_dataclass()
-
-            update_result = await w.update(updater)
-            if update_result is None:
+            data = await w.update_data(updater)
+            if data is None:
                 raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
+            if updater.build_values():
+                ContainerRegistryValidator(
+                    ContainerRegistryValidatorArgs(
+                        type=data.type,
+                        project=data.project,
+                        url=data.url,
+                    )
+                ).validate()
+            return data
 
-            reg_row = update_result.row
-            validator = ContainerRegistryValidator(
-                ContainerRegistryValidatorArgs(
-                    type=reg_row.type,
-                    project=reg_row.project,
-                    url=reg_row.url,
-                )
-            )
-            validator.validate()
-            return reg_row.to_dataclass()
+    async def delete_registry(self, purger: ContainerRegistryPurger) -> ContainerRegistryData:
+        """Delete a container registry with the RBAC graph it left.
 
-    async def delete_registry(self, purger: Purger[ContainerRegistryRow]) -> ContainerRegistryData:
+        Raises ContainerRegistryNotFound if the registry does not exist.
         """
-        Delete a container registry with its RBAC entries and virtual scope.
-        Returns the deleted registry data.
-        Raises ContainerRegistryNotFound if registry doesn't exist.
-        """
-        spec = cast(ContainerRegistryPurgerSpec, purger.spec)
-        async with self._rbac_ops_provider.write_ops() as w:
-            await self._clear_all_allowed_groups(w, spec.registry_id)
-            result = await w.delete_scope(
-                ScopeDeletion(
-                    purger=RBACEntityPurger(spec=spec),
-                    scope=ScopeRef(
-                        scope_type=CONTAINER_REGISTRY_SCOPE_TYPE, scope_id=spec.registry_id
-                    ),
-                )
-            )
-            if result is None:
+        async with self._ops_provider.write_ops() as w:
+            await self._clear_all_allowed_groups(w, purger.registry_id)
+            data = await w.purge_entity(purger)
+            if data is None:
                 raise ContainerRegistryNotFound(
-                    f"Container registry not found (id:{purger.spec.pk_value()})"
+                    f"Container registry not found (id:{purger.registry_id})"
                 )
-
-            return result.row.to_dataclass()
+            return data
 
     @container_registry_repository_resilience.apply()
     async def get_by_registry_and_project(
@@ -320,41 +276,25 @@ class ContainerRegistryRepository:
 
     async def _handle_allowed_groups_update(
         self,
-        ops: RBACWriteOps,
+        ops: ContainerRegistryWriteOps,
         registry_id: ContainerRegistryID,
         allowed_group_updates: AllowedGroupsModel,
     ) -> None:
+        """Add or remove the projects a container registry is reachable from.
+
+        Raises ContainerRegistryGroupsAlreadyAssociated when a project is already
+        associated, and ContainerRegistryGroupsAssociationNotFound when none of the
+        projects to remove was associated.
         """
-        Handle adding/removing group associations for a container registry.
-
-        Each allowed project enrolls the registry as an entity member (virtual-scope
-        membership + scope-entity association) and is bound to the registry's virtual
-        scope so project-scoped permissions reach the registry's entities.
-
-        Args:
-            ops: RBAC write ops bound to the current transaction
-            registry_id: Container registry UUID
-            allowed_group_updates: Groups to add or remove
-
-        Raises:
-            ContainerRegistryGroupsAlreadyAssociated: If groups are already associated
-            ContainerRegistryGroupsAssociationNotFound: If trying to remove non-existing associations
-        """
-        registry_scope = ScopeRef(scope_type=CONTAINER_REGISTRY_SCOPE_TYPE, scope_id=registry_id)
-        # Registries created before the virtual-scope rollout have no virtual scope node.
-        await ops.ensure_scope(registry_scope)
+        # Registries created before the virtual-scope rollout have no node.
+        await ops.provision_registry(registry_id)
 
         for raw_project_id in allowed_group_updates.add:
             project_id = ProjectID(uuid.UUID(raw_project_id))
-            await ops.create(
-                Creator(
-                    spec=ContainerRegistryGroupCreatorSpec(
-                        registry_id=registry_id,
-                        project_id=project_id,
-                    )
-                )
+            await ops.create_field(
+                registry_id, ContainerRegistryGroupCreator(project_id=project_id)
             )
-            await self._enroll_registry_in_project(ops, registry_id, project_id)
+            await ops.enroll_registry_in_project(registry_id, project_id)
 
         if allowed_group_updates.remove:
             total_deleted = 0
@@ -370,68 +310,28 @@ class ContainerRegistryRepository:
 
     async def _clear_all_allowed_groups(
         self,
-        ops: RBACWriteOps,
+        ops: ContainerRegistryWriteOps,
         registry_id: ContainerRegistryID,
     ) -> None:
-        registry_scope = ScopeRef(scope_type=CONTAINER_REGISTRY_SCOPE_TYPE, scope_id=registry_id)
-        await ops.ensure_scope(registry_scope)
-        result = await ops.batch_query_in_global(
-            sa.select(AssociationContainerRegistriesGroupsRow.group_id).where(
-                AssociationContainerRegistriesGroupsRow.registry_id == registry_id
-            ),
-            BatchQuerier(pagination=NoPagination()),
+        await ops.provision_registry(registry_id)
+        removed = await ops.batch_purge_field_entities(
+            registry_id, ContainerRegistryProjectsPurger()
         )
-        for row in result.rows:
-            await self._withdraw_registry_from_project(ops, registry_id, ProjectID(row.group_id))
-
-    async def _enroll_registry_in_project(
-        self,
-        ops: RBACWriteOps,
-        registry_id: ContainerRegistryID,
-        project_id: ProjectID,
-    ) -> None:
-        """Enroll the registry in the project's virtual scope and let the project
-        scope reach the registry's own entities."""
-        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)
-        await ops.ensure_scope(project_scope)
-        await ops.add_bulk_inheriting_members(
-            EntityMembersAddition(
-                scope=project_scope,
-                members=[
-                    ScopeEntityMember(
-                        ref=EntityRef(
-                            entity_type=CONTAINER_REGISTRY_ENTITY_TYPE,
-                            entity_id=registry_id,
-                        )
-                    )
-                ],
-            )
-        )
+        for group in removed:
+            await ops.withdraw_registry_from_project(registry_id, group.project_id)
 
     async def _withdraw_registry_from_project(
         self,
-        ops: RBACWriteOps,
+        ops: ContainerRegistryWriteOps,
         registry_id: ContainerRegistryID,
         project_id: ProjectID,
     ) -> int:
-        """Reverse :meth:`_enroll_registry_in_project` and delete the N:N mapping row.
-
-        Returns the number of deleted mapping rows.
-        """
-        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)
-        purge_result = await ops.batch_purge(
-            BatchPurger(
-                spec=ContainerRegistryGroupPurgerSpec(
-                    registry_id=registry_id,
-                    project_id=project_id,
-                )
-            )
+        """Reverse an association, returning the number of deleted mapping rows."""
+        removed = await ops.batch_purge_field_entities(
+            registry_id, ContainerRegistryProjectPurger(project_id=project_id)
         )
-        await ops.remove_bulk_members(
-            project_scope,
-            [EntityRef(entity_type=CONTAINER_REGISTRY_ENTITY_TYPE, entity_id=registry_id)],
-        )
-        return purge_result.deleted_count
+        await ops.withdraw_registry_from_project(registry_id, project_id)
+        return len(removed)
 
     async def _get_by_registry_and_project(
         self,

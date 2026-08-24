@@ -21,10 +21,9 @@ import trafaret as t
 import yarl
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.docker import (
     ImageRef,
-    LabelName,
     arch_name_aliases,
     validate_image_labels,
 )
@@ -44,16 +43,14 @@ from ai.backend.manager.data.image.types import (
     ImageType,
     RescanImagesResult,
 )
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 from ai.backend.manager.exceptions import ScanImageError, ScanTagError
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow
+from ai.backend.manager.models.image.creators import ImageCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    execute_rbac_entity_creators,
+from ai.backend.manager.repositories.ops.v2.container_registry.provider import (
+    ContainerRegistryOpsProvider,
 )
-from ai.backend.manager.repositories.image.creators import ImageRowCreatorSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 concurrency_sema: ContextVar[asyncio.Semaphore] = ContextVar("concurrency_sema")
@@ -68,6 +65,7 @@ if TYPE_CHECKING:
 
 class BaseContainerRegistry(metaclass=ABCMeta):
     db: ExtendedAsyncSAEngine
+    _ops_provider: ContainerRegistryOpsProvider
     registry_name: str
     registry_info: ContainerRegistryRow
     registry_url: yarl.URL
@@ -101,6 +99,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         ssl_verify: bool = True,
     ) -> None:
         self.db = db
+        self._ops_provider = ContainerRegistryOpsProvider(db)
         self.registry_name = registry_name
         self.registry_info = registry_info
         self.registry_url = yarl.URL(registry_info.url)
@@ -156,24 +155,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         finally:
             all_updates.reset(all_updates_token)
 
-    def _determine_additional_image_scopes(
-        self,
-        labels: dict[str, str],
-    ) -> list[RBACElementRef]:
-        """
-        Parse the customized image owner label and return a USER scope
-        if present, allowing user-level access restriction for customized images.
-        """
-        result: list[RBACElementRef] = []
-        owner_label = labels.get(LabelName.CUSTOMIZED_OWNER)
-        if owner_label is not None:
-            prefix, sep, scope_id = owner_label.partition(":")
-            if prefix and sep and scope_id:
-                result.append(RBACElementRef(RBACElementType.USER, scope_id))
-            else:
-                log.warning("Invalid {} label value: {!r}", LabelName.CUSTOMIZED_OWNER, owner_label)
-        return result
-
     async def commit_rescan_result(self) -> list[ImageData]:
         scanned_images: list[ImageData] = []
         _all_updates = all_updates.get()
@@ -209,7 +190,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             if (reporter := progress_reporter.get()) is not None:
                                 await reporter.update(1, message=progress_msg)
 
-                rbac_creators: list[RBACEntityCreator[ImageRow]] = []
+                creators: list[ImageCreator] = []
                 for image_identifier, update in _all_updates.items():
                     try:
                         parsed_img = ImageRef.from_image_str(
@@ -226,47 +207,49 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             await reporter.update(1, message=progress_msg)
                         continue
 
-                    rbac_creators.append(
-                        RBACEntityCreator(
-                            spec=ImageRowCreatorSpec(
-                                name=parsed_img.canonical,
-                                project=self.registry_info.project,
-                                architecture=image_identifier.architecture,
-                                registry_id=self.registry_info.id,
-                                is_local=is_local,
-                                registry=parsed_img.registry,
-                                image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
-                                tag=parsed_img.tag,
-                                config_digest=update["config_digest"],
-                                size_bytes=update["size_bytes"],
-                                type=ImageType.COMPUTE,
-                                accelerators=update.get("accels"),
-                                labels=update["labels"],
-                                status=ImageStatus.ALIVE,
-                            ),
-                            scope_ref=RBACElementRef(
-                                RBACElementType.CONTAINER_REGISTRY,
-                                str(self.registry_info.id),
-                            ),
-                            additional_scope_refs=self._determine_additional_image_scopes(
-                                update["labels"]
-                            ),
-                            element_type=RBACElementType.IMAGE,
+                    creators.append(
+                        ImageCreator(
+                            name=parsed_img.canonical,
+                            project=self.registry_info.project,
+                            architecture=image_identifier.architecture,
+                            registry_id=ContainerRegistryID(self.registry_info.id),
+                            is_local=is_local,
+                            registry=parsed_img.registry,
+                            image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
+                            tag=parsed_img.tag,
+                            config_digest=update["config_digest"],
+                            size_bytes=update["size_bytes"],
+                            type=ImageType.COMPUTE,
+                            accelerators=update.get("accels"),
+                            labels=update["labels"],
+                            status=ImageStatus.ALIVE,
                         ),
                     )
 
-                bulk_result = await execute_rbac_entity_creators(session, rbac_creators)
-                for row in bulk_result.rows:
-                    scanned_images.append(row.to_dataclass())
-                    progress_msg = (
-                        f"Updated image - {row.name}/{row.architecture} ({row.config_digest})"
-                    )
-                    log.info(progress_msg)
-                    if (reporter := progress_reporter.get()) is not None:
-                        await reporter.update(1, message=progress_msg)
-
                 await session.flush()
+
+            scanned_images.extend(await self._create_scanned_images(creators))
         return scanned_images
+
+    async def _create_scanned_images(self, creators: list[ImageCreator]) -> list[ImageData]:
+        """Insert the images the scan found, each joining the registry it came from.
+
+        A registry created before the virtual-scope rollout has no node to join, so it
+        is put into the graph first.
+        """
+        if not creators:
+            return []
+        async with self._ops_provider.write_ops() as w:
+            await w.provision_registry(ContainerRegistryID(self.registry_info.id))
+            created = await w.atomic_create_entities(creators)
+        for image in created:
+            progress_msg = (
+                f"Updated image - {image.name}/{image.architecture} ({image.config_digest})"
+            )
+            log.info(progress_msg)
+            if (reporter := progress_reporter.get()) is not None:
+                await reporter.update(1, message=progress_msg)
+        return created
 
     async def scan_single_ref(self, image: str) -> RescanImagesResult:
         all_updates_token = all_updates.set({})

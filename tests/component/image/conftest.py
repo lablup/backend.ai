@@ -35,6 +35,7 @@ from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.image.repository import ImageRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
 
@@ -47,7 +48,12 @@ def image_processors(
     agent_registry: AgentRegistry,
     processor_registry: ProcessorRegistry[Any],
 ) -> ImageProcessors:
-    repo = ImageRepository(database_engine, valkey_clients.image, config_provider)
+    repo = ImageRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        valkey_clients.image,
+        config_provider,
+    )
     service = ImageService(agent_registry, repo, config_provider)
     mock_scope = MagicMock(spec=ScopeActionRBACValidator)
     mock_scope.validate = AsyncMock()

@@ -28,27 +28,17 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.container_registry.conditions import ContainerRegistryConditions
+from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
 from ai.backend.manager.models.container_registry.orders import (
     DEFAULT_FORWARD_ORDER,
     TIEBREAKER_ORDER,
     resolve_order,
 )
+from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.container_registry.creators import (
-    ContainerRegistryCreatorSpec,
-)
-from ai.backend.manager.repositories.container_registry.purgers import (
-    ContainerRegistryPurgerSpec,
-)
-from ai.backend.manager.repositories.container_registry.updaters import (
-    ContainerRegistryUpdaterSpec,
-)
 from ai.backend.manager.services.container_registry.actions.create_container_registry import (
     CreateContainerRegistryAction,
 )
@@ -105,7 +95,7 @@ class ContainerRegistryAdapter(BaseAdapter):
                 add=input.allowed_groups.add,
                 remove=input.allowed_groups.remove,
             )
-        spec = ContainerRegistryCreatorSpec(
+        creator = ContainerRegistryCreator(
             url=input.url,
             type=input.type,
             registry_name=input.registry_name,
@@ -118,7 +108,7 @@ class ContainerRegistryAdapter(BaseAdapter):
             allowed_groups=allowed_groups,
         )
         result = await self._processors.container_registry.create_container_registry.run(
-            CreateContainerRegistryAction(creator=Creator(spec=spec))
+            CreateContainerRegistryAction(creator=creator)
         )
         return CreateContainerRegistryPayload(registry=self._data_to_dto(result.data))
 
@@ -133,7 +123,8 @@ class ContainerRegistryAdapter(BaseAdapter):
                 add=input.allowed_groups.add,
                 remove=input.allowed_groups.remove,
             )
-        spec = ContainerRegistryUpdaterSpec(
+        updater = ContainerRegistryUpdater(
+            registry_id=ContainerRegistryID(input.id),
             url=(OptionalState.update(input.url) if input.url is not None else OptionalState.nop()),
             type=(
                 OptionalState.update(input.type) if input.type is not None else OptionalState.nop()
@@ -167,7 +158,6 @@ class ContainerRegistryAdapter(BaseAdapter):
                 else TriState.nop()
             ),
         )
-        updater: Updater[ContainerRegistryRow] = Updater(spec=spec, pk_value=input.id)
         result = await self._processors.container_registry.update_container_registry.run(
             UpdateContainerRegistryAction(updater=updater)
         )
@@ -178,9 +168,7 @@ class ContainerRegistryAdapter(BaseAdapter):
         input: DeleteContainerRegistryInput,
     ) -> DeleteContainerRegistryPayload:
         """Delete a container registry (superadmin only). This is a hard delete."""
-        purger: Purger[ContainerRegistryRow] = Purger(
-            spec=ContainerRegistryPurgerSpec(registry_id=ContainerRegistryID(input.id))
-        )
+        purger = ContainerRegistryPurger(registry_id=ContainerRegistryID(input.id))
         await self._processors.container_registry.delete_container_registry.run(
             DeleteContainerRegistryAction(purger=purger)
         )

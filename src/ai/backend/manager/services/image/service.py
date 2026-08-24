@@ -2,7 +2,6 @@ import logging
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
@@ -10,17 +9,14 @@ from ai.backend.common.types import AgentId, ImageAlias, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageWithAgentInstallStatus
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
 from ai.backend.manager.models.image import (
     ImageIdentifier,
-    ImageRow,
 )
+from ai.backend.manager.models.image.creators import ImageAliasCreator
+from ai.backend.manager.models.image.updaters import ImageUpdater
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.image.creators import ImageAliasCreatorSpec
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
@@ -261,9 +257,7 @@ class ImageService:
                 ImageIdentifier(action.target, action.architecture),
                 ImageAlias(action.target),
             ])
-            # Create Updater with resolved image ID
-            updater: Updater[ImageRow] = Updater(spec=action.updater_spec, pk_value=image_data.id)
-            # Pass Updater to repository
+            updater = ImageUpdater(image_id=image_data.id, update=action.update)
             updated_image_data = await self._image_repository.update_image_properties(updater)
         except UnknownImageReference as e:
             raise UpdateImageActionUnknownImageReferenceError from e
@@ -273,7 +267,7 @@ class ImageService:
     async def update_image_by_id(
         self, action: UpdateImageByIdAction
     ) -> UpdateImageByIdActionResult:
-        updater: Updater[ImageRow] = Updater(spec=action.updater_spec, pk_value=action.image_id)
+        updater = ImageUpdater(image_id=action.image_id, update=action.update)
         updated_image_data = await self._image_repository.update_image_properties(updater)
         return UpdateImageByIdActionResult(image=updated_image_data)
 
@@ -414,18 +408,9 @@ class ImageService:
         """
         Creates an alias for an image by its ID.
         """
-        rbac_creator = RBACEntityCreator(
-            spec=ImageAliasCreatorSpec(
-                alias=action.alias,
-                image_id=action.image_id,
-            ),
-            element_type=RBACElementType.IMAGE_ALIAS,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.IMAGE,
-                element_id=str(action.image_id),
-            ),
+        image_alias = await self._image_repository.add_image_alias_by_id(
+            action.image_id, ImageAliasCreator(alias=action.alias)
         )
-        image_alias = await self._image_repository.add_image_alias_by_id(rbac_creator)
         return AliasImageByIdActionResult(
             image_id=action.image_id,
             image_alias=image_alias,

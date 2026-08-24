@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias, ImageID
@@ -29,7 +29,6 @@ from ai.backend.manager.data.image.types import (
     RescanImagesResult,
     ResourceLimitInput,
 )
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.image import (
     AliasImageActionDBError,
     AliasImageActionValueError,
@@ -45,23 +44,22 @@ from ai.backend.manager.models.image import (
     ImageIdentifier,
     ImageRow,
 )
+from ai.backend.manager.models.image.creators import ImageAliasCreator
+from ai.backend.manager.models.image.updaters import ImageUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    execute_rbac_entity_creator,
-)
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
-from ai.backend.manager.repositories.image.creators import ImageAliasCreatorSpec
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ImageDBSource:
     _db: ExtendedAsyncSAEngine
+    _ops_provider: V2DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: V2DBOpsProvider) -> None:
         self._db = db
+        self._ops_provider = ops_provider
 
     async def fetch_image_by_identifiers(
         self, identifiers: list[ImageAlias | ImageRef | ImageIdentifier]
@@ -239,30 +237,19 @@ class ImageDBSource:
 
     async def insert_image_alias(
         self, alias: str, image_canonical: str, architecture: str
-    ) -> tuple[UUID, ImageAliasData]:
+    ) -> tuple[ImageID, ImageAliasData]:
         """
         Deprecated. Use insert_image_alias_by_id instead.
         """
         try:
-            async with self._db.begin_session() as session:
+            async with self._db.begin_readonly_session_read_committed() as session:
                 image_row = await ImageRow.resolve(
                     session, [ImageIdentifier(image_canonical, architecture)]
                 )
-                rbac_creator = RBACEntityCreator(
-                    spec=ImageAliasCreatorSpec(
-                        alias=alias,
-                        image_id=image_row.id,
-                    ),
-                    element_type=RBACElementType.IMAGE_ALIAS,
-                    scope_ref=RBACElementRef(
-                        element_type=RBACElementType.IMAGE,
-                        element_id=str(image_row.id),
-                    ),
-                )
-                result = await execute_rbac_entity_creator(session, rbac_creator)
-                row_id = image_row.id
-                alias_data = ImageAliasData(id=result.row.id, alias=result.row.alias or "")
-            return row_id, alias_data
+                image_id = ImageID(image_row.id)
+            async with self._ops_provider.write_ops() as w:
+                alias_data = await w.create_field(image_id, ImageAliasCreator(alias=alias))
+            return image_id, alias_data
         except ValueError as e:
             raise AliasImageActionValueError from e
         except DBAPIError as e:
@@ -271,13 +258,15 @@ class ImageDBSource:
     async def query_image_alias(self, alias: str) -> ImageAliasData:
         async with self._db.begin_readonly_session_read_committed() as session:
             row = await self._get_image_alias_by_name(session, alias)
-            return ImageAliasData(id=row.id, alias=row.alias or "")
+            return ImageAliasData(id=ImageAliasID(row.id), alias=row.alias or "")
 
     async def remove_image_alias(self, alias: str) -> tuple[UUID, ImageAliasData]:
         async with self._db.begin_session() as session:
             existing_alias = await self._get_image_alias_by_name(session, alias)
             image_id = existing_alias.image_id
-            alias_data = ImageAliasData(id=existing_alias.id, alias=existing_alias.alias or "")
+            alias_data = ImageAliasData(
+                id=ImageAliasID(existing_alias.id), alias=existing_alias.alias or ""
+            )
             await session.delete(existing_alias)
         return image_id, alias_data
 
@@ -324,13 +313,13 @@ class ImageDBSource:
                 raise RegistryNotFoundForImage(f"Registry not found for image {image_id}")
             return image_row.to_dataclass(), image_row.image_ref, registry_row
 
-    async def modify_image_properties(self, updater: Updater[ImageRow]) -> ImageData:
+    async def modify_image_properties(self, updater: ImageUpdater) -> ImageData:
         try:
-            async with self._db.begin_session() as session:
-                result = await execute_updater(session, updater)
-                if result is None:
-                    raise ImageNotFound(f"Image not found (id:{updater.pk_value})")
-                return result.row.to_dataclass()
+            async with self._ops_provider.write_ops() as w:
+                data = await w.update_data(updater)
+                if data is None:
+                    raise ImageNotFound(f"Image not found (id:{updater.image_id})")
+                return data
         except (ValueError, DBAPIError) as e:
             raise UpdateImageActionValueError from e
 
@@ -348,18 +337,17 @@ class ImageDBSource:
             return image_row.to_dataclass()
 
     async def insert_image_alias_by_id(
-        self, creator: RBACEntityCreator[ImageAliasRow]
+        self, image_id: ImageID, creator: ImageAliasCreator
     ) -> ImageAliasData:
         """
-        Creates an image alias using the RBACEntityCreator pattern.
+        Creates an alias of the image the id names.
         """
         try:
-            async with self._db.begin_session() as session:
-                spec = cast(ImageAliasCreatorSpec, creator.spec)
+            async with self._db.begin_readonly_session_read_committed() as session:
                 # Validate that the image exists
-                await self._get_image_by_id(session, spec.image_id)
-                result = await execute_rbac_entity_creator(session, creator)
-                return ImageAliasData(id=result.row.id, alias=result.row.alias or "")
+                await self._get_image_by_id(session, image_id)
+            async with self._ops_provider.write_ops() as w:
+                return await w.create_field(image_id, creator)
         except ValueError as e:
             raise AliasImageActionValueError from e
         except DBAPIError as e:
