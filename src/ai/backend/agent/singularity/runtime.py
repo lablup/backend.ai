@@ -20,11 +20,13 @@ Measured on apptainer 1.5.3, unprivileged (no ``starter-suid``), as uid 1000.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
 import re
 import shutil
+import stat
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, ClassVar, Final, override
@@ -60,6 +62,46 @@ def resolve_binary() -> str:
     # Fall through to the preferred name so the failure names the missing tool rather than
     # surfacing as a bare FileNotFoundError from create_subprocess_exec.
     return _BIN_CANDIDATES[0]
+
+
+_OVERLAY_XATTR_PREFIXES: Final = ("trusted.overlay.", "user.overlay.", "user.fuseoverlayfs.")
+
+
+def _is_opaque(path: Path) -> bool:
+    for prefix in _OVERLAY_XATTR_PREFIXES:
+        with contextlib.suppress(OSError):
+            if os.getxattr(path, f"{prefix}opaque") == b"y":
+                return True
+    return False
+
+
+def _clone_metadata(src: Path, dst: Path) -> None:
+    """Owner, mode and mtime from src onto dst, minus the overlay's own bookkeeping xattrs."""
+    info = src.lstat()
+    with contextlib.suppress(OSError):
+        os.chown(dst, info.st_uid, info.st_gid, follow_symlinks=False)
+    if not dst.is_symlink():
+        with contextlib.suppress(OSError):
+            dst.chmod(stat.S_IMODE(info.st_mode))
+        with contextlib.suppress(OSError):
+            os.utime(dst, (info.st_atime, info.st_mtime))
+    with contextlib.suppress(OSError):
+        for name in os.listxattr(dst, follow_symlinks=False):
+            if name.startswith(_OVERLAY_XATTR_PREFIXES):
+                with contextlib.suppress(OSError):
+                    os.removexattr(dst, name, follow_symlinks=False)
+
+
+def _copy_entry(src: Path, dst: Path) -> None:
+    if dst.is_dir() and not dst.is_symlink():
+        force_rmtree(dst)
+    else:
+        dst.unlink(missing_ok=True)
+    if src.is_symlink():
+        dst.symlink_to(src.readlink())
+    else:
+        shutil.copy2(src, dst, follow_symlinks=False)
+    _clone_metadata(src, dst)
 
 
 class SingularityRuntime(RootlessOciRuntime):
@@ -250,19 +292,12 @@ class SingularityRuntime(RootlessOciRuntime):
         upper = self._overlay_dir(container_id) / "upper"
         if not base.is_dir():
             raise RuntimeError(f"no base sandbox for {base_image_ref}")
-        await asyncio.to_thread(shutil.rmtree, target, ignore_errors=True)
+        await asyncio.to_thread(force_rmtree, target)
         rc, _out, err = await self._run_as_agent("cp", "-a", str(base), str(target))
         if rc != 0:
             raise RuntimeError(f"could not copy the base sandbox: {err.decode(errors='replace')}")
         if upper.is_dir():
-            # `cp -a <upper>/. <target>` overlays the container's writes, including deletions'
-            # whiteout entries — harmless as ordinary files, and the alternative (interpreting
-            # overlayfs whiteouts) buys nothing for a snapshot nobody diffs.
-            rc, _out, err = await self._run_as_agent("cp", "-a", f"{upper}/.", str(target))
-            if rc != 0:
-                raise RuntimeError(
-                    f"could not overlay the container's writes: {err.decode(errors='replace')}"
-                )
+            await asyncio.to_thread(self._merge_overlay, upper, target)
         # The committed image must inherit the base's identity, or the manager reads it as "not
         # present locally" and either re-pulls from a registry that has never heard of it or
         # rejects it outright. See the enroot backend for the full story.
@@ -281,6 +316,47 @@ class SingularityRuntime(RootlessOciRuntime):
                 "working_dir": base_meta.get("working_dir"),
             })
         )
+
+    @staticmethod
+    def _merge_overlay(upper: Path, target: Path) -> None:
+        """Apply the container's overlay upperdir onto a copy of the base rootfs.
+
+        A plain ``cp -a`` of the upperdir is wrong, and wrong in a way that survives all the way
+        into the registry: overlayfs records a *deletion* as a character device with rdev 0:0 at
+        the deleted path, so copying it verbatim republished `/etc/hostname` as an unopenable
+        `c--------- 0,0` node instead of removing it (measured — the bogus node was found inside
+        the pushed OCI layer). Two overlay conventions therefore have to be interpreted here:
+
+        * **whiteout** — a char device with rdev 0 means "this path is deleted"; drop it from the
+          merged tree rather than copying the marker.
+        * **opaque directory** — the ``overlay.opaque`` xattr means the upper directory *replaces*
+          the lower one, so the base's contents of that directory must go first.
+
+        The runtime's own bookkeeping xattrs (``*.overlay.origin`` / ``.impure`` / ``.uuid``) are
+        stripped: they describe this container's overlay, not the image being published.
+        """
+        for parent, dirnames, filenames in os.walk(upper):
+            src_dir = Path(parent)
+            dst_dir = target / src_dir.relative_to(upper)
+            if _is_opaque(src_dir) and dst_dir.is_dir():
+                force_rmtree(dst_dir)
+            dst_dir.mkdir(parents=True, exist_ok=True)
+            _clone_metadata(src_dir, dst_dir)
+            for name in [*filenames, *dirnames]:
+                src, dst = src_dir / name, dst_dir / name
+                info = src.lstat()
+                if stat.S_ISCHR(info.st_mode) and info.st_rdev == 0:
+                    # Whiteout: the base may hold either a file or a whole directory here.
+                    if dst.is_dir() and not dst.is_symlink():
+                        force_rmtree(dst)
+                    else:
+                        dst.unlink(missing_ok=True)
+                    if name in dirnames:
+                        dirnames.remove(name)  # nothing under a whiteout to walk into
+                    continue
+                if name in dirnames:
+                    continue  # os.walk will visit it and create it above
+                _copy_entry(src, dst)
 
     @staticmethod
     def _sandbox_digest(sandbox: Path) -> str | None:
