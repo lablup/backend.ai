@@ -56,7 +56,9 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.resource import DataTransformationFailed
+from ai.backend.manager.errors.secret import InvalidSecretBinding
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.secret.types import SecretValue
 
 if TYPE_CHECKING:
     from sqlalchemy.engine.interfaces import Dialect
@@ -957,6 +959,44 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator[TUUIDSubType]):
         return type(self)(self._subtype_func)
 
 
+class SecretColumn(TypeDecorator[SecretValue]):
+    """
+    A column holding a secret, stored either as legacy plaintext or encrypted.
+
+    It only converts between the stored string and its parsed form: encrypting needs a
+    key provider and is asynchronous, so it happens before a value reaches here.
+    """
+
+    impl = UnicodeText
+    cache_ok = True
+
+    context: str
+
+    def __init__(self, context: str) -> None:
+        super().__init__()
+        # Names this column, and is what callers pass the key provider as the associated
+        # data. Public because SQLAlchemy keys a type's cache on the __init__ arguments it
+        # finds as plain attributes; sharing one key would bind a value under another
+        # column's associated data.
+        self.context = context
+
+    @override
+    def process_bind_param(self, value: Any, _dialect: Dialect) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, SecretValue):
+            raise InvalidSecretBinding(
+                f"A secret column takes a SecretValue but got {type(value).__name__}."
+            )
+        return value.serialize()
+
+    @override
+    def process_result_value(self, value: str | None, _dialect: Dialect) -> SecretValue | None:
+        if value is None:
+            return None
+        return SecretValue.parse(value)
+
+
 class SlugType(TypeDecorator[str]):
     """
     A type wrapper for slug type string
@@ -1133,6 +1173,11 @@ async def populate_fixture(
                                 rounds=600_000,
                                 salt_size=32,
                             )
+                elif isinstance(col.type, SecretColumn):
+                    for row in rows:
+                        if col.name in row and row[col.name] is not None:
+                            # Fixtures carry plaintext, which needs no key provider.
+                            row[col.name] = SecretValue(row[col.name])
                 elif isinstance(col.type, ResourceSlotColumn):
                     from ai.backend.common.types import ResourceSlot
 

@@ -195,6 +195,7 @@ class ErrorDomain(enum.StrEnum):
     RUNTIME_VARIANT = "runtime-variant"
     ROLE_INVITATION = "role-invitation"
     RETENTION_POLICY = "retention-policy"
+    SECRET = "secret"
 
     EXTERNAL_SYSTEM = "external-system"  # Errors from external systems
 
