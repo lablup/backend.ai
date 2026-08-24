@@ -57,6 +57,11 @@ class UserStatus(enum.StrEnum):
                 return cls.PURGE_ERROR
         return None
 
+    @classmethod
+    def purge_in_progress(cls) -> frozenset[UserStatus]:
+        """Statuses a purge is working through. Writes are refused while in one."""
+        return frozenset({cls.PURGING, cls.PURGE_ERROR})
+
 
 @dataclass
 class UserInfoContext:

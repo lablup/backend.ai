@@ -11,16 +11,18 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.domain.types import DomainData, DomainStatus
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
-class DomainUpdater(DataUpdater[DomainRow, DomainData]):
-    """Edits a domain's settings."""
+class DomainUpdater(GuardedDataUpdater[DomainRow, DomainData]):
+    """Edits a domain's settings; refuses while a purge is working through it."""
 
     domain_id: DomainID
     new_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
@@ -48,6 +50,10 @@ class DomainUpdater(DataUpdater[DomainRow, DomainData]):
     @override
     def target_id_value(self) -> UUID:
         return self.domain_id
+
+    @override
+    def guard_conditions(self) -> list[QueryCondition]:
+        return [DomainConditions.not_being_purged()]
 
     @override
     def build_values(self) -> dict[str, Any]:
@@ -108,8 +114,8 @@ class DomainDotfilesUpdater(DataUpdater[DomainRow, DomainData]):
 
 
 @dataclass
-class DomainSoftDeleteUpdater(DataUpdater[DomainRow, DomainData]):
-    """Retires a domain by clearing its active flag."""
+class DomainSoftDeleteUpdater(GuardedDataUpdater[DomainRow, DomainData]):
+    """Retires a domain; refuses while a purge is working through it."""
 
     domain_id: DomainID
 
@@ -127,8 +133,12 @@ class DomainSoftDeleteUpdater(DataUpdater[DomainRow, DomainData]):
         return self.domain_id
 
     @override
+    def guard_conditions(self) -> list[QueryCondition]:
+        return [DomainConditions.not_being_purged()]
+
+    @override
     def build_values(self) -> dict[str, Any]:
-        return {"is_active": False}
+        return {"is_active": False, "status": DomainStatus.DELETED}
 
     @property
     @override
@@ -141,8 +151,9 @@ class DomainSoftDeleteUpdater(DataUpdater[DomainRow, DomainData]):
 
 
 @dataclass
-class DomainRestoreUpdater(DataUpdater[DomainRow, DomainData]):
-    """Puts a retired domain back in service."""
+class DomainRestoreUpdater(GuardedDataUpdater[DomainRow, DomainData]):
+    """Puts a retired domain back in service; refuses while a purge is working
+    through it."""
 
     domain_id: DomainID
 
@@ -160,8 +171,12 @@ class DomainRestoreUpdater(DataUpdater[DomainRow, DomainData]):
         return self.domain_id
 
     @override
+    def guard_conditions(self) -> list[QueryCondition]:
+        return [DomainConditions.not_being_purged()]
+
+    @override
     def build_values(self) -> dict[str, Any]:
-        return {"is_active": True}
+        return {"is_active": True, "status": DomainStatus.ACTIVE}
 
     @property
     @override

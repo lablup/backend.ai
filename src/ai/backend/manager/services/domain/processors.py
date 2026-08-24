@@ -88,9 +88,9 @@ class DomainProcessors:
         self.lookup = group.public_lookup_ops(LookupDomainAction)
         self.global_search = group.global_search_ops(GlobalSearchDomainsAction)
         self.public_search_rg_domains = group.public_search_ops(SearchRGDomainsAction)
-        self.update_domain = group.single_update_ops(UpdateDomainAction)
-        self.delete_domain = group.single_delete_ops(DeleteDomainAction)
-        self.restore_domain = group.single_restore_ops(RestoreDomainAction)
+        self.update_domain = group.single_guarded_update_ops(UpdateDomainAction)
+        self.delete_domain = group.single_guarded_delete_ops(DeleteDomainAction)
+        self.restore_domain = group.single_guarded_restore_ops(RestoreDomainAction)
         self.create_domain = group.global_role_managed_create_ops(CreateDomainAction)
         self.create_domain_node = group.global_scope(
             CreateDomainNodeAction, service.create_domain_node

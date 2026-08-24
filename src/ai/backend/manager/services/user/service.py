@@ -88,6 +88,10 @@ from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
     PurgeUserActionResult,
 )
+from ai.backend.manager.services.user.actions.restore_user import (
+    RestoreUserAction,
+    RestoreUserActionResult,
+)
 from ai.backend.manager.services.user.actions.update_keypair_dotfile import (
     UpdateKeypairDotfileAction,
     UpdateKeypairDotfileActionResult,
@@ -158,6 +162,10 @@ class UserService:
     async def delete_user(self, action: DeleteUserAction) -> DeleteUserActionResult:
         await self._user_repository.delete_user_by_uuid_validated(user_uuid=action.user_id)
         return DeleteUserActionResult()
+
+    async def restore_user(self, action: RestoreUserAction) -> RestoreUserActionResult:
+        await self._user_repository.restore_user_by_uuid_validated(user_uuid=action.user_id)
+        return RestoreUserActionResult()
 
     async def get_user(self, action: GetUserAction) -> GetUserActionResult:
         """Retrieve a single user by UUID.

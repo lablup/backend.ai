@@ -23,6 +23,7 @@ from .service import (
     GlobalPurgeService,
     GlobalSearchService,
     GlobalUpsertService,
+    GuardedUpdateService,
     LookupService,
     PartialBulkDeleteService,
     PartialBulkRestoreService,
@@ -65,5 +66,6 @@ __all__ = (
     "RoleManagedEntityAtomicCreateService",
     "RoleManagedEntityCreateService",
     "SearchService",
+    "GuardedUpdateService",
     "UpdateService",
 )

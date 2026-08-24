@@ -64,7 +64,7 @@ from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user import UserRow, UserStatus
 from ai.backend.manager.models.utils import execute_with_retry
 
 if TYPE_CHECKING:
@@ -594,6 +594,15 @@ def _set_unauthenticated_state(request: web.Request) -> None:
     request["user"] = None
 
 
+#: Statuses whose owner may not authenticate: the account is gone or a purge is
+#: working through it. This is what keeps a soft-deleted user's keypairs from
+#: reaching the API — the delete no longer deactivates them.
+_AUTH_DENIED_USER_STATUSES: Final = frozenset({
+    UserStatus.DELETED,
+    *UserStatus.purge_in_progress(),
+})
+
+
 @dataclass(frozen=True)
 class _AuthContext:
     """What an authenticated request carries about its caller."""
@@ -633,6 +642,7 @@ async def _query_auth_context_by_access_key(
                     UserRow.uuid,
                     UserRow.email,
                     UserRow.role,
+                    UserRow.status,
                     UserRow.domain_name,
                     UserRow.domain_id,
                     UserRow.sudo_session_enabled,
@@ -648,6 +658,8 @@ async def _query_auth_context_by_access_key(
             return None
 
         keypair_row, user_row, keypair_policy_row, user_policy_row = row
+        if user_row.status in _AUTH_DENIED_USER_STATUSES:
+            raise AuthorizationFailed(f"User account is {user_row.status}")
         return _AuthContext(
             user=AuthenticatedUser(
                 uuid=UserID(user_row.uuid),
@@ -771,6 +783,8 @@ async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserDat
     row = await execute_with_retry(_query)
     if row is None:
         raise UserNotFound("Impersonation target user not found")
+    if row.status in _AUTH_DENIED_USER_STATUSES:
+        raise AuthorizationFailed(f"Impersonation target user account is {row.status}")
     return UserData(
         user_id=row.uuid,
         is_authorized=True,

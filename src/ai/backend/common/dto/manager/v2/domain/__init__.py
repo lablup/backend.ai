@@ -9,6 +9,7 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     DomainFilter,
     DomainOrder,
     PurgeDomainInput,
+    RestoreDomainInput,
     SearchDomainsRequest,
     UpdateDomainInput,
 )
@@ -21,6 +22,7 @@ from ai.backend.common.dto.manager.v2.domain.response import (
     DomainPayload,
     DomainRegistryInfo,
     PurgeDomainPayload,
+    RestoreDomainPayload,
     SearchDomainsPayload,
 )
 from ai.backend.common.dto.manager.v2.domain.types import (
@@ -38,6 +40,7 @@ __all__ = (
     "CreateDomainInput",
     "UpdateDomainInput",
     "DeleteDomainInput",
+    "RestoreDomainInput",
     "PurgeDomainInput",
     "DomainFilter",
     "DomainOrder",
@@ -51,6 +54,7 @@ __all__ = (
     "DomainPayload",
     "SearchDomainsPayload",
     "DeleteDomainPayload",
+    "RestoreDomainPayload",
     "PurgeDomainPayload",
     # Types
     "DomainFairShareScopeDTO",

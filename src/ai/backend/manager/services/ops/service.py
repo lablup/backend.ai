@@ -59,6 +59,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     GlobalEntityWithFieldsCreateOpsAction,
     GlobalRoleManagedEntityCreateOpsAction,
     GlobalSearchOpsAction,
+    GuardedUpdateOpsAction,
     LookupOpsAction,
     PartialBulkGetEntityOpsAction,
     PartialBulkUpdateOpsAction,
@@ -119,6 +120,7 @@ __all__ = (
     "GlobalAtomicUpsertService",
     "FieldUpsertService",
     "UpdateService",
+    "GuardedUpdateService",
     "DeleteService",
     "RestoreService",
     "PartialBulkUpdateService",
@@ -763,6 +765,22 @@ class RestoreService[TData]:
 
     async def execute(self, action: UpdateOpsAction[Any, TData]) -> EntityOpsResult[TData]:
         return EntityOpsResult(data=await self._repository.update(action.to_updater()))
+
+
+class GuardedUpdateService[TData]:
+    """Applies the action's guarded updater.
+
+    Serves the update, delete and restore shapes alike: which column moves is the
+    updater's business, and the shape is what says how the write is recorded.
+    """
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: GuardedUpdateOpsAction[Any, TData]) -> EntityOpsResult[TData]:
+        return EntityOpsResult(data=await self._repository.update_guarded(action.to_updater()))
 
 
 class PartialBulkUpdateService[TData]:

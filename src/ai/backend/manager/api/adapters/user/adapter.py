@@ -50,6 +50,7 @@ from ai.backend.common.dto.manager.v2.user.request import (
     CreateUserInput,
     DeleteUserInput,
     PurgeUserInput,
+    RestoreUserInput,
     SearchUsersRequest,
     UpdateUserInput,
     UserFilter,
@@ -68,6 +69,7 @@ from ai.backend.common.dto.manager.v2.user.response import (
     DeleteUserPayload,
     EntityTimestamps,
     PurgeUserPayload,
+    RestoreUserPayload,
     SearchUsersPayload,
     UpdateMyAllowedClientIPPayload,
     UpdateUserPayload,
@@ -151,6 +153,7 @@ from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
     PurgeUserAction,
 )
+from ai.backend.manager.services.user.actions.restore_user import RestoreUserAction
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
 from ai.backend.manager.services.user.actions.search_users_by_domain import (
     SearchUsersByDomainAction,
@@ -556,6 +559,13 @@ class UserAdapter(BaseAdapter):
         """Soft-delete a user by UUID."""
         await self._processors.user.delete_user.run(DeleteUserAction(user_id=UserID(input.user_id)))
         return DeleteUserPayload(success=True)
+
+    async def restore_user_by_id(self, input: RestoreUserInput) -> RestoreUserPayload:
+        """Restore a soft-deleted user by UUID."""
+        await self._processors.user.restore_user.run(
+            RestoreUserAction(user_id=UserID(input.user_id))
+        )
+        return RestoreUserPayload(success=True)
 
     async def purge_user_by_id(
         self, input: PurgeUserInput, admin_user_id: UUID

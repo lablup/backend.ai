@@ -43,8 +43,8 @@ For each area, separate **✅ what already exists** from **➕ what to add**.
 | ✅ | `vfolder` — `VFolderOperationStatus` is the only multi-step one: `DELETE_PENDING` → `DELETE_ONGOING` → `DELETE_COMPLETE` / `DELETE_ERROR` |
 | ✅ | `restore` — only on `domain`, `project`, and `vfolder` |
 | ➕ | Open `restore` on all five entities |
-| ➕ | Add one operation-axis enum column to each of the five entities |
-| ➕ | Introduce an existence-axis enum column on `domain` and `project`. A boolean cannot name its default value |
+| ➕ | Add the cleanup-progress values (`purging`, `purge-error`) to each entity's one status enum |
+| ➕ | Introduce a status enum on `domain` and `project`. A boolean cannot name its default value |
 
 Only `user`'s soft delete is more than a state transition — it also deactivates every keypair the user owns. That is also why `user` has no `restore`.
 
@@ -96,20 +96,23 @@ The reconciler base is currently tied to session scheduling vocabulary — `Sche
 
 ## 3. Implementation Design
 
-### 3.1 Two axes and where they are stored
+### 3.1 One status enum and where it lives
 
-An entity has two axes, and **both live on the entity row**. Two axes means two columns.
+**Each entity has one status enum, and that enum lives on the entity row.** Cleanup progress is carried as values in the same enum.
 
-| Axis | What it answers | Column |
+| entity | enum | Values |
 |---|---|---|
-| Existence | What is this entity | One enum |
-| Operation | What is being done to this entity | One enum |
+| `domain` | `DomainStatus` | `active`, `deleted`, `purging`, `purge-error` |
+| `project` | `ProjectStatus` | `active`, `deleted`, `purging`, `purge-error` |
+| `user` | `UserStatus` | `active`, `inactive`, `deleted`, `before-verification`, `purging`, `purge-error` |
+| `image` | `ImageStatus` | `ALIVE`, `DELETED`, `PURGING`, `PURGE_ERROR` |
+| `vfolder` | `VFolderOperationStatus` | `ready`, `performing`, `cloning`, `mounted`, `error`, `delete-pending`, `delete-ongoing`, `delete-complete`, `delete-error` |
 
-**Both axes are enums, and all five entities carry both.** `domain` and `project` currently express existence as an `is_active` boolean, which has no room for a name. A boolean cannot name its values and cannot gain new ones, so an existence-axis enum is introduced.
+Cleanup progress is not split into a column of its own. A row being cleaned up is already soft deleted, and once cleanup finishes the row is gone. No combination of the two holds at once, so one enum carries both.
 
-The two axes are orthogonal. An image being cleaned up is still `ALIVE` on the existence axis. Merging them into one enum makes that fact inexpressible.
+`vfolder` gains no new values. `delete-ongoing` and `delete-error` are where the other entities' `purging` and `purge-error` sit. `performing`, `cloning`, and `mounted` sharing that enum is out of this BEP's scope.
 
-`VFolderOperationStatus` is the mixed case today — `READY`, `PERFORMING`, `CLONING`, `MOUNTED` sit in the same enum as `DELETE_PENDING` and `DELETE_ONGOING`, so "is a cloning vfolder ready" has no answer.
+`domain` and `project` gain a status enum over the `is_active` boolean. `is_active` stays as a read-only value derived from the enum and is dropped once callers move.
 
 **Where state is stored is decided by the reading side.** Three questions decide it.
 
@@ -119,56 +122,44 @@ The two axes are orthogonal. An image being cleaned up is still `ALIVE` on the e
 | Whose vocabulary is the value | That entity's domain | Shared across entities |
 | Does it disappear with the entity | Yes | It may outlive it |
 
-Cleanup progress answers all three on the entity-row side. Users see and filter on it in listings (that is what vfolder's `DELETE_ONGOING` is today), the vocabulary belongs to that entity, and it disappears with the entity. **So no separate work table is introduced.** This matches sokovan keeping `SessionStatus`, `EndpointLifecycle`, and `RouteStatus` on their own rows.
+Cleanup progress answers all three on the entity-row side. Users see and filter on it in listings (that is what vfolder's `delete-ongoing` is today), the vocabulary belongs to that entity, and it disappears with the entity. **So no separate work table is introduced.** This matches sokovan keeping `SessionStatus`, `EndpointLifecycle`, and `RouteStatus` on their own rows.
 
-Each entity defines its own enums. No shared vocabulary is created, so an `image` rescan value would grow that enum alone and leave the other entities untouched.
+Each entity defines its own enum. No shared vocabulary is created, so an `image` rescan value would grow that enum alone and leave the other entities untouched.
 
 Granularity is also the domain's call. Deletion does not split progress into separate values — the remaining resources are observable, so there is nothing to carry. An operation whose progress cannot be observed puts its steps into its own enum.
 
-**Both axes name their default value.** The existence default is active; the operation default is that no operation is in flight. Both are the everyday value, and leaving them unnamed makes it impossible to tell whether a row is normal.
+**The default value is named** — `active`, `ALIVE`, `ready`. Leaving the everyday value unnamed makes it impossible to tell whether a row is normal. The column is not nullable, and every existing row is backfilled with the default when the column is added.
 
-| Axis | Value | domain, project | user | image | vfolder |
-|---|---|---|---|---|---|
-| Existence | **default — active** | new | `ACTIVE`, `INACTIVE`, `BEFORE_VERIFICATION` | `ALIVE` | `READY` and others |
-| Existence | soft deleted | new | `DELETED` | `DELETED` | `DELETE_PENDING` |
-| Operation | **default — nothing in flight** | new | new | new | new |
-| Operation | cleanup in progress | new | new | new | `DELETE_ONGOING` moves here |
-| Operation | cleanup failed | new | new | new | `DELETE_ERROR` moves here |
+While status is `purging` or `purge-error`, `delete`, `restore`, and `update` on that entity are rejected. Something being cleaned up cannot be revived or edited.
 
-Neither axis is nullable. Naming the default as a value keeps it distinct from "unknown" and keeps filters to a value comparison. When the columns are added, every existing row is backfilled with the default.
-
-`is_active` on `domain` and `project` stays as a read-only value derived from the existence-axis enum so existing callers keep working, and is dropped once they move.
-
-While the operation axis is not at its default, `delete`, `restore`, and `update` on that entity are rejected. Something being cleaned up cannot be revived or edited.
-
-A successful cleanup removes the row, so there is no transition back to the operation default. The only way out of cleanup-failed is `force purge` (3.5).
+A successful cleanup removes the row, so there is no transition back to the default. The only way out of `purge-error` is `force purge` (3.5).
 
 These are all the transitions.
 
-| Transition | Trigger | Axis changed |
-|---|---|---|
-| active → soft deleted | `delete` request | Existence |
-| soft deleted → active | `restore` request | Existence |
-| → cleanup in progress | `purge` request | Operation |
-| row removed | cleanup complete | — |
-| → cleanup failed | retries exhausted | Operation |
-| row removed | `force purge` request (3.5) | — |
+| Transition | Trigger |
+|---|---|
+| `active` → `deleted` | `delete` request |
+| `deleted` → `active` | `restore` request |
+| → `purging` | `purge` request |
+| row removed | cleanup complete |
+| `purging` → `purge-error` | retries exhausted |
+| row removed | `force purge` request (3.5) |
 
 All five entities get `restore`. `user`'s keypair deactivation is removed from soft delete, and the authentication gate (2.2) blocks a soft-deleted user's API access instead.
 
-### 3.2 Moving the reconciler base
+### 3.2 The reconciler base stays in sokovan
 
-The generic ABCs in `sokovan/reconciler` move to `manager/reconciler`. Sokovan and the deletion coordinator share the base and know nothing of each other below it.
+The generic ABCs in `sokovan/reconciler` are not moved to `manager/reconciler`. Sokovan is being widened into tick-based entity lifecycle at large with the deletion lifecycle inside it, so there is no longer a reason to lift the base out of sokovan (BA-7453).
 
-| Today | After the move |
+The deletion coordinator inherits that base from inside sokovan. The changes the base itself needs still stand.
+
+| Item | Change |
 |---|---|
-| `SchedulingResult` | Generalized to a neutral name unrelated to scheduling. Not renamed into deletion vocabulary — sokovan could not use it then |
+| `SchedulingResult` | Generalized to a neutral name unrelated to scheduling. Not renamed into deletion vocabulary — scheduling could not use it then |
 | `HandlerPolicyResolver` (from `data/session/options`) | Narrowed to an interface supplying retry counts and timeouts, and moved to the base |
 | `ReconcilerStageMetadata.transitions` | Success on the last stage must be able to mean **row removal**, not a status transition |
 | `LockID` and the distributed lock | Unchanged. Stages that run without a lock stay allowed |
 | `ReconcilerMetricObserver` | Unchanged. The labels carry which machinery it is |
-
-It goes into manager rather than `common` because manager is the only consumer.
 
 Since `transitions` is bound to a single status type, **there is one stage, one reconcile type, and one task spec per entity kind**. Per-kind failure isolation and per-kind cadence come with that.
 
@@ -295,9 +286,9 @@ The window where the DB row and the external resource disagree cannot be elimina
 
 | Operation | Today | After |
 |---|---|---|
-| `delete` | `is_active=False` for domain and project, status plus keypair deactivation for user, status for image | All five change the existence axis only |
+| `delete` | `is_active=False` for domain and project, status plus keypair deactivation for user, status for image | All five move status to `deleted` |
 | `restore` | Only on domain, project, vfolder | All five. Allowed only from the soft-deleted state |
-| `purge` | Cleans everything synchronously and answers on completion | **Contract kept.** Moves the operation axis, subscribes to completion, and answers |
+| `purge` | Cleans everything synchronously and answers on completion | **Contract kept.** Moves status to `purging`, subscribes to completion, and answers |
 | `force purge` | Only on vfolder (`force_delete`) | All five. Permissions match `purge` |
 
 **The existing API's synchronous contract does not change.** The handler moves the transition through the controller, subscribes to that entity's cleanup completion, waits, and answers.
@@ -308,7 +299,7 @@ The wait is bounded at **five minutes**. Stages such as confirming session termi
 
 Completion is subscribed through `common/bgtask`'s completion event. Exposing a task id for clients to subscribe to directly is not offered.
 
-The operation axis is exposed as a field on the entity. No join is needed, and its values appear only in that entity type's schema.
+Status is exposed as a field on the entity. No join is needed, and its values appear only in that entity type's schema.
 
 ### 3.8 Cascading RBAC scopes and roles
 
@@ -322,20 +313,19 @@ When a scope-owning entity is purged, the roles auto-provisioned at that scope a
 |---|---|
 | `purge` response time | The contract is the same, but past five minutes it answers with a timeout. Callers assuming completion must handle that case |
 | `user` soft delete | No longer deactivates keypairs. The authentication gate takes that role |
-| vfolder `DELETE_ONGOING`, `DELETE_ERROR` | Move from the existence enum to the operation-axis column. Screens filtering on these values are affected |
-| vfolder `DELETE_COMPLETE` | Goes away. Cleanup completion is the row removal |
-| `is_active` on `domain`, `project` | Becomes derived from the existence-axis enum, then is dropped |
+| vfolder `delete-ongoing`, `delete-error` | The values stay. They are read as the other entities' `purging` and `purge-error` |
+| vfolder `delete-complete` | Goes away. Cleanup completion is the row removal |
+| `is_active` on `domain`, `project` | Becomes derived from the status enum, then is dropped |
 
-`UserStatus` and `ImageStatus` keep their values. `is_active` on `domain` and `project` stays as a read-only value derived from the existence-axis enum, so the GraphQL and REST filters and the WebUI that read it are not affected right away; it is dropped after callers move. The operation axis is an added field.
+`UserStatus` and `ImageStatus` keep their values and gain `purging` and `purge-error`. `is_active` on `domain` and `project` stays as a read-only value derived from the status enum, so the GraphQL and REST filters and the WebUI that read it are not affected right away; it is dropped after callers move.
 
 ### Migration
 
-1. Add one operation-axis enum column to each of the five entities and backfill existing rows with the default. Add a reconcile history table per entity kind.
-2. Add the existence-axis enum column to `domain` and `project` and carry `is_active` values over. While both exist the enum is authoritative and `is_active` is derived.
+1. Add `purging` and `purge-error` to each of the five entities' status enum. `domain` and `project` gain a status enum column and carry `is_active` values over; while both exist the enum is authoritative and `is_active` is derived. Add a reconcile history table per entity kind.
 3. Add the `user.status` gate to API request authentication, and only then remove keypair deactivation from soft delete. **Reversing the order lets a soft-deleted user keep making API requests with their key.**
 4. Users already soft-deleted with keypairs off are left as they are. `restore` only reverts the user row.
-5. Move vfolder's `DELETE_ONGOING` and `DELETE_ERROR` to the operation axis, and drive rows left at `DELETE_COMPLETE` through cleanup to finish removing them. `PERFORMING`, `CLONING`, and `MOUNTED` are also not existence-axis values, but they are out of scope here.
-6. Move callers reading `is_active` onto the existence-axis enum, then drop the column.
+5. Read vfolder's `delete-ongoing` and `delete-error` as the other entities' `purging` and `purge-error`, and drive rows left at `delete-complete` through cleanup to finish removing them. `performing`, `cloning`, and `mounted` sitting in the same enum are out of scope here.
+6. Move callers reading `is_active` onto the status enum, then drop the column.
 
 ### Work in flight
 
@@ -348,13 +338,13 @@ The purger move into `models/` in BA-7443, BA-7444, and BA-7449 **continues as p
 | 1 | Add the `user.status` gate to API request authentication. Independent of the rest and can land first |
 | 2 | Open `restore` on `user` and `image`, and remove keypair deactivation from `user` soft delete |
 | 3 | Move today's synchronous purge onto `force purge` and open it on all five entities. Behavior is unchanged |
-| 4 | Move the generic reconciler base to `manager/reconciler` and split out the scheduling vocabulary. Sokovan only changes its wiring |
-| 5 | Add both axis enum columns and the history tables to the five entities. `domain` and `project` gain an existence axis; vfolder's mixed values split across the two axes |
+| 4 | Split the scheduling vocabulary out of sokovan's generic reconciler base. The base stays in sokovan |
+| 5 | Add the cleanup-progress values to the five entities' status enum and add the history tables. `domain` and `project` gain a status enum |
 | 6 | Build the controller, the coordinator, the cleanup stage contract, and the registry sweep test. Validate the flow on the `domain` handler, which has the shortest stage list |
 | 7 | Attach the `vfolder`, `image`, `project`, and `user` handlers and remove the procedural code from the services |
 | 8 | Add the cascading RBAC role and scope stage (BA-6807, BA-6186) |
 | 9 | Switch the `purge` handler to subscribing for completion. The response contract stays the same |
-| 10 | Move `is_active` callers onto the existence-axis enum and drop the column |
+| 10 | Move `is_active` callers onto the status enum and drop the column |
 
 ## 6. Open Questions
 

@@ -218,6 +218,18 @@ class ImageDBSource:
             await image_row.mark_as_deleted(session)
             return image_row.to_dataclass()
 
+    async def mark_image_alive_by_id(
+        self,
+        image_id: UUID,
+    ) -> ImageData:
+        """
+        Marks a soft-deleted image record as alive again by its ID in the database.
+        """
+        async with self._db.begin_session() as session:
+            image_row = await self._get_image_by_id(session, image_id)
+            await image_row.mark_as_alive(session)
+            return image_row.to_dataclass()
+
     async def fetch_image_by_id(self, image_id: UUID, load_aliases: bool = False) -> ImageData:
         """
         Fetches an image from database by ID.

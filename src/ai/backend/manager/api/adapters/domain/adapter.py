@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     DomainFilter,
     DomainOrder,
     PurgeDomainInput,
+    RestoreDomainInput,
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
@@ -25,6 +26,7 @@ from ai.backend.common.dto.manager.v2.domain.response import (
     DomainPayload,
     DomainRegistryInfo,
     PurgeDomainPayload,
+    RestoreDomainPayload,
 )
 from ai.backend.common.dto.manager.v2.domain.types import DomainOrderField, OrderDirection
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -37,13 +39,18 @@ from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.orders import DomainOrders
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.domain.searchers import DomainSearcher
-from ai.backend.manager.models.domain.updaters import DomainSoftDeleteUpdater, DomainUpdater
+from ai.backend.manager.models.domain.updaters import (
+    DomainRestoreUpdater,
+    DomainSoftDeleteUpdater,
+    DomainUpdater,
+)
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.services.domain.actions.create_domain_node import CreateDomainNodeAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
+from ai.backend.manager.services.domain.actions.restore_domain import RestoreDomainAction
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
 from ai.backend.manager.services.domain.actions.search_rg_domains import SearchRGDomainsAction
 from ai.backend.manager.services.domain.actions.update_domain_node import UpdateDomainNodeAction
@@ -236,11 +243,7 @@ class DomainAdapter(BaseAdapter):
         )
         return DomainPayload(domain=self._domain_data_to_node(result.domain_data))
 
-    async def admin_delete(
-        self,
-        input: DeleteDomainInput,
-        user_info: UserInfo,
-    ) -> DeleteDomainPayload:
+    async def admin_delete(self, input: DeleteDomainInput) -> DeleteDomainPayload:
         """Soft-delete a domain (superadmin only)."""
         target = await self._processors.domain.lookup.run(
             LookupDomainAction(name=DomainName(input.name))
@@ -252,11 +255,19 @@ class DomainAdapter(BaseAdapter):
         )
         return DeleteDomainPayload(deleted=True)
 
-    async def admin_purge(
-        self,
-        input: PurgeDomainInput,
-        user_info: UserInfo,
-    ) -> PurgeDomainPayload:
+    async def admin_restore(self, input: RestoreDomainInput) -> RestoreDomainPayload:
+        """Restore a soft-deleted domain (superadmin only)."""
+        target = await self._processors.domain.lookup.run(
+            LookupDomainAction(name=DomainName(input.name))
+        )
+        await self._processors.domain.restore_domain.run(
+            RestoreDomainAction(
+                updater=DomainRestoreUpdater(domain_id=target.entity_id()),
+            )
+        )
+        return RestoreDomainPayload(restored=True)
+
+    async def admin_purge(self, input: PurgeDomainInput) -> PurgeDomainPayload:
         """Permanently purge a domain (superadmin only)."""
         target = await self._processors.domain.lookup.run(
             LookupDomainAction(name=DomainName(input.name))

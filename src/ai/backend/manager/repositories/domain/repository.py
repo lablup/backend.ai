@@ -12,7 +12,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.domain.types import DomainData
-from ai.backend.manager.errors.resource import DomainDeletionFailed
+from ai.backend.manager.errors.resource import DomainDeletionFailed, DomainPurgeInProgress
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.purgers import DomainKernelPurger, DomainPurger
 from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater, DomainUpdater
@@ -109,10 +109,14 @@ class DomainRepository:
                         ),
                     )
         async with self._v2_ops.write_ops() as w:
-            data = await w.update_data(updater)
-            if data is None:
-                raise DomainNotFound(f"Domain not found: {updater.target_id_value()}")
-            return data
+            data = await w.update_guarded_data(updater)
+            if data is not None:
+                return data
+            if await w.row_exists(
+                updater.row_class, updater.target_id_column(), updater.target_id_value()
+            ):
+                raise DomainPurgeInProgress(f"Domain is being purged: {updater.target_id_value()}")
+            raise DomainNotFound(f"Domain not found: {updater.target_id_value()}")
 
     @domain_repository_resilience.apply()
     async def update_dotfiles(self, updater: DomainDotfilesUpdater) -> DomainData:

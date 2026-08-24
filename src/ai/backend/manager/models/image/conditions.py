@@ -25,6 +25,15 @@ class ImageConditions:
     """Query conditions for images."""
 
     @staticmethod
+    def not_being_purged() -> QueryCondition:
+        """Match the images no purge is working through."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ImageRow.status.not_in(ImageStatus.purge_in_progress())
+
+        return inner
+
+    @staticmethod
     def by_ids(image_ids: Collection[ImageID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ImageRow.id.in_(image_ids)

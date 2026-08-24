@@ -18,6 +18,7 @@ from ai.backend.common.types import BackendAISchema
 __all__ = (
     "AdminSearchDomainsPayload",
     "DeleteDomainPayload",
+    "RestoreDomainPayload",
     "DomainBasicInfo",
     "DomainLifecycleInfo",
     "DomainNode",
@@ -128,6 +129,14 @@ class DeleteDomainPayload(BaseResponseModel):
 
     deleted: bool = Field(
         description="Whether the deletion was successful.",
+    )
+
+
+class RestoreDomainPayload(BaseResponseModel):
+    """Payload for domain restore mutation."""
+
+    restored: bool = Field(
+        description="Whether the restore was successful.",
     )
 
 

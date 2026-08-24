@@ -32,6 +32,7 @@ __all__ = (
     "EntityTimestamps",
     "PurgeUserPayload",
     "PurgeUsersPayload",
+    "RestoreUserPayload",
     "SearchUsersPayload",
     "UpdateMyAllowedClientIPPayload",
     "UpdateUserPayload",
@@ -213,6 +214,14 @@ class DeleteUserPayload(BaseResponseModel):
 
     success: bool = Field(
         description="Whether the deletion was successful.",
+    )
+
+
+class RestoreUserPayload(BaseResponseModel):
+    """Payload for user restore mutation."""
+
+    success: bool = Field(
+        description="Whether the restore was successful.",
     )
 
 

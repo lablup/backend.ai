@@ -99,6 +99,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     CreateGlobalWithFieldsOpsAction,
     CreateRoleManagedEntityOpsAction,
     DeletePartialBulkOpsAction,
+    DeleteSingleEntityGuardedOpsAction,
     DeleteSingleEntityOpsAction,
     GetGlobalOpsAction,
     GetSingleEntityOpsAction,
@@ -109,10 +110,12 @@ from ai.backend.manager.actions.v2.ops.base import (
     PartialBulkPurgeGlobalEntityOpsAction,
     PurgeEntityOpsAction,
     RestorePartialBulkOpsAction,
+    RestoreSingleEntityGuardedOpsAction,
     RestoreSingleEntityOpsAction,
     SearchGlobalOpsAction,
     UpdateGlobalOpsAction,
     UpdatePartialBulkOpsAction,
+    UpdateSingleEntityGuardedOpsAction,
     UpdateSingleEntityOpsAction,
     UpsertEntityOpsAction,
     UpsertGlobalOpsAction,
@@ -167,6 +170,7 @@ from ai.backend.manager.services.ops.service import (
     GlobalRoleManagedEntityCreateService,
     GlobalSearchService,
     GlobalUpsertService,
+    GuardedUpdateService,
     LookupService,
     PartialBulkDeleteService,
     PartialBulkGetService,
@@ -984,6 +988,54 @@ class ProcessorGroup[TData: EntityData]:
         )
         return SingleEntityActionProcessor(
             RestoreService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.single_entity, *monitors),
+            validators=(*self._deps.validators.single_entity, *validators),
+        )
+
+    def single_guarded_update_ops[TAction: UpdateSingleEntityGuardedOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleEntityActionProcessor[TAction, EntityOpsResult[TData]]:
+        self._record(
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
+        )
+        return SingleEntityActionProcessor(
+            GuardedUpdateService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.single_entity, *monitors),
+            validators=(*self._deps.validators.single_entity, *validators),
+        )
+
+    def single_guarded_delete_ops[TAction: DeleteSingleEntityGuardedOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleEntityActionProcessor[TAction, EntityOpsResult[TData]]:
+        self._record(
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
+        )
+        return SingleEntityActionProcessor(
+            GuardedUpdateService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.single_entity, *monitors),
+            validators=(*self._deps.validators.single_entity, *validators),
+        )
+
+    def single_guarded_restore_ops[TAction: RestoreSingleEntityGuardedOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleEntityActionProcessor[TAction, EntityOpsResult[TData]]:
+        self._record(
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
+        )
+        return SingleEntityActionProcessor(
+            GuardedUpdateService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.single_entity, *monitors),
             validators=(*self._deps.validators.single_entity, *validators),
         )

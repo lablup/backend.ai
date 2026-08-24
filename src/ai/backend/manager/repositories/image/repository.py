@@ -225,6 +225,16 @@ class ImageRepository:
         return await self._db_source.mark_image_deleted_by_id(image_id)
 
     @image_repository_resilience.apply()
+    async def restore_image_by_id(
+        self,
+        image_id: UUID,
+    ) -> ImageData:
+        """
+        Marks a soft-deleted image as alive again by its ID.
+        """
+        return await self._db_source.mark_image_alive_by_id(image_id)
+
+    @image_repository_resilience.apply()
     async def fetch_image_by_id(self, image_id: UUID, load_aliases: bool = False) -> ImageData:
         """
         Fetches an image from database by ID.

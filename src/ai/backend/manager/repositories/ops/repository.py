@@ -17,7 +17,7 @@ from ai.backend.common.data.entity.types import (
     FieldIdentifier,
 )
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.repository import EntityNotFoundError, EntityWriteRefusedError
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.creator import (
     DanglingFieldCreator,
@@ -47,7 +47,11 @@ from ai.backend.manager.models.specs.querier import (
 )
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
 from ai.backend.manager.models.specs.types import BulkResultWithFailures, EntityWithFieldsResult
-from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
+from ai.backend.manager.models.specs.updater import (
+    DataBatchUpdater,
+    DataUpdater,
+    GuardedDataUpdater,
+)
 from ai.backend.manager.models.specs.upserter import (
     EntityUpserter,
     FieldUpserter,
@@ -402,6 +406,23 @@ class OpsRepository[TData]:
                     f"{updater.row_class.__name__} {updater.target_id_value()} not found"
                 )
             return data
+
+    async def update_guarded(self, updater: GuardedDataUpdater[Any, TData]) -> TData:
+        """Apply a guarded update, telling a missing row from a refused one.
+
+        The guard rides on the UPDATE, so the row it declined is read back in the same
+        session rather than re-checked against a later state.
+        """
+        async with self._ops.write_ops() as w:
+            data = await w.update_guarded_data(updater)
+            if data is not None:
+                return data
+            row_name = f"{updater.row_class.__name__} {updater.target_id_value()}"
+            if await w.row_exists(
+                updater.row_class, updater.target_id_column(), updater.target_id_value()
+            ):
+                raise EntityWriteRefusedError(f"{row_name} refused the write")
+            raise EntityNotFoundError(f"{row_name} not found")
 
     async def partial_bulk_update(
         self, updaters: Mapping[EntityIdentifier, DataUpdater[Any, TData]]

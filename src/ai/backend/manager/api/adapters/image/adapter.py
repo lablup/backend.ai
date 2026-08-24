@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ImageFilterInputDTO,
     ImageOrderByInputDTO,
     PurgeImageInput,
+    RestoreImageInput,
     UpdateImageInput,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
@@ -33,6 +34,7 @@ from ai.backend.common.dto.manager.v2.image.response import (
     ImageNode,
     ImageRequirementsInfoDTO,
     PurgeImagePayload,
+    RestoreImagePayload,
     UpdateImagePayload,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
@@ -64,6 +66,7 @@ from ai.backend.manager.services.image.actions.alias_image import AliasImageById
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
+from ai.backend.manager.services.image.actions.restore_image import RestoreImageByIdAction
 from ai.backend.manager.services.image.actions.search_aliases import SearchAliasesAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 from ai.backend.manager.services.image.actions.update_image_by_id import UpdateImageByIdAction
@@ -230,6 +233,13 @@ class ImageAdapter(BaseAdapter):
             ForgetImageByIdAction(image_id=ImageID(input.image_id))
         )
         return ForgetImagePayload(item=self._data_to_dto(result.image))
+
+    async def admin_restore(self, input: RestoreImageInput) -> RestoreImagePayload:
+        """Restore a forgotten (soft-deleted) image by ID."""
+        result = await self._processors.image.restore_image_by_id.run(
+            RestoreImageByIdAction(image_id=ImageID(input.image_id))
+        )
+        return RestoreImagePayload(item=self._data_to_dto(result.image))
 
     async def admin_purge(self, input: PurgeImageInput) -> PurgeImagePayload:
         """Purge (hard-delete) an image by ID."""
