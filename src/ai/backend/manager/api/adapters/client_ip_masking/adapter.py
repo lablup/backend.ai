@@ -91,6 +91,8 @@ class ClientIPMaskingAdapter(BaseAdapter):
             UpsertClientIPMaskingPolicyAction(
                 target_type=ClientIPMaskingTarget(input.target_type.value),
                 mode=ClientIPMaskingMode(input.mode.value),
+                ipv4_prefix=input.ipv4_prefix,
+                ipv6_prefix=input.ipv6_prefix,
             )
         )
         return ClientIPMaskingPolicyPayload(policy=self._data_to_node(result.data))
@@ -138,6 +140,8 @@ class ClientIPMaskingAdapter(BaseAdapter):
             id=data.id,
             target_type=ClientIPMaskingTargetDTO(data.target_type.value),
             mode=ClientIPMaskingModeDTO(data.mode.value),
+            ipv4_prefix=data.ipv4_prefix,
+            ipv6_prefix=data.ipv6_prefix,
             created_at=data.created_at,
             updated_at=data.updated_at,
         )

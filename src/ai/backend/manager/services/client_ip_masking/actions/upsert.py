@@ -24,6 +24,8 @@ class UpsertClientIPMaskingPolicyAction(
 
     target_type: ClientIPMaskingTarget
     mode: ClientIPMaskingMode
+    ipv4_prefix: int | None
+    ipv6_prefix: int | None
 
     @override
     @classmethod
@@ -37,4 +39,9 @@ class UpsertClientIPMaskingPolicyAction(
 
     @override
     def to_upserter(self) -> ClientIPMaskingPolicyUpserter:
-        return ClientIPMaskingPolicyUpserter(target_type=self.target_type, mode=self.mode)
+        return ClientIPMaskingPolicyUpserter(
+            target_type=self.target_type,
+            mode=self.mode,
+            ipv4_prefix=self.ipv4_prefix,
+            ipv6_prefix=self.ipv6_prefix,
+        )

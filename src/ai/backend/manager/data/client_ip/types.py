@@ -15,6 +15,8 @@ class ClientIPMaskingPolicyData(EntityData):
     id: ClientIPMaskingPolicyID
     target_type: ClientIPMaskingTarget
     mode: ClientIPMaskingMode
+    ipv4_prefix: int | None
+    ipv6_prefix: int | None
     created_at: datetime
     updated_at: datetime
 

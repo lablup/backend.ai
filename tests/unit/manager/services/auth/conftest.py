@@ -10,7 +10,7 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.client_ip.masking import ClientIPMaskingMode
+from ai.backend.manager.data.client_ip.masking import ClientIPMasker, ClientIPMaskingMode
 from ai.backend.manager.repositories.client_ip_masking.repository import ClientIPMaskingRepository
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -55,5 +55,6 @@ def sample_client_type_id() -> UUID:
 @pytest.fixture
 def mock_client_ip_masking_repository() -> AsyncMock:
     repo = AsyncMock(spec=ClientIPMaskingRepository)
-    repo.resolve_mode.return_value = ClientIPMaskingMode.NONE
+    repo.resolve_masker.return_value = ClientIPMasker(ClientIPMaskingMode.NONE)
+    repo.mask.side_effect = lambda _target, client_ip: client_ip
     return repo

@@ -2,8 +2,11 @@ import enum
 import ipaddress
 from dataclasses import dataclass
 
-_IPV4_MASK_PREFIX = 24
-_IPV6_MASK_PREFIX = 48
+DEFAULT_IPV4_MASK_PREFIX = 24
+DEFAULT_IPV6_MASK_PREFIX = 48
+
+MAX_IPV4_PREFIX = 32
+MAX_IPV6_PREFIX = 128
 
 
 class ClientIPMaskingTarget(enum.StrEnum):
@@ -27,12 +30,18 @@ class ClientIPMaskingMode(enum.StrEnum):
 class ClientIPMasker:
     """Turns a raw client IP into the value a record keeps.
 
+    The prefixes say how much of the address ``TRUNCATE`` leaves; how deep an
+    address has to be cut before it counts as anonymous differs by jurisdiction,
+    and an IPv6 prefix an ISP hands out whole is no anonymisation at all.
+
     Parsing runs in every mode: the address may come from a client-controlled
     ``X-Forwarded-For`` when no trusted proxy is configured, and an unparsable
     value is dropped rather than stored.
     """
 
     mode: ClientIPMaskingMode
+    ipv4_prefix: int = DEFAULT_IPV4_MASK_PREFIX
+    ipv6_prefix: int = DEFAULT_IPV6_MASK_PREFIX
 
     def mask(self, client_ip: str | None) -> str | None:
         if client_ip is None:
@@ -50,6 +59,6 @@ class ClientIPMasker:
                 return None
 
     def _truncate(self, address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> str:
-        prefix = _IPV4_MASK_PREFIX if address.version == 4 else _IPV6_MASK_PREFIX
+        prefix = self.ipv4_prefix if address.version == 4 else self.ipv6_prefix
         network = ipaddress.ip_network(f"{address}/{prefix}", strict=False)
         return str(network.network_address)

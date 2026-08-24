@@ -24,6 +24,12 @@ class ClientIPMaskingPolicyNode(BaseResponseModel):
     id: UUID = Field(description="Policy ID")
     target_type: ClientIPMaskingTarget = Field(description="Which recorded client IP is governed")
     mode: ClientIPMaskingMode = Field(description="Masking applied before the address is stored")
+    ipv4_prefix: int | None = Field(
+        default=None, description="IPv4 bits 'truncate' keeps; null takes the built-in width"
+    )
+    ipv6_prefix: int | None = Field(
+        default=None, description="IPv6 bits 'truncate' keeps; null takes the built-in width"
+    )
     created_at: datetime = Field(description="Timestamp when the policy was first written")
     updated_at: datetime = Field(description="Timestamp when the policy was last changed")
 

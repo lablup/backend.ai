@@ -50,6 +50,22 @@ class AdminUpsertClientIPMaskingPolicyInput(BaseRequestModel):
 
     target_type: ClientIPMaskingTarget = Field(description="Which recorded client IP to govern")
     mode: ClientIPMaskingMode = Field(description="Masking applied before the address is stored")
+    ipv4_prefix: int | None = Field(
+        default=None,
+        ge=0,
+        le=32,
+        description=(
+            "IPv4 bits 'truncate' keeps; the rest are zeroed. Null takes the built-in width of 24."
+        ),
+    )
+    ipv6_prefix: int | None = Field(
+        default=None,
+        ge=0,
+        le=128,
+        description=(
+            "IPv6 bits 'truncate' keeps; the rest are zeroed. Null takes the built-in width of 48."
+        ),
+    )
 
 
 class AdminPurgeClientIPMaskingPolicyInput(BaseRequestModel):

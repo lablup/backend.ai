@@ -28,6 +28,8 @@ class ClientIPMaskingPolicyUpserter(
 
     target_type: ClientIPMaskingTarget
     mode: ClientIPMaskingMode
+    ipv4_prefix: int | None
+    ipv6_prefix: int | None
 
     @override
     def entity_id(self, row: ClientIPMaskingPolicyRow) -> EntityIdentifier:
@@ -47,11 +49,21 @@ class ClientIPMaskingPolicyUpserter(
 
     @override
     def build_insert_values(self) -> dict[str, Any]:
-        return {"target_type": self.target_type, "mode": self.mode}
+        return {
+            "target_type": self.target_type,
+            "mode": self.mode,
+            "ipv4_prefix": self.ipv4_prefix,
+            "ipv6_prefix": self.ipv6_prefix,
+        }
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        return {"mode": self.mode, "updated_at": sa.func.now()}
+        return {
+            "mode": self.mode,
+            "ipv4_prefix": self.ipv4_prefix,
+            "ipv6_prefix": self.ipv6_prefix,
+            "updated_at": sa.func.now(),
+        }
 
     @override
     def to_data(self, row: ClientIPMaskingPolicyRow) -> ClientIPMaskingPolicyData:

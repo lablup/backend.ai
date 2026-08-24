@@ -109,7 +109,19 @@ def search(
 @client_ip_masking_policy.command()
 @click.argument("target_type", type=click.Choice(_TARGET_TYPES, case_sensitive=False))
 @click.argument("mode", type=click.Choice(_MODES, case_sensitive=False))
-def upsert(target_type: str, mode: str) -> None:
+@click.option(
+    "--ipv4-prefix",
+    default=None,
+    type=click.IntRange(0, 32),
+    help="IPv4 bits 'truncate' keeps; omit to take the built-in width of 24.",
+)
+@click.option(
+    "--ipv6-prefix",
+    default=None,
+    type=click.IntRange(0, 128),
+    help="IPv6 bits 'truncate' keeps; omit to take the built-in width of 48.",
+)
+def upsert(target_type: str, mode: str, ipv4_prefix: int | None, ipv6_prefix: int | None) -> None:
     """Set the masking one target gets (superadmin only)."""
     from ai.backend.common.dto.manager.v2.client_ip_masking.request import (
         AdminUpsertClientIPMaskingPolicyInput,
@@ -126,6 +138,8 @@ def upsert(target_type: str, mode: str) -> None:
                 AdminUpsertClientIPMaskingPolicyInput(
                     target_type=ClientIPMaskingTarget(target_type),
                     mode=ClientIPMaskingMode(mode),
+                    ipv4_prefix=ipv4_prefix,
+                    ipv6_prefix=ipv6_prefix,
                 ),
             )
             print_result(payload)

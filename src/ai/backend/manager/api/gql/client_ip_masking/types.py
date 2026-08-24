@@ -97,6 +97,12 @@ class ClientIPMaskingPolicyGQL(PydanticNodeMixin[NodeDTO]):
     mode: ClientIPMaskingModeGQL = gql_field(
         description="Masking applied before the address is stored."
     )
+    ipv4_prefix: int | None = gql_field(
+        description="IPv4 bits 'truncate' keeps; null takes the built-in width of 24."
+    )
+    ipv6_prefix: int | None = gql_field(
+        description="IPv6 bits 'truncate' keeps; null takes the built-in width of 48."
+    )
     created_at: datetime = gql_field(description="Timestamp when the policy was first written.")
     updated_at: datetime = gql_field(description="Timestamp when the policy was last changed.")
 
@@ -114,6 +120,14 @@ class UpsertClientIPMaskingPolicyInputGQL(PydanticInputMixin[UpsertInputDTO]):
     )
     mode: ClientIPMaskingModeGQL = gql_field(
         description="Masking applied before the address is stored."
+    )
+    ipv4_prefix: int | None = gql_field(
+        default=None,
+        description="IPv4 bits 'truncate' keeps; null takes the built-in width of 24.",
+    )
+    ipv6_prefix: int | None = gql_field(
+        default=None,
+        description="IPv6 bits 'truncate' keeps; null takes the built-in width of 48.",
     )
 
 

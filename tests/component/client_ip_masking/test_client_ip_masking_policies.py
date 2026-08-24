@@ -38,9 +38,17 @@ async def _upsert(
     registry: V2ClientRegistry,
     target_type: ClientIPMaskingTarget,
     mode: ClientIPMaskingMode,
+    *,
+    ipv4_prefix: int | None = None,
+    ipv6_prefix: int | None = None,
 ) -> None:
     await registry.client_ip_masking.admin_upsert(
-        AdminUpsertClientIPMaskingPolicyInput(target_type=target_type, mode=mode),
+        AdminUpsertClientIPMaskingPolicyInput(
+            target_type=target_type,
+            mode=mode,
+            ipv4_prefix=ipv4_prefix,
+            ipv6_prefix=ipv6_prefix,
+        ),
     )
 
 
@@ -290,6 +298,98 @@ class TestClientIPMaskingPoliciesSearchArguments:
         assert second_page.items[0].id != first_page.items[0].id
 
 
+class TestTruncationWidth:
+    """How much of the address `truncate` leaves is the policy's to say."""
+
+    async def test_the_width_round_trips(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+    ) -> None:
+        await _upsert(
+            admin_v2_registry,
+            ClientIPMaskingTarget.LOGIN_HISTORY,
+            ClientIPMaskingMode.TRUNCATE,
+            ipv4_prefix=16,
+            ipv6_prefix=32,
+        )
+
+        result = await admin_v2_registry.client_ip_masking.admin_search(
+            AdminSearchClientIPMaskingPoliciesInput(),
+        )
+
+        assert [(item.ipv4_prefix, item.ipv6_prefix) for item in result.items] == [(16, 32)]
+
+    async def test_an_omitted_width_stays_null(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+    ) -> None:
+        """A policy that names no width takes the built-in one rather than storing it."""
+        await _upsert(
+            admin_v2_registry,
+            ClientIPMaskingTarget.LOGIN_HISTORY,
+            ClientIPMaskingMode.TRUNCATE,
+        )
+
+        result = await admin_v2_registry.client_ip_masking.admin_search(
+            AdminSearchClientIPMaskingPoliciesInput(),
+        )
+
+        assert [(item.ipv4_prefix, item.ipv6_prefix) for item in result.items] == [(None, None)]
+
+    async def test_the_width_reaches_the_masker_the_login_path_resolves(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        masking_repository: ClientIPMaskingRepository,
+    ) -> None:
+        await _upsert(
+            admin_v2_registry,
+            ClientIPMaskingTarget.LOGIN_HISTORY,
+            ClientIPMaskingMode.TRUNCATE,
+            ipv4_prefix=16,
+        )
+
+        masker = await masking_repository.resolve_masker(ClientIPMaskingTargetData.LOGIN_HISTORY)
+
+        assert masker.mask("203.0.113.7") == "203.0.0.0"
+
+    async def test_an_omitted_width_falls_back_to_the_built_in_one(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        masking_repository: ClientIPMaskingRepository,
+    ) -> None:
+        await _upsert(
+            admin_v2_registry,
+            ClientIPMaskingTarget.LOGIN_HISTORY,
+            ClientIPMaskingMode.TRUNCATE,
+        )
+
+        masker = await masking_repository.resolve_masker(ClientIPMaskingTargetData.LOGIN_HISTORY)
+
+        assert masker.mask("203.0.113.7") == "203.0.113.0"
+
+    async def test_the_target_row_wins_whole_including_its_width(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        masking_repository: ClientIPMaskingRepository,
+    ) -> None:
+        """The row is the unit: an override does not inherit the default's width."""
+        await _upsert(
+            admin_v2_registry,
+            ClientIPMaskingTarget.DEFAULT,
+            ClientIPMaskingMode.TRUNCATE,
+            ipv4_prefix=8,
+        )
+        await _upsert(
+            admin_v2_registry,
+            ClientIPMaskingTarget.LOGIN_HISTORY,
+            ClientIPMaskingMode.TRUNCATE,
+        )
+
+        masker = await masking_repository.resolve_masker(ClientIPMaskingTargetData.LOGIN_HISTORY)
+
+        assert masker.mask("203.0.113.7") == "203.0.113.0"
+
+
 class TestWhatTheLoginPathResolves:
     """The API writes the row; the login path reads it through the repository."""
 
@@ -297,9 +397,9 @@ class TestWhatTheLoginPathResolves:
         self,
         masking_repository: ClientIPMaskingRepository,
     ) -> None:
-        mode = await masking_repository.resolve_mode(ClientIPMaskingTargetData.LOGIN_HISTORY)
+        masker = await masking_repository.resolve_masker(ClientIPMaskingTargetData.LOGIN_HISTORY)
 
-        assert mode == ClientIPMaskingModeData.NONE
+        assert masker.mode == ClientIPMaskingModeData.NONE
 
     async def test_the_default_applies_where_the_target_has_none(
         self,
@@ -312,9 +412,9 @@ class TestWhatTheLoginPathResolves:
             ClientIPMaskingMode.TRUNCATE,
         )
 
-        mode = await masking_repository.resolve_mode(ClientIPMaskingTargetData.LOGIN_HISTORY)
+        masker = await masking_repository.resolve_masker(ClientIPMaskingTargetData.LOGIN_HISTORY)
 
-        assert mode == ClientIPMaskingModeData.TRUNCATE
+        assert masker.mode == ClientIPMaskingModeData.TRUNCATE
 
     async def test_the_target_policy_wins_over_the_default(
         self,
@@ -332,9 +432,9 @@ class TestWhatTheLoginPathResolves:
             ClientIPMaskingMode.NONE,
         )
 
-        mode = await masking_repository.resolve_mode(ClientIPMaskingTargetData.LOGIN_HISTORY)
+        masker = await masking_repository.resolve_masker(ClientIPMaskingTargetData.LOGIN_HISTORY)
 
-        assert mode == ClientIPMaskingModeData.NONE
+        assert masker.mode == ClientIPMaskingModeData.NONE
 
     async def test_purging_the_override_falls_back_to_the_default(
         self,
@@ -357,6 +457,6 @@ class TestWhatTheLoginPathResolves:
             AdminPurgeClientIPMaskingPolicyInput(id=override.policy.id),
         )
 
-        mode = await masking_repository.resolve_mode(ClientIPMaskingTargetData.LOGIN_HISTORY)
+        masker = await masking_repository.resolve_masker(ClientIPMaskingTargetData.LOGIN_HISTORY)
 
-        assert mode == ClientIPMaskingModeData.TRUNCATE
+        assert masker.mode == ClientIPMaskingModeData.TRUNCATE
