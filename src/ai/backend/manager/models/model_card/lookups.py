@@ -26,7 +26,7 @@ class ModelCardResourceRequirementOwnerLookup(
     @override
     def build_query(
         self, field_ids: Sequence[ModelCardResourceRequirementID]
-    ) -> sa.sql.Select[Any]:
+    ) -> sa.sql.Select[tuple[ModelCardResourceRequirementID, ModelCardID]]:
         return sa.select(
             ModelCardResourceRequirementRow.id,
             ModelCardResourceRequirementRow.model_card_id,

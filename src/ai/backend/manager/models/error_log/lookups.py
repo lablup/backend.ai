@@ -19,7 +19,9 @@ class ErrorLogOwnerLookup(FieldOwnerLookup[ErrorLogID, UserID]):
     """The user an error was recorded against."""
 
     @override
-    def build_query(self, field_ids: Sequence[ErrorLogID]) -> sa.sql.Select[Any]:
+    def build_query(
+        self, field_ids: Sequence[ErrorLogID]
+    ) -> sa.sql.Select[tuple[ErrorLogID, UserID]]:
         """Rows written before logs became a user's field carry no user, so they
         resolve to no owner and drop out of the lookup."""
         return sa.select(ErrorLogRow.id, sa.cast(ErrorLogRow.user, GUID(UserID))).where(

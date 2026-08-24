@@ -18,7 +18,9 @@ class ArtifactRevisionOwnerLookup(FieldOwnerLookup[ArtifactRevisionID, ArtifactI
     """The artifact a revision belongs to."""
 
     @override
-    def build_query(self, field_ids: Sequence[ArtifactRevisionID]) -> sa.sql.Select[Any]:
+    def build_query(
+        self, field_ids: Sequence[ArtifactRevisionID]
+    ) -> sa.sql.Select[tuple[ArtifactRevisionID, ArtifactID]]:
         return sa.select(ArtifactRevisionRow.id, ArtifactRevisionRow.artifact_id).where(
             ArtifactRevisionRow.id.in_(field_ids)
         )

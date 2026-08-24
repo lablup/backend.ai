@@ -20,7 +20,9 @@ class RolePermissionPresetOwnerLookup(FieldOwnerLookup[RolePermissionPresetID, R
     """The preset a permission entry belongs to."""
 
     @override
-    def build_query(self, field_ids: Sequence[RolePermissionPresetID]) -> sa.sql.Select[Any]:
+    def build_query(
+        self, field_ids: Sequence[RolePermissionPresetID]
+    ) -> sa.sql.Select[tuple[RolePermissionPresetID, RolePresetID]]:
         return sa.select(RolePermissionPresetRow.id, RolePermissionPresetRow.role_preset_id).where(
             RolePermissionPresetRow.id.in_(field_ids)
         )
