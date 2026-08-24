@@ -31,7 +31,7 @@ import strawberry.experimental.pydantic
 import strawberry.federation
 from pydantic import BaseModel
 from strawberry.experimental.pydantic.conversion_types import StrawberryTypeFromPydantic
-from strawberry.relay import Connection, Edge
+from strawberry.relay import Connection
 from strawberry.schema_directives import OneOf
 from strawberry.types.base import get_object_definition
 from strawberry.types.field import StrawberryField
@@ -61,9 +61,7 @@ __all__ = (
 )
 
 T = TypeVar("T", bound="PydanticNodeMixin[Any]")
-# Both, as the decorator's stated role covers: a connection type and the edge type it
-# carries are documented the same way.
-T_conn = TypeVar("T_conn", bound="Connection[Any] | Edge[Any]")
+T_conn = TypeVar("T_conn", bound="Connection[Any]")
 T_input = TypeVar("T_input", bound="PydanticInputMixin[Any]")
 
 
