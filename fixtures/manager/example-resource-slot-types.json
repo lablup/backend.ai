@@ -209,6 +209,17 @@
         "round_length": 0
       },
       "rank": 1400
+    },
+    {
+      "slot_name": "cuda.unified",
+      "slot_type": "unified",
+      "required": false,
+      "display_name": "GPU",
+      "description": "NVIDIA Unified GPU",
+      "display_unit": "GPU",
+      "display_icon": "nvidia",
+      "number_format": {"binary": false, "round_length": 0},
+      "rank": 1500
     }
   ]
 }
