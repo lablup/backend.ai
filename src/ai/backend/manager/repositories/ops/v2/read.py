@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 from typing import Any
 
 import sqlalchemy as sa
@@ -39,6 +40,10 @@ from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
 
 class V2ReadOps(V2OpsBase):
     """Read-only operations bound to a single session; data-returning paths only."""
+
+    async def current_time(self) -> datetime:
+        """DB-sourced current time, consistent across servers (not a per-server clock)."""
+        return (await self._sess.execute(sa.select(sa.func.now()))).scalar_one()
 
     async def query_data[TRow: Base, TData](
         self, querier: DataQuerier[TRow, TData]

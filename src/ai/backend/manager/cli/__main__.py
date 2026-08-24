@@ -273,7 +273,7 @@ def clear_history(cli_ctx: CLIContext, retention: str, vacuum_full: bool) -> Non
     from ai.backend.manager.models.base import ensure_all_tables_registered
     from ai.backend.manager.models.kernel import kernels
     from ai.backend.manager.repositories.db.engine import connect_database, vacuum_db
-    from ai.backend.manager.repositories.ops import DBOpsProvider
+    from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
     from ai.backend.manager.repositories.retention.repository import RetentionRepository
 
     from .context import config_provider_ctx, redis_ctx
@@ -332,7 +332,7 @@ def clear_history(cli_ctx: CLIContext, retention: str, vacuum_full: bool) -> Non
             connect_database(bootstrap_config.db) as db,
             config_provider_ctx(cli_ctx) as config_provider,
         ):
-            repository = RetentionRepository(DBOpsProvider(db), config_provider)
+            repository = RetentionRepository(RetentionOpsProvider(db), config_provider)
             results = await repository.sweep()
         total_deleted = sum(result.deleted_count for result in results)
         log.info(

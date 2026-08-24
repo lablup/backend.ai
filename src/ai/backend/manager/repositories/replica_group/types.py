@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
@@ -81,22 +80,6 @@ class ApplyWritesResult:
 
     updated_group_ids: set[ReplicaGroupID]
     updated_endpoint_ids: set[DeploymentID]
-
-
-@dataclass
-class RevisionReplicaCount:
-    """Active route counts for one (group, revision): warming+serving vs serving only."""
-
-    live: int
-    serving: int
-
-
-@dataclass
-class RevisionRouteConfig:
-    """Per-revision settings copied onto each route at creation."""
-
-    health_check: ModelHealthCheck | None
-    termination_grace_period: float
 
 
 @dataclass

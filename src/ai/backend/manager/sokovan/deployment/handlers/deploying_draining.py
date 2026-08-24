@@ -18,9 +18,7 @@ from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
 from ai.backend.manager.models.replica_group.updaters import ReplicaGroupDeployUpdater
-from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.updater import DataUpdater
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.sokovan.deployment.types import (
@@ -91,11 +89,8 @@ class DeployingDrainingHandler(DeploymentHandler):
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
         deployment_ids = [d.deployment_info.id for d in deployments]
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[ReplicaGroupConditions.by_deployment_ids(deployment_ids)],
-        )
-        views = await self._replica_group_repository.search_deploy_scheduling_views(querier)
+        conditions = [ReplicaGroupConditions.by_deployment_ids(deployment_ids)]
+        views = await self._replica_group_repository.search_deploy_scheduling_views(conditions)
         groups_by_deployment: dict[DeploymentID, list[ReplicaGroupDeploySchedulingView]] = {}
         for view in views:
             groups_by_deployment.setdefault(view.deployment_id, []).append(view)

@@ -11,6 +11,8 @@ from ai.backend.manager.repositories.ops.v2.artifact_registry.provider import (
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.ops.v2.replica_group.provider import ReplicaGroupOpsProvider
+from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -77,6 +79,8 @@ class RepositoriesDependency(DomainDependency[RepositoriesInput, Repositories]):
                 v2_ops_provider=V2DBOpsProvider(setup_input.db),
                 reconcile_ops_provider=ReconcileOpsProvider(setup_input.db),
                 artifact_registry_ops_provider=ArtifactRegistryOpsProvider(setup_input.db),
+                replica_group_ops_provider=ReplicaGroupOpsProvider(setup_input.db),
+                retention_ops_provider=RetentionOpsProvider(setup_input.db),
                 storage_manager=setup_input.storage_manager,
                 config_provider=setup_input.config_provider,
                 key_provider_pool=setup_input.key_provider_pool,

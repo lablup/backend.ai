@@ -703,7 +703,7 @@ class VFolderService:
 
     async def purge(self, action: PurgeVFolderAction) -> PurgeVFolderActionResult:
         """Purge a DELETE_COMPLETE vfolder from DB (admin only)."""
-        data = await self._vfolder_repository.purge_vfolder(action.purger)
+        data = await self._vfolder_repository.purge_vfolder(action.vfolder_uuid)
         return PurgeVFolderActionResult(vfolder_uuid=data.id)
 
     async def force_delete(

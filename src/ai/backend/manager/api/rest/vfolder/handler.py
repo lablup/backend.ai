@@ -127,8 +127,6 @@ from ai.backend.manager.models.vfolder import (
     VFolderStatusSet,
 )
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
-from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
 from ai.backend.manager.services.auth.actions.resolve_user_scope import (
     PublicResolveUserScopeAction,
 )
@@ -1507,7 +1505,6 @@ class VFolderHandler:
         await self._vfolder.purge_vfolder.run(
             PurgeVFolderAction(
                 vfolder_uuid=VFolderUUID(folder_id),
-                purger=RBACEntityPurger(spec=VFolderPurgerSpec(vfolder_id=folder_id)),
             )
         )
 
