@@ -17,8 +17,10 @@ import enum
 from dataclasses import dataclass, field
 from typing import Final, Self
 
+from ai.backend.manager.data.secret.types import KeyProviderType, SecretKeyId
 from ai.backend.manager.errors.secret import (
     InvalidEncryptedSecretFormat,
+    UnknownSecretKeyProvider,
     UnsupportedSecretFormatVersion,
 )
 
@@ -47,7 +49,7 @@ class SecretFormatVersion(enum.StrEnum):
 class WrappedDataEncryptionKey:
     """The data encryption key as stored. Both fields are set and read by its provider."""
 
-    key_id: str
+    key_id: SecretKeyId
     blob: bytes = field(repr=False)
 
     def __post_init__(self) -> None:
@@ -61,18 +63,15 @@ class WrappedDataEncryptionKey:
 class EncryptedData:
     """A secret in its encrypted form, addressed to the key provider that wrote it."""
 
-    provider_id: str
+    provider_type: KeyProviderType
     wrapped_key: WrappedDataEncryptionKey
     nonce: bytes = field(repr=False)
     ciphertext: bytes = field(repr=False)
 
     def __post_init__(self) -> None:
-        if not self.provider_id:
-            raise InvalidEncryptedSecretFormat("The key provider id of a secret is empty.")
-        if SECRET_FIELD_DELIMITER in self.provider_id:
+        if self.provider_type is KeyProviderType.PLAIN:
             raise InvalidEncryptedSecretFormat(
-                f"The key provider id {self.provider_id!r} must not contain "
-                f"{SECRET_FIELD_DELIMITER!r}."
+                "A plaintext secret is stored without a marker, so it cannot name a provider."
             )
         if not self.nonce:
             raise InvalidEncryptedSecretFormat("An encrypted secret carries an empty nonce.")
@@ -81,31 +80,42 @@ class EncryptedData:
 
     @classmethod
     def parse(cls, body: str) -> Self:
-        provider_id, _, tail = body.partition(SECRET_FIELD_DELIMITER)
+        provider_type, _, tail = body.partition(SECRET_FIELD_DELIMITER)
         # The key id is provider-defined and may contain the delimiter, so the three
         # base64url fields after it are split off from the right.
         fields = tail.rsplit(SECRET_FIELD_DELIMITER, _TRAILING_FIELD_COUNT)
         if len(fields) != _TRAILING_FIELD_COUNT + 1:
             raise InvalidEncryptedSecretFormat(
-                "An encrypted secret must hold a key provider id, a key id, "
+                "An encrypted secret must hold a key provider type, a key id, "
                 "a wrapped key, a nonce, and a ciphertext."
             )
         key_id, encoded_key, encoded_nonce, encoded_ciphertext = fields
         return cls(
-            provider_id=provider_id,
-            wrapped_key=WrappedDataEncryptionKey(key_id=key_id, blob=cls._decode(encoded_key)),
+            provider_type=cls._provider_type(provider_type),
+            wrapped_key=WrappedDataEncryptionKey(
+                key_id=SecretKeyId(key_id), blob=cls._decode(encoded_key)
+            ),
             nonce=cls._decode(encoded_nonce),
             ciphertext=cls._decode(encoded_ciphertext),
         )
 
     def serialize(self) -> str:
         return SECRET_FIELD_DELIMITER.join([
-            self.provider_id,
+            self.provider_type,
             self.wrapped_key.key_id,
             self._encode(self.wrapped_key.blob),
             self._encode(self.nonce),
             self._encode(self.ciphertext),
         ])
+
+    @classmethod
+    def _provider_type(cls, raw: str) -> KeyProviderType:
+        try:
+            return KeyProviderType(raw)
+        except ValueError as e:
+            raise UnknownSecretKeyProvider(
+                f"The stored secret names the key provider {raw!r}, which this build does not know."
+            ) from e
 
     @classmethod
     def _decode(cls, encoded: str) -> bytes:

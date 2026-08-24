@@ -172,6 +172,8 @@ Alias keys are also URL-quoted in the same way.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import enum
 import logging
 import os
@@ -182,7 +184,7 @@ from datetime import UTC, datetime
 from ipaddress import IPv4Network
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Any, Literal, override
+from typing import Annotated, Any, Literal, Self, override
 
 from pydantic import (
     AliasChoices,
@@ -192,6 +194,7 @@ from pydantic import (
     IPvAnyNetwork,
     field_serializer,
     field_validator,
+    model_validator,
 )
 
 from ai.backend.common.config import BaseConfigSchema
@@ -225,6 +228,11 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.secret.types import (
+    KeyProviderType,
+    SecretKeyId,
+    SecretKeyMaterial,
+)
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
 from ai.backend.manager.pglock import PgAdvisoryLock
 
@@ -525,6 +533,94 @@ class AuthConfig(BaseConfigSchema):
             ),
             added_version="26.4.2",
             example=ConfigExample(local="604800", prod="604800"),
+        ),
+    ]
+
+
+class ConfigKeyProviderConfig(BaseConfigSchema):
+    active_key_id: Annotated[
+        SecretKeyId,
+        Field(
+            validation_alias=AliasChoices("active-key-id", "active_key_id"),
+            serialization_alias="active-key-id",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "The key id new values are encrypted under. Rotating a key is adding a new "
+                "id to the key list and pointing this at it; the previous ids stay so their "
+                "values keep decrypting."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="v1", prod="v1"),
+        ),
+    ]
+    keys: Annotated[
+        dict[SecretKeyId, SecretKeyMaterial],
+        Field(),
+        BackendAIConfigMeta(
+            description=(
+                "Key encryption keys by id, as base64-encoded 32-byte values. Each wraps "
+                "the per-value data encryption keys rather than the values themselves, so "
+                "an id may be retired only once no stored value still names it."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            secret=True,
+        ),
+    ]
+
+    @model_validator(mode="after")
+    def _validate_keys(self) -> Self:
+        for key_id, material in self.keys.items():
+            if not key_id:
+                raise ValueError("A key encryption key id must not be empty.")
+            try:
+                decoded = base64.b64decode(material, validate=True)
+            except (binascii.Error, ValueError) as e:
+                raise ValueError(f"The key {key_id!r} is not valid base64.") from e
+            if len(decoded) != 32:
+                raise ValueError(
+                    f"The key {key_id!r} must decode to 32 bytes but got {len(decoded)}."
+                )
+        if self.active_key_id not in self.keys:
+            raise ValueError(f"active-key-id {self.active_key_id!r} is not in the key list.")
+        return self
+
+
+class SecretEncryptionConfig(BaseConfigSchema):
+    write_provider_type: Annotated[
+        KeyProviderType,
+        Field(
+            default=KeyProviderType.PLAIN,
+            validation_alias=AliasChoices("write-provider-type", "write_provider_type"),
+            serialization_alias="write-provider-type",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "The key provider new secrets are written through, named by its type. "
+                "'plain' stores them unencrypted; every other type is configured by the "
+                "matching provider section below. Reads are decided by the stored value, so "
+                "secrets written earlier keep decrypting through the provider they name, and "
+                "a batch re-encryption normalizes stored secrets to whatever this names."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="plain", prod="config"),
+        ),
+    ]
+    config_provider: Annotated[
+        ConfigKeyProviderConfig | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("config-provider", "config_provider"),
+            serialization_alias="config-provider",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "The key provider that holds its key encryption keys in this file, under the "
+                "id 'config'. Omit this section to leave that provider unconfigured, in which "
+                "case no stored secret naming it can be read."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -3686,6 +3782,23 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "password requirements in production environments."
             ),
             added_version="25.8.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    secret_encryption: Annotated[
+        SecretEncryptionConfig,
+        Field(
+            default_factory=SecretEncryptionConfig,
+            validation_alias=AliasChoices("secret-encryption", "secret_encryption"),
+            serialization_alias="secret-encryption",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "At-rest encryption for secret columns such as the keypair secret key. "
+                "Names which key provider writes new secrets and configures the providers. "
+                "New secrets are stored as plaintext until a write provider is named."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]

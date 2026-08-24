@@ -9,13 +9,14 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.secret.types import EncryptedData
 
 
 class KeyProvider(ABC):
     @abstractmethod
-    def provider_id(self) -> str:
-        """The id written into stored values, naming this provider as their reader."""
+    def provider_type(self) -> KeyProviderType:
+        """The type written into stored values, naming this provider as their reader."""
         raise NotImplementedError
 
     @abstractmethod

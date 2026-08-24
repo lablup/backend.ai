@@ -52,3 +52,55 @@ class UnknownSecretKeyProvider(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class InvalidSecretKeyMaterial(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-secret-key-material"
+    error_title = "A configured secret encryption key is not of a usable size."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SECRET,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class UnknownSecretKeyId(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/unknown-secret-key-id"
+    error_title = "The stored secret names a key id that is not configured."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SECRET,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class SecretDecryptionFailed(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/secret-decryption-failed"
+    error_title = "The secret failed authentication during decryption."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SECRET,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class SecretEncryptionMisconfigured(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/secret-encryption-misconfigured"
+    error_title = "The secret encryption settings cannot be assembled."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SECRET,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
