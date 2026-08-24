@@ -7708,12 +7708,12 @@ type EntityInvitationConnection
   """Pagination data for this connection"""
   pageInfo: PageInfo!
 
-  """Contains the nodes in this connection"""
+  """Contains the nodes in this connection."""
   edges: [EntityInvitationEdge!]!
   count: Int!
 }
 
-"""An edge in a connection."""
+"""Added in 26.8.3. One entity invitation within a connection."""
 type EntityInvitationEdge
   @join__type(graph: STRAWBERRY)
 {
