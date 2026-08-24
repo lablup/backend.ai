@@ -4232,6 +4232,23 @@ type CreateEndpointAutoScalingRuleNode
   rule: EndpointAutoScalingRuleNode
 }
 
+"""Added in 26.8.3. Create entity invitation input."""
+input CreateEntityInvitationInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Type of the entity being offered."""
+  targetEntityType: String!
+
+  """Id of the entity being offered."""
+  targetEntityId: UUID!
+
+  """Address the offer goes to."""
+  inviteeEmail: String!
+
+  """Permissions the offer caps at; empty for no ceiling."""
+  permissions: [PermissionBit!]! = []
+}
+
 type CreateGroup
   @join__type(graph: GRAPHENE)
 {
@@ -7647,6 +7664,138 @@ input EntityFilter
   AND: [EntityFilter!] = null
   OR: [EntityFilter!] = null
   NOT: [EntityFilter!] = null
+}
+
+"""
+Added in 26.8.3. An offer of one existing entity to one address, settled by the answer.
+"""
+type EntityInvitation implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Who sent the offer."""
+  inviterUserId: UUID!
+
+  """Address the offer goes to."""
+  inviteeEmail: String!
+
+  """Type of the entity being offered."""
+  targetEntityType: String!
+
+  """Id of the entity being offered."""
+  targetEntityId: UUID!
+
+  """Permissions the offer caps at; empty for no ceiling."""
+  permissions: [PermissionBit!]!
+
+  """Whether the invitation is still open."""
+  status: EntityInvitationStatus!
+
+  """When the offer was made."""
+  createdAt: DateTime!
+
+  """When it was last written."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.8.3. Paginated list of entity invitations."""
+type EntityInvitationConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [EntityInvitationEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type EntityInvitationEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: EntityInvitation!
+}
+
+"""Added in 26.8.3. Filter for entity invitations."""
+input EntityInvitationFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Status filter."""
+  status: EntityInvitationStatus = null
+
+  """Exact address match."""
+  inviteeEmail: String = null
+}
+
+"""Added in 26.8.3. Order specification."""
+input EntityInvitationOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: EntityInvitationOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "DESC"
+}
+
+"""Added in 26.8.3. Order fields for entity invitations."""
+enum EntityInvitationOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+  STATUS @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.8.3. Entity invitation payload."""
+type EntityInvitationPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The invitation the run touched."""
+  invitation: EntityInvitation!
+}
+
+"""
+Added in 26.8.3. One side invitations are read from; RECEIVED and SENT name nothing else.
+"""
+input EntityInvitationScopeItem
+  @join__type(graph: STRAWBERRY)
+{
+  """Which side the read comes in through."""
+  side: EntityInvitationSide!
+
+  """Type of the entity being offered; TARGET only."""
+  targetEntityType: String = null
+
+  """Id of the entity being offered; TARGET only."""
+  targetEntityId: UUID = null
+}
+
+"""Added in 26.8.3. Which side of an invitation a read comes in through."""
+enum EntityInvitationSide
+  @join__type(graph: STRAWBERRY)
+{
+  RECEIVED @join__enumValue(graph: STRAWBERRY)
+  SENT @join__enumValue(graph: STRAWBERRY)
+  TARGET @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.8.3. Whether an invitation is still open."""
+enum EntityInvitationStatus
+  @join__type(graph: STRAWBERRY)
+{
+  PENDING @join__enumValue(graph: STRAWBERRY)
+  ACCEPTED @join__enumValue(graph: STRAWBERRY)
+  REJECTED @join__enumValue(graph: STRAWBERRY)
+  CANCELED @join__enumValue(graph: STRAWBERRY)
 }
 
 union EntityNode
@@ -13347,6 +13496,18 @@ type Mutation
   """Added in 26.8.0. Create a retention policy (superadmin only)."""
   adminCreateRetentionPolicy(input: CreateRetentionPolicyInput!): CreateRetentionPolicyPayload @join__field(graph: STRAWBERRY)
 
+  """Added in 26.8.3. Offer one entity to one address."""
+  createEntityInvitation(input: CreateEntityInvitationInput!): EntityInvitationPayload @join__field(graph: STRAWBERRY)
+
+  """Added in 26.8.3. Take what was offered."""
+  acceptEntityInvitation(id: UUID!): EntityInvitationPayload @join__field(graph: STRAWBERRY)
+
+  """Added in 26.8.3. Turn down what was offered."""
+  rejectEntityInvitation(id: UUID!): EntityInvitationPayload @join__field(graph: STRAWBERRY)
+
+  """Added in 26.8.3. Withdraw an offer before it was answered."""
+  cancelEntityInvitation(id: UUID!): EntityInvitationPayload @join__field(graph: STRAWBERRY)
+
   """Added in 26.8.0. Update a retention policy (superadmin only)."""
   adminUpdateRetentionPolicy(input: UpdateRetentionPolicyInput!): UpdateRetentionPolicyPayload @join__field(graph: STRAWBERRY)
 
@@ -13985,6 +14146,19 @@ type Permission implements Node
 
   """The scope this permission applies to."""
   scope: EntityNode
+}
+
+"""
+Added in 26.8.3. One bit of a permission mask; distinct from OperationType, which names an action.
+"""
+enum PermissionBit
+  @join__type(graph: STRAWBERRY)
+{
+  READ @join__enumValue(graph: STRAWBERRY)
+  UPDATE @join__enumValue(graph: STRAWBERRY)
+  CREATE @join__enumValue(graph: STRAWBERRY)
+  SOFT_DELETE @join__enumValue(graph: STRAWBERRY)
+  HARD_DELETE @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.3.0. Permission connection."""
@@ -16700,6 +16874,16 @@ type Query
   Added in 26.8.0. Get a single retention policy by ID (superadmin only).
   """
   adminRetentionPolicy(id: UUID!): RetentionPolicy @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.8.3. Read one invitation by id, from the side that offered it. The invitee reaches theirs through the search addressed to them.
+  """
+  entityInvitation(id: UUID!): EntityInvitation @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.8.3. Page through the invitations the named sides reach, combined with OR. RECEIVED and SENT are answered for by the caller and name nobody.
+  """
+  entityInvitations(scope: [EntityInvitationScopeItem!]!, filter: EntityInvitationFilter = null, orderBy: [EntityInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityInvitationConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Search runtime variant presets."""
   runtimeVariantPresets(filter: RuntimeVariantPresetFilter = null, orderBy: [RuntimeVariantPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantPresetConnection @join__field(graph: STRAWBERRY)

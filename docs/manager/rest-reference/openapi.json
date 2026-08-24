@@ -16013,6 +16013,341 @@
         "title": "UnassignUsersFromProjectInput",
         "type": "object"
       },
+      "EntityID": {
+        "format": "uuid",
+        "type": "string"
+      },
+      "PermissionBitDTO": {
+        "description": "One bit of the permission mask.\n\nDistinct from :class:`OperationTypeDTO`, which names an action: this names what is\nheld. A cap is a set of these, and an empty set is no cap at all.",
+        "enum": [
+          "read",
+          "update",
+          "create",
+          "soft_delete",
+          "hard_delete"
+        ],
+        "title": "PermissionBitDTO",
+        "type": "string"
+      },
+      "CreateEntityInvitationInput": {
+        "description": "One offer of one entity to one address.\n\nThe cap is given as the permissions it holds rather than a bitmask; an empty list\nmeans no ceiling, so the invitee's own permissions stand unclipped.",
+        "properties": {
+          "target_entity_type": {
+            "description": "Type of the entity being offered",
+            "title": "Target Entity Type",
+            "type": "string"
+          },
+          "target_entity_id": {
+            "$ref": "#/components/schemas/EntityID",
+            "description": "Id of the entity being offered"
+          },
+          "invitee_email": {
+            "description": "Address the offer goes to",
+            "title": "Invitee Email",
+            "type": "string"
+          },
+          "permissions": {
+            "description": "Permissions the offer caps at; empty for no ceiling",
+            "items": {
+              "$ref": "#/components/schemas/PermissionBitDTO"
+            },
+            "title": "Permissions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "target_entity_type",
+          "target_entity_id",
+          "invitee_email"
+        ],
+        "title": "CreateEntityInvitationInput",
+        "type": "object"
+      },
+      "EntityInvitationFilter": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityInvitationStatusFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "target_entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "invitee_email": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "title": "EntityInvitationFilter",
+        "type": "object"
+      },
+      "EntityInvitationOrderBy": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/EntityInvitationOrderField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "DESC"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "EntityInvitationOrderBy",
+        "type": "object"
+      },
+      "EntityInvitationOrderField": {
+        "enum": [
+          "created_at",
+          "updated_at",
+          "status"
+        ],
+        "title": "EntityInvitationOrderField",
+        "type": "string"
+      },
+      "EntityInvitationScopeDTO": {
+        "description": "The sides the read covers, combined with OR.",
+        "properties": {
+          "items": {
+            "description": "Sides to read from (OR across all items).",
+            "items": {
+              "$ref": "#/components/schemas/EntityInvitationScopeItemDTO"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "EntityInvitationScopeDTO",
+        "type": "object"
+      },
+      "EntityInvitationScopeItemDTO": {
+        "description": "One side invitations are read from.\n\n``RECEIVED`` and ``SENT`` are answered for by the requester themselves and name\nnothing else; ``TARGET`` names the entity whose invitations are being read.",
+        "properties": {
+          "side": {
+            "$ref": "#/components/schemas/EntityInvitationSideDTO",
+            "description": "Which side the read comes in through."
+          },
+          "target_entity_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Type of the entity being offered; TARGET only.",
+            "title": "Target Entity Type"
+          },
+          "target_entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityID"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Id of the entity being offered; TARGET only."
+          }
+        },
+        "required": [
+          "side"
+        ],
+        "title": "EntityInvitationScopeItemDTO",
+        "type": "object"
+      },
+      "EntityInvitationSideDTO": {
+        "description": "Which side of an invitation a read comes in through.",
+        "enum": [
+          "received",
+          "sent",
+          "target"
+        ],
+        "title": "EntityInvitationSideDTO",
+        "type": "string"
+      },
+      "EntityInvitationStatusDTO": {
+        "enum": [
+          "pending",
+          "accepted",
+          "rejected",
+          "canceled"
+        ],
+        "title": "EntityInvitationStatusDTO",
+        "type": "string"
+      },
+      "EntityInvitationStatusFilter": {
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityInvitationStatusDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityInvitationStatusDTO"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "In"
+          }
+        },
+        "title": "EntityInvitationStatusFilter",
+        "type": "object"
+      },
+      "ScopedSearchEntityInvitationsInput": {
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/EntityInvitationScopeDTO",
+            "description": "Sides to read from."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityInvitationFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityInvitationOrderBy"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchEntityInvitationsInput",
+        "type": "object"
+      },
       "CreateRoleInvitationInput": {
         "description": "Input for creating role invitations.",
         "properties": {
@@ -47493,6 +47828,178 @@
           }
         ],
         "description": "Unassign users from a project.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-invitations": {
+      "post": {
+        "operationId": "v2/entity-invitations.create",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEntityInvitationInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Offer one entity to one address.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-invitations/{invitation_id}": {
+      "get": {
+        "operationId": "v2/entity-invitations.get",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Read one invitation from the side that offered it.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/entity-invitations.cancel",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Withdraw the offer before it was answered.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-invitations/{invitation_id}/accept": {
+      "post": {
+        "operationId": "v2/entity-invitations.accept",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Take what was offered.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-invitations/{invitation_id}/reject": {
+      "post": {
+        "operationId": "v2/entity-invitations.reject",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Turn down what was offered.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-invitations/scoped/search": {
+      "post": {
+        "operationId": "v2/entity-invitations.scoped_search",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchEntityInvitationsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "The invitations the named sides reach.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/role-invitations": {

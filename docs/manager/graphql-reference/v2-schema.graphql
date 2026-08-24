@@ -2856,6 +2856,21 @@ type CreateDownloadSessionV2Payload {
   url: String!
 }
 
+"""Added in 26.8.3. Create entity invitation input."""
+input CreateEntityInvitationInput {
+  """Type of the entity being offered."""
+  targetEntityType: String!
+
+  """Id of the entity being offered."""
+  targetEntityId: UUID!
+
+  """Address the offer goes to."""
+  inviteeEmail: String!
+
+  """Permissions the offer caps at; empty for no ceiling."""
+  permissions: [PermissionBit!]! = []
+}
+
 """Added in 25.14.0. """
 input CreateHuggingFaceRegistryInput {
   name: String!
@@ -5275,6 +5290,117 @@ input EntityFilter {
   AND: [EntityFilter!] = null
   OR: [EntityFilter!] = null
   NOT: [EntityFilter!] = null
+}
+
+"""
+Added in 26.8.3. An offer of one existing entity to one address, settled by the answer.
+"""
+type EntityInvitation implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Who sent the offer."""
+  inviterUserId: UUID!
+
+  """Address the offer goes to."""
+  inviteeEmail: String!
+
+  """Type of the entity being offered."""
+  targetEntityType: String!
+
+  """Id of the entity being offered."""
+  targetEntityId: UUID!
+
+  """Permissions the offer caps at; empty for no ceiling."""
+  permissions: [PermissionBit!]!
+
+  """Whether the invitation is still open."""
+  status: EntityInvitationStatus!
+
+  """When the offer was made."""
+  createdAt: DateTime!
+
+  """When it was last written."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.8.3. Paginated list of entity invitations."""
+type EntityInvitationConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [EntityInvitationEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type EntityInvitationEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: EntityInvitation!
+}
+
+"""Added in 26.8.3. Filter for entity invitations."""
+input EntityInvitationFilter {
+  """Status filter."""
+  status: EntityInvitationStatus = null
+
+  """Exact address match."""
+  inviteeEmail: String = null
+}
+
+"""Added in 26.8.3. Order specification."""
+input EntityInvitationOrderBy {
+  """Field to order by."""
+  field: EntityInvitationOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "DESC"
+}
+
+"""Added in 26.8.3. Order fields for entity invitations."""
+enum EntityInvitationOrderField {
+  CREATED_AT
+  UPDATED_AT
+  STATUS
+}
+
+"""Added in 26.8.3. Entity invitation payload."""
+type EntityInvitationPayload {
+  """The invitation the run touched."""
+  invitation: EntityInvitation!
+}
+
+"""
+Added in 26.8.3. One side invitations are read from; RECEIVED and SENT name nothing else.
+"""
+input EntityInvitationScopeItem {
+  """Which side the read comes in through."""
+  side: EntityInvitationSide!
+
+  """Type of the entity being offered; TARGET only."""
+  targetEntityType: String = null
+
+  """Id of the entity being offered; TARGET only."""
+  targetEntityId: UUID = null
+}
+
+"""Added in 26.8.3. Which side of an invitation a read comes in through."""
+enum EntityInvitationSide {
+  RECEIVED
+  SENT
+  TARGET
+}
+
+"""Added in 26.8.3. Whether an invitation is still open."""
+enum EntityInvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELED
 }
 
 union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
@@ -9057,6 +9183,18 @@ type Mutation {
   """Added in 26.8.0. Create a retention policy (superadmin only)."""
   adminCreateRetentionPolicy(input: CreateRetentionPolicyInput!): CreateRetentionPolicyPayload
 
+  """Added in 26.8.3. Offer one entity to one address."""
+  createEntityInvitation(input: CreateEntityInvitationInput!): EntityInvitationPayload
+
+  """Added in 26.8.3. Take what was offered."""
+  acceptEntityInvitation(id: UUID!): EntityInvitationPayload
+
+  """Added in 26.8.3. Turn down what was offered."""
+  rejectEntityInvitation(id: UUID!): EntityInvitationPayload
+
+  """Added in 26.8.3. Withdraw an offer before it was answered."""
+  cancelEntityInvitation(id: UUID!): EntityInvitationPayload
+
   """Added in 26.8.0. Update a retention policy (superadmin only)."""
   adminUpdateRetentionPolicy(input: UpdateRetentionPolicyInput!): UpdateRetentionPolicyPayload
 
@@ -9563,6 +9701,17 @@ type Permission implements Node {
 
   """The scope this permission applies to."""
   scope: EntityNode
+}
+
+"""
+Added in 26.8.3. One bit of a permission mask; distinct from OperationType, which names an action.
+"""
+enum PermissionBit {
+  READ
+  UPDATE
+  CREATE
+  SOFT_DELETE
+  HARD_DELETE
 }
 
 """Added in 26.3.0. Permission connection."""
@@ -11567,6 +11716,16 @@ type Query {
   Added in 26.8.0. Get a single retention policy by ID (superadmin only).
   """
   adminRetentionPolicy(id: UUID!): RetentionPolicy
+
+  """
+  Added in 26.8.3. Read one invitation by id, from the side that offered it. The invitee reaches theirs through the search addressed to them.
+  """
+  entityInvitation(id: UUID!): EntityInvitation
+
+  """
+  Added in 26.8.3. Page through the invitations the named sides reach, combined with OR. RECEIVED and SENT are answered for by the caller and name nobody.
+  """
+  entityInvitations(scope: [EntityInvitationScopeItem!]!, filter: EntityInvitationFilter = null, orderBy: [EntityInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityInvitationConnection
 
   """Added in 26.4.2. Search runtime variant presets."""
   runtimeVariantPresets(filter: RuntimeVariantPresetFilter = null, orderBy: [RuntimeVariantPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantPresetConnection
