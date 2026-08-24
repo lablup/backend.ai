@@ -252,7 +252,8 @@ def test_rendered_compose_system_path_parity_mounts(template: str) -> None:
 def test_rendered_compose_wheelhouse_mounts(template: str) -> None:
     doc = render(template, enable_gpu=False)
     services = doc["services"]
-    wheelhouse = f"{BASE_PATH}/wheelhouse:/app/wheelhouse:ro"
+    # rw: installing from the staging dir unpacks the wheels in place
+    wheelhouse = f"{BASE_PATH}/wheelhouse:/app/wheelhouse"
     # plugin-wheel staging dir: manager and agent only
     for name, service in services.items():
         if name in ("manager", "agent"):
