@@ -6,15 +6,15 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import BulkScopedSearchOpsAction
-from ai.backend.manager.data.label.types import LabelData
-from ai.backend.manager.models.label.row import LabelRow
-from ai.backend.manager.models.label.scopes import EntityLabelOperationScope
-from ai.backend.manager.models.label.searchers import LabelSearcher
+from ai.backend.manager.data.entity_label.types import EntityLabelData
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_label.scopes import EntityLabelOperationScope
+from ai.backend.manager.models.entity_label.searchers import EntityLabelSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
 
 @dataclass
-class SearchLabelsAction(BulkScopedSearchOpsAction[LabelRow, LabelData]):
+class SearchEntityLabelsAction(BulkScopedSearchOpsAction[EntityLabelRow, EntityLabelData]):
     """Page through the labels on the entities named, combined with OR.
 
     Every entity is authorized before the read runs, so a label comes back exactly when
@@ -22,12 +22,12 @@ class SearchLabelsAction(BulkScopedSearchOpsAction[LabelRow, LabelData]):
     """
 
     owners: Sequence[EntityIdentifier]
-    searcher: LabelSearcher
+    searcher: EntityLabelSearcher
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "search_labels"
+        return "search_entity_labels"
 
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:
@@ -41,5 +41,5 @@ class SearchLabelsAction(BulkScopedSearchOpsAction[LabelRow, LabelData]):
         ]
 
     @override
-    def to_searcher(self) -> LabelSearcher:
+    def to_searcher(self) -> EntityLabelSearcher:
         return self.searcher

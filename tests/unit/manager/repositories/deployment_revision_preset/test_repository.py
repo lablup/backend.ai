@@ -38,7 +38,7 @@ from ai.backend.manager.models.deployment_revision_preset.searchers import (
     PresetResourceSlotSearcher,
 )
 from ai.backend.manager.models.deployment_revision_preset.updaters import DeploymentPresetUpdater
-from ai.backend.manager.models.label.row import LabelRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow, ResourceSlotTypeRow
@@ -101,7 +101,7 @@ async def database(
             VirtualScopeRow,
             EntityMembershipRow,
             ScopeBindingRow,
-            LabelRow,
+            EntityLabelRow,
             RoleRow,
             PermissionRow,
             RuntimeVariantRow,

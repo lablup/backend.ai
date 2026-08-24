@@ -35,6 +35,7 @@ from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_
 from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.entity_label import ENTITY_LABEL_FIELD_TYPE
 from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
 from ai.backend.common.data.entity.fair_share import (
     DOMAIN_FAIR_SHARE_ENTITY_TYPE,
@@ -42,7 +43,6 @@ from ai.backend.common.data.entity.fair_share import (
     USER_FAIR_SHARE_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.image import IMAGE_ENTITY_TYPE
-from ai.backend.common.data.entity.label import LABEL_FIELD_TYPE
 from ai.backend.common.data.entity.login_client_type import LOGIN_CLIENT_TYPE_ENTITY_TYPE
 from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
 from ai.backend.common.data.entity.notification import (
@@ -87,7 +87,10 @@ from ai.backend.manager.actions.registry.types import (
     ProcessorDependencies,
 )
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
-from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
+from ai.backend.manager.actions.v2.field.base import (
+    BaseRuntimeSingleFieldAction,
+    BaseSingleFieldAction,
+)
 from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
@@ -97,7 +100,7 @@ from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAct
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
-from ai.backend.manager.data.label.types import LabelData
+from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
@@ -116,6 +119,11 @@ from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.entity_label.actions.lookup_owner import (
+    LookupBulkEntityLabelOwnerAction,
+    LookupEntityLabelOwnerAction,
+)
+from ai.backend.manager.services.entity_label.processors import EntityLabelProcessors
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
@@ -123,11 +131,6 @@ from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
-from ai.backend.manager.services.label.actions.lookup_owner import (
-    LookupBulkLabelOwnerAction,
-    LookupLabelOwnerAction,
-)
-from ai.backend.manager.services.label.processors import LabelProcessors
 from ai.backend.manager.services.login_client_type.processors import (
     LoginClientTypeProcessors,
 )
@@ -191,6 +194,7 @@ _V2_ACTION_BASES: tuple[type[Any], ...] = (
     BaseLookupAction,
     BaseBulkLookupAction,
     BaseSingleFieldAction,
+    BaseRuntimeSingleFieldAction,
     BaseBulkFieldAction,
 )
 
@@ -289,12 +293,12 @@ def test_every_defined_v2_action_is_wired() -> None:
     AuditLogProcessors(
         registry.dangling_field_group(FieldGroupMeta(AUDIT_LOG_FIELD_TYPE), AuditLogData)
     )
-    LabelProcessors(
+    EntityLabelProcessors(
         registry.dangling_lookup_field_group(
-            FieldGroupMeta(LABEL_FIELD_TYPE),
-            LabelData,
-            LookupLabelOwnerAction,
-            LookupBulkLabelOwnerAction,
+            FieldGroupMeta(ENTITY_LABEL_FIELD_TYPE),
+            EntityLabelData,
+            LookupEntityLabelOwnerAction,
+            LookupBulkEntityLabelOwnerAction,
         )
     )
     PrometheusQueryPresetProcessors(

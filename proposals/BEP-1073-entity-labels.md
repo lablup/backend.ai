@@ -24,10 +24,10 @@ This BEP decides four things:
 
 | Decision | Outcome |
 |----------|---------|
-| Label identity | A label is a `key=value` pair, not a map entry — a target may hold the same key twice with different values |
+| Label identity | A label is a map entry: one value per key on a target, replaced by writing the key again |
 | Structure | One table; the entity it labels is a polymorphic reference, never a foreign key |
 | Filter | `some` / `every` / `none` nested filter per [BEP-1060](BEP-1060-v2-connection-type-nested-filters.md), one shared `LabelFilter` reused by every labelable entity |
-| API surface | One add, one remove, and one search, reusing the `audit_log` filter and page/order shape |
+| API surface | One put, one remove, and one search, reusing the `audit_log` filter and page/order shape |
 
 A label goes on any entity. The `labels` filter is wired first for **session, deployment, vfolder,
 and agent**.
@@ -80,17 +80,18 @@ For each area, separate **✅ what already exists** from **➕ what to add**.
 
 ### 1. Label identity
 
-A label is a **`key=value` pair**, not a map entry. A target may carry `team=infra` and `team=ml`
-simultaneously.
+A label is a **map entry**: a key holds one value on a target, as Kubernetes labels do. Writing a key
+the target already carries replaces the value rather than adding a second row, which is why the write
+is a put and not an add.
 
-This differs from Kubernetes label maps, where a key holds one value. Multi-value is the more useful
-default here — membership in several teams, projects, or cost centers is common — and map behavior
-is recoverable as a service-layer rule if a caller needs it. The reverse is not.
+`UNIQUE (entity_type, entity_id, key)` is what enforces it. A caller wanting several values under one
+name spells them into the key — `team-infra`, `team-ml` — or into the value as a delimited string it
+parses itself.
 
 ### 2. Structure and relationships
 
-One table (`labels`), holding one row per label put on one entity: the entity, the key, and the
-value.
+One table (`entity_labels`), holding one row per key put on one entity: the entity, the key, and
+the value.
 
 The entity is a polymorphic `(entity_type, entity_id)` reference in the shape `audit_logs` already
 uses — untyped at the DB level, discriminated by the accompanying type. No labelable table gains a
@@ -174,12 +175,18 @@ Two contract points bind the implementation:
 Audit records are written by the system and only read through the API; labels are written by users.
 These operations therefore have no `audit_log` counterpart.
 
-There are two, and both name the entity and the `key=value` in a single call.
-
 | Operation | Shape |
 |-----------|-------|
-| Add | Puts `key=value` on the entity |
-| Remove | Takes it off the entity |
+| Put | Names the entity and the `key=value`; sets the key, replacing whatever value it held |
+| Remove | Names the label's own id, read from a search |
+
+Put is an upsert, not an insert: a key holds one value, so naming a key the entity already carries is
+a caller restating what it should be rather than a conflict. `updated_at` records when a value was
+last replaced.
+
+Remove names the row rather than the entity and the key, so every operation over a label row is
+named the way the other field kinds are named. Which entity answers for it is read from the row
+before the delete runs.
 
 Defining a label and putting it on something are not separable steps: a label attached to nothing
 has no meaning this BEP assigns it, and no rule anywhere restricts a label to one declared in

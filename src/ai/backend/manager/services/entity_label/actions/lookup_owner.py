@@ -4,27 +4,28 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.label import LabelID
+from ai.backend.common.data.entity.entity_label import EntityLabelID
 from ai.backend.common.data.entity.types import (
     GLOBAL_ENTITY_TYPE,
     EntityType,
-    RuntimeEntityID,
 )
-from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
-from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerOpsAction
+from ai.backend.manager.actions.v2.field.bulk_lookup import (
+    LookupBulkRuntimeFieldOwnerOpsAction,
+)
+from ai.backend.manager.actions.v2.field.lookup import LookupRuntimeFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
-from ai.backend.manager.models.label.lookups import LabelOwnerLookup
+from ai.backend.manager.models.entity_label.lookups import EntityLabelOwnerLookup
 
 
 @dataclass(frozen=True)
-class LabelIDLookupKey(LookupKey):
+class EntityLabelIDLookupKey(LookupKey):
     """A label's id, resolved into the entity it is on."""
 
-    label_id: LabelID
+    label_id: EntityLabelID
 
     @override
     def kind(self) -> str:
-        return "label_id"
+        return "entity_label_id"
 
     @override
     def to_dict(self) -> dict[str, Any]:
@@ -32,7 +33,7 @@ class LabelIDLookupKey(LookupKey):
 
 
 @dataclass
-class LookupLabelOwnerAction(LookupFieldOwnerOpsAction[LabelID, RuntimeEntityID]):
+class LookupEntityLabelOwnerAction(LookupRuntimeFieldOwnerOpsAction[EntityLabelID]):
     """The entity one label is on.
 
     ``entity_type`` names no kind: a label goes on any of them, and this read is what
@@ -40,7 +41,7 @@ class LookupLabelOwnerAction(LookupFieldOwnerOpsAction[LabelID, RuntimeEntityID]
     follows is authorized against the entity this answers with.
     """
 
-    label_id: LabelID
+    label_id: EntityLabelID
 
     @override
     @classmethod
@@ -50,26 +51,26 @@ class LookupLabelOwnerAction(LookupFieldOwnerOpsAction[LabelID, RuntimeEntityID]
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "lookup_label_owner"
+        return "lookup_entity_label_owner"
 
     @override
     def lookup_key(self) -> LookupKey:
-        return LabelIDLookupKey(self.label_id)
+        return EntityLabelIDLookupKey(self.label_id)
 
     @override
-    def field_id(self) -> LabelID:
+    def field_id(self) -> EntityLabelID:
         return self.label_id
 
     @override
-    def to_owner_lookup(self) -> LabelOwnerLookup:
-        return LabelOwnerLookup()
+    def to_owner_lookup(self) -> EntityLabelOwnerLookup:
+        return EntityLabelOwnerLookup()
 
 
 @dataclass
-class LookupBulkLabelOwnerAction(LookupBulkFieldOwnerOpsAction[LabelID, RuntimeEntityID]):
+class LookupBulkEntityLabelOwnerAction(LookupBulkRuntimeFieldOwnerOpsAction[EntityLabelID]):
     """The entities several labels are on."""
 
-    label_ids: Sequence[LabelID]
+    label_ids: Sequence[EntityLabelID]
 
     @override
     @classmethod
@@ -79,16 +80,16 @@ class LookupBulkLabelOwnerAction(LookupBulkFieldOwnerOpsAction[LabelID, RuntimeE
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "lookup_bulk_label_owner"
+        return "lookup_bulk_entity_label_owner"
 
     @override
-    def to_lookup_key(self, field_id: LabelID) -> LookupKey:
-        return LabelIDLookupKey(field_id)
+    def to_lookup_key(self, field_id: EntityLabelID) -> LookupKey:
+        return EntityLabelIDLookupKey(field_id)
 
     @override
-    def field_ids(self) -> Sequence[LabelID]:
+    def field_ids(self) -> Sequence[EntityLabelID]:
         return tuple(self.label_ids)
 
     @override
-    def to_owner_lookup(self) -> LabelOwnerLookup:
-        return LabelOwnerLookup()
+    def to_owner_lookup(self) -> EntityLabelOwnerLookup:
+        return EntityLabelOwnerLookup()

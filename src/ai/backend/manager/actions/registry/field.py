@@ -36,6 +36,7 @@ from ai.backend.manager.actions.v2.field.ops import (
     PartialBulkPurgeFieldOpsAction,
     PurgeFieldOpsAction,
     RestoreFieldOpsAction,
+    RuntimePurgeFieldOpsAction,
     UpdateFieldOpsAction,
 )
 from ai.backend.manager.actions.v2.field.processor import (
@@ -369,7 +370,9 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
             validators=(*self._deps.validators.single_entity, *validators),
         )
 
-    def purge_ops[TAction: PurgeFieldOpsAction[Any, Any, Any, Any]](
+    def purge_ops[
+        TAction: PurgeFieldOpsAction[Any, Any, Any, Any] | RuntimePurgeFieldOpsAction[Any, Any, Any]
+    ](
         self,
         action_cls: type[TAction],
         *,

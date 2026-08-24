@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.types import EntityID, EntityType
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.label.row import LabelRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 __all__ = ("EntityLabelOperationScope",)
@@ -36,8 +36,8 @@ class EntityLabelOperationScope(OperationScope):
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
-                LabelRow.entity_type == entity_type,
-                LabelRow.entity_id == entity_id,
+                EntityLabelRow.entity_type == entity_type,
+                EntityLabelRow.entity_id == entity_id,
             )
 
         return inner

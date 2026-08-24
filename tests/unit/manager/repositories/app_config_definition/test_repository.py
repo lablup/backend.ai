@@ -28,7 +28,7 @@ from ai.backend.manager.models.app_config_definition.row import AppConfigDefinit
 from ai.backend.manager.models.app_config_definition.searchers import (
     AppConfigDefinitionSearcher,
 )
-from ai.backend.manager.models.label.row import LabelRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.specs.pagination import CursorForwardPagination, OffsetPagination
@@ -51,7 +51,7 @@ async def repository(
             VirtualScopeRow,
             EntityMembershipRow,
             ScopeBindingRow,
-            LabelRow,
+            EntityLabelRow,
             RoleRow,
             PermissionRow,
             AppConfigDefinitionRow,

@@ -24,11 +24,11 @@ from ai.backend.manager.data.model_card.types import (
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.label.row import LabelRow
 from ai.backend.manager.models.model_card.creators import (
     ModelCardCreator,
     ModelCardResourceRequirementCreator,
@@ -93,7 +93,7 @@ class TestModelCardCreatorResourceRequirements:
                 KeyPairResourcePolicyRow,
                 VirtualScopeRow,
                 ScopeBindingRow,
-                LabelRow,
+                EntityLabelRow,
                 EntityMembershipRow,
                 RoleRow,
                 UserRoleRow,

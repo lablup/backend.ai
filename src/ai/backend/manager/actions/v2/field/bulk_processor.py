@@ -26,7 +26,6 @@ from ai.backend.manager.actions.v2.field.bulk_base import (
 )
 from ai.backend.manager.actions.v2.field.bulk_lookup import (
     BulkFieldOwnerLookupOpsResult,
-    LookupBulkFieldOwnerOpsAction,
 )
 from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
@@ -40,9 +39,7 @@ __all__ = (
     "PartialFieldResultJudge",
 )
 
-type OwnerBulkLookupProcessor = BulkLookupActionProcessor[
-    LookupBulkFieldOwnerOpsAction[Any, Any], BulkFieldOwnerLookupOpsResult[Any]
-]
+type OwnerBulkLookupProcessor = BulkLookupActionProcessor[Any, BulkFieldOwnerLookupOpsResult[Any]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

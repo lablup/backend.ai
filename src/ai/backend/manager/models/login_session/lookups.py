@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import Any, override
+from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy import Row
 
 from ai.backend.common.data.entity.login_history import LoginHistoryID
 from ai.backend.common.data.entity.login_session import LoginSessionID
@@ -25,8 +25,8 @@ class LoginSessionOwnerLookup(FieldOwnerLookup[LoginSessionID, UserID]):
         )
 
     @override
-    def to_entity_id(self, row: Row[Any]) -> UserID:
-        return UserID(row[1])
+    def to_entity_id(self, value: UUID) -> UserID:
+        return UserID(value)
 
 
 class LoginHistoryOwnerLookup(FieldOwnerLookup[LoginHistoryID, UserID]):
@@ -39,5 +39,5 @@ class LoginHistoryOwnerLookup(FieldOwnerLookup[LoginHistoryID, UserID]):
         )
 
     @override
-    def to_entity_id(self, row: Row[Any]) -> UserID:
-        return UserID(row[1])
+    def to_entity_id(self, value: UUID) -> UserID:
+        return UserID(value)

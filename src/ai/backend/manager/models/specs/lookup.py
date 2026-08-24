@@ -8,9 +8,13 @@ from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy import Row
 
-from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
+from ai.backend.common.data.entity.types import (
+    EntityIdentifier,
+    EntityType,
+    FieldIdentifier,
+    RuntimeEntityID,
+)
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 
@@ -80,10 +84,6 @@ class FieldOwnerLookup[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](AB
     through a join is expressible. It selects the pair, so one spec serves a single row
     and a batch alike: which row each owner belongs to survives.
 
-    ``to_entity_id`` takes the selected row rather than one value off it, as
-    :class:`DataLookup` does: an identifier answers for the entity it names, and where
-    the reference is polymorphic the type is a second value only the row carries.
-
     Example:
         class ReplicaOwnerLookup(FieldOwnerLookup):
             def build_query(self, field_ids):
@@ -91,19 +91,53 @@ class FieldOwnerLookup[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](AB
                     ReplicaRow.id.in_(field_ids)
                 )
 
-            def to_entity_id(self, row: Row[Any]) -> DeploymentID:
-                return DeploymentID(row[1])
+            def to_entity_id(self, value: UUID) -> DeploymentID:
+                return DeploymentID(value)
+    """
+
+    @abstractmethod
+    def build_query(
+        self, field_ids: Sequence[TFieldID]
+    ) -> sa.sql.Select[tuple[TFieldID, TOwnerID]]:
+        """Build the query selecting each named row's id and its owning entity's id."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_entity_id(self, value: UUID) -> TOwnerID:
+        """Convert the selected value into the owning entity's identifier."""
+        raise NotImplementedError
+
+
+class RuntimeFieldOwnerLookup[TFieldID: FieldIdentifier](ABC):
+    """Resolves a field row's id into the id of the polymorphic entity that owns it.
+
+    Unrelated to :class:`FieldOwnerLookup`, which answers for an owner whose kind its id
+    class names. Here the kind is a value on the row, so the query selects it third —
+    after the row's id and the owner's — and the identifier is built from both.
+
+    The two are separate roots down to the ops methods that execute them, so a lookup
+    cannot reach the path that would drop the type it carries.
+
+    Example:
+        class EntityLabelOwnerLookup(RuntimeFieldOwnerLookup[EntityLabelID]):
+            def build_query(self, field_ids):
+                return sa.select(
+                    EntityLabelRow.id, EntityLabelRow.entity_id, EntityLabelRow.entity_type
+                ).where(EntityLabelRow.id.in_(field_ids))
+
+            def owner_of(self, entity_type, entity_id) -> RuntimeEntityID:
+                return RuntimeEntityID(entity_type, entity_id)
     """
 
     @abstractmethod
     def build_query(self, field_ids: Sequence[TFieldID]) -> sa.sql.Select[Any]:
-        """Build the query selecting each named row's id first and whatever
-        ``to_entity_id`` builds the owner's identifier from after it."""
+        """Build the query selecting each named row's id, its owning entity's id, and
+        that entity's type, in that order."""
         raise NotImplementedError
 
     @abstractmethod
-    def to_entity_id(self, row: Row[Any]) -> TOwnerID:
-        """Convert one selected row into the owning entity's identifier."""
+    def owner_of(self, entity_type: EntityType, entity_id: UUID) -> RuntimeEntityID:
+        """Build the owner's identifier from the type and id the row carried."""
         raise NotImplementedError
 
 

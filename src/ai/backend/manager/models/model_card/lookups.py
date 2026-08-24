@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, override
+from typing import override
+from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy import Row
 
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.model_card_resource_requirement import (
@@ -33,5 +33,5 @@ class ModelCardResourceRequirementOwnerLookup(
         ).where(ModelCardResourceRequirementRow.id.in_(field_ids))
 
     @override
-    def to_entity_id(self, row: Row[Any]) -> ModelCardID:
-        return ModelCardID(row[1])
+    def to_entity_id(self, value: UUID) -> ModelCardID:
+        return ModelCardID(value)

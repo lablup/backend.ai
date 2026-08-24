@@ -7,7 +7,13 @@ from typing import Any
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
+from ai.backend.common.data.entity.types import (
+    EntityIdentifier,
+    EntityType,
+    FieldData,
+    FieldIdentifier,
+    RuntimeEntityID,
+)
 from ai.backend.manager.errors.repository import (
     AmbiguousEntityKeyError,
     EmptyOperationScopeError,
@@ -19,6 +25,7 @@ from ai.backend.manager.models.specs.lookup import (
     FieldKeyLookup,
     FieldOwnerKeyLookup,
     FieldOwnerLookup,
+    RuntimeFieldOwnerLookup,
 )
 from ai.backend.manager.models.specs.querier import (
     BulkEntityQuerier,
@@ -101,7 +108,23 @@ class V2ReadOps(V2OpsBase):
         if not field_ids:
             return {}
         rows = (await self._sess.execute(lookup.build_query(field_ids))).all()
-        owners = {row[0]: lookup.to_entity_id(row) for row in rows}
+        owners = {row[0]: lookup.to_entity_id(row[1]) for row in rows}
+        return {field_id: owners[field_id] for field_id in field_ids if field_id in owners}
+
+    async def lookup_runtime_field_owners(
+        self, lookup: RuntimeFieldOwnerLookup[Any], field_ids: Sequence[FieldIdentifier]
+    ) -> Mapping[FieldIdentifier, RuntimeEntityID]:
+        """Read the owning entity of each named field row whose owner is polymorphic.
+
+        The counterpart of :meth:`lookup_field_owners` for the other lookup root: the
+        query selects the owner's type third and the spec builds the identifier from it.
+        Separate rather than branching, so a spec cannot reach the path that reads only
+        the id and loses the kind.
+        """
+        if not field_ids:
+            return {}
+        rows = (await self._sess.execute(lookup.build_query(field_ids))).all()
+        owners = {row[0]: lookup.owner_of(EntityType(row[2]), row[1]) for row in rows}
         return {field_id: owners[field_id] for field_id in field_ids if field_id in owners}
 
     async def lookup_field_owner_by_key[TOwnerID: EntityIdentifier](

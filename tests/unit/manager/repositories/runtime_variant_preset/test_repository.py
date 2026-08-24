@@ -13,7 +13,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetValueType,
 )
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
-from ai.backend.manager.models.label.row import LabelRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
@@ -48,7 +48,7 @@ class TestRuntimeVariantPresetRepositoryFlag:
                 VirtualScopeRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
-                LabelRow,
+                EntityLabelRow,
                 RoleRow,
                 PermissionRow,
                 RuntimeVariantRow,

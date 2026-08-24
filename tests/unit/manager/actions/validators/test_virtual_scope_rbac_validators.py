@@ -70,9 +70,9 @@ from ai.backend.manager.models.agent import AgentRow
 # registry. These rows are reachable via relationships but are not otherwise
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.label.row import LabelRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -462,7 +462,7 @@ async def db_with_rbac_tables(
             AssociationScopesEntitiesRow,
             VirtualScopeRow,
             ScopeBindingRow,
-            LabelRow,
+            EntityLabelRow,
             EntityMembershipRow,
         ],
     ):

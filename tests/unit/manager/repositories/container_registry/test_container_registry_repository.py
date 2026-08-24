@@ -34,10 +34,10 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.label.row import LabelRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -163,7 +163,7 @@ class TestContainerRegistryRepository:
                 # The registry's owner virtual scope and the allowed-project edges
                 VirtualScopeRow,
                 ScopeBindingRow,
-                LabelRow,
+                EntityLabelRow,
                 EntityMembershipRow,
             ],
         ):

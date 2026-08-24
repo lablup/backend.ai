@@ -15,6 +15,7 @@ from ai.backend.common.data.entity.types import (
     EntityType,
     FieldData,
     FieldIdentifier,
+    RuntimeEntityID,
 )
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.errors.repository import EntityNotFoundError
@@ -33,6 +34,7 @@ from ai.backend.manager.models.specs.lookup import (
     FieldKeyLookup,
     FieldOwnerKeyLookup,
     FieldOwnerLookup,
+    RuntimeFieldOwnerLookup,
 )
 from ai.backend.manager.models.specs.purger import (
     EntityBatchPurger,
@@ -141,6 +143,23 @@ class OpsRepository[TData]:
         ``None`` — the same contract ``lookup`` keeps.
         """
         owners = await self.field_owners(lookup, [field_id])
+        owner = owners.get(field_id)
+        if owner is None:
+            raise EntityNotFoundError("No field row matches the given id")
+        return owner
+
+    async def runtime_field_owners(
+        self, lookup: RuntimeFieldOwnerLookup[Any], field_ids: Sequence[FieldIdentifier]
+    ) -> Mapping[FieldIdentifier, RuntimeEntityID]:
+        """Read the polymorphic owning entity of each named field row."""
+        async with self._ops.read_ops() as r:
+            return await r.lookup_runtime_field_owners(lookup, field_ids)
+
+    async def runtime_field_owner(
+        self, lookup: RuntimeFieldOwnerLookup[Any], field_id: FieldIdentifier
+    ) -> RuntimeEntityID:
+        """Read one field row's polymorphic owning entity, raising if the row is gone."""
+        owners = await self.runtime_field_owners(lookup, [field_id])
         owner = owners.get(field_id)
         if owner is None:
             raise EntityNotFoundError("No field row matches the given id")

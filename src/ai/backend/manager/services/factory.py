@@ -17,6 +17,7 @@ from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_
 from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.entity_label import ENTITY_LABEL_FIELD_TYPE
 from ai.backend.common.data.entity.etcd_config import ETCD_CONFIG_ENTITY_TYPE
 from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
 from ai.backend.common.data.entity.fair_share import (
@@ -25,7 +26,6 @@ from ai.backend.common.data.entity.fair_share import (
     USER_FAIR_SHARE_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.image import IMAGE_ENTITY_TYPE
-from ai.backend.common.data.entity.label import LABEL_FIELD_TYPE
 from ai.backend.common.data.entity.login_client_type import LOGIN_CLIENT_TYPE_ENTITY_TYPE
 from ai.backend.common.data.entity.manager_admin import MANAGER_ADMIN_ENTITY_TYPE
 from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
@@ -80,7 +80,7 @@ from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
-from ai.backend.manager.data.label.types import LabelData
+from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.data.resource_usage_history.types import (
     DomainUsageBucketData,
     ProjectUsageBucketData,
@@ -124,6 +124,11 @@ from ai.backend.manager.services.deployment_revision_preset.service import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.entity_label.actions.lookup_owner import (
+    LookupBulkEntityLabelOwnerAction,
+    LookupEntityLabelOwnerAction,
+)
+from ai.backend.manager.services.entity_label.processors import EntityLabelProcessors
 from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
 from ai.backend.manager.services.etcd_config.service import EtcdConfigService
 from ai.backend.manager.services.events.service import EventsService
@@ -142,11 +147,6 @@ from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
-from ai.backend.manager.services.label.actions.lookup_owner import (
-    LookupBulkLabelOwnerAction,
-    LookupLabelOwnerAction,
-)
-from ai.backend.manager.services.label.processors import LabelProcessors
 from ai.backend.manager.services.login_client_type.processors import (
     LoginClientTypeProcessors,
 )
@@ -735,12 +735,12 @@ def create_processors(
                 FieldGroupMeta(AUDIT_LOG_FIELD_TYPE), AuditLogData
             )
         ),
-        label=LabelProcessors(
+        entity_label=EntityLabelProcessors(
             registry.dangling_lookup_field_group(
-                FieldGroupMeta(LABEL_FIELD_TYPE),
-                LabelData,
-                LookupLabelOwnerAction,
-                LookupBulkLabelOwnerAction,
+                FieldGroupMeta(ENTITY_LABEL_FIELD_TYPE),
+                EntityLabelData,
+                LookupEntityLabelOwnerAction,
+                LookupBulkEntityLabelOwnerAction,
             )
         ),
         idle_checker_assignment=IdleCheckerAssignmentProcessors(

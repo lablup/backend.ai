@@ -1,4 +1,4 @@
-"""add labels table
+"""add entity_labels table
 
 Revision ID: 96014c885c33
 Revises: b7c1e93d40aa
@@ -20,7 +20,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.create_table(
-        "labels",
+        "entity_labels",
         sa.Column(
             "id",
             GUID(),
@@ -37,14 +37,23 @@ def upgrade() -> None:
             server_default=sa.func.now(),
             nullable=False,
         ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_labels")),
-        sa.UniqueConstraint("entity_type", "entity_id", "key", "value", name="uq_labels_label"),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            onupdate=sa.func.now(),
+            nullable=False,
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_entity_labels")),
+        sa.UniqueConstraint("entity_type", "entity_id", "key", name="uq_entity_labels_key"),
     )
-    op.create_index("ix_labels_entity", "labels", ["entity_type", "entity_id"], unique=False)
-    op.create_index("ix_labels_pair", "labels", ["key", "value"], unique=False)
+    op.create_index(
+        "ix_entity_labels_entity", "entity_labels", ["entity_type", "entity_id"], unique=False
+    )
+    op.create_index("ix_entity_labels_pair", "entity_labels", ["key", "value"], unique=False)
 
 
 def downgrade() -> None:
-    op.drop_index("ix_labels_pair", table_name="labels")
-    op.drop_index("ix_labels_entity", table_name="labels")
-    op.drop_table("labels")
+    op.drop_index("ix_entity_labels_pair", table_name="entity_labels")
+    op.drop_index("ix_entity_labels_entity", table_name="entity_labels")
+    op.drop_table("entity_labels")

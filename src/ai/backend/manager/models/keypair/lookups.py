@@ -8,7 +8,6 @@ from typing import Any, override
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy import Row
 
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
@@ -32,8 +31,8 @@ class KeypairOwnerLookup(FieldOwnerLookup[KeyPairID, UserID]):
         return sa.select(KeyPairRow.id, KeyPairRow.user).where(KeyPairRow.id.in_(field_ids))
 
     @override
-    def to_entity_id(self, row: Row[Any]) -> UserID:
-        return UserID(row[1])
+    def to_entity_id(self, value: UUID) -> UserID:
+        return UserID(value)
 
 
 @dataclass

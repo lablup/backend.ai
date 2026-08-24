@@ -6,7 +6,10 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
+from ai.backend.manager.actions.v2.field.base import (
+    BaseRuntimeSingleFieldAction,
+    BaseSingleFieldAction,
+)
 from ai.backend.manager.actions.v2.field.bulk_base import BasePartialBulkFieldAction
 from ai.backend.manager.actions.v2.ops.base import (
     FieldGetOpsAction,
@@ -89,6 +92,17 @@ class PurgeFieldOpsAction[
     TData: FieldData,
 ](BaseSingleFieldAction[TFieldID, TOwnerID], FieldPurgeOpsAction[TRow, TData], ABC):
     """A hard delete of a field row, authorized against its owner."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
+class RuntimePurgeFieldOpsAction[TFieldID: FieldIdentifier, TRow: Base, TData: FieldData](
+    BaseRuntimeSingleFieldAction[TFieldID], FieldPurgeOpsAction[TRow, TData], ABC
+):
+    """A hard delete of a field row whose owning entity is polymorphic."""
 
     @override
     @classmethod

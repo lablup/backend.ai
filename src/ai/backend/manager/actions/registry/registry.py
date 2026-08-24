@@ -18,15 +18,17 @@ from ai.backend.manager.actions.registry.types import (
     WiredProcessor,
 )
 from ai.backend.manager.actions.types import ActionBacking, ActionGate, ActionKind
-from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
+from ai.backend.manager.actions.v2.field.bulk_lookup import (
+    LookupBulkRuntimeFieldOwnerOpsAction,
+)
 from ai.backend.manager.actions.v2.field.bulk_processor import OwnerBulkLookupProcessor
-from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerOpsAction
+from ai.backend.manager.actions.v2.field.lookup import LookupRuntimeFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.field.processor import OwnerLookupProcessor
 from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.services.ops.service import (
-    BulkFieldOwnerLookupService,
-    FieldOwnerLookupService,
+    BulkRuntimeFieldOwnerLookupService,
+    RuntimeFieldOwnerLookupService,
 )
 
 
@@ -84,8 +86,8 @@ class ProcessorRegistry[TData: EntityData]:
         self,
         meta: FieldGroupMeta,
         data_cls: type[TFieldData],
-        owner_lookup_action_cls: type[LookupFieldOwnerOpsAction[Any, Any]],
-        bulk_owner_lookup_action_cls: type[LookupBulkFieldOwnerOpsAction[Any, Any]],
+        owner_lookup_action_cls: type[LookupRuntimeFieldOwnerOpsAction[Any]],
+        bulk_owner_lookup_action_cls: type[LookupBulkRuntimeFieldOwnerOpsAction[Any]],
     ) -> LookupFieldGroup[TFieldData]:
         """The operations over a field kind whose owner is not fixed, including the ones
         that name a single row.
@@ -97,13 +99,13 @@ class ProcessorRegistry[TData: EntityData]:
         self._record_lookup(meta, owner_lookup_action_cls)
         self._record_lookup(meta, bulk_owner_lookup_action_cls)
         owner_lookup: OwnerLookupProcessor = LookupActionProcessor(
-            FieldOwnerLookupService(self._deps.repository).execute,
+            RuntimeFieldOwnerLookupService(self._deps.repository).execute,
             monitors=self._deps.monitors.lookup,
             validators=self._deps.validators.lookup,
             post_validators=self._deps.validators.single_entity,
         )
         bulk_owner_lookup: OwnerBulkLookupProcessor = BulkLookupActionProcessor(
-            BulkFieldOwnerLookupService(self._deps.repository).execute,
+            BulkRuntimeFieldOwnerLookupService(self._deps.repository).execute,
             monitors=self._deps.monitors.bulk_lookup,
             post_validators=self._deps.validators.atomic_bulk,
         )

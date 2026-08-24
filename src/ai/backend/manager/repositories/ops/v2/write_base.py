@@ -33,7 +33,7 @@ from ai.backend.manager.errors.repository import (
     UpsertEmptyResultError,
 )
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.label.row import LabelRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.specs.membership import EntityMembershipEntry
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
@@ -124,9 +124,9 @@ class V2WriteOpsBase(V2OpsBase):
             )
         )
         await self._sess.execute(
-            sa.delete(LabelRow).where(
-                LabelRow.entity_type == entity.entity_type(),
-                LabelRow.entity_id == entity,
+            sa.delete(EntityLabelRow).where(
+                EntityLabelRow.entity_type == entity.entity_type(),
+                EntityLabelRow.entity_id == entity,
             )
         )
 

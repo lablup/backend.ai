@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, override
+from typing import override
+from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy import Row
 
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.preset_resource_slot import PresetResourceSlotID
@@ -28,5 +28,5 @@ class PresetResourceSlotOwnerLookup(FieldOwnerLookup[PresetResourceSlotID, Deplo
         )
 
     @override
-    def to_entity_id(self, row: Row[Any]) -> DeploymentPresetID:
-        return DeploymentPresetID(row[1])
+    def to_entity_id(self, value: UUID) -> DeploymentPresetID:
+        return DeploymentPresetID(value)

@@ -8,7 +8,6 @@ from typing import Any, override
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy import Row
 
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.session import SessionID
@@ -48,5 +47,5 @@ class KernelOwnerLookup(FieldOwnerLookup[KernelID, SessionID]):
         return sa.select(KernelRow.id, KernelRow.session_id).where(KernelRow.id.in_(field_ids))
 
     @override
-    def to_entity_id(self, row: Row[Any]) -> SessionID:
-        return SessionID(row[1])
+    def to_entity_id(self, value: UUID) -> SessionID:
+        return SessionID(value)

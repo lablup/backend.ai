@@ -196,7 +196,6 @@ class ErrorDomain(enum.StrEnum):
     ROLE_INVITATION = "role-invitation"
     RETENTION_POLICY = "retention-policy"
     SECRET = "secret"
-    LABEL = "label"
 
     EXTERNAL_SYSTEM = "external-system"  # Errors from external systems
 

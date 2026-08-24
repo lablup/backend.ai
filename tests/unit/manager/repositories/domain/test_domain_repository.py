@@ -37,11 +37,11 @@ from ai.backend.manager.models.deployment_revision_preset import DeploymentRevis
 from ai.backend.manager.models.domain import DomainRow, domains
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.label.row import LabelRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType, groups
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -100,7 +100,7 @@ class TestDomainRepository:
                 VirtualScopeRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
-                LabelRow,
+                EntityLabelRow,
                 UserRow,
                 KeyPairRow,
                 ProjectRow,

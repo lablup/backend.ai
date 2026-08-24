@@ -7,12 +7,15 @@ from ai.backend.manager.models.specs.lookup import (
     FieldKeyLookup,
     FieldOwnerKeyLookup,
     FieldOwnerLookup,
+    RuntimeFieldOwnerLookup,
 )
 
 __all__ = (
     "FieldKeyLookupOpsAction",
     "FieldOwnerKeyLookupOpsAction",
     "FieldOwnerLookupOpsAction",
+    "LookupRuntimeFieldOwnerOpsAction",
+    "RuntimeFieldOwnerLookupOpsAction",
     "LookupFieldByKeyOpsAction",
     "LookupFieldOwnerByKeyOpsAction",
     "LookupFieldOwnerOpsAction",
@@ -47,6 +50,31 @@ class LookupFieldOwnerOpsAction[TFieldID: FieldIdentifier, TOwnerID: EntityIdent
     ``lookup_key()`` names that key, which only the domain can write: which column
     identifies a field row differs per table.
     """
+
+
+class RuntimeFieldOwnerLookupOpsAction[TFieldID: FieldIdentifier](OpsBackendAction):
+    """A read of the polymorphic entity that owns a field row, keyed by that row's id.
+
+    The counterpart of :class:`FieldOwnerLookupOpsAction` for the other lookup root; the
+    two stay apart down to the ops method each is executed by.
+    """
+
+    @abstractmethod
+    def field_id(self) -> TFieldID:
+        """Return the id of the field row whose owner is read."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_owner_lookup(self) -> RuntimeFieldOwnerLookup[TFieldID]:
+        """Return the spec this action executes."""
+        raise NotImplementedError
+
+
+class LookupRuntimeFieldOwnerOpsAction[TFieldID: FieldIdentifier](
+    BaseLookupAction, RuntimeFieldOwnerLookupOpsAction[TFieldID], ABC
+):
+    """The polymorphic owner resolution seen as what it is: the field row's id is the
+    external key."""
 
 
 class FieldOwnerKeyLookupOpsAction[TOwnerID: EntityIdentifier](OpsBackendAction):

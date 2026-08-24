@@ -49,8 +49,8 @@ from ai.backend.manager.errors.repository import (
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.label.row import LabelRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -270,7 +270,7 @@ _SCOPE_TABLES = [
     VirtualScopeRow,
     EntityMembershipRow,
     ScopeBindingRow,
-    LabelRow,
+    EntityLabelRow,
     # create_scope provisions preset-derived roles, so it reads these even when empty.
     RolePresetRow,
     RolePermissionPresetRow,

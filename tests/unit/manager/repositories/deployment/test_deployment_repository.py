@@ -80,11 +80,11 @@ from ai.backend.manager.models.endpoint.creators import (
     DeploymentReplicaFields,
 )
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.label.row import LabelRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -206,7 +206,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 VirtualScopeRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
-                LabelRow,
+                EntityLabelRow,
                 PermissionRow,
                 DomainRow,
                 ResourceGroupRow,

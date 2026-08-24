@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, override
+from typing import override
+from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy import Row
 
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
@@ -28,5 +28,5 @@ class RolePermissionPresetOwnerLookup(FieldOwnerLookup[RolePermissionPresetID, R
         )
 
     @override
-    def to_entity_id(self, row: Row[Any]) -> RolePresetID:
-        return RolePresetID(row[1])
+    def to_entity_id(self, value: UUID) -> RolePresetID:
+        return RolePresetID(value)

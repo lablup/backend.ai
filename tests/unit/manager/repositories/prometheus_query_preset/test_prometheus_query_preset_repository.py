@@ -24,7 +24,7 @@ from ai.backend.manager.data.prometheus_query_preset import (
     PrometheusQueryPresetData,
 )
 from ai.backend.manager.errors.repository import EntityNotFoundError
-from ai.backend.manager.models.label.row import LabelRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset.creators import (
     PrometheusQueryPresetCreator,
@@ -72,7 +72,7 @@ class TestPrometheusQueryPresetRepository:
                 VirtualScopeRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
-                LabelRow,
+                EntityLabelRow,
                 RoleRow,
                 PermissionRow,
                 PrometheusQueryPresetCategoryRow,

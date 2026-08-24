@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, override
+from typing import override
+from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy import Row
 
 from ai.backend.common.data.entity.error_log import ErrorLogID
 from ai.backend.common.data.entity.user import UserID
@@ -29,5 +29,5 @@ class ErrorLogOwnerLookup(FieldOwnerLookup[ErrorLogID, UserID]):
         )
 
     @override
-    def to_entity_id(self, row: Row[Any]) -> UserID:
-        return UserID(row[1])
+    def to_entity_id(self, value: UUID) -> UserID:
+        return UserID(value)
