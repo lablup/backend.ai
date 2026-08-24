@@ -30,5 +30,5 @@ class EntityLabelProcessors:
 
     def __init__(self, group: LookupFieldGroup[EntityLabelData]) -> None:
         self.put = group.upsert_ops(PutEntityLabelAction)
-        self.remove = group.purge_ops(RemoveEntityLabelAction)
+        self.remove = group.runtime_purge_ops(RemoveEntityLabelAction)
         self.search = group.atomic_bulk_scoped_search_ops(SearchEntityLabelsAction)

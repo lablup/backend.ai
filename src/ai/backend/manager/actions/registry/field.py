@@ -370,15 +370,35 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
             validators=(*self._deps.validators.single_entity, *validators),
         )
 
-    def purge_ops[
-        TAction: PurgeFieldOpsAction[Any, Any, Any, Any] | RuntimePurgeFieldOpsAction[Any, Any, Any]
-    ](
+    def purge_ops[TAction: PurgeFieldOpsAction[Any, Any, Any, Any]](
         self,
         action_cls: type[TAction],
         *,
         validators: Sequence[SingleEntityActionValidator] = (),
         monitors: Sequence[SingleEntityActionMonitor] = (),
     ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TFieldData]]:
+        self._record(
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
+        )
+        return SingleFieldActionProcessor(
+            FieldPurgeService(self._deps.repository).execute,
+            self._owner_lookup,
+            monitors=(*self._deps.monitors.single_entity, *monitors),
+            validators=(*self._deps.validators.single_entity, *validators),
+        )
+
+    def runtime_purge_ops[TAction: RuntimePurgeFieldOpsAction[Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TFieldData]]:
+        """A hard delete of a field row whose owning entity is polymorphic.
+
+        Separate from :meth:`purge_ops` because the action is the other root: the owner
+        it names is read by the runtime lookup, executed by its own ops method.
+        """
         self._record(
             action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
         )
