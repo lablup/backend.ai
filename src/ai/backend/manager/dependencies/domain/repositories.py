@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, override
 
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 
@@ -69,6 +70,7 @@ class RepositoriesDependency(DomainDependency[RepositoriesInput, Repositories]):
                 db=setup_input.db,
                 ops_provider=DBOpsProvider(setup_input.db),
                 v2_ops_provider=V2DBOpsProvider(setup_input.db),
+                reconcile_ops_provider=ReconcileOpsProvider(setup_input.db),
                 storage_manager=setup_input.storage_manager,
                 config_provider=setup_input.config_provider,
                 valkey_stat_client=setup_input.valkey_stat,

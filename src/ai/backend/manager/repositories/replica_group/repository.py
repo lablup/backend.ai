@@ -23,7 +23,7 @@ from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.replica_group.types import (
     ApplyWritesResult,
     AutoscaleReconcileFetch,
@@ -65,8 +65,10 @@ class ReplicaGroupRepository:
 
     _db_source: ReplicaGroupDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
-        self._db_source = ReplicaGroupDBSource(db, v2_ops_provider)
+    def __init__(
+        self, db: ExtendedAsyncSAEngine, reconcile_ops_provider: ReconcileOpsProvider
+    ) -> None:
+        self._db_source = ReplicaGroupDBSource(db, reconcile_ops_provider)
 
     @replica_group_repository_resilience.apply()
     async def search_deploy_scheduling_views(

@@ -16,7 +16,6 @@ from sqlalchemy.engine import CursorResult
 
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.specs import purger as specs_purger
 from ai.backend.manager.repositories.base.types import ConflictCheck
 
 from .integrity import parse_integrity_error
@@ -225,7 +224,7 @@ async def execute_purger[TRow: Base](
 class BatchPurgerSpec[TRow: Base](ABC):
     """Abstract base class for defining batch purge targets.
 
-    Deprecated: use ``DataBatchPurger`` in ``models/specs/purger.py``.
+    Deprecated: use ``FieldBatchPurger`` in ``models/specs/purger.py``.
 
     Implementations specify what to delete by providing a subquery
     that selects rows to delete. The table and PK columns are inferred
@@ -252,15 +251,17 @@ class BatchPurgerSpec[TRow: Base](ABC):
         raise NotImplementedError
 
 
-class DataBatchPurger[TRow: Base, TData](
-    BatchPurgerSpec[TRow], specs_purger.DataBatchPurger[TRow, TData], ABC
-):
-    """Legacy-compatible view of the v2 batch purge spec.
+class DataBatchPurger[TRow: Base, TData](BatchPurgerSpec[TRow], ABC):
+    """Legacy batch purge spec that converts each removed row.
 
-    The declaration lives in ``models/specs/purger.py``; this adds the legacy
-    ``BatchPurgerSpec`` contract on top, so existing executors and domain specs
-    keep working during the transition.
+    The v2 roots (``models/specs/purger.py``) bound a batch by its owner or its scope;
+    this one is bounded by whatever its subquery says, which is why it stays here.
     """
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert one deleted row into its ``data/`` type."""
+        raise NotImplementedError
 
 
 @dataclass

@@ -32,6 +32,7 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.stream.repository import StreamRepository
 from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
@@ -103,7 +104,7 @@ async def session_processors(
             event_hub=AsyncMock(),
             error_monitor=AsyncMock(),
             idle_checker_host=AsyncMock(),
-            session_repository=SessionRepository(database_engine),
+            session_repository=SessionRepository(database_engine, DBOpsProvider(database_engine)),
             scheduler_repository=AsyncMock(),
             scheduling_controller=AsyncMock(),
             appproxy_client_pool=AsyncMock(),

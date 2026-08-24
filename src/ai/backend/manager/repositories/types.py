@@ -12,6 +12,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 
 
 @dataclass
@@ -19,6 +20,7 @@ class RepositoryArgs:
     db: ExtendedAsyncSAEngine
     ops_provider: DBOpsProvider
     v2_ops_provider: V2DBOpsProvider
+    reconcile_ops_provider: ReconcileOpsProvider
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
     valkey_stat_client: ValkeyStatClient

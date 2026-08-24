@@ -9,8 +9,8 @@ these on top of :class:`~.base.V2OpsBase`.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Collection, Mapping, Sequence
-from typing import Any, ClassVar, NoReturn
+from collections.abc import Callable, Collection, Mapping, Sequence
+from typing import Any, ClassVar, NoReturn, cast
 
 import sqlalchemy as sa
 from asyncpg.exceptions import PostgresError
@@ -399,3 +399,41 @@ class V2WriteOpsBase(V2OpsBase):
                 + ", ".join(f"{e.entity_type()}:{e}" for e in missing)
             )
         return resolved
+
+    async def _batch_purge_returning[TRow: Base, TData](
+        self,
+        scope_condition: sa.ColumnElement[bool] | None,
+        build_subquery: Callable[[], sa.sql.Select[Any]],
+        conflict_checks: Sequence[ConflictCheck],
+        to_data: Callable[[TRow], TData],
+        batch_size: int = 1000,
+    ) -> list[TData]:
+        base_subquery = build_subquery()
+        entity = base_subquery.column_descriptions[0]["entity"]
+        table = sa.inspect(entity).local_table
+        pk_columns = list(table.primary_key.columns)
+        row_class = cast("type[TRow]", entity)
+
+        await self._validate_conflict_checks(conflict_checks)
+
+        removed: list[TData] = []
+        while True:
+            selecting = build_subquery()
+            if scope_condition is not None:
+                selecting = selecting.where(scope_condition)
+            sub = selecting.subquery()
+            pk_subquery = sa.select(*[sub.c[pk.key] for pk in pk_columns]).limit(batch_size)
+            stmt = (
+                sa.delete(table)
+                .where(sa.tuple_(*pk_columns).in_(pk_subquery))
+                .returning(*table.columns)
+            )
+            try:
+                result = await self._sess.execute(stmt)
+            except sa.exc.IntegrityError as e:
+                raise self._parse_integrity_error(e) from e
+            rows = result.fetchall()
+            removed.extend(to_data(row_class(**dict(r._mapping))) for r in rows)
+            if len(rows) < batch_size:
+                break
+        return removed

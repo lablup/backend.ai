@@ -75,7 +75,7 @@ class UserRepository:
     _db_source: UserDBSource
 
     def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
-        self._db_source = UserDBSource(db)
+        self._db_source = UserDBSource(db, v2_ops_provider)
         self._v2_ops = v2_ops_provider
 
     @user_repository_resilience.apply()

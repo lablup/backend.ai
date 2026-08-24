@@ -43,9 +43,18 @@
   The legacy `DBOpsProvider` path (including `create_dependent` and
   `create_with_next_value`) is for existing code only — when a new domain needs those
   capabilities, report it as a v2 gap (see the demotion mapping in `services/KNOWLEDGE.md`).
-- For general API paths, prefer using `DBOpsProvider` (`write_ops` / `read_ops`). Internal operations may use db directly,
-  but separating into a repository is the default.
-- ops use the default provider; keep a separate provider only for common operations in specific situations such as sokovan.
+- ❌ MUST NOT construct an ops object. `V2WriteOps(session)`, `V2ReadOps(session)` and
+  every form of it are forbidden, with no exception. ✅ Take ops from a provider's
+  `write_ops()` / `read_ops()`. The transaction boundary has to belong to the provider,
+  or nothing holds the work to the transaction the method opened.
+- ✅ MUST inject a provider into a repository — never a session, never an engine. A
+  repository holding an engine can open a session inside itself, which is the rule above
+  broken. The new path is `V2DBOpsProvider`.
+- A primitive only one domain uses does NOT go on the general ops. Write ops extending
+  `V2WriteOps` and a provider extending `V2DBOpsProvider` that overrides `write_ops()`,
+  and inject that provider only into the repositories needing the primitive
+  (`ops/v2/reconciler/`, `ops/rbac/`).
+- Separating into a repository is the default; internal operations may use db directly.
 - ops methods take only spec types (Querier/Creator/Updater/Upserter/Purger, `DependentCreatorSpec`).
   A single spec owns only a single table.
 - Do NOT do multi-table writes inside a spec. The repository creates the parent first, then composes the dependent values

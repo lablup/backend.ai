@@ -11,16 +11,20 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
+    VFolderPermissionData,
 )
-from ai.backend.manager.models.specs.creator import EntityCreator
+from ai.backend.manager.errors.repository import ForeignKeyViolationError
+from ai.backend.manager.errors.storage import VFolderNotFound
+from ai.backend.manager.models.specs.creator import EntityCreator, FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderPermissionRow, VFolderRow
 
 
 @dataclass
@@ -90,3 +94,47 @@ class VFolderCreator(EntityCreator[VFolderRow, VFolderData]):
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
         return row.to_data()
+
+
+@dataclass
+class VFolderPermissionCreator(
+    FieldCreator[VFolderUUID, VFolderPermissionRow, VFolderPermissionData]
+):
+    """Records one user's mount permission on a vfolder.
+
+    The legacy row the mount path reads. Access itself is the grant recorded beside it;
+    this says nothing about the RBAC graph.
+    """
+
+    user_id: uuid.UUID
+    permission: VFolderMountPermission
+
+    @override
+    def field_id(self, row: VFolderPermissionRow) -> VFolderPermissionID:
+        return VFolderPermissionID(row.id)
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return (
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                error=VFolderNotFound(),
+            ),
+        )
+
+    @override
+    def build_row(self, owner_id: VFolderUUID) -> VFolderPermissionRow:
+        return VFolderPermissionRow(
+            vfolder=owner_id,
+            user=self.user_id,
+            permission=self.permission,
+        )
+
+    @override
+    def to_data(self, row: VFolderPermissionRow) -> VFolderPermissionData:
+        return VFolderPermissionData(
+            id=VFolderPermissionID(row.id),
+            vfolder=row.vfolder,
+            user=row.user,
+            permission=row.permission or VFolderMountPermission.READ_WRITE,
+        )

@@ -1,8 +1,11 @@
-"""Shared mixin for reconcile history rows (session/deployment/route/replica group).
+"""Shared mixin for reconcile history rows.
 
 Holds the columns common to every history table and the single merge rule. Category
 and the entity FK stay on each row (not universal); the merge rule does not use them —
 category only scopes which row is read as the latest.
+
+``ReplicaGroupHistoryRow`` is the only row using it. The session, deployment and route
+history tables declare the same columns themselves, each with its own merge rule.
 """
 
 from __future__ import annotations

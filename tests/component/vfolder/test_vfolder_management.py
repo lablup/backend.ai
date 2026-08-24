@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.vfolder import (
     AcceptInvitationReq,
@@ -30,6 +31,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
 )
 from ai.backend.manager.models.vfolder import vfolder_invitations, vfolders
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
@@ -383,16 +385,17 @@ class TestVFolderInviteAcceptReject:
             assert row is not None
             assert row.state == VFolderInvitationState.ACCEPTED
 
-    async def test_accept_fails_when_invitee_has_no_system_role(
+    async def test_accept_fails_when_invitee_has_no_virtual_scope(
         self,
         admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
         regular_user_fixture: Any,
+        db_engine: SAEngine,
     ) -> None:
-        """Accepting an invitation fails with a 5xx UserSystemRoleNotProvisioned error
-        when the invitee is missing the RBAC SYSTEM role (a server-side data-integrity
-        condition). Note: the user_system_role fixture is intentionally omitted here."""
+        """Accepting an invitation fails with a 5xx VirtualScopeNotFound error when the
+        invitee has no virtual scope to hold the vfolder — a server-side data-integrity
+        condition, since every user is provisioned one."""
         vf = await vfolder_factory()
         await admin_registry.vfolder.invite(
             vf["name"],
@@ -403,6 +406,16 @@ class TestVFolderInviteAcceptReject:
         )
         invitations = await user_registry.vfolder.list_invitations()
         inv_id = invitations.invitations[0].id
+
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                sa.delete(VirtualScopeRow).where(
+                    sa.and_(
+                        VirtualScopeRow.scope_type == USER_SCOPE_TYPE,
+                        VirtualScopeRow.scope_id == regular_user_fixture.user_uuid,
+                    )
+                )
+            )
 
         with pytest.raises(BackendAPIError) as exc_info:
             await user_registry.vfolder.accept_invitation(

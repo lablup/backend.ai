@@ -856,7 +856,7 @@ class BatchPurgeService[TData: EntityData]:
 
     async def execute(self, action: BatchPurgeOpsAction[Any, TData]) -> EntitiesOpsResult[TData]:
         return EntitiesOpsResult(
-            items=await self._repository.batch_purge_in_scopes(
+            items=await self._repository.batch_purge_entities_in_scopes(
                 action.operation_scopes(), action.to_batch_purger()
             )
         )
@@ -874,5 +874,5 @@ class GlobalBatchPurgeService[TData: EntityData]:
         self, action: GlobalBatchPurgeOpsAction[Any, TData]
     ) -> EntitiesOpsResult[TData]:
         return EntitiesOpsResult(
-            items=await self._repository.batch_purge_in_global(action.to_batch_purger())
+            items=await self._repository.batch_purge_entities_in_global(action.to_batch_purger())
         )

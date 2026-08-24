@@ -44,6 +44,7 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.project.db_source import ProjectDBSource
 from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
 from ai.backend.testutils.db import with_tables
@@ -297,7 +298,7 @@ class TestAssignUsersToProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ProjectDBSource:
-        return ProjectDBSource(db=db_with_cleanup)
+        return ProjectDBSource(db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup))
 
     # --- Test cases ---
 
@@ -736,7 +737,7 @@ class TestUnassignUsersFromProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ProjectDBSource:
-        return ProjectDBSource(db=db_with_cleanup)
+        return ProjectDBSource(db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup))
 
     # --- Test cases ---
 

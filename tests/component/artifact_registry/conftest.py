@@ -127,7 +127,7 @@ def artifact_revision_processors(
     storage_namespace_repository = StorageNamespaceRepository(database_engine)
     huggingface_repository = HuggingFaceRepository(database_engine)
     reservoir_repository = ReservoirRegistryRepository(database_engine)
-    vfolder_repository = VfolderRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
     service = ArtifactRevisionService(
         artifact_repository=artifact_repository,
         revision_ops=OpsRepository(V2DBOpsProvider(database_engine)),

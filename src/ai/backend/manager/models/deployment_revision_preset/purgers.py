@@ -13,7 +13,7 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
 )
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
-from ai.backend.manager.models.specs.purger import DataBatchPurger, EntityPurger
+from ai.backend.manager.models.specs.purger import EntityPurger, FieldBatchPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
 __all__ = (
@@ -53,19 +53,16 @@ class DeploymentPresetPurger(
         return row.to_data()
 
 
-class PresetResourceSlotBatchPurger(DataBatchPurger[PresetResourceSlotRow, ResourceSlotEntryData]):
+class PresetResourceSlotBatchPurger(
+    FieldBatchPurger[DeploymentPresetID, PresetResourceSlotRow, ResourceSlotEntryData]
+):
     """Clear every slot row of one preset, so an update can restate the whole set."""
 
-    _preset_id: DeploymentPresetID
-
-    def __init__(self, preset_id: DeploymentPresetID) -> None:
-        self._preset_id = preset_id
-
     @override
-    def build_subquery(self) -> sa.sql.Select[tuple[PresetResourceSlotRow]]:
-        return sa.select(PresetResourceSlotRow).where(
-            PresetResourceSlotRow.preset_id == self._preset_id
-        )
+    def build_subquery(
+        self, owner_id: DeploymentPresetID
+    ) -> sa.sql.Select[tuple[PresetResourceSlotRow]]:
+        return sa.select(PresetResourceSlotRow).where(PresetResourceSlotRow.preset_id == owner_id)
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:

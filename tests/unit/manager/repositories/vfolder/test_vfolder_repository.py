@@ -18,6 +18,7 @@ from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     BinarySize,
@@ -103,6 +104,7 @@ from ai.backend.manager.models.virtual_scope.entity_membership import EntityMemb
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.testutils.db import with_tables
@@ -303,6 +305,17 @@ class TestVfolderRepository:
             db_sess.add(user_role)
             await db_sess.flush()
 
+            # Sharing a vfolder enrolls it in the grantee's virtual scope, which the
+            # real user-create path provisions.
+            db_sess.add(
+                VirtualScopeRow(
+                    id=uuid.uuid4(),
+                    scope_type=USER_SCOPE_TYPE,
+                    scope_id=UserID(user_uuid),
+                )
+            )
+            await db_sess.flush()
+
         yield user_uuid
 
     @pytest.fixture
@@ -348,7 +361,9 @@ class TestVfolderRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[VfolderRepository, None]:
         """Create VfolderRepository instance with database"""
-        repo = VfolderRepository(db=db_with_cleanup)
+        repo = VfolderRepository(
+            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+        )
         yield repo
 
     async def test_model_store_vfolder_permission_is_overridden_to_read_only(
@@ -547,7 +562,9 @@ class TestVfolderRepositoryAllowedVfolderHosts:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> VfolderRepository:
         """Create VfolderRepository instance."""
-        return VfolderRepository(db=db_with_cleanup)
+        return VfolderRepository(
+            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+        )
 
     async def test_get_allowed_vfolder_hosts_returns_vfolder_host_permission_map(
         self,
@@ -776,7 +793,9 @@ class TestVfolderRepositoryPurge:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> VfolderRepository:
         """Create VfolderRepository instance."""
-        return VfolderRepository(db=db_with_cleanup)
+        return VfolderRepository(
+            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+        )
 
     async def _create_vfolder_in_db(
         self,
@@ -1192,7 +1211,9 @@ class TestVfolderRepositoryDeleteForever:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> VfolderRepository:
-        return VfolderRepository(db=db_with_cleanup)
+        return VfolderRepository(
+            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+        )
 
     async def _create_vfolder(
         self,
@@ -1956,7 +1977,9 @@ class TestVFolderRepositoryTrashAndRestore:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> VfolderRepository:
-        return VfolderRepository(db=db_with_cleanup)
+        return VfolderRepository(
+            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+        )
 
     @pytest.fixture
     async def ready_vfolder(

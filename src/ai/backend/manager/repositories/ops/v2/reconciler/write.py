@@ -1,9 +1,13 @@
-"""Reconcile writes of the v2 ops: a status transition and the history it leaves.
+"""Reconcile writes: a status transition and the history it leaves.
 
 Every reconciled row (deployment, replica, replica group) advances the same way — the
 status is written and the transition is recorded — so the pair is one primitive rather
 than two calls a caller could get out of step. A repeated transition merges onto the
 latest history row within the same scope instead of inserting another.
+
+The primitive sits here rather than in the general write ops because reconciliation is
+the only thing that has it: :class:`ReconcileWriteOps` extends the general ops, so a
+repository handed the general ones never sees it.
 """
 
 from __future__ import annotations
@@ -20,7 +24,7 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.mixins.history import ReconcileHistoryMixin
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.updater import DataUpdater
-from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
+from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
 
 @dataclass
@@ -43,8 +47,8 @@ class ReconcileTransition[
     status_updater: DataUpdater[TStatusRow, TStatusData] | None = None
 
 
-class V2ReconcileWriteOps(V2WriteOpsBase):
-    """Status-with-history writes, bound to a single session."""
+class ReconcileWriteOps(V2WriteOps):
+    """The general v2 write ops plus the status-with-history transition."""
 
     async def apply_transitions(
         self, transitions: Sequence[ReconcileTransition[Any, Any, Any, Any, Any]]

@@ -93,7 +93,7 @@ def vfolder_processors(
     RBAC checks use check_permission_with_scope_chain() against the real DB.
     Without explicit RBAC permission grants, all access is denied (403).
     """
-    vfolder_repository = VfolderRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
     user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
     service = VFolderService(
         config_provider=MagicMock(),

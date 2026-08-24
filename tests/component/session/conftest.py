@@ -49,6 +49,7 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
@@ -98,7 +99,7 @@ def session_repository(
     """Real ``SessionRepository`` exposed as a fixture so individual tests can
     override or stub specific methods (e.g., ``resolve_image``) without
     monkey-patching the class globally."""
-    return SessionRepository(database_engine)
+    return SessionRepository(database_engine, DBOpsProvider(database_engine))
 
 
 @pytest.fixture()

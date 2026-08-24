@@ -99,7 +99,7 @@ def vfolder_processors(
     the etcd-backed allowed-vfolder-types lookup are stubbed so that
     service-layer create paths can complete without external dependencies.
     """
-    vfolder_repository = VfolderRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
     user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
     config_provider = MagicMock()
     config_provider.legacy_etcd_config_loader.get_vfolder_types = AsyncMock(

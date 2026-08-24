@@ -23,7 +23,7 @@ and is read through an entity's permission like a field, while belonging to neit
 | Operation | Roots | Why |
 |---|---|---|
 | creator | `GlobalEntityCreator` / `EntityCreator` / `RoleManagedEntityCreator` / `FieldCreator` / `SidecarCreator` | only a create settles what a row belongs to |
-| purger | `EntityPurger` / `FieldPurger` / `GuardedFieldPurger` | removing an entity removes what it left in the graph; a field row splits further on how it is picked: by id, or by id behind a precondition |
+| purger | `EntityPurger` / `EntityBatchPurger` / `FieldPurger` / `GuardedFieldPurger` / `FieldBatchPurger` | removing an entity removes what it left in the graph; a field row splits further on how it is picked: by id, or by id behind a precondition; the batch roots pick by subquery instead of by id |
 | updater | `DataUpdater` / `GuardedDataUpdater` | an update never changes what a row belongs to, so the roots split on how the row is picked: by id, or by id behind a precondition |
 
 The roots are deliberately unrelated. Do NOT extract a common base across them
@@ -54,6 +54,10 @@ joins nothing.
 - `member_of(row)` declares which existing entities the new one joins as a member; a
   target without a virtual scope node fails the write. It never carries a permission
   cap (membership vs sharing: `KNOWLEDGE.md`).
+- Sharing an entity afterwards is an `EntityGrant`, executed by `grant_entities` /
+  `revoke_entities`. Its `permission_cap` is the ceiling the grantee's permissions are
+  clipped to (`None` clips nothing); re-granting rewrites the cap. Do NOT reach for a
+  creator to share something that already exists.
 - Entity types are open strings: types outside the RBAC element enum are accepted, and
   permission-carrying paths convert lazily.
 - Do NOT keep module-level declaration instances (no `X_MEMBERSHIP = ...()`).
@@ -71,6 +75,19 @@ joins nothing.
 - The plain entity paths never touch roles, even when matching presets exist.
 - Enrollment writes graph edges only. Granting a joining user the target's auto_assign
   roles is an explicit ops primitive — never an implicit side effect keyed on the type.
+
+## A batch purge says which kind it removes, and what bounds it
+
+- `EntityBatchPurger` tears down each deleted row's virtual scope, memberships and
+  permissions, as `EntityPurger` does for one; `FieldBatchPurger` does not, because a
+  field row holds nothing in the graph.
+- The two are unrelated roots, so an entity spec cannot flow through the field path and
+  leave its graph rows behind. There is no unmarked batch purge.
+- What bounds the sweep follows the same axis every other write does: an entity batch is
+  bounded by the scopes the ops call names, a field batch by the owner it is given —
+  `build_subquery(owner_id)`, like `create_field(owner_id, ...)`. No field operation is
+  scoped, and this one is not either.
+- `EntityBatchPurger.entity_id(row)` takes the row: a batch names a subquery, not an id.
 
 ## Values left for the database to compute
 

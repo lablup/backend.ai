@@ -32,6 +32,7 @@ from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.db_source import SessionDBSource
 
 session_repository_resilience = Resilience(
@@ -52,8 +53,8 @@ session_repository_resilience = Resilience(
 class SessionRepository:
     _db_source: SessionDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = SessionDBSource(db)
+    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: DBOpsProvider) -> None:
+        self._db_source = SessionDBSource(db, ops_provider)
 
     @session_repository_resilience.apply()
     async def get_session_name(self, session_id: SessionId) -> str:

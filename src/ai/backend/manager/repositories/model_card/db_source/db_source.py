@@ -15,6 +15,7 @@ from sqlalchemy.engine import CursorResult
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
@@ -27,6 +28,7 @@ from ai.backend.manager.data.model_card.types import (
     BulkModelCardDeleteFailure,
     BulkModelCardDeleteResultData,
     ModelCardData,
+    ModelCardResourceRequirementData,
     ResourceRequirementEntry,
     VFolderScanData,
 )
@@ -38,7 +40,11 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.model_card.purgers import ModelCardPurger
+from ai.backend.manager.models.model_card.creators import ModelCardResourceRequirementCreator
+from ai.backend.manager.models.model_card.purgers import (
+    ModelCardPurger,
+    ModelCardResourceRequirementBatchPurger,
+)
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.models.project.row import ProjectRow
@@ -49,6 +55,7 @@ from ai.backend.manager.models.resource_slot.row import (
     ModelCardResourceRequirementRow,
     PresetResourceSlotRow,
 )
+from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import (
     DEAD_VFOLDER_STATUSES,
@@ -61,6 +68,7 @@ from ai.backend.manager.repositories.model_card.types import (
     AvailablePresetsSearchResult,
 )
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.types import TriState
 
@@ -69,43 +77,41 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class ModelCardDBSource:
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops_provider
 
     async def update(self, updater: ModelCardUpdater) -> ModelCardData:
-        async with self._db.begin_session() as session:
+        async with self._v2_ops.write_ops() as w:
             # The card comes back even when build_values() is empty (a child-only update
             # that syncs model_card_resource_requirements); None means it is missing.
-            data = await V2WriteOps(session).update_data(updater)
+            data = await w.update_data(updater)
             if data is None:
                 raise ModelCardNotFound(f"Model card with ID {updater.card_id} not found.")
 
             # Plain column UPDATE cannot touch the child table, so replace it explicitly.
-            await self._apply_min_resource_change(session, data.id, updater.min_resource)
+            await self._apply_min_resource_change(w, ModelCardID(data.id), updater.min_resource)
 
             return data
 
     async def _apply_min_resource_change(
         self,
-        session: SASession,
-        card_id: UUID,
+        w: V2WriteOps,
+        card_id: ModelCardID,
         min_resource: TriState[list[ResourceRequirementEntry]],
     ) -> None:
         """Replace normalized requirement rows for the card when requested.
 
-        NOP  → leave existing rows alone.
-        NULLIFY → delete every requirement for the card.
-        UPDATE → delete-then-insert with the provided list.
+        NOP  -> leave existing rows alone.
+        NULLIFY -> delete every requirement for the card.
+        UPDATE -> delete-then-insert with the provided list.
         """
         if min_resource.is_nop():
             return
 
-        await session.execute(
-            sa.delete(ModelCardResourceRequirementRow).where(
-                ModelCardResourceRequirementRow.model_card_id == card_id
-            )
-        )
+        await w.batch_purge_field_entities(card_id, ModelCardResourceRequirementBatchPurger())
 
         if min_resource.is_nullify():
             return
@@ -114,10 +120,14 @@ class ModelCardDBSource:
         if not entries:
             return
 
-        rows: list[dict[str, object]] = []
+        creations: list[
+            FieldToCreate[
+                ModelCardID, ModelCardResourceRequirementRow, ModelCardResourceRequirementData
+            ]
+        ] = []
         for entry in entries:
             try:
-                quantity = Decimal(entry.min_quantity)
+                Decimal(entry.min_quantity)
             except (InvalidOperation, ValueError):
                 log.warning(
                     "model card update: skipping invalid min_quantity {!r} for card {} slot {}",
@@ -126,13 +136,14 @@ class ModelCardDBSource:
                     entry.slot_name,
                 )
                 continue
-            rows.append({
-                "model_card_id": card_id,
-                "slot_name": entry.slot_name,
-                "min_quantity": quantity,
-            })
-        if rows:
-            await session.execute(sa.insert(ModelCardResourceRequirementRow).values(rows))
+            creations.append(
+                FieldToCreate(
+                    owner_id=card_id,
+                    creator=ModelCardResourceRequirementCreator(entry=entry),
+                )
+            )
+        if creations:
+            await w.atomic_create_fields(creations)
 
     async def delete(
         self,

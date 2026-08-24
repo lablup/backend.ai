@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission, VFolderOwnershipType
@@ -20,6 +21,8 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow  # noqa: F401
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -35,7 +38,10 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderPermissionRow,
     VFolderRow,
 )
-from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
@@ -63,6 +69,12 @@ class TestVFolderPurgersIntegration:
                 VFolderRow,
                 VFolderInvitationRow,
                 VFolderPermissionRow,
+                # An entity batch purge tears the graph down with each row.
+                VirtualScopeRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
+                RoleRow,
+                PermissionRow,
             ],
         ):
             yield database_connection
@@ -236,9 +248,10 @@ class TestVFolderPurgersIntegration:
         vfolder_ids = [sample_vfolder.id]
 
         # Purge invitations
-        async with db_with_cleanup.begin_session() as session:
-            purger = VFolderInvitationBatchPurger(vfolder_ids=vfolder_ids)
-            removed = await V2WriteOps(session).batch_purge_in_global(purger)
+        async with V2DBOpsProvider(db_with_cleanup).write_ops() as w:
+            removed = await w.batch_purge_entities_in_global(
+                VFolderInvitationBatchPurger(vfolder_ids=vfolder_ids)
+            )
             assert len(removed) == len(sample_invitations)
 
         # Verify invitations are deleted
@@ -260,9 +273,10 @@ class TestVFolderPurgersIntegration:
         vfolder_ids = [sample_vfolder.id]
 
         # Purge permissions
-        async with db_with_cleanup.begin_session() as session:
-            purger = VFolderPermissionBatchPurger(vfolder_ids=vfolder_ids)
-            removed = await V2WriteOps(session).batch_purge_in_global(purger)
+        async with V2DBOpsProvider(db_with_cleanup).write_ops() as w:
+            removed = await w.batch_purge_field_entities(
+                VFolderUUID(sample_vfolder.id), VFolderPermissionBatchPurger()
+            )
             assert len(removed) == len(sample_permissions)
 
         # Verify permissions are deleted

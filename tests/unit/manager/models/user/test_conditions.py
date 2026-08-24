@@ -49,6 +49,7 @@ from ai.backend.manager.models.user.orders import UserOrders
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.testutils.db import TableOrORM, with_tables
 
@@ -414,7 +415,7 @@ class TestUserNestedSearchIntegration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> UserDBSource:
-        return UserDBSource(db=db_with_cleanup)
+        return UserDBSource(db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def search_fixture(

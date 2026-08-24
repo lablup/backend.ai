@@ -55,7 +55,7 @@ from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.specs.purger import DataBatchPurger
+from ai.backend.manager.models.specs.purger import EntityBatchPurger
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
@@ -208,10 +208,14 @@ class _PresetBatchUpdater(DataBatchUpdater[RolePresetRow, RolePresetData]):
 
 
 @dataclass
-class _PresetBatchPurger(DataBatchPurger[RolePresetRow, RolePresetData]):
+class _PresetBatchPurger(EntityBatchPurger[RolePresetRow, RolePresetData]):
     """Removes every preset whose name matches."""
 
     name: str
+
+    @override
+    def entity_id(self, row: RolePresetRow) -> RolePresetID:
+        return RolePresetID(row.id)
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[RolePresetRow]]:
@@ -499,7 +503,9 @@ class TestBatchPurge:
             _PresetCreator(name="default", scope_type=RBACScopeType.PROJECT)
         )
 
-        removed = await repository.batch_purge_in_global(_PresetBatchPurger(name="default"))
+        removed = await repository.batch_purge_entities_in_global(
+            _PresetBatchPurger(name="default")
+        )
 
         assert len(removed) == 2
         assert {r.name for r in removed} == {"default"}
@@ -509,7 +515,9 @@ class TestBatchPurge:
     async def test_no_match_returns_nothing(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
-        assert await repository.batch_purge_in_global(_PresetBatchPurger(name="absent")) == []
+        assert (
+            await repository.batch_purge_entities_in_global(_PresetBatchPurger(name="absent")) == []
+        )
 
 
 class TestUpsert:
