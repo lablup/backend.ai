@@ -104,6 +104,11 @@ class EntityInvitationEdge(Edge[EntityInvitationGQL]):
     BackendAIGQLMeta(added_version=_ADDED, description="Paginated list of entity invitations.")
 )
 class EntityInvitationConnection(Connection[EntityInvitationGQL]):
+    # Restated so the schema's edge type is the described one above rather than the
+    # one Strawberry would generate from the generic, which carries no version.
+    edges: list[EntityInvitationEdge] = gql_field(  # type: ignore[assignment]
+        description="Contains the nodes in this connection."
+    )
     count: int
 
     def __init__(self, *args, count: int, **kwargs) -> None:  # type: ignore[no-untyped-def]
