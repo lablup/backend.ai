@@ -184,6 +184,18 @@ class DanglingFieldCreator[TRow: Base, TData: FieldData](FieldRowCreator[TRow, T
         raise NotImplementedError
 
 
+@dataclass(frozen=True)
+class NestedFieldToCreate[TOwnerID: FieldIdentifier, TRow: Base, TData: FieldData]:
+    """One nested row to insert, under the field row named beside it.
+
+    What :class:`FieldToCreate` is to a field row, this is to a nested one: a batch
+    may reach several owners at once without the two falling out of step.
+    """
+
+    owner_id: TOwnerID
+    creator: NestedFieldCreator[TOwnerID, TRow, TData]
+
+
 class NestedFieldCreator[TOwnerID: FieldIdentifier, TRow: Base, TData: FieldData](ABC):
     """Insert spec of a field row another field row owns.
 

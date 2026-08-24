@@ -14,6 +14,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import (
     AccessKey,
@@ -37,17 +38,15 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.scheduling_history.creators import SessionSchedulingHistoryCreator
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.updater import BatchUpdater
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
-from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatchUpdaterSpec
-from ai.backend.manager.repositories.scheduling_history.creators import (
-    SessionSchedulingHistoryCreatorSpec,
-)
+from ai.backend.manager.repositories.scheduler.types.session import SessionHistoryToCreate
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -335,39 +334,34 @@ class TestUpdateWithHistory:
     ) -> None:
         """Test update_with_history updates session and creates history record atomically."""
         # Setup
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         from_status = SessionStatus.PREPARING
         to_status = SessionStatus.PREPARED
 
         # Create updater and history creator
-        updater = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=to_status,
-                status_changed_at=datetime.now(tzutc()),
-                reason="test-success",
-            ),
-            conditions=[
-                lambda: SessionRow.id.in_([test_session_id]),
-                lambda: SessionRow.status.in_([from_status]),
-            ],
+        updater = SessionStatusBatchUpdater(
+            session_ids=[test_session_id],
+            to_status=to_status,
+            status_changed_at=datetime.now(tzutc()),
+            reason="test-success",
         )
 
-        bulk_creator = BulkCreator(
-            specs=[
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=test_session_id,
+        histories = [
+            SessionHistoryToCreate(
+                session_id=SessionID(test_session_id),
+                creator=SessionSchedulingHistoryCreator(
                     phase="prepare",
                     result=SchedulingResult.SUCCESS,
                     message="Preparation completed successfully",
                     from_status=from_status,
                     to_status=to_status,
-                )
-            ]
-        )
+                ),
+            )
+        ]
 
         # Execute
-        updated_count = await db_source.update_with_history(updater, bulk_creator)
+        updated_count = await db_source.update_with_history(updater, histories)
 
         # Verify - session should be updated
         assert updated_count == 1
@@ -399,40 +393,35 @@ class TestUpdateWithHistory:
     ) -> None:
         """Test update_with_history records failure status correctly."""
         # Setup
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         from_status = SessionStatus.PREPARING
         to_status = SessionStatus.ERROR
 
         # Create updater and history creator for failure case
-        updater = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=to_status,
-                status_changed_at=datetime.now(tzutc()),
-                reason="agent-lost",
-            ),
-            conditions=[
-                lambda: SessionRow.id.in_([test_session_id]),
-                lambda: SessionRow.status.in_([from_status]),
-            ],
+        updater = SessionStatusBatchUpdater(
+            session_ids=[test_session_id],
+            to_status=to_status,
+            status_changed_at=datetime.now(tzutc()),
+            reason="agent-lost",
         )
 
-        bulk_creator = BulkCreator(
-            specs=[
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=test_session_id,
+        histories = [
+            SessionHistoryToCreate(
+                session_id=SessionID(test_session_id),
+                creator=SessionSchedulingHistoryCreator(
                     phase="prepare",
                     result=SchedulingResult.FAILURE,
                     message="Agent connection lost during preparation",
                     from_status=from_status,
                     to_status=to_status,
                     error_code="AGENT_LOST",
-                )
-            ]
-        )
+                ),
+            )
+        ]
 
         # Execute
-        updated_count = await db_source.update_with_history(updater, bulk_creator)
+        updated_count = await db_source.update_with_history(updater, histories)
 
         # Verify
         assert updated_count == 1
@@ -496,41 +485,36 @@ class TestUpdateWithHistory:
                 db_sess.add(session)
 
         # Setup
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         from_status = SessionStatus.PREPARING
         to_status = SessionStatus.PREPARED
 
         # Create updater for all sessions
-        updater = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=to_status,
-                status_changed_at=datetime.now(tzutc()),
-                reason="batch-success",
-            ),
-            conditions=[
-                lambda: SessionRow.id.in_(session_ids),
-                lambda: SessionRow.status.in_([from_status]),
-            ],
+        updater = SessionStatusBatchUpdater(
+            session_ids=session_ids,
+            to_status=to_status,
+            status_changed_at=datetime.now(tzutc()),
+            reason="batch-success",
         )
 
         # Create history records for all sessions
-        bulk_creator = BulkCreator(
-            specs=[
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=session_id,
+        histories = [
+            SessionHistoryToCreate(
+                session_id=SessionID(session_id),
+                creator=SessionSchedulingHistoryCreator(
                     phase="prepare",
                     result=SchedulingResult.SUCCESS,
                     message="Batch preparation completed",
                     from_status=from_status,
                     to_status=to_status,
-                )
-                for session_id in session_ids
-            ]
-        )
+                ),
+            )
+            for session_id in session_ids
+        ]
 
         # Execute
-        updated_count = await db_source.update_with_history(updater, bulk_creator)
+        updated_count = await db_source.update_with_history(updater, histories)
 
         # Verify - all sessions should be updated
         assert updated_count == 3
@@ -558,69 +542,58 @@ class TestUpdateWithHistory:
     ) -> None:
         """Test update_with_history when no sessions match the condition."""
         # Setup with non-existent session ID
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         non_existent_id = SessionId(uuid.uuid4())
 
-        updater = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=SessionStatus.PREPARED,
-                status_changed_at=datetime.now(tzutc()),
-                reason="test",
-            ),
-            conditions=[
-                lambda: SessionRow.id.in_([non_existent_id]),
-            ],
+        updater = SessionStatusBatchUpdater(
+            session_ids=[non_existent_id],
+            to_status=SessionStatus.PREPARED,
+            status_changed_at=datetime.now(tzutc()),
+            reason="test",
         )
 
-        bulk_creator = BulkCreator(
-            specs=[
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=non_existent_id,
+        histories = [
+            SessionHistoryToCreate(
+                session_id=SessionID(non_existent_id),
+                creator=SessionSchedulingHistoryCreator(
                     phase="prepare",
                     result=SchedulingResult.SUCCESS,
                     message="Test message",
                     from_status=SessionStatus.PREPARING,
                     to_status=SessionStatus.PREPARED,
-                )
-            ]
-        )
+                ),
+            )
+        ]
 
         # Execute - should not fail, but update count should be 0
-        updated_count = await db_source.update_with_history(updater, bulk_creator)
+        updated_count = await db_source.update_with_history(updater, histories)
 
         # Verify - no sessions updated, but history record is still created
         # (This matches the current behavior where history is always created)
         assert updated_count == 0
 
-    async def test_update_with_history_empty_bulk_creator(
+    async def test_update_with_history_empty_histories(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_session_id: SessionId,
     ) -> None:
-        """Test update_with_history with empty bulk creator."""
+        """Test update_with_history with no history to record."""
         # Setup
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
-        from_status = SessionStatus.PREPARING
         to_status = SessionStatus.PREPARED
 
-        updater = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=to_status,
-                status_changed_at=datetime.now(tzutc()),
-                reason="test-empty-history",
-            ),
-            conditions=[
-                lambda: SessionRow.id.in_([test_session_id]),
-                lambda: SessionRow.status.in_([from_status]),
-            ],
+        updater = SessionStatusBatchUpdater(
+            session_ids=[test_session_id],
+            to_status=to_status,
+            status_changed_at=datetime.now(tzutc()),
+            reason="test-empty-history",
         )
 
-        # Empty bulk creator
-        bulk_creator: BulkCreator[SessionSchedulingHistoryRow] = BulkCreator(specs=[])
+        histories: list[SessionHistoryToCreate] = []
 
         # Execute
-        updated_count = await db_source.update_with_history(updater, bulk_creator)
+        updated_count = await db_source.update_with_history(updater, histories)
 
         # Verify - session should be updated, no history records
         assert updated_count == 1
@@ -648,33 +621,29 @@ class TestUpdateWithHistory:
         Neither ``from_status`` nor which attempt result was recorded is part
         of the merge key — only attempt-vs-skip is (see the skip test below).
         """
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         # First call - creates history record
-        updater1 = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=SessionStatus.PREPARING,
-                status_changed_at=datetime.now(tzutc()),
-                reason="retry-1",
-            ),
-            conditions=[
-                lambda: SessionRow.id.in_([test_session_id]),
-            ],
+        updater1 = SessionStatusBatchUpdater(
+            session_ids=[test_session_id],
+            to_status=SessionStatus.PREPARING,
+            status_changed_at=datetime.now(tzutc()),
+            reason="retry-1",
         )
-        bulk_creator1 = BulkCreator(
-            specs=[
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=test_session_id,
+        histories1 = [
+            SessionHistoryToCreate(
+                session_id=SessionID(test_session_id),
+                creator=SessionSchedulingHistoryCreator(
                     phase="schedule",
                     result=SchedulingResult.FAILURE,
                     message="No resources available",
                     from_status=SessionStatus.PENDING,
                     to_status=SessionStatus.PREPARING,
                     error_code="RESOURCE_EXHAUSTED",
-                )
-            ]
-        )
-        await db_source.update_with_history(updater1, bulk_creator1)
+                ),
+            )
+        ]
+        await db_source.update_with_history(updater1, histories1)
 
         # Verify first record created with attempts=1
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -687,30 +656,26 @@ class TestUpdateWithHistory:
             assert first_record.attempts == 1
 
         # Second call - same phase + error_code + to_status -> should merge
-        updater2 = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=SessionStatus.PREPARING,
-                status_changed_at=datetime.now(tzutc()),
-                reason="retry-2",
-            ),
-            conditions=[
-                lambda: SessionRow.id.in_([test_session_id]),
-            ],
+        updater2 = SessionStatusBatchUpdater(
+            session_ids=[test_session_id],
+            to_status=SessionStatus.PREPARING,
+            status_changed_at=datetime.now(tzutc()),
+            reason="retry-2",
         )
-        bulk_creator2 = BulkCreator(
-            specs=[
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=test_session_id,
-                    phase="schedule",  # same phase
+        histories2 = [
+            SessionHistoryToCreate(
+                session_id=SessionID(test_session_id),
+                creator=SessionSchedulingHistoryCreator(
+                    phase="schedule",
                     result=SchedulingResult.FAILURE,
-                    message="Still no resources",  # different message - doesn't matter
-                    from_status=SessionStatus.PENDING,  # different from_status - doesn't matter
-                    to_status=SessionStatus.PREPARING,  # same to_status
-                    error_code="RESOURCE_EXHAUSTED",  # same error_code
-                )
-            ]
-        )
-        await db_source.update_with_history(updater2, bulk_creator2)
+                    message="Still no resources",
+                    from_status=SessionStatus.PENDING,
+                    to_status=SessionStatus.PREPARING,
+                    error_code="RESOURCE_EXHAUSTED",
+                ),
+            )
+        ]
+        await db_source.update_with_history(updater2, histories2)
 
         # Verify merged - same record, attempts=2
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -723,30 +688,26 @@ class TestUpdateWithHistory:
             assert records[0].attempts == 2  # Incremented
 
         # Third call - should merge again
-        updater3 = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=SessionStatus.PREPARING,
-                status_changed_at=datetime.now(tzutc()),
-                reason="retry-3",
-            ),
-            conditions=[
-                lambda: SessionRow.id.in_([test_session_id]),
-            ],
+        updater3 = SessionStatusBatchUpdater(
+            session_ids=[test_session_id],
+            to_status=SessionStatus.PREPARING,
+            status_changed_at=datetime.now(tzutc()),
+            reason="retry-3",
         )
-        bulk_creator3 = BulkCreator(
-            specs=[
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=test_session_id,
+        histories3 = [
+            SessionHistoryToCreate(
+                session_id=SessionID(test_session_id),
+                creator=SessionSchedulingHistoryCreator(
                     phase="schedule",
-                    result=SchedulingResult.SUCCESS,  # different result - doesn't matter
+                    result=SchedulingResult.SUCCESS,
                     message="Third attempt",
-                    from_status=SessionStatus.SCHEDULED,  # different from_status
+                    from_status=SessionStatus.SCHEDULED,
                     to_status=SessionStatus.PREPARING,
                     error_code="RESOURCE_EXHAUSTED",
-                )
-            ]
-        )
-        await db_source.update_with_history(updater3, bulk_creator3)
+                ),
+            )
+        ]
+        await db_source.update_with_history(updater3, histories3)
 
         # Verify merged - attempts=3
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -768,46 +729,44 @@ class TestUpdateWithHistory:
         attempt record stays the number the give-up (deprioritization)
         classification is allowed to see.
         """
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
-        updater = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=SessionStatus.PENDING,
-                status_changed_at=datetime.now(tzutc()),
-                reason="attempted",
-            ),
-            conditions=[lambda: SessionRow.id.in_([test_session_id])],
+        updater = SessionStatusBatchUpdater(
+            session_ids=[test_session_id],
+            to_status=SessionStatus.PENDING,
+            status_changed_at=datetime.now(tzutc()),
+            reason="attempted",
         )
         await db_source.update_with_history(
             updater,
-            BulkCreator(
-                specs=[
-                    SessionSchedulingHistoryCreatorSpec(
-                        session_id=test_session_id,
+            [
+                SessionHistoryToCreate(
+                    session_id=SessionID(test_session_id),
+                    creator=SessionSchedulingHistoryCreator(
                         phase="schedule",
                         result=SchedulingResult.NEED_RETRY,
                         message="No resources available",
                         to_status=SessionStatus.PENDING,
-                    )
-                ]
-            ),
+                    ),
+                )
+            ],
         )
 
         # Same phase and to_status, but nothing was attempted these two cycles
         for _ in range(2):
             await db_source.update_with_history(
                 updater,
-                BulkCreator(
-                    specs=[
-                        SessionSchedulingHistoryCreatorSpec(
-                            session_id=test_session_id,
+                [
+                    SessionHistoryToCreate(
+                        session_id=SessionID(test_session_id),
+                        creator=SessionSchedulingHistoryCreator(
                             phase="schedule",
                             result=SchedulingResult.SKIPPED,
                             message="Not attempted",
                             to_status=SessionStatus.PENDING,
-                        )
-                    ]
-                ),
+                        ),
+                    )
+                ],
             )
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -827,53 +786,49 @@ class TestUpdateWithHistory:
         test_session_id: SessionId,
     ) -> None:
         """Test that different phase creates new record (no merge)."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         # First call
-        updater1 = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=SessionStatus.PREPARING,
-                status_changed_at=datetime.now(tzutc()),
-                reason="first",
-            ),
-            conditions=[lambda: SessionRow.id.in_([test_session_id])],
+        updater1 = SessionStatusBatchUpdater(
+            session_ids=[test_session_id],
+            to_status=SessionStatus.PREPARING,
+            status_changed_at=datetime.now(tzutc()),
+            reason="first",
         )
-        bulk_creator1 = BulkCreator(
-            specs=[
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=test_session_id,
+        histories1 = [
+            SessionHistoryToCreate(
+                session_id=SessionID(test_session_id),
+                creator=SessionSchedulingHistoryCreator(
                     phase="schedule",
                     result=SchedulingResult.FAILURE,
                     message="First",
                     to_status=SessionStatus.PREPARING,
                     error_code="ERROR_A",
-                )
-            ]
-        )
-        await db_source.update_with_history(updater1, bulk_creator1)
+                ),
+            )
+        ]
+        await db_source.update_with_history(updater1, histories1)
 
         # Second call - different phase
-        updater2 = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=SessionStatus.PREPARING,
-                status_changed_at=datetime.now(tzutc()),
-                reason="second",
-            ),
-            conditions=[lambda: SessionRow.id.in_([test_session_id])],
+        updater2 = SessionStatusBatchUpdater(
+            session_ids=[test_session_id],
+            to_status=SessionStatus.PREPARING,
+            status_changed_at=datetime.now(tzutc()),
+            reason="second",
         )
-        bulk_creator2 = BulkCreator(
-            specs=[
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=test_session_id,
-                    phase="prepare",  # different phase
+        histories2 = [
+            SessionHistoryToCreate(
+                session_id=SessionID(test_session_id),
+                creator=SessionSchedulingHistoryCreator(
+                    phase="prepare",
                     result=SchedulingResult.FAILURE,
                     message="Second",
-                    to_status=SessionStatus.PREPARING,  # same to_status
-                    error_code="ERROR_A",  # same error_code
-                )
-            ]
-        )
-        await db_source.update_with_history(updater2, bulk_creator2)
+                    to_status=SessionStatus.PREPARING,
+                    error_code="ERROR_A",
+                ),
+            )
+        ]
+        await db_source.update_with_history(updater2, histories2)
 
         # Verify - two separate records
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -892,53 +847,49 @@ class TestUpdateWithHistory:
         test_session_id: SessionId,
     ) -> None:
         """Test that different error_code creates new record (no merge)."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         # First call
-        updater1 = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=SessionStatus.PREPARING,
-                status_changed_at=datetime.now(tzutc()),
-                reason="first",
-            ),
-            conditions=[lambda: SessionRow.id.in_([test_session_id])],
+        updater1 = SessionStatusBatchUpdater(
+            session_ids=[test_session_id],
+            to_status=SessionStatus.PREPARING,
+            status_changed_at=datetime.now(tzutc()),
+            reason="first",
         )
-        bulk_creator1 = BulkCreator(
-            specs=[
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=test_session_id,
+        histories1 = [
+            SessionHistoryToCreate(
+                session_id=SessionID(test_session_id),
+                creator=SessionSchedulingHistoryCreator(
                     phase="schedule",
                     result=SchedulingResult.FAILURE,
                     message="First",
                     to_status=SessionStatus.PREPARING,
                     error_code="ERROR_A",
-                )
-            ]
-        )
-        await db_source.update_with_history(updater1, bulk_creator1)
+                ),
+            )
+        ]
+        await db_source.update_with_history(updater1, histories1)
 
         # Second call - different error_code
-        updater2 = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=SessionStatus.PREPARING,
-                status_changed_at=datetime.now(tzutc()),
-                reason="second",
-            ),
-            conditions=[lambda: SessionRow.id.in_([test_session_id])],
+        updater2 = SessionStatusBatchUpdater(
+            session_ids=[test_session_id],
+            to_status=SessionStatus.PREPARING,
+            status_changed_at=datetime.now(tzutc()),
+            reason="second",
         )
-        bulk_creator2 = BulkCreator(
-            specs=[
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=test_session_id,
-                    phase="schedule",  # same phase
+        histories2 = [
+            SessionHistoryToCreate(
+                session_id=SessionID(test_session_id),
+                creator=SessionSchedulingHistoryCreator(
+                    phase="schedule",
                     result=SchedulingResult.FAILURE,
                     message="Second",
-                    to_status=SessionStatus.PREPARING,  # same to_status
-                    error_code="ERROR_B",  # different error_code
-                )
-            ]
-        )
-        await db_source.update_with_history(updater2, bulk_creator2)
+                    to_status=SessionStatus.PREPARING,
+                    error_code="ERROR_B",
+                ),
+            )
+        ]
+        await db_source.update_with_history(updater2, histories2)
 
         # Verify - two separate records
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -956,53 +907,49 @@ class TestUpdateWithHistory:
         test_session_id: SessionId,
     ) -> None:
         """Test that different to_status creates new record (no merge)."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         # First call
-        updater1 = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=SessionStatus.PREPARING,
-                status_changed_at=datetime.now(tzutc()),
-                reason="first",
-            ),
-            conditions=[lambda: SessionRow.id.in_([test_session_id])],
+        updater1 = SessionStatusBatchUpdater(
+            session_ids=[test_session_id],
+            to_status=SessionStatus.PREPARING,
+            status_changed_at=datetime.now(tzutc()),
+            reason="first",
         )
-        bulk_creator1 = BulkCreator(
-            specs=[
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=test_session_id,
+        histories1 = [
+            SessionHistoryToCreate(
+                session_id=SessionID(test_session_id),
+                creator=SessionSchedulingHistoryCreator(
                     phase="schedule",
                     result=SchedulingResult.SUCCESS,
                     message="First",
                     to_status=SessionStatus.PREPARING,
                     error_code=None,
-                )
-            ]
-        )
-        await db_source.update_with_history(updater1, bulk_creator1)
+                ),
+            )
+        ]
+        await db_source.update_with_history(updater1, histories1)
 
         # Second call - different to_status
-        updater2 = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=SessionStatus.SCHEDULED,
-                status_changed_at=datetime.now(tzutc()),
-                reason="second",
-            ),
-            conditions=[lambda: SessionRow.id.in_([test_session_id])],
+        updater2 = SessionStatusBatchUpdater(
+            session_ids=[test_session_id],
+            to_status=SessionStatus.SCHEDULED,
+            status_changed_at=datetime.now(tzutc()),
+            reason="second",
         )
-        bulk_creator2 = BulkCreator(
-            specs=[
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=test_session_id,
-                    phase="schedule",  # same phase
+        histories2 = [
+            SessionHistoryToCreate(
+                session_id=SessionID(test_session_id),
+                creator=SessionSchedulingHistoryCreator(
+                    phase="schedule",
                     result=SchedulingResult.SUCCESS,
                     message="Second",
-                    to_status=SessionStatus.SCHEDULED,  # different to_status
-                    error_code=None,  # same error_code (None)
-                )
-            ]
-        )
-        await db_source.update_with_history(updater2, bulk_creator2)
+                    to_status=SessionStatus.SCHEDULED,
+                    error_code=None,
+                ),
+            )
+        ]
+        await db_source.update_with_history(updater2, histories2)
 
         # Verify - two separate records
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -1054,31 +1001,29 @@ class TestUpdateWithHistory:
                 )
                 db_sess.add(session)
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         # First batch call - creates 3 history records
-        updater1 = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=SessionStatus.PREPARING,
-                status_changed_at=datetime.now(tzutc()),
-                reason="batch-1",
-            ),
-            conditions=[lambda: SessionRow.id.in_(session_ids)],
+        updater1 = SessionStatusBatchUpdater(
+            session_ids=session_ids,
+            to_status=SessionStatus.PREPARING,
+            status_changed_at=datetime.now(tzutc()),
+            reason="batch-1",
         )
-        bulk_creator1 = BulkCreator(
-            specs=[
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=sid,
+        histories1 = [
+            SessionHistoryToCreate(
+                session_id=SessionID(sid),
+                creator=SessionSchedulingHistoryCreator(
                     phase="schedule",
                     result=SchedulingResult.FAILURE,
                     message="First attempt",
                     to_status=SessionStatus.PREPARING,
                     error_code="RESOURCE_EXHAUSTED",
-                )
-                for sid in session_ids
-            ]
-        )
-        await db_source.update_with_history(updater1, bulk_creator1)
+                ),
+            )
+            for sid in session_ids
+        ]
+        await db_source.update_with_history(updater1, histories1)
 
         # Verify 3 records with attempts=1
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -1090,28 +1035,26 @@ class TestUpdateWithHistory:
             assert all(r.attempts == 1 for r in records)
 
         # Second batch call - same phase+error_code+to_status -> all should merge
-        updater2 = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=SessionStatus.PREPARING,
-                status_changed_at=datetime.now(tzutc()),
-                reason="batch-2",
-            ),
-            conditions=[lambda: SessionRow.id.in_(session_ids)],
+        updater2 = SessionStatusBatchUpdater(
+            session_ids=session_ids,
+            to_status=SessionStatus.PREPARING,
+            status_changed_at=datetime.now(tzutc()),
+            reason="batch-2",
         )
-        bulk_creator2 = BulkCreator(
-            specs=[
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=sid,
+        histories2 = [
+            SessionHistoryToCreate(
+                session_id=SessionID(sid),
+                creator=SessionSchedulingHistoryCreator(
                     phase="schedule",
                     result=SchedulingResult.FAILURE,
                     message="Second attempt",
                     to_status=SessionStatus.PREPARING,
                     error_code="RESOURCE_EXHAUSTED",
-                )
-                for sid in session_ids
-            ]
-        )
-        await db_source.update_with_history(updater2, bulk_creator2)
+                ),
+            )
+            for sid in session_ids
+        ]
+        await db_source.update_with_history(updater2, histories2)
 
         # Verify still 3 records but all with attempts=2
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -1163,28 +1106,26 @@ class TestUpdateWithHistory:
             await db_sess.flush()
 
         status_changed_at = datetime.now(tzutc())
-        updater = BatchUpdater(
-            spec=SessionStatusBatchUpdaterSpec(
-                to_status=SessionStatus.RUNNING,
-                status_changed_at=status_changed_at,
-            ),
-            conditions=[lambda: SessionRow.id.in_([session_id])],
+        updater = SessionStatusBatchUpdater(
+            session_ids=[session_id],
+            to_status=SessionStatus.RUNNING,
+            status_changed_at=status_changed_at,
         )
-        bulk_creator = BulkCreator(
-            specs=[
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=session_id,
+        histories = [
+            SessionHistoryToCreate(
+                session_id=SessionID(session_id),
+                creator=SessionSchedulingHistoryCreator(
                     phase="start",
                     result=SchedulingResult.SUCCESS,
                     message="Session started",
                     from_status=SessionStatus.CREATING,
                     to_status=SessionStatus.RUNNING,
-                )
-            ]
-        )
+                ),
+            )
+        ]
 
-        db_source = ScheduleDBSource(db_with_cleanup)
-        updated_count = await db_source.update_with_history(updater, bulk_creator)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        updated_count = await db_source.update_with_history(updater, histories)
         assert updated_count == 1
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:

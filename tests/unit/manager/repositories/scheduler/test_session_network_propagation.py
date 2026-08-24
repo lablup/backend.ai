@@ -51,6 +51,7 @@ from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
@@ -307,7 +308,7 @@ class TestPersistentNetworkNotRecreated:
             network_id=pre_created_network_id,
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         querier = BatchQuerier(
             pagination=NoPagination(),
             conditions=[SessionConditions.by_ids([session_id])],

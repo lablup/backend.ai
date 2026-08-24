@@ -74,6 +74,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -674,6 +675,7 @@ async def compute_session_processors(
     )
     scheduler_repository = SchedulerRepository(
         database_engine,
+        ReconcileOpsProvider(database_engine),
         valkey_clients.stat,
         valkey_clients.schedule,
         config_provider,

@@ -38,6 +38,7 @@ from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
@@ -115,6 +116,7 @@ def agent_processors(
     )
     scheduler_repo = SchedulerRepository(
         database_engine,
+        ReconcileOpsProvider(database_engine),
         valkey_clients.stat,
         valkey_clients.schedule,
         config_provider,

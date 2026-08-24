@@ -47,11 +47,11 @@ from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.updater import BatchUpdater
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.scheduler.types.session import SessionHistoryToCreate
 from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.views.sokovan.agent import AgentLimit, ResourceGroupResource
@@ -115,13 +115,14 @@ class SchedulerRepository:
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
+        reconcile_ops_provider: ReconcileOpsProvider,
         valkey_stat: ValkeyStatClient,
         valkey_schedule: ValkeyScheduleClient,
         config_provider: ManagerConfigProvider,
         storage_manager: StorageSessionManager,
     ) -> None:
         self._db = db
-        self._db_source = ScheduleDBSource(db)
+        self._db_source = ScheduleDBSource(db, reconcile_ops_provider)
         self._cache_source = ScheduleCacheSource(valkey_stat)
         self._valkey_schedule = valkey_schedule
         self._config_provider = config_provider
@@ -818,40 +819,23 @@ class SchedulerRepository:
     @scheduler_repository_resilience.apply()
     async def update_with_history(
         self,
-        updater: BatchUpdater[SessionRow],
-        bulk_creator: BulkCreator[SessionSchedulingHistoryRow],
+        updater: SessionStatusBatchUpdater,
+        histories: Sequence[SessionHistoryToCreate],
     ) -> int:
-        """Update session statuses and record history in same transaction.
+        """Move the sessions the updater selects and record each transition, in one
+        transaction.
 
-        This method combines batch status update with history recording,
-        ensuring both operations are atomic within a single transaction.
-
-        Args:
-            updater: BatchUpdater containing spec and conditions for session update
-            bulk_creator: BulkCreator containing specs for history records
-
-        Returns:
-            Number of sessions updated
+        Returns the number of sessions updated.
         """
-        return await self._db_source.update_with_history(updater, bulk_creator)
+        return await self._db_source.update_with_history(updater, histories)
 
     @scheduler_repository_resilience.apply()
     async def create_scheduling_history(
         self,
-        bulk_creator: BulkCreator[SessionSchedulingHistoryRow],
-    ) -> int:
-        """Create scheduling history records without status update.
-
-        Used for recording skipped sessions where no status change occurs
-        but the scheduling attempt should be recorded in history.
-
-        Args:
-            bulk_creator: BulkCreator containing specs for history records
-
-        Returns:
-            Number of history records created
-        """
-        return await self._db_source.create_scheduling_history(bulk_creator)
+        histories: Sequence[SessionHistoryToCreate],
+    ) -> None:
+        """Record scheduling history for sessions that stay in their current status."""
+        await self._db_source.create_scheduling_history(histories)
 
     # ========================================================================
     # Search methods (BatchQuerier pattern)

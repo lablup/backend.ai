@@ -60,6 +60,7 @@ from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHi
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
@@ -476,7 +477,7 @@ class TestForceTerminateResourceDeallocation:
         resource_slot_types: None,
     ) -> None:
         """Force-terminate sets free_at on allocations and decrements agent_resources.used."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         session_id, kernel_id = await self._create_session_with_kernel_and_resources(
             db_with_cleanup,
@@ -547,7 +548,7 @@ class TestForceTerminateResourceDeallocation:
         resource_slot_types: None,
     ) -> None:
         """When agent_id is NULL (offline agent), free_at is still set on allocations."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         session_id, kernel_id = await self._create_session_with_kernel_and_resources(
             db_with_cleanup,
@@ -598,7 +599,7 @@ class TestForceTerminateResourceDeallocation:
         resource_slot_types: None,
     ) -> None:
         """Forced termination must also apply to sessions already in TERMINATING."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         session_id, kernel_id = await self._create_session_with_kernel_and_resources(
             db_with_cleanup,
@@ -1045,7 +1046,7 @@ class TestBulkTerminateResourceDeallocation:
         resource_slot_types: None,
     ) -> None:
         """update_kernels_to_terminated sets free_at and decrements agent_resources.used."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         _, kernel_id = await self._create_kernel_with_resources(
             db_with_cleanup,
@@ -1369,7 +1370,7 @@ class TestNegativeValueGuard:
         resource_slot_types: None,
     ) -> None:
         """Calling update_kernel_status_terminated twice doesn't produce negative used values."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         session_id = SessionId(uuid.uuid4())
         kernel_id = KernelId(uuid.uuid4())
         cpu_used = Decimal("2")

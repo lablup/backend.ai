@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
@@ -30,6 +31,7 @@ from ai.backend.manager.data.session.types import (
     SubStepResult,
 )
 from ai.backend.manager.models.base import GUID, Base, PydanticListColumn, StrEnumType
+from ai.backend.manager.models.mixins.history import ReconcileHistoryMixin
 
 __all__ = (
     "DeploymentHistoryRow",
@@ -39,55 +41,22 @@ __all__ = (
 )
 
 
-class SessionSchedulingHistoryRow(Base):
+class SessionSchedulingHistoryRow(ReconcileHistoryMixin, Base):
     __tablename__ = "session_scheduling_history"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
-    )
+    # Common columns (id, phase, from/to_status, result, error_code, message,
+    # sub_steps, attempts, created_at, updated_at) come from the mixin; the merge
+    # rule below replaces the mixin's.
     session_id: Mapped[SessionID] = mapped_column(
         "session_id", GUID(SessionID), nullable=False, index=True
-    )
-
-    phase: Mapped[str] = mapped_column("phase", sa.String(length=64), nullable=False)
-    from_status: Mapped[str | None] = mapped_column(
-        "from_status", sa.String(length=64), nullable=True
-    )
-    to_status: Mapped[str | None] = mapped_column("to_status", sa.String(length=64), nullable=True)
-
-    result: Mapped[str] = mapped_column("result", sa.String(length=32), nullable=False)
-    error_code: Mapped[str | None] = mapped_column(
-        "error_code", sa.String(length=128), nullable=True
-    )
-    message: Mapped[str] = mapped_column("message", sa.Text, nullable=False)
-
-    sub_steps: Mapped[list[SubStepResult]] = mapped_column(
-        "sub_steps",
-        PydanticListColumn(SubStepResult),
-        nullable=False,
-        server_default=sa.text("'[]'::jsonb"),
-    )
-
-    attempts: Mapped[int] = mapped_column("attempts", sa.Integer, nullable=False, default=1)
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        default=sa.func.now(),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        default=sa.func.now(),
-        onupdate=sa.func.now(),
     )
 
     def records_an_attempt(self) -> bool:
         """Whether this record describes an attempt rather than a skip."""
         return self.result != SchedulingResult.SKIPPED
 
-    def should_merge_with(self, new_row: SessionSchedulingHistoryRow) -> bool:
+    @override
+    def should_merge_with(self, other: SessionSchedulingHistoryRow) -> bool:
         """Check if a new entry should be merged with this one.
 
         Merge conditions:
@@ -101,10 +70,10 @@ class SessionSchedulingHistoryRow(Base):
         session really got.
         """
         return (
-            self.phase == new_row.phase
-            and self.error_code == new_row.error_code
-            and self.to_status == new_row.to_status
-            and self.records_an_attempt() == new_row.records_an_attempt()
+            self.phase == other.phase
+            and self.error_code == other.error_code
+            and self.to_status == other.to_status
+            and self.records_an_attempt() == other.records_an_attempt()
         )
 
     def to_data(self) -> SessionSchedulingHistoryData:

@@ -39,6 +39,7 @@ from ai.backend.manager.models.resource_group import ResourceGroupOpts, Resource
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.views.sokovan.workload import PreemptionScopeKey
@@ -298,9 +299,9 @@ class TestFetchPreemptionCandidates:
             access_key=test_access_key,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         assert fetch.preemption_candidates.by_key == {}
@@ -402,9 +403,9 @@ class TestFetchPreemptionCandidates:
             access_key=test_access_key,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         assert fetch.preemption_candidates.scope == PreemptionVictimScope.USER
@@ -464,9 +465,9 @@ class TestFetchPreemptionCandidates:
             access_key=test_access_key,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         candidates = fetch.preemption_candidates.by_key[_user_key(test_user_uuid)].candidates
@@ -571,9 +572,9 @@ class TestFetchPreemptionCandidates:
             access_key=other_access_key,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         by_key = fetch.preemption_candidates.by_key
@@ -660,9 +661,9 @@ class TestFetchPreemptionCandidates:
             access_key=other_access_key,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         by_key = fetch.preemption_candidates.by_key
@@ -719,9 +720,9 @@ class TestFetchPreemptionCandidates:
                 )
             )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         user_entry = fetch.preemption_candidates.by_key[_user_key(test_user_uuid)]
@@ -779,9 +780,9 @@ class TestFetchPreemptionCandidates:
             access_key=test_access_key,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         by_key = fetch.preemption_candidates.by_key
@@ -887,9 +888,9 @@ class TestFetchPreemptionCandidates:
             access_key=test_access_key,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         candidates = fetch.preemption_candidates.by_key[_user_key(test_user_uuid)].candidates
@@ -986,9 +987,9 @@ class TestPreemptionVictimScope:
             access_key=other_access_key,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         snapshot = fetch.preemption_candidates
@@ -1084,9 +1085,9 @@ class TestPreemptionVictimScope:
             access_key=extra_domain_access_key,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         snapshot = fetch.preemption_candidates
@@ -1170,9 +1171,9 @@ class TestPreemptionVictimScope:
             access_key=extra_domain_access_key,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         snapshot = fetch.preemption_candidates

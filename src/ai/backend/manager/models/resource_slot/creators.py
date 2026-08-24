@@ -2,18 +2,26 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import override
 
+from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.resource_slot import (
     ResourceSlotTypeUUID,
 )
 from ai.backend.common.types import SlotTypes
-from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
+from ai.backend.manager.data.resource_slot.types import (
+    ResourceAllocationData,
+    ResourceSlotTypeData,
+)
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource_slot import ResourceSlotTypeAlreadyExists
-from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
+from ai.backend.manager.models.resource_slot.row import (
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.resource_slot.types import NumberFormat
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.creator import GlobalEntityCreator, NestedFieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
@@ -70,3 +78,38 @@ class ResourceSlotTypeCreator(GlobalEntityCreator[ResourceSlotTypeRow, ResourceS
     @override
     def to_data(self, row: ResourceSlotTypeRow) -> ResourceSlotTypeData:
         return row.to_data()
+
+
+@dataclass(frozen=True)
+class KernelResourceAllocationCreator(
+    NestedFieldCreator[KernelID, ResourceAllocationRow, ResourceAllocationData]
+):
+    """Record what one kernel asked for in one slot.
+
+    Written under the kernel the amount belongs to; the buckets an agent holds are
+    moved later, by the scheduler, not at enqueue.
+    """
+
+    slot_name: str
+    requested: Decimal
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_row(self, owner_id: KernelID) -> ResourceAllocationRow:
+        return ResourceAllocationRow(
+            kernel_id=owner_id,
+            slot_name=self.slot_name,
+            requested=self.requested,
+        )
+
+    @override
+    def to_data(self, row: ResourceAllocationRow) -> ResourceAllocationData:
+        return ResourceAllocationData(
+            kernel_id=row.kernel_id,
+            slot_name=row.slot_name,
+            requested=row.requested,
+            used=row.used,
+        )

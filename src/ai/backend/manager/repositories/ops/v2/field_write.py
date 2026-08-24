@@ -13,7 +13,12 @@ from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, Fie
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.specs.creator import FieldCreator, FieldToCreate, NestedFieldCreator
+from ai.backend.manager.models.specs.creator import (
+    FieldCreator,
+    FieldToCreate,
+    NestedFieldCreator,
+    NestedFieldToCreate,
+)
 from ai.backend.manager.models.specs.purger import (
     FieldBatchPurger,
     FieldPurger,
@@ -74,6 +79,23 @@ class V2FieldWriteOps(V2WriteOpsBase):
                 ],
                 nested_creators[0].integrity_error_checks(),
             )
+        return [c.creator.to_data(row) for c, row in zip(creations, rows, strict=True)]
+
+    async def atomic_create_nested_fields[
+        TOwnerID: FieldIdentifier,
+        TRow: Base,
+        TData: FieldData,
+    ](self, creations: Sequence[NestedFieldToCreate[TOwnerID, TRow, TData]]) -> list[TData]:
+        """Insert nested rows atomically, each under the field row named beside it.
+
+        The owners are already written, so this is the path for a batch whose rows
+        differ per owner; :meth:`atomic_create_fields_with_nested` is for the batch
+        that shares one set of nested specs.
+        """
+        if not creations:
+            return []
+        rows = [c.creator.build_row(c.owner_id) for c in creations]
+        await self._insert_rows(rows, creations[0].creator.integrity_error_checks())
         return [c.creator.to_data(row) for c, row in zip(creations, rows, strict=True)]
 
     async def atomic_create_field_entities[

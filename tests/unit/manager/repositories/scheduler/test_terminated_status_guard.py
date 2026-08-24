@@ -23,6 +23,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -73,7 +74,7 @@ class TestTerminatedStatusGuard:
 
     @pytest.fixture
     def db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ScheduleDBSource:
-        return ScheduleDBSource(db_with_cleanup)
+        return ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
     async def _create_kernels(
         self,

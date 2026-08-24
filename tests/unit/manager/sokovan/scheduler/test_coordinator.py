@@ -30,7 +30,7 @@ from ai.backend.manager.data.session.types import (
     TransitionStatus,
 )
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
-from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatchUpdaterSpec
+from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.sokovan.scheduler.coordinator import (
     FailureClassificationResult,
     HookExecutionResult,
@@ -1054,7 +1054,7 @@ class TestScheduleCoordinatorStatusTransition:
 
         Given: Session transitioning to RUNNING
         When: Apply transition is called
-        Then: SessionStatusBatchUpdaterSpec is created with reason="" to clear status_info
+        Then: SessionStatusBatchUpdater is created with reason="" to clear status_info
         """
         # Arrange
         session_info = _create_session_transition_info(session_id=SessionId(uuid4()))
@@ -1065,7 +1065,7 @@ class TestScheduleCoordinatorStatusTransition:
 
         captured_updater = None
 
-        async def capture_update_with_history(updater: Any, history_creator: Any) -> int:
+        async def capture_update_with_history(updater: Any, histories: Any) -> int:
             nonlocal captured_updater
             captured_updater = updater
             return 1
@@ -1086,9 +1086,9 @@ class TestScheduleCoordinatorStatusTransition:
 
         # Assert - spec must have reason="" so status_info is cleared
         assert captured_updater is not None
-        assert isinstance(captured_updater.spec, SessionStatusBatchUpdaterSpec)
-        assert captured_updater.spec.reason == ""
-        built = captured_updater.spec.build_values()
+        assert isinstance(captured_updater, SessionStatusBatchUpdater)
+        assert captured_updater.reason == ""
+        built = captured_updater.build_values()
         assert "status_info" in built
         assert built["status_info"] == ""
 

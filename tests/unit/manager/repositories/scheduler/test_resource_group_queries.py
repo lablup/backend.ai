@@ -18,6 +18,7 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.testutils.db import with_tables
 
@@ -155,7 +156,7 @@ class TestScalingGroupQueries:
         even when they have no ALIVE, schedulable, or any agents, so that coordinator
         promotion and termination checks still visit sessions pinned there.
         """
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         resource_group_ids = set(await db_source.get_all_resource_groups())
 
         assert mixed_agents_scenario.schedulable in resource_group_ids

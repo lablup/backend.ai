@@ -67,6 +67,7 @@ from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHi
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
@@ -517,7 +518,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             mem_requested=Decimal("4096"),
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         result = await db_source.update_kernel_status_running(
             kernel_id, "test-started", _make_creation_info(cpu="2", mem="4096")
         )
@@ -572,7 +573,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             mem_requested=Decimal("4096"),
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         await db_source.update_kernel_status_running(
             kernel_id, "test-started", _make_creation_info(cpu="2", mem="4096")
         )
@@ -620,7 +621,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             agent_id=test_agent_id,
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         result = await db_source.update_kernel_status_running(
             kernel_id, "test-started", _make_creation_info()
         )
@@ -676,7 +677,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             mem_requested=Decimal("4096"),
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         creation_info = _make_creation_info(cpu="2", mem="4096")
 
         first = await db_source.update_kernel_status_running(kernel_id, "started", creation_info)
@@ -739,7 +740,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             mem_requested=Decimal("1024"),
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         result = await db_source.update_kernel_status_running(
             kernel_id, "test-started", _make_creation_info(cpu="4", mem="1024")
         )
@@ -789,7 +790,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             kernel_status=KernelStatus.PENDING,  # Not a valid source status
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         result = await db_source.update_kernel_status_running(
             kernel_id, "test-started", _make_creation_info()
         )
@@ -839,7 +840,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             kernel_status=KernelStatus.CREATING,
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         result = await db_source.update_kernel_status_running(
             kernel_id, "test-started", _make_creation_info()
         )
