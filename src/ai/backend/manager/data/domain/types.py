@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
@@ -18,6 +19,15 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
+
+
+class DomainStatus(enum.StrEnum):
+    """Lifecycle status of a domain."""
+
+    ACTIVE = "active"
+    DELETED = "deleted"
+    PURGING = "purging"
+    PURGE_ERROR = "purge-error"
 
 
 @dataclass
