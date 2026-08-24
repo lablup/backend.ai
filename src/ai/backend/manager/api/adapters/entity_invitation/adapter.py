@@ -12,7 +12,7 @@ from ai.backend.common.dto.manager.v2.entity_invitation.request import (
     CreateEntityInvitationInput,
     EntityInvitationFilter,
     EntityInvitationOrderBy,
-    EntityInvitationScopeItemDTO,
+    EntityInvitationScope,
     ScopedSearchEntityInvitationsInput,
 )
 from ai.backend.common.dto.manager.v2.entity_invitation.response import (
@@ -22,7 +22,6 @@ from ai.backend.common.dto.manager.v2.entity_invitation.response import (
 )
 from ai.backend.common.dto.manager.v2.entity_invitation.types import (
     EntityInvitationOrderField,
-    EntityInvitationSideDTO,
     EntityInvitationStatusDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
@@ -49,11 +48,11 @@ from ai.backend.manager.services.entity_invitation.actions.create import (
 )
 from ai.backend.manager.services.entity_invitation.actions.get import GetEntityInvitationAction
 from ai.backend.manager.services.entity_invitation.actions.search import (
+    EntityInvitationInviteeScopeItem,
+    EntityInvitationInviterScopeItem,
     EntityInvitationScopeItem,
-    ReceivedEntityInvitationScopeItem,
+    EntityInvitationTargetScopeItem,
     SearchEntityInvitationsAction,
-    SentEntityInvitationScopeItem,
-    TargetEntityInvitationScopeItem,
 )
 
 __all__ = ("EntityInvitationAdapter",)
@@ -130,12 +129,12 @@ class EntityInvitationAdapter(BaseAdapter):
     async def scoped_search(
         self, input: ScopedSearchEntityInvitationsInput
     ) -> SearchEntityInvitationsPayload:
-        """Page through the invitations the named sides reach, combined with OR.
+        """Page through the invitations the named scopes reach, combined with OR.
 
-        The two sides answered for by the requester name nobody: whose invitations they
-        are comes from the caller's identity, not from what they sent.
+        Every scope is authorized before the read runs, so naming another person's
+        invitations is refused unless the caller may reach that person's scope.
         """
-        items = [self._to_scope_item(item) for item in input.scope.items]
+        items = self._to_scope_items(input.scope)
         searcher = self._build_searcher(
             EntityInvitationSearcher,
             conditions=self._convert_filter(input.filter) if input.filter else [],
@@ -158,26 +157,19 @@ class EntityInvitationAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
-    def _to_scope_item(self, item: EntityInvitationScopeItemDTO) -> EntityInvitationScopeItem:
-        match item.side:
-            case EntityInvitationSideDTO.RECEIVED:
-                return ReceivedEntityInvitationScopeItem(user_id=self._me())
-            case EntityInvitationSideDTO.SENT:
-                return SentEntityInvitationScopeItem(user_id=self._me())
-            case EntityInvitationSideDTO.TARGET:
-                entity_type = item.target_entity_type
-                entity_id = item.target_entity_id
-                if entity_type is None or entity_id is None:
-                    raise UnreachableError("A TARGET item naming nothing is refused when parsed")
-                return TargetEntityInvitationScopeItem(
-                    target=RuntimeEntityID(entity_type, entity_id)
+    def _to_scope_items(self, scope: EntityInvitationScope) -> list[EntityInvitationScopeItem]:
+        items: list[EntityInvitationScopeItem] = []
+        for invitee in scope.invitee or ():
+            items.append(EntityInvitationInviteeScopeItem(user_id=UserID(invitee.value)))
+        for inviter in scope.inviter or ():
+            items.append(EntityInvitationInviterScopeItem(user_id=UserID(inviter.value)))
+        for target in scope.target or ():
+            items.append(
+                EntityInvitationTargetScopeItem(
+                    target=RuntimeEntityID(target.entity_type, target.entity_id)
                 )
-
-    def _me(self) -> UserID:
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
-        return UserID(me.user_id)
+            )
+        return items
 
     def _to_permission_cap(self, permissions: Sequence[PermissionBitDTO]) -> Permission | None:
         """An empty list means no ceiling, which is what ``None`` says to the graph."""

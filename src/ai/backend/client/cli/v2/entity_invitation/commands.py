@@ -14,10 +14,7 @@ from ai.backend.client.cli.v2.helpers import (
     print_result,
 )
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.dto.manager.v2.entity_invitation.types import (
-    EntityInvitationSideDTO,
-    EntityInvitationStatusDTO,
-)
+from ai.backend.common.dto.manager.v2.entity_invitation.types import EntityInvitationStatusDTO
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 
 
@@ -26,31 +23,23 @@ def entity_invitation() -> None:
     """Entity invitation commands."""
 
 
-def _parse_sides(sides: tuple[str, ...]) -> list[tuple[EntityInvitationSideDTO, str | None]]:
-    """Read each ``--side`` value: a bare side, or ``target:<type>:<id>``."""
-    parsed: list[tuple[EntityInvitationSideDTO, str | None]] = []
-    for raw in sides:
-        side_raw, sep, rest = raw.partition(":")
-        try:
-            side = EntityInvitationSideDTO(side_raw)
-        except ValueError:
-            valid = ", ".join(member.value for member in EntityInvitationSideDTO)
+def _parse_targets(targets: tuple[str, ...]) -> list[tuple[str, uuid.UUID]]:
+    """Read each ``--target`` value, given as ``<entity_type>:<entity_id>``."""
+    parsed: list[tuple[str, uuid.UUID]] = []
+    for raw in targets:
+        entity_type, sep, entity_id = raw.partition(":")
+        if not sep or not entity_id:
             raise click.BadParameter(
-                f"Unknown side {side_raw!r}; expected one of: {valid}.",
-                param_hint="--side",
-            ) from None
-        if side is EntityInvitationSideDTO.TARGET:
-            if not sep or rest.count(":") != 1:
-                raise click.BadParameter(
-                    f"Invalid side item {raw!r}; expected 'target:<entity_type>:<entity_id>'.",
-                    param_hint="--side",
-                )
-        elif sep:
-            raise click.BadParameter(
-                f"Side {side.value!r} names no entity, but {raw!r} does.",
-                param_hint="--side",
+                f"Invalid target {raw!r}; expected '<entity_type>:<entity_id>'.",
+                param_hint="--target",
             )
-        parsed.append((side, rest or None))
+        try:
+            parsed.append((entity_type, uuid.UUID(entity_id)))
+        except ValueError:
+            raise click.BadParameter(
+                f"Entity identifier {entity_id!r} must be a UUID.",
+                param_hint="--target",
+            ) from None
     return parsed
 
 
@@ -153,14 +142,24 @@ def cancel(invitation_id: uuid.UUID) -> None:
 
 @entity_invitation.command(name="scoped-search")
 @click.option(
-    "--side",
-    "sides",
+    "--invitee",
+    "invitees",
     multiple=True,
-    required=True,
-    help=(
-        "Side to read from (repeatable; OR across items): 'received', 'sent', or "
-        "'target:<entity_type>:<entity_id>'."
-    ),
+    type=click.UUID,
+    help="User the invitations are addressed to (repeatable).",
+)
+@click.option(
+    "--inviter",
+    "inviters",
+    multiple=True,
+    type=click.UUID,
+    help="User who sent the invitations (repeatable).",
+)
+@click.option(
+    "--target",
+    "targets",
+    multiple=True,
+    help="Entity the invitations offer, as '<entity_type>:<entity_id>' (repeatable).",
 )
 @click.option(
     "--status",
@@ -176,46 +175,40 @@ def cancel(invitation_id: uuid.UUID) -> None:
     help="Order by field:direction (e.g., created_at:desc, status:asc).",
 )
 def scoped_search(
-    sides: tuple[str, ...],
+    invitees: tuple[uuid.UUID, ...],
+    inviters: tuple[uuid.UUID, ...],
+    targets: tuple[str, ...],
     status: str | None,
     limit: int,
     offset: int,
     order_by: tuple[str, ...],
 ) -> None:
-    """Search the invitations the named sides reach."""
+    """Search the invitations the named scopes reach (OR across all of them)."""
     from ai.backend.common.dto.manager.v2.entity_invitation.request import (
         EntityInvitationFilter,
         EntityInvitationOrderBy,
-        EntityInvitationScopeDTO,
-        EntityInvitationScopeItemDTO,
+        EntityInvitationScope,
         EntityInvitationStatusFilter,
+        EntityInvitationTargetScope,
         ScopedSearchEntityInvitationsInput,
     )
     from ai.backend.common.dto.manager.v2.entity_invitation.types import (
         EntityInvitationOrderField,
     )
+    from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 
-    items: list[EntityInvitationScopeItemDTO] = []
-    for side, target in _parse_sides(sides):
-        if target is None:
-            items.append(EntityInvitationScopeItemDTO(side=side))
-            continue
-        entity_type, _, entity_id = target.partition(":")
-        try:
-            target_id = uuid.UUID(entity_id)
-        except ValueError:
-            raise click.BadParameter(
-                f"Entity identifier {entity_id!r} must be a UUID.",
-                param_hint="--side",
-            ) from None
-        items.append(
-            EntityInvitationScopeItemDTO(
-                side=side,
-                target_entity_type=EntityType(entity_type),
-                target_entity_id=target_id,
-            )
-        )
+    if not invitees and not inviters and not targets:
+        raise click.UsageError("Name at least one of --invitee, --inviter or --target.")
 
+    scope = EntityInvitationScope(
+        invitee=[UUIDScope(value=user_id) for user_id in invitees] or None,
+        inviter=[UUIDScope(value=user_id) for user_id in inviters] or None,
+        target=[
+            EntityInvitationTargetScope(entity_type=EntityType(entity_type), entity_id=entity_id)
+            for entity_type, entity_id in _parse_targets(targets)
+        ]
+        or None,
+    )
     filter_dto = (
         EntityInvitationFilter(
             status=EntityInvitationStatusFilter(equals=EntityInvitationStatusDTO(status))
@@ -234,7 +227,7 @@ def scoped_search(
         try:
             result = await registry.entity_invitation.scoped_search(
                 ScopedSearchEntityInvitationsInput(
-                    scope=EntityInvitationScopeDTO(items=items),
+                    scope=scope,
                     filter=filter_dto,
                     order=orders,
                     limit=limit,

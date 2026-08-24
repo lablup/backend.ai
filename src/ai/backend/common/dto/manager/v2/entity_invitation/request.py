@@ -10,17 +10,16 @@ from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.entity_invitation.types import (
     EntityInvitationOrderField,
-    EntityInvitationSideDTO,
     EntityInvitationStatusDTO,
 )
-from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO, UUIDScope
 
 __all__ = (
     "CreateEntityInvitationInput",
     "EntityInvitationFilter",
     "EntityInvitationOrderBy",
-    "EntityInvitationScopeDTO",
-    "EntityInvitationScopeItemDTO",
+    "EntityInvitationScope",
+    "EntityInvitationTargetScope",
     "ScopedSearchEntityInvitationsInput",
 )
 
@@ -60,42 +59,47 @@ class EntityInvitationFilter(BaseRequestModel):
 EntityInvitationFilter.model_rebuild()
 
 
-class EntityInvitationScopeItemDTO(BaseRequestModel):
-    """One side invitations are read from.
+class EntityInvitationTargetScope(BaseRequestModel):
+    """One entity whose invitations are being read.
 
-    ``RECEIVED`` and ``SENT`` are answered for by the requester themselves and name
-    nothing else; ``TARGET`` names the entity whose invitations are being read.
+    Its own pair rather than the shared ``EntityTypeScope``: what an invitation offers
+    is an open entity type, which that closed element enum cannot name.
     """
 
-    side: EntityInvitationSideDTO = Field(description="Which side the read comes in through.")
-    target_entity_type: EntityType | None = Field(
-        default=None, description="Type of the entity being offered; TARGET only."
+    entity_type: EntityType = Field(description="Type of the entity being offered")
+    entity_id: EntityID = Field(description="Id of the entity being offered")
+
+
+class EntityInvitationScope(BaseRequestModel):
+    """Scope for the scoped entity invitation query.
+
+    Each list is OR'd internally and across lists. Raises an error if every field is
+    empty. Naming a user reads the invitations they were sent or sent themselves, which
+    the permission check on that user's scope is what allows.
+    """
+
+    invitee: list[UUIDScope] | None = Field(
+        default=None, description="Users the invitations are addressed to"
     )
-    target_entity_id: EntityID | None = Field(
-        default=None, description="Id of the entity being offered; TARGET only."
+    inviter: list[UUIDScope] | None = Field(
+        default=None, description="Users who sent the invitations"
+    )
+    target: list[EntityInvitationTargetScope] | None = Field(
+        default=None, description="Entities the invitations offer"
     )
 
     @model_validator(mode="after")
-    def _check_target(self) -> EntityInvitationScopeItemDTO:
-        names = (self.target_entity_type, self.target_entity_id)
-        if self.side is EntityInvitationSideDTO.TARGET:
-            if None in names:
-                raise ValueError("A TARGET item names the entity being offered.")
-        elif any(name is not None for name in names):
-            raise ValueError(f"A {self.side.value.upper()} item names no entity.")
+    def _require_non_empty(self) -> EntityInvitationScope:
+        if not self.invitee and not self.inviter and not self.target:
+            raise ValueError(
+                "EntityInvitationScope requires a non-empty value for "
+                "'invitee', 'inviter' or 'target'"
+            )
         return self
 
 
-class EntityInvitationScopeDTO(BaseRequestModel):
-    """The sides the read covers, combined with OR."""
-
-    items: list[EntityInvitationScopeItemDTO] = Field(
-        min_length=1, description="Sides to read from (OR across all items)."
-    )
-
-
 class ScopedSearchEntityInvitationsInput(BaseRequestModel):
-    scope: EntityInvitationScopeDTO = Field(description="Sides to read from.")
+    scope: EntityInvitationScope = Field(description="Scope (OR across all items)")
     filter: EntityInvitationFilter | None = None
     order: list[EntityInvitationOrderBy] | None = None
     first: int | None = None

@@ -16,7 +16,10 @@ from ai.backend.common.dto.manager.v2.entity_invitation.request import (
     EntityInvitationOrderBy as OrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.entity_invitation.request import (
-    EntityInvitationScopeItemDTO as ScopeItemDTO,
+    EntityInvitationScope as ScopeDTO,
+)
+from ai.backend.common.dto.manager.v2.entity_invitation.request import (
+    EntityInvitationTargetScope as TargetScopeDTO,
 )
 from ai.backend.common.dto.manager.v2.entity_invitation.response import (
     EntityInvitationNode as NodeDTO,
@@ -24,10 +27,7 @@ from ai.backend.common.dto.manager.v2.entity_invitation.response import (
 from ai.backend.common.dto.manager.v2.entity_invitation.response import (
     EntityInvitationPayload as PayloadDTO,
 )
-from ai.backend.common.dto.manager.v2.entity_invitation.types import (
-    EntityInvitationSideDTO,
-    EntityInvitationStatusDTO,
-)
+from ai.backend.common.dto.manager.v2.entity_invitation.types import EntityInvitationStatusDTO
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -40,6 +40,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.rbac.types.scope import UUIDScopeGQL
 
 _ADDED = "26.8.3"
 
@@ -47,14 +48,6 @@ EntityInvitationStatusGQL: type[EntityInvitationStatusDTO] = gql_enum(
     BackendAIGQLMeta(added_version=_ADDED, description="Whether an invitation is still open."),
     EntityInvitationStatusDTO,
     name="EntityInvitationStatus",
-)
-
-EntityInvitationSideGQL: type[EntityInvitationSideDTO] = gql_enum(
-    BackendAIGQLMeta(
-        added_version=_ADDED, description="Which side of an invitation a read comes in through."
-    ),
-    EntityInvitationSideDTO,
-    name="EntityInvitationSide",
 )
 
 PermissionBitGQL: type[PermissionBitDTO] = gql_enum(
@@ -134,18 +127,34 @@ class EntityInvitationOrderByGQL(PydanticInputMixin[OrderByDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=_ADDED,
-        description="One side invitations are read from; RECEIVED and SENT name nothing else.",
+        added_version=_ADDED, description="One entity whose invitations are being read."
     ),
-    name="EntityInvitationScopeItem",
+    name="EntityInvitationTargetScope",
 )
-class EntityInvitationScopeItemGQL(PydanticInputMixin[ScopeItemDTO]):
-    side: EntityInvitationSideGQL = gql_field(description="Which side the read comes in through.")
-    target_entity_type: str | None = gql_field(
-        default=None, description="Type of the entity being offered; TARGET only."
+class EntityInvitationTargetScopeGQL(PydanticInputMixin[TargetScopeDTO]):
+    entity_type: str = gql_field(description="Type of the entity being offered.")
+    entity_id: UUID = gql_field(description="Id of the entity being offered.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=_ADDED,
+        description=(
+            "Scope for the scoped entity invitation query. "
+            "All items are OR'd; raises an error if every field is empty."
+        ),
+    ),
+    name="EntityInvitationScope",
+)
+class EntityInvitationScopeGQL(PydanticInputMixin[ScopeDTO]):
+    invitee: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Users the invitations are addressed to."
     )
-    target_entity_id: UUID | None = gql_field(
-        default=None, description="Id of the entity being offered; TARGET only."
+    inviter: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Users who sent the invitations."
+    )
+    target: list[EntityInvitationTargetScopeGQL] | None = gql_field(
+        default=None, description="Entities the invitations offer."
     )
 
 

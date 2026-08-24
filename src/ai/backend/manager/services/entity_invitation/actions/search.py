@@ -27,11 +27,11 @@ from ai.backend.manager.models.entity_invitation.searchers import EntityInvitati
 from ai.backend.manager.models.scopes import OperationScope
 
 __all__ = (
+    "EntityInvitationInviteeScopeItem",
+    "EntityInvitationInviterScopeItem",
     "EntityInvitationScopeItem",
-    "ReceivedEntityInvitationScopeItem",
+    "EntityInvitationTargetScopeItem",
     "SearchEntityInvitationsAction",
-    "SentEntityInvitationScopeItem",
-    "TargetEntityInvitationScopeItem",
 )
 
 
@@ -54,8 +54,8 @@ class EntityInvitationScopeItem(ABC):
 
 
 @dataclass(frozen=True)
-class ReceivedEntityInvitationScopeItem(EntityInvitationScopeItem):
-    """The invitations addressed to one person's own email."""
+class EntityInvitationInviteeScopeItem(EntityInvitationScopeItem):
+    """The invitations addressed to one person's email."""
 
     user_id: UserID
 
@@ -69,7 +69,7 @@ class ReceivedEntityInvitationScopeItem(EntityInvitationScopeItem):
 
 
 @dataclass(frozen=True)
-class SentEntityInvitationScopeItem(EntityInvitationScopeItem):
+class EntityInvitationInviterScopeItem(EntityInvitationScopeItem):
     """The invitations one person sent."""
 
     user_id: UserID
@@ -84,7 +84,7 @@ class SentEntityInvitationScopeItem(EntityInvitationScopeItem):
 
 
 @dataclass(frozen=True)
-class TargetEntityInvitationScopeItem(EntityInvitationScopeItem):
+class EntityInvitationTargetScopeItem(EntityInvitationScopeItem):
     """The invitations offering one entity."""
 
     target: EntityIdentifier

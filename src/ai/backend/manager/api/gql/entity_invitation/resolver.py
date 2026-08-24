@@ -10,7 +10,6 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.entity_invitation.request import (
     EntityInvitationFilter,
     EntityInvitationOrderBy,
-    EntityInvitationScopeDTO,
     ScopedSearchEntityInvitationsInput,
 )
 from ai.backend.common.dto.manager.v2.entity_invitation.types import EntityInvitationOrderField
@@ -27,7 +26,7 @@ from ai.backend.manager.api.gql.entity_invitation.types import (
     EntityInvitationGQL,
     EntityInvitationOrderByGQL,
     EntityInvitationPayloadGQL,
-    EntityInvitationScopeItemGQL,
+    EntityInvitationScopeGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
@@ -38,14 +37,14 @@ _ADDED = "26.8.3"
     BackendAIGQLMeta(
         added_version=_ADDED,
         description=(
-            "Page through the invitations the named sides reach, combined with OR. "
-            "RECEIVED and SENT are answered for by the caller and name nobody."
+            "Page through the invitations the named scopes reach, combined with OR. "
+            "Every scope is authorized before the read runs."
         ),
     )
 )  # type: ignore[misc]
 async def entity_invitations(
     info: Info[StrawberryGQLContext],
-    scope: list[EntityInvitationScopeItemGQL],
+    scope: EntityInvitationScopeGQL,
     filter: EntityInvitationFilterGQL | None = None,
     order_by: list[EntityInvitationOrderByGQL] | None = None,
     before: str | None = None,
@@ -66,7 +65,7 @@ async def entity_invitations(
             for o in order_by
         ]
     search_input = ScopedSearchEntityInvitationsInput(
-        scope=EntityInvitationScopeDTO(items=[item.to_pydantic() for item in scope]),
+        scope=scope.to_pydantic(),
         filter=filter_dto,
         order=orders_dto,
         first=first,
