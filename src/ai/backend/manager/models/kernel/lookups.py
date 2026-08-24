@@ -8,10 +8,10 @@ from typing import Any, override
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy import Row
 
 from ai.backend.common.data.entity.kernel import KernelID
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.specs.lookup import FieldOwnerKeyLookup, FieldOwnerLookup
 
@@ -45,10 +45,8 @@ class KernelOwnerLookup(FieldOwnerLookup[KernelID, SessionID]):
 
     @override
     def build_query(self, field_ids: Sequence[KernelID]) -> sa.sql.Select[Any]:
-        return sa.select(KernelRow.id, KernelRow.session_id, sa.literal(SESSION_ENTITY_TYPE)).where(
-            KernelRow.id.in_(field_ids)
-        )
+        return sa.select(KernelRow.id, KernelRow.session_id).where(KernelRow.id.in_(field_ids))
 
     @override
-    def to_entity_id(self, value: UUID, owner_type: EntityType) -> SessionID:
-        return SessionID(value)
+    def to_entity_id(self, row: Row[Any]) -> SessionID:
+        return SessionID(row[1])

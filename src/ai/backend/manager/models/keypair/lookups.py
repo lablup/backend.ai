@@ -8,10 +8,10 @@ from typing import Any, override
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy import Row
 
 from ai.backend.common.data.entity.keypair import KeyPairID
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -29,13 +29,11 @@ class KeypairOwnerLookup(FieldOwnerLookup[KeyPairID, UserID]):
 
     @override
     def build_query(self, field_ids: Sequence[KeyPairID]) -> sa.sql.Select[Any]:
-        return sa.select(KeyPairRow.id, KeyPairRow.user, sa.literal(USER_ENTITY_TYPE)).where(
-            KeyPairRow.id.in_(field_ids)
-        )
+        return sa.select(KeyPairRow.id, KeyPairRow.user).where(KeyPairRow.id.in_(field_ids))
 
     @override
-    def to_entity_id(self, value: UUID, owner_type: EntityType) -> UserID:
-        return UserID(value)
+    def to_entity_id(self, row: Row[Any]) -> UserID:
+        return UserID(row[1])
 
 
 @dataclass

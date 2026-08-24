@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import Any, override
-from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy import Row
 
 from ai.backend.common.data.entity.label import LabelID
 from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
@@ -19,8 +19,8 @@ __all__ = ("LabelOwnerLookup",)
 class LabelOwnerLookup(FieldOwnerLookup[LabelID, RuntimeEntityID]):
     """The entity each of the labels named is on.
 
-    The owner's type is a column rather than a literal: a label goes on any type, so
-    which one it is is only knowable per row.
+    A label goes on any type, so the owner's type is selected beside its id and read off
+    the row rather than named as a constant.
     """
 
     @override
@@ -30,5 +30,5 @@ class LabelOwnerLookup(FieldOwnerLookup[LabelID, RuntimeEntityID]):
         )
 
     @override
-    def to_entity_id(self, value: UUID, owner_type: EntityType) -> RuntimeEntityID:
-        return RuntimeEntityID(owner_type, value)
+    def to_entity_id(self, row: Row[Any]) -> RuntimeEntityID:
+        return RuntimeEntityID(EntityType(row[2]), row[1])

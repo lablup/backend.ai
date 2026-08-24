@@ -7,12 +7,7 @@ from typing import Any
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.types import (
-    EntityIdentifier,
-    EntityType,
-    FieldData,
-    FieldIdentifier,
-)
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.manager.errors.repository import (
     AmbiguousEntityKeyError,
     EmptyOperationScopeError,
@@ -106,7 +101,7 @@ class V2ReadOps(V2OpsBase):
         if not field_ids:
             return {}
         rows = (await self._sess.execute(lookup.build_query(field_ids))).all()
-        owners = {row[0]: lookup.to_entity_id(row[1], EntityType(row[2])) for row in rows}
+        owners = {row[0]: lookup.to_entity_id(row) for row in rows}
         return {field_id: owners[field_id] for field_id in field_ids if field_id in owners}
 
     async def lookup_field_owner_by_key[TOwnerID: EntityIdentifier](
