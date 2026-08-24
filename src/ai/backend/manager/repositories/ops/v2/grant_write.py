@@ -96,7 +96,7 @@ class V2GrantWriteOps(V2WriteOpsBase):
         await self.grant_entities([
             EntityGrant(
                 entity=data.target(),
-                grantee=updater.accepter_user_id,
+                grantee=updater.invitee_user_id,
                 permission_cap=data.permission_cap,
             )
         ])
