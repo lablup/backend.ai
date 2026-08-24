@@ -1117,6 +1117,8 @@ type Image {
 enum ImageStatus {
   ALIVE
   DELETED
+  PURGING
+  PURGE_ERROR
 }
 
 """Added in 25.3.0."""
