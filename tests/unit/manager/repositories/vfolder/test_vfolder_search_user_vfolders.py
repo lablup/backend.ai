@@ -38,6 +38,7 @@ from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -170,7 +171,7 @@ class TestVfolderSearchUserVfolders:
                 KeyPairRow(
                     user=user_a_id,
                     access_key="TESTKEY0000000A",
-                    secret_key="test-secret-a",
+                    secret_key=SecretValue("test-secret-a"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -181,7 +182,7 @@ class TestVfolderSearchUserVfolders:
                 KeyPairRow(
                     user=user_b_id,
                     access_key="TESTKEY0000000B",
-                    secret_key="test-secret-b",
+                    secret_key=SecretValue("test-secret-b"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -375,7 +376,7 @@ class TestVfolderSearchUserVfolders:
                 KeyPairRow(
                     user=user_id,
                     access_key="TESTKEY0000000M",
-                    secret_key="test-secret-m",
+                    secret_key=SecretValue("test-secret-m"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -590,7 +591,7 @@ class TestVfolderSearchUserVfolders:
                 KeyPairRow(
                     user=user_a_id,
                     access_key="TESTKEY0000000P",
-                    secret_key="test-secret-p",
+                    secret_key=SecretValue("test-secret-p"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -601,7 +602,7 @@ class TestVfolderSearchUserVfolders:
                 KeyPairRow(
                     user=user_b_id,
                     access_key="TESTKEY0000000Q",
-                    secret_key="test-secret-q",
+                    secret_key=SecretValue("test-secret-q"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",

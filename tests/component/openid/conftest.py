@@ -44,6 +44,7 @@ from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.config.unified import DatabaseConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.domain.row import DomainRow
@@ -68,6 +69,7 @@ from ai.backend.manager.plugin.openid.hook import OIDCHookPlugin
 from ai.backend.manager.plugin.openid.valkey_client import ValkeyOpenIDClient
 from ai.backend.manager.plugin.openid.webapp import OIDCWebAppPlugin
 from ai.backend.manager.repositories.db.engine import connect_database
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     postgres_container,
     redis_container,
@@ -561,6 +563,9 @@ def mock_root_app(
     return {
         "_db": seed_data,  # seed_data yields database_engine
         "_config_provider": mock_config_provider,
+        "_key_provider_pool": KeyProviderPool(
+            providers=[], write_provider_type=KeyProviderType.PLAIN
+        ),
     }
 
 

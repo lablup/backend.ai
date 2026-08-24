@@ -30,6 +30,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.keypair.row import generate_keypair_data
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -42,6 +43,7 @@ from ai.backend.manager.repositories.ops.rbac.provider import (
     RBACOpsProvider,
 )
 from ai.backend.manager.repositories.user.creators import UserScopeCreation
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 from .config import OIDCWebAppConfig
 from .valkey_client import ValkeyOpenIDClient
@@ -129,6 +131,7 @@ async def create_user_if_not_exists(
     group_order: list[str],
     db: ExtendedAsyncSAEngine,
     password_info: PasswordInfo,
+    key_provider_pool: KeyProviderPool,
 ) -> UserRow:
     """Provision an OpenID user through the RBAC member ops: the user scope, its
     default keypair, and the domain/project (model-store included) enrollments."""
@@ -180,6 +183,7 @@ async def create_user_if_not_exists(
                 domain_id=domain_id,
                 project_ids=project_ids,
                 keypair_resource_policy=user_info["keypair_resource_policy"],
+                keypair_secrets=await generate_keypair_data(key_provider_pool),
             )
         )
         log.info("OPENID.WEBAPP: new user created ({})", result.user_row.email)
@@ -363,6 +367,7 @@ class OIDCWebAppPlugin(WebappPlugin):
             [x.strip() for x in openid_config.group_order.split(",")],
             db,
             password_info,
+            root_app["_key_provider_pool"],
         )
         force = state.get("force", ["false"])[0].lower() == "true"
         token_data = {

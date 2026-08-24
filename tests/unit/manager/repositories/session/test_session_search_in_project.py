@@ -48,6 +48,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -194,7 +195,7 @@ class TestSessionSearchInProject:
                 KeyPairRow(
                     user=user_id,
                     access_key=access_key,
-                    secret_key="test-secret",
+                    secret_key=SecretValue("test-secret"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",

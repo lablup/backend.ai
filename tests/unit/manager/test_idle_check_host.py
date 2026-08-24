@@ -83,6 +83,7 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import TableOrORM, with_tables
 
 IDLE_LOGGER_NAME = "ai.backend.manager.idle"
@@ -346,7 +347,7 @@ class TestDoIdleCheck:
             db_sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key=SecretKey(f"SK{uuid.uuid4().hex[:38]}"),
+                    secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex[:38]}")),
                     user=user_uuid,
                     is_active=True,
                     is_admin=False,

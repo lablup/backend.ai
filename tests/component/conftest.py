@@ -112,6 +112,7 @@ from ai.backend.manager.config.unified import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.manager_status.types import ManagerStatus
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.base import pgsql_connect_opts
@@ -158,6 +159,8 @@ from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.testutils.bootstrap import (  # noqa: F401
@@ -932,7 +935,7 @@ async def admin_user_fixture(
         await conn.execute(
             sa.insert(keypairs).values(
                 access_key=data.keypair.access_key,
-                secret_key=data.keypair.secret_key,
+                secret_key=SecretValue(data.keypair.secret_key),
                 is_active=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
@@ -1042,7 +1045,7 @@ async def regular_user_fixture(
         await conn.execute(
             sa.insert(keypairs).values(
                 access_key=data.keypair.access_key,
-                secret_key=data.keypair.secret_key,
+                secret_key=SecretValue(data.keypair.secret_key),
                 is_active=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
@@ -1434,9 +1437,15 @@ def auth_processors(
     storage_manager: StorageSessionManager,
 ) -> AuthProcessors:
     """Real AuthProcessors wired with real AuthService and AuthRepository."""
-    repo = AuthRepository(database_engine)
+    repo = AuthRepository(
+        database_engine, KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN)
+    )
     user_resource_policy_repository = UserResourcePolicyRepository(database_engine)
-    user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     group_repository = ProjectRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
@@ -1454,6 +1463,7 @@ def auth_processors(
         group_repository=group_repository,
         ssh_key_validator=SSHKeyValidator(),
         client_ip_masking_repository=ClientIPMaskingRepository(database_engine),
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     return AuthProcessors(
         processor_registry.group(GroupMeta(AUTH_ENTITY_TYPE)),
@@ -1518,6 +1528,9 @@ async def server(
             3,
             build_auth_middleware(
                 db=db,
+                key_provider_pool=KeyProviderPool(
+                    providers=[], write_provider_type=KeyProviderType.PLAIN
+                ),
                 jwt_validator=jwt_validator,
                 valkey_stat=valkey_clients.stat,
                 hook_plugin_ctx=hook_plugin_ctx,

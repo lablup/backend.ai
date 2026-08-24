@@ -13,6 +13,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 
 @dataclass
@@ -23,6 +24,7 @@ class RepositoryArgs:
     reconcile_ops_provider: ReconcileOpsProvider
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
+    key_provider_pool: KeyProviderPool
     valkey_stat_client: ValkeyStatClient
     valkey_schedule_client: ValkeyScheduleClient
     valkey_image_client: ValkeyImageClient

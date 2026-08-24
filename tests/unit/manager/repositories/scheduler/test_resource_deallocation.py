@@ -61,6 +61,7 @@ from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -256,7 +257,7 @@ class TestForceTerminateResourceDeallocation:
             db_sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
+                    secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex}")),
                     is_active=True,
                     is_admin=False,
                     resource_policy=test_keypair_resource_policy_name,
@@ -831,7 +832,7 @@ class TestBulkTerminateResourceDeallocation:
             db_sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
+                    secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex}")),
                     is_active=True,
                     is_admin=False,
                     resource_policy=test_keypair_resource_policy_name,
@@ -1283,7 +1284,7 @@ class TestNegativeValueGuard:
             db_sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
+                    secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex}")),
                     is_active=True,
                     is_admin=False,
                     resource_policy=test_keypair_resource_policy_name,

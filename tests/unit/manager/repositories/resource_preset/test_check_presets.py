@@ -92,6 +92,7 @@ from ai.backend.manager.repositories.resource_preset.repository import (
 from ai.backend.manager.repositories.resource_preset.types import (
     CheckPresetsResult,
 )
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
@@ -406,7 +407,7 @@ class TestCheckPresetsOccupiedSlots:
             # Get user email for user_id field
             keypair = KeyPairRow(
                 access_key=access_key,
-                secret_key="test-secret",
+                secret_key=SecretValue("test-secret"),
                 user=test_user_uuid,  # user is UUID (required NOT NULL)
                 is_active=True,
                 resource_policy=test_resource_policy_name,
@@ -1467,7 +1468,7 @@ class TestCheckPresetsZeroValues:
             # Get user email for user_id field
             keypair = KeyPairRow(
                 access_key=access_key,
-                secret_key="test-secret",
+                secret_key=SecretValue("test-secret"),
                 user=test_user_uuid,
                 is_active=True,
                 resource_policy=test_resource_policy_name,

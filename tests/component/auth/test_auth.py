@@ -57,6 +57,7 @@ from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import AuthUserFixtureData
@@ -243,7 +244,7 @@ async def expired_password_user(
         await conn.execute(
             sa.insert(keypairs).values(
                 access_key=data.access_key,
-                secret_key=data.secret_key,
+                secret_key=SecretValue(data.secret_key),
                 is_active=True,
                 is_default=True,
                 resource_policy=resource_policy_fixture,
@@ -373,7 +374,7 @@ async def cross_domain_fixture(
         await conn.execute(
             sa.insert(keypairs).values(
                 access_key=admin_data.keypair.access_key,
-                secret_key=admin_data.keypair.secret_key,
+                secret_key=SecretValue(admin_data.keypair.secret_key),
                 is_active=True,
                 is_default=True,
                 resource_policy=resource_policy_fixture,
@@ -416,7 +417,7 @@ async def cross_domain_fixture(
         await conn.execute(
             sa.insert(keypairs).values(
                 access_key=user_data.keypair.access_key,
-                secret_key=user_data.keypair.secret_key,
+                secret_key=SecretValue(user_data.keypair.secret_key),
                 is_active=True,
                 is_default=True,
                 resource_policy=resource_policy_fixture,

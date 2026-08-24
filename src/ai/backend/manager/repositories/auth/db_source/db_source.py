@@ -34,8 +34,8 @@ from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.user import KeyPairNotFound, UserCreationBadRequest
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
-from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
+from ai.backend.manager.models.keypair.row import generate_keypair_data, keypairs
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.user import (
     UserRole,
@@ -50,6 +50,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.rbac.provider import FullUserCreation, RBACOpsProvider
 from ai.backend.manager.repositories.user.creators import UserScopeCreation
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 auth_db_source_resilience = Resilience(
     policies=[
@@ -91,10 +92,12 @@ class AuthDBSource:
 
     _db: ExtendedAsyncSAEngine
     _rbac_ops_provider: RBACOpsProvider
+    _key_provider_pool: KeyProviderPool
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, key_provider_pool: KeyProviderPool) -> None:
         self._db = db
         self._rbac_ops_provider = RBACOpsProvider(db)
+        self._key_provider_pool = key_provider_pool
 
     @auth_db_source_resilience.apply()
     async def fetch_group_membership(self, group_id: UUID, user_id: UUID) -> GroupMembershipData:
@@ -147,6 +150,7 @@ class AuthDBSource:
                     project_ids=project_ids,
                     keypair_resource_policy=keypair_resource_policy,
                     keypair_rate_limit=keypair_rate_limit,
+                    keypair_secrets=await generate_keypair_data(self._key_provider_pool),
                 )
             )
             return UserCreationData(

@@ -8,6 +8,7 @@ import pytest
 
 from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.manager.data.auth.types import UserCreationData
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import EmailAlreadyExistsError
 from ai.backend.manager.errors.user import UserCreationBadRequest
 from ai.backend.manager.models.user import UserRole, UserStatus
@@ -15,6 +16,8 @@ from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.auth.actions.signup import SignupAction
 from ai.backend.manager.services.auth.service import AuthService
 
@@ -22,7 +25,9 @@ from ai.backend.manager.services.auth.service import AuthService
 def make_mock_keypair() -> MagicMock:
     keypair = MagicMock()
     keypair.access_key = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=20))
-    keypair.secret_key = "".join(random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=40))
+    keypair.secret_key = SecretValue(
+        "".join(random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=40))
+    )
     return keypair
 
 
@@ -50,6 +55,7 @@ def auth_service(
         group_repository=mock_group_repository,
         ssh_key_validator=AsyncMock(),
         client_ip_masking_repository=mock_client_ip_masking_repository,
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
 
 
@@ -90,7 +96,7 @@ async def test_signup_successful_with_minimal_data(
 
     assert result.user_id == UUID("12345678-1234-5678-1234-567812345678")
     assert result.access_key == mock_keypair.access_key
-    assert result.secret_key == mock_keypair.secret_key
+    assert result.secret_key == mock_keypair.secret_key.content
 
 
 async def test_signup_successful_with_full_data(
@@ -130,7 +136,7 @@ async def test_signup_successful_with_full_data(
 
     assert result.user_id == UUID("87654321-4321-8765-4321-876543218765")
     assert result.access_key == mock_keypair.access_key
-    assert result.secret_key == mock_keypair.secret_key
+    assert result.secret_key == mock_keypair.secret_key.content
 
 
 async def test_signup_fails_when_email_already_exists(

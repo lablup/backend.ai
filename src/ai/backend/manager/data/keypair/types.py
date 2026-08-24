@@ -4,7 +4,8 @@ from datetime import datetime
 
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.types import FieldData
-from ai.backend.common.types import AccessKey, SecretKey
+from ai.backend.common.types import AccessKey
+from ai.backend.manager.secret.types import SecretValue
 
 
 @dataclass
@@ -18,10 +19,11 @@ class KeyPairCreator:
 
 @dataclass
 class KeyPairSecrets:
-    """Raw generated cryptographic material used before DB insert."""
+    """Generated cryptographic material used before DB insert. ``secret_key`` is
+    already in its stored form, so it is bound as is."""
 
     access_key: AccessKey
-    secret_key: SecretKey
+    secret_key: SecretValue
     ssh_public_key: str
     ssh_private_key: str
 
@@ -31,7 +33,9 @@ class KeyPairData(FieldData):
     id: KeyPairID
     user_id: uuid.UUID
     access_key: AccessKey
-    secret_key: SecretKey
+    # Stored form: plaintext for a legacy row, ciphertext once a write provider is named.
+    # Decrypt through the key provider pool where the plaintext is needed.
+    secret_key: SecretValue
 
     is_active: bool
     is_admin: bool

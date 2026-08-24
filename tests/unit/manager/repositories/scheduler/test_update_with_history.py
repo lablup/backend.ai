@@ -48,6 +48,7 @@ from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatc
 from ai.backend.manager.repositories.scheduling_history.creators import (
     SessionSchedulingHistoryCreatorSpec,
 )
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -247,7 +248,7 @@ class TestUpdateWithHistory:
         async with db_with_cleanup.begin_session() as db_sess:
             keypair = KeyPairRow(
                 access_key=access_key,
-                secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
+                secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex}")),
                 is_active=True,
                 is_admin=False,
                 resource_policy=test_keypair_resource_policy_name,

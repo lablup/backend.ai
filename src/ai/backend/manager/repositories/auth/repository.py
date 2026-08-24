@@ -25,6 +25,7 @@ from ai.backend.manager.repositories.auth.db_source.db_source import (
     CredentialVerificationResult,
     LoginSessionCreationResult,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 auth_repository_resilience = Resilience(
     policies=[
@@ -36,8 +37,8 @@ auth_repository_resilience = Resilience(
 class AuthRepository:
     _db_source: AuthDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = AuthDBSource(db)
+    def __init__(self, db: ExtendedAsyncSAEngine, key_provider_pool: KeyProviderPool) -> None:
+        self._db_source = AuthDBSource(db, key_provider_pool)
 
     @auth_repository_resilience.apply()
     async def get_group_membership(self, group_id: UUID, user_id: UUID) -> GroupMembershipData:

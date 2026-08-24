@@ -55,6 +55,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.agent.row import AgentRow
@@ -79,6 +80,7 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
@@ -702,7 +704,11 @@ async def compute_session_processors(
         scheduler_repository=scheduler_repository,
         scheduling_controller=scheduling_controller,
         appproxy_client_pool=AsyncMock(),
-        user_repository=UserRepository(database_engine, V2DBOpsProvider(database_engine)),
+        user_repository=UserRepository(
+            database_engine,
+            V2DBOpsProvider(database_engine),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        ),
     )
     service = SessionService(args)
     return SessionProcessors(

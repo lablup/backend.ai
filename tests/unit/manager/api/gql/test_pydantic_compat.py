@@ -357,6 +357,7 @@ class TestAdaptersRegistry:
         adapters = Adapters.create(
             processors=MagicMock(),
             auth_config=MagicMock(),
+            key_provider_pool=MagicMock(),
             deployment_coordinator=MagicMock(),
             schedule_coordinator=MagicMock(),
         )
@@ -366,6 +367,7 @@ class TestAdaptersRegistry:
         adapters = Adapters.create(
             processors=MagicMock(),
             auth_config=MagicMock(),
+            key_provider_pool=MagicMock(),
             deployment_coordinator=MagicMock(),
             schedule_coordinator=MagicMock(),
         )

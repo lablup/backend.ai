@@ -57,6 +57,7 @@ from ai.backend.manager.data.permission.types import (
     Permission,
     ScopeType,
 )
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.domain import DomainRow
@@ -83,6 +84,8 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.permission_contoller.processors import (
@@ -156,7 +159,11 @@ def user_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> UserProcessors:
     """Real UserProcessors for user.search_by_project SDK calls."""
-    repo = UserRepository(database_engine, V2DBOpsProvider(database_engine))
+    repo = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = UserService(
         storage_manager=AsyncMock(),
         valkey_stat_client=valkey_clients.stat,
@@ -225,7 +232,13 @@ def server_module_registries(
     processors.permission_controller = permission_controller_processors
 
     proj_handler = V2ProjectHandler(adapter=ProjectAdapter(processors))
-    user_handler = V2UserHandler(adapter=UserAdapter(processors, config_provider.config.auth))
+    user_handler = V2UserHandler(
+        adapter=UserAdapter(
+            processors,
+            config_provider.config.auth,
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
+    )
     rbac_handler = V2RBACHandler(adapter=RBACAdapter(processors))
 
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
@@ -614,7 +627,7 @@ async def assigned_users(
             await conn.execute(
                 sa.insert(keypairs).values(
                     access_key=ak,
-                    secret_key=secrets.token_hex(20),
+                    secret_key=SecretValue(secrets.token_hex(20)),
                     is_active=True,
                     is_default=True,
                     resource_policy=resource_policy_fixture,

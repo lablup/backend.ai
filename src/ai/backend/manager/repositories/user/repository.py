@@ -52,6 +52,7 @@ from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.repositories.user.db_source import UserDBSource
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -73,10 +74,18 @@ user_repository_resilience = Resilience(
 
 class UserRepository:
     _db_source: UserDBSource
+    _v2_ops: V2DBOpsProvider
+    _key_provider_pool: KeyProviderPool
 
-    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
-        self._db_source = UserDBSource(db, v2_ops_provider)
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
+        key_provider_pool: KeyProviderPool,
+    ) -> None:
+        self._db_source = UserDBSource(db, v2_ops_provider, key_provider_pool)
         self._v2_ops = v2_ops_provider
+        self._key_provider_pool = key_provider_pool
 
     @user_repository_resilience.apply()
     async def default_access_key(self, user_id: UserID) -> AccessKey | None:
@@ -295,7 +304,7 @@ class UserRepository:
             keypair = await w.create_field(
                 user_id,
                 KeypairCreator(
-                    secrets=generate_keypair_data(),
+                    secrets=await generate_keypair_data(self._key_provider_pool),
                     is_active=creator.is_active,
                     is_admin=creator.is_admin,
                     resource_policy=creator.resource_policy,

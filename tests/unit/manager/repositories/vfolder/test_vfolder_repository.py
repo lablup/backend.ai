@@ -107,6 +107,7 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPu
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -623,7 +624,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
                 KeyPairRow(
                     user=test_user,
                     access_key=f"AK{test_user.hex[:14]}",
-                    secret_key="test-secret",
+                    secret_key=SecretValue("test-secret"),
                     is_active=True,
                     is_admin=False,
                     resource_policy=keypair_policy_with_hosts,

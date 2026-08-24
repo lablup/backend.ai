@@ -69,6 +69,7 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import SessionTemplateRow
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.server import webapp_plugin_ctx
 from ai.backend.testutils.pants import get_parallel_slot
 
@@ -652,7 +653,7 @@ async def admin_user_fixture(
         await conn.execute(
             sa.insert(keypairs).values(
                 access_key=data.keypair.access_key,
-                secret_key=data.keypair.secret_key,
+                secret_key=SecretValue(data.keypair.secret_key),
                 is_active=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
@@ -733,7 +734,7 @@ async def regular_user_fixture(
         await conn.execute(
             sa.insert(keypairs).values(
                 access_key=data.keypair.access_key,
-                secret_key=data.keypair.secret_key,
+                secret_key=SecretValue(data.keypair.secret_key),
                 is_active=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
@@ -820,6 +821,7 @@ async def server_factory(
             3,
             build_auth_middleware(
                 db=r.infrastructure.db,
+                key_provider_pool=r.bootstrap.key_provider_pool,
                 jwt_validator=r.system.jwt_validator,
                 valkey_stat=r.infrastructure.valkey.stat,
                 hook_plugin_ctx=r.plugins.hook_plugin_ctx,

@@ -37,6 +37,7 @@ from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -180,7 +181,7 @@ class TestVfolderSearchFilter:
                 KeyPairRow(
                     user=user_a_id,
                     access_key="TESTKEYCLONE000A",
-                    secret_key="test-secret-ca",
+                    secret_key=SecretValue("test-secret-ca"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -191,7 +192,7 @@ class TestVfolderSearchFilter:
                 KeyPairRow(
                     user=user_b_id,
                     access_key="TESTKEYCLONE000B",
-                    secret_key="test-secret-cb",
+                    secret_key=SecretValue("test-secret-cb"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",

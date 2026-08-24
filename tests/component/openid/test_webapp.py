@@ -11,6 +11,7 @@ import pytest
 import sqlalchemy as sa
 from aiohttp import web
 
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -23,6 +24,7 @@ from ai.backend.manager.plugin.openid.webapp import (
     create_user_if_not_exists,
     generate_user_data,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 # ===========================================================================
 # TestGenerateUserData — pure function, no DB needed
@@ -115,6 +117,7 @@ class TestCreateUserIfNotExists:
             ["backend-ai-users"],
             seed_data,
             password_info,
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         )
 
         assert user.email == "newuser@example.com"
@@ -142,6 +145,7 @@ class TestCreateUserIfNotExists:
             ["backend-ai-users"],
             seed_data,
             password_info,
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         )
         user2 = await create_user_if_not_exists(
             openid_claims,
@@ -149,6 +153,7 @@ class TestCreateUserIfNotExists:
             ["backend-ai-users"],
             seed_data,
             password_info,
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         )
 
         assert user1.uuid == user2.uuid

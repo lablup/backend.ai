@@ -44,6 +44,7 @@ from ai.backend.manager.data.permission.types import (
     Permission,
     ScopeType,
 )
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
@@ -61,6 +62,7 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
@@ -100,7 +102,11 @@ def vfolder_processors(
     service-layer create paths can complete without external dependencies.
     """
     vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
-    user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     config_provider = MagicMock()
     config_provider.legacy_etcd_config_loader.get_vfolder_types = AsyncMock(
         return_value=["user", "group"]

@@ -22,6 +22,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.project import association_groups_users
 from ai.backend.manager.models.user import users
+from ai.backend.manager.secret.types import SecretValue
 
 
 @dataclass
@@ -83,7 +84,7 @@ async def auth_user_fixture(
         await conn.execute(
             sa.insert(keypairs).values(
                 access_key=data.access_key,
-                secret_key=data.secret_key,
+                secret_key=SecretValue(data.secret_key),
                 is_active=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,

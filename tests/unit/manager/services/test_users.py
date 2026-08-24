@@ -18,7 +18,7 @@ from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.types import AccessKey, SecretKey
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.user.types import (
@@ -32,6 +32,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
 )
@@ -107,7 +108,7 @@ class TestCreateUser:
             id=KeyPairID(uuid.uuid4()),
             user_id=sample_user_uuid,
             access_key=AccessKey("TESTKEY1234567890"),
-            secret_key=SecretKey("test-secret-key"),
+            secret_key=SecretValue("test-secret-key"),
             is_active=True,
             is_admin=False,
             is_default=True,
