@@ -45,6 +45,9 @@ from ai.backend.manager.repositories.container_registry.repository import (
 )
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.etcd_config.repository import EtcdConfigRepository
+from ai.backend.manager.repositories.ops.v2.container_registry.provider import (
+    ContainerRegistryOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
@@ -86,7 +89,9 @@ def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
 ) -> ContainerRegistryProcessors:
-    repo = ContainerRegistryRepository(database_engine)
+    repo = ContainerRegistryRepository(
+        database_engine, ContainerRegistryOpsProvider(database_engine)
+    )
     service = ContainerRegistryService(database_engine, repo)
     return ContainerRegistryProcessors(
         processor_registry.group(GroupMeta(CONTAINER_REGISTRY_ENTITY_TYPE)), service

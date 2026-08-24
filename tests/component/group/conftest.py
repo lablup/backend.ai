@@ -29,6 +29,9 @@ from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRo
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
+from ai.backend.manager.repositories.ops.v2.container_registry.provider import (
+    ContainerRegistryOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
@@ -71,7 +74,9 @@ def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
 ) -> ContainerRegistryProcessors:
-    repo = ContainerRegistryRepository(database_engine)
+    repo = ContainerRegistryRepository(
+        database_engine, ContainerRegistryOpsProvider(database_engine)
+    )
     quota_service = cast(AbstractPerProjectContainerRegistryQuotaService, InMemoryQuotaService())
     service = ContainerRegistryService(database_engine, repo, quota_service=quota_service)
     return ContainerRegistryProcessors(

@@ -48,6 +48,7 @@ from ai.backend.manager.models.image import (
     ImageRow,
     get_permission_ctx,
 )
+from ai.backend.manager.models.image.updaters import ImageUpdate
 from ai.backend.manager.models.minilang import EnumFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
@@ -57,7 +58,6 @@ from ai.backend.manager.models.minilang.queryfilter import (
 from ai.backend.manager.models.rbac import ScopeType
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
 from ai.backend.manager.services.container_registry.actions.clear_images import ClearImagesAction
 from ai.backend.manager.services.container_registry.actions.load_all_container_registries import (
     LoadAllContainerRegistriesAction,
@@ -1143,7 +1143,7 @@ class ModifyImageInput(graphene.InputObjectType):  # type: ignore[misc]
     supported_accelerators = graphene.List(graphene.String, required=False)
     resource_limits = graphene.List(lambda: ResourceLimitInput, required=False)
 
-    def to_updater_spec(self) -> ImageUpdaterSpec:
+    def to_update(self) -> ImageUpdate:
         resources_data: dict[str, Any] | UndefinedType = Undefined
         if self.resource_limits is not Undefined:
             resources_data = {}
@@ -1168,7 +1168,7 @@ class ModifyImageInput(graphene.InputObjectType):  # type: ignore[misc]
         )
         labels = {label.key: label.value for label in self.labels} if self.labels else Undefined
 
-        return ImageUpdaterSpec(
+        return ImageUpdate(
             name=OptionalState[str].from_graphql(self.name),
             registry=OptionalState[str].from_graphql(self.registry),
             image=OptionalState[str].from_graphql(self.image),
@@ -1219,7 +1219,7 @@ class ModifyImage(graphene.Mutation):  # type: ignore[misc]
             UpdateImageAction(
                 target=target,
                 architecture=arch,
-                updater_spec=props.to_updater_spec(),
+                update=props.to_update(),
             )
         )
 

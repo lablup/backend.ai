@@ -7,7 +7,8 @@ from decimal import Decimal
 from typing import Any, NamedTuple, override
 from uuid import UUID
 
-from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.entity.image_alias import ImageAliasID
+from ai.backend.common.data.entity.types import EntityData, FieldData
 from ai.backend.common.types import CIStrEnum, ImageCanonical, ImageID, SlotName
 
 type Resources = dict[SlotName, dict[str, Any]]
@@ -165,8 +166,8 @@ class RescanImagesResult:
 
 
 @dataclass
-class ImageAliasData:
-    id: UUID = field(compare=False)
+class ImageAliasData(FieldData):
+    id: ImageAliasID = field(compare=False)
     alias: str
 
 
