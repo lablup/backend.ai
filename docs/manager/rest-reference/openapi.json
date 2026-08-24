@@ -12953,6 +12953,36 @@
           "mode": {
             "$ref": "#/components/schemas/ClientIPMaskingMode",
             "description": "Masking applied before the address is stored"
+          },
+          "ipv4_prefix": {
+            "anyOf": [
+              {
+                "maximum": 32,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "IPv4 bits 'truncate' keeps; the rest are zeroed. Null takes the built-in width of 24.",
+            "title": "Ipv4 Prefix"
+          },
+          "ipv6_prefix": {
+            "anyOf": [
+              {
+                "maximum": 128,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "IPv6 bits 'truncate' keeps; the rest are zeroed. Null takes the built-in width of 48.",
+            "title": "Ipv6 Prefix"
           }
         },
         "required": [

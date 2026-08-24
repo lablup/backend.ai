@@ -2269,6 +2269,12 @@ type ClientIPMaskingPolicy implements Node {
   """Masking applied before the address is stored."""
   mode: ClientIPMaskingMode!
 
+  """IPv4 bits 'truncate' keeps; null takes the built-in width of 24."""
+  ipv4Prefix: Int
+
+  """IPv6 bits 'truncate' keeps; null takes the built-in width of 48."""
+  ipv6Prefix: Int
+
   """Timestamp when the policy was first written."""
   createdAt: DateTime!
 
@@ -16357,6 +16363,12 @@ input UpsertClientIPMaskingPolicyInput {
 
   """Masking applied before the address is stored."""
   mode: ClientIPMaskingMode!
+
+  """IPv4 bits 'truncate' keeps; null takes the built-in width of 24."""
+  ipv4Prefix: Int = null
+
+  """IPv6 bits 'truncate' keeps; null takes the built-in width of 48."""
+  ipv6Prefix: Int = null
 }
 
 """
