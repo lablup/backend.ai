@@ -42,6 +42,56 @@ class TestBackendSelection:
         assert BACKEND_DRIVER["singularity"] == "cni"
 
 
+class TestPull:
+    async def test_a_plain_http_registry_is_allowed(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """BAI clusters commonly run an internal plain-HTTP registry, and apptainer defaults to
+        https — the pull then dies with "server gave HTTP response to HTTPS client" (measured
+        live). The enroot backend allows the same thing via ENROOT_ALLOW_HTTP."""
+        rt = SingularityRuntime(
+            data_path=tmp_path / "data",
+            cache_path=tmp_path / "cache",
+            runtime_path=tmp_path / "run",
+            state_path=tmp_path / "state",
+            kernel_uid=os.geteuid(),
+            kernel_gid=os.getegid(),
+        )
+        (tmp_path / "data").mkdir(parents=True)
+        seen: list[tuple[str, ...]] = []
+
+        async def _fake_run(*argv: str, **kwargs: object) -> tuple[int, bytes, bytes]:
+            seen.append(argv)
+            return 1, b"", b"stopped before touching the network"
+
+        monkeypatch.setattr(rt, "_run", _fake_run)
+
+        with pytest.raises(RuntimeError):
+            await rt.pull_image("192.168.0.156:5000/stable/python:3.13")
+
+        assert "--no-https" in seen[0]
+
+
+class TestOpen:
+    async def test_the_build_tmpdir_is_created(self, tmp_path: Path) -> None:
+        """apptainer will not create APPTAINER_TMPDIR itself; it just refuses to build, and the
+        failure reaches the user as an image-pull error naming a path (measured live)."""
+        rt = SingularityRuntime(
+            data_path=tmp_path / "data",
+            cache_path=tmp_path / "cache",
+            runtime_path=tmp_path / "run",
+            state_path=tmp_path / "state",
+            kernel_uid=os.geteuid(),
+            kernel_gid=os.getegid(),
+        )
+        try:
+            await rt.open()
+            assert rt._tmp_path().is_dir()
+            assert rt._runtime_env()["APPTAINER_TMPDIR"] == str(rt._tmp_path())
+        finally:
+            await rt.close()
+
+
 class TestContainerLifecycle:
     @pytest.fixture
     def runtime(self, tmp_path: Path) -> SingularityRuntime:

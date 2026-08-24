@@ -72,13 +72,28 @@ class SingularityRuntime(RootlessOciRuntime):
         self._binary = resolve_binary()
 
     @override
+    async def open(self) -> None:
+        await super().open()
+        # apptainer refuses to build if APPTAINER_TMPDIR does not already exist — it will not
+        # create it — and the failure surfaces as a pull error naming a path, with nothing to say
+        # that the agent was supposed to have made it. The base creates the four roots; this one
+        # is a child of the cache root, so it has to be created here.
+        tmp = self._tmp_path()
+        await asyncio.to_thread(tmp.mkdir, parents=True, exist_ok=True)
+        if os.geteuid() != self._kernel_uid:
+            os.chown(tmp, self._kernel_uid, self._kernel_gid)
+
+    def _tmp_path(self) -> Path:
+        return self._cache_path / "tmp"
+
+    @override
     def _runtime_env(self) -> dict[str, str]:
         return {
             # Apptainer reads both prefixes; set the modern one and let the alias inherit.
             "APPTAINER_CACHEDIR": str(self._cache_path),
-            "APPTAINER_TMPDIR": str(self._cache_path / "tmp"),
+            "APPTAINER_TMPDIR": str(self._tmp_path()),
             "SINGULARITY_CACHEDIR": str(self._cache_path),
-            "SINGULARITY_TMPDIR": str(self._cache_path / "tmp"),
+            "SINGULARITY_TMPDIR": str(self._tmp_path()),
         }
 
     # ------------------------------------------------------------------ images
@@ -121,7 +136,17 @@ class SingularityRuntime(RootlessOciRuntime):
         try:
             await asyncio.to_thread(shutil.rmtree, staging, ignore_errors=True)
             rc, _out, err = await self._run(
-                self._binary, "build", "--force", "--sandbox", str(staging), f"docker://{image_ref}"
+                self._binary,
+                "build",
+                "--force",
+                # BAI clusters commonly run an internal plain-HTTP registry; apptainer defaults to
+                # https and fails the handshake with "server gave HTTP response to HTTPS client".
+                # The enroot backend allows this the same way (ENROOT_ALLOW_HTTP). A dedicated
+                # config knob can gate it per-registry later.
+                "--no-https",
+                "--sandbox",
+                str(staging),
+                f"docker://{image_ref}",
             )
             if rc != 0:
                 raise RuntimeError(
