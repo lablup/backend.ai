@@ -20,6 +20,11 @@ class ImageStatus(enum.StrEnum):
     PURGING = "PURGING"
     PURGE_ERROR = "PURGE_ERROR"
 
+    @classmethod
+    def purge_in_progress(cls) -> frozenset[ImageStatus]:
+        """Statuses a purge is working through. Writes are refused while in one."""
+        return frozenset({cls.PURGING, cls.PURGE_ERROR})
+
 
 class ImageOrderField(enum.StrEnum):
     NAME = "NAME"

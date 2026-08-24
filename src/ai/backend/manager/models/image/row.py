@@ -65,7 +65,7 @@ from ai.backend.manager.data.image.types import (
 )
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
-from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.image import ImageNotFound, ImagePurgeInProgress
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -703,8 +703,19 @@ class ImageRow(CreatedAtMixin, Base):
         return parsed_image_info
 
     async def mark_as_deleted(self, db_session: AsyncSession) -> None:
+        self._reject_while_purging()
         self.status = ImageStatus.DELETED
         await db_session.flush()
+
+    async def mark_as_alive(self, db_session: AsyncSession) -> None:
+        self._reject_while_purging()
+        self.status = ImageStatus.ALIVE
+        await db_session.flush()
+
+    def _reject_while_purging(self) -> None:
+        """Refuse a status write while a purge is working through this image."""
+        if self.status in ImageStatus.purge_in_progress():
+            raise ImagePurgeInProgress(f"Image is being purged: {self.id}")
 
     def set_resource_limit(
         self,

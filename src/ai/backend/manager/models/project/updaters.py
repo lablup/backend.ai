@@ -11,16 +11,18 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.data.project.types import ProjectData, ProjectStatus
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
-class ProjectUpdater(DataUpdater[ProjectRow, ProjectData]):
-    """Edits a project's settings."""
+class ProjectUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
+    """Edits a project's settings; refuses while a purge is working through it."""
 
     project_id: ProjectID
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
@@ -52,6 +54,10 @@ class ProjectUpdater(DataUpdater[ProjectRow, ProjectData]):
     @override
     def target_id_value(self) -> UUID:
         return self.project_id
+
+    @override
+    def guard_conditions(self) -> list[QueryCondition]:
+        return [ProjectConditions.not_being_purged()]
 
     @override
     def build_values(self) -> dict[str, Any]:
@@ -114,8 +120,8 @@ class ProjectDotfilesUpdater(DataUpdater[ProjectRow, ProjectData]):
 
 
 @dataclass
-class ProjectSoftDeleteUpdater(DataUpdater[ProjectRow, ProjectData]):
-    """Retires a project by clearing its active flag."""
+class ProjectSoftDeleteUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
+    """Retires a project; refuses while a purge is working through it."""
 
     project_id: ProjectID
 
@@ -133,8 +139,12 @@ class ProjectSoftDeleteUpdater(DataUpdater[ProjectRow, ProjectData]):
         return self.project_id
 
     @override
+    def guard_conditions(self) -> list[QueryCondition]:
+        return [ProjectConditions.not_being_purged()]
+
+    @override
     def build_values(self) -> dict[str, Any]:
-        return {"is_active": False}
+        return {"is_active": False, "status": ProjectStatus.DELETED}
 
     @property
     @override
@@ -147,8 +157,9 @@ class ProjectSoftDeleteUpdater(DataUpdater[ProjectRow, ProjectData]):
 
 
 @dataclass
-class ProjectRestoreUpdater(DataUpdater[ProjectRow, ProjectData]):
-    """Puts a retired project back in service."""
+class ProjectRestoreUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
+    """Puts a retired project back in service; refuses while a purge is working
+    through it."""
 
     project_id: ProjectID
 
@@ -166,8 +177,12 @@ class ProjectRestoreUpdater(DataUpdater[ProjectRow, ProjectData]):
         return self.project_id
 
     @override
+    def guard_conditions(self) -> list[QueryCondition]:
+        return [ProjectConditions.not_being_purged()]
+
+    @override
     def build_values(self) -> dict[str, Any]:
-        return {"is_active": True}
+        return {"is_active": True, "status": ProjectStatus.ACTIVE}
 
     @property
     @override

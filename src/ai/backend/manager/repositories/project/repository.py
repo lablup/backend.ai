@@ -21,7 +21,11 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.project.types import ProjectData, UnassignUsersResult
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.errors.resource import InvalidUserUpdateMode, ProjectNotFound
+from ai.backend.manager.errors.resource import (
+    InvalidUserUpdateMode,
+    ProjectNotFound,
+    ProjectPurgeInProgress,
+)
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater, ProjectUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -83,7 +87,14 @@ class ProjectRepository:
                 project_id, user_update_mode, [UserID(uid) for uid in user_uuids]
             )
         async with self._v2_ops.write_ops() as w:
-            return await w.update_data(updater)
+            data = await w.update_guarded_data(updater)
+            if data is None and await w.row_exists(
+                updater.row_class, updater.target_id_column(), updater.target_id_value()
+            ):
+                raise ProjectPurgeInProgress(
+                    f"Project is being purged: {updater.target_id_value()}"
+                )
+            return data
 
     @project_repository_resilience.apply()
     async def update_dotfiles(self, updater: ProjectDotfilesUpdater) -> ProjectData:

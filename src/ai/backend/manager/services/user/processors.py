@@ -93,6 +93,10 @@ from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
     PurgeUserActionResult,
 )
+from ai.backend.manager.services.user.actions.restore_user import (
+    RestoreUserAction,
+    RestoreUserActionResult,
+)
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
 from ai.backend.manager.services.user.actions.search_users_by_domain import (
     SearchUsersByDomainAction,
@@ -142,6 +146,7 @@ class UserProcessors:
     get_user: SingleEntityActionProcessor[GetUserAction, GetUserActionResult]
     update_user: SingleEntityActionProcessor[UpdateUserAction, UpdateUserActionResult]
     delete_user: SingleEntityActionProcessor[DeleteUserAction, DeleteUserActionResult]
+    restore_user: SingleEntityActionProcessor[RestoreUserAction, RestoreUserActionResult]
     purge_user: SingleEntityActionProcessor[PurgeUserAction, PurgeUserActionResult]
     bulk_create_users: GlobalActionProcessor[BulkCreateUserAction, BulkCreateUserActionResult]
     bulk_modify_users: GlobalActionProcessor[BulkUpdateUserAction, BulkUpdateUserActionResult]
@@ -206,6 +211,7 @@ class UserProcessors:
         self.get_user = group.single_entity(GetUserAction, user_service.get_user)
         self.update_user = group.single_entity(UpdateUserAction, user_service.update_user)
         self.delete_user = group.single_entity(DeleteUserAction, user_service.delete_user)
+        self.restore_user = group.single_entity(RestoreUserAction, user_service.restore_user)
         self.purge_user = group.single_entity(PurgeUserAction, user_service.purge_user)
         self.bulk_create_users = group.global_scope(
             BulkCreateUserAction, user_service.bulk_create_users

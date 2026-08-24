@@ -29,6 +29,11 @@ class DomainStatus(enum.StrEnum):
     PURGING = "purging"
     PURGE_ERROR = "purge-error"
 
+    @classmethod
+    def purge_in_progress(cls) -> frozenset[DomainStatus]:
+        """Statuses a purge is working through. Writes are refused while in one."""
+        return frozenset({cls.PURGING, cls.PURGE_ERROR})
+
 
 @dataclass
 class UserInfo:

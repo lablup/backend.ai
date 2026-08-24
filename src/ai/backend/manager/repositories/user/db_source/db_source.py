@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from datetime import datetime, timedelta
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 from uuid import UUID, uuid4
 
 import aiotools
@@ -44,6 +44,7 @@ from ai.backend.manager.errors.user import (
     UserModificationBadRequest,
     UserModificationFailure,
     UserNotFound,
+    UserPurgeInProgress,
 )
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
@@ -293,6 +294,8 @@ class UserDBSource:
 
         # Get current user data for validation (by UUID)
         current_user = await self._get_user_by_uuid_with_session(session, user_id)
+        if current_user.status in UserStatus.purge_in_progress():
+            raise UserPurgeInProgress(f"User is being purged: {user_id}")
 
         # Check if new username is already taken by another user
         new_username = updater.username.optional_value()
@@ -355,18 +358,43 @@ class UserDBSource:
             return await self._update_single_user_validated(session, updater)
 
     async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> None:
-        """Soft delete user by UUID, setting status to DELETED and deactivating keypairs."""
+        """Soft delete a user by UUID, setting status to DELETED.
+
+        The user's keypairs are left active: what keeps a deleted account out of the
+        API is the status gate the auth middleware applies.
+        """
         async with self._db.begin() as conn:
-            await conn.execute(
-                sa.update(keypairs).values(is_active=False).where(keypairs.c.user == user_uuid)
-            )
             result = await conn.execute(
                 sa.update(users)
                 .values(status=UserStatus.DELETED, status_info="admin-requested")
-                .where(users.c.uuid == user_uuid)
+                .where(
+                    (users.c.uuid == user_uuid)
+                    & users.c.status.not_in(UserStatus.purge_in_progress())
+                )
             )
             if result.rowcount == 0:
-                raise UserNotFound(f"User with UUID {user_uuid} not found.")
+                await self._raise_missing_or_purging(conn, user_uuid)
+
+    async def restore_user_by_uuid_validated(self, user_uuid: UUID) -> None:
+        """Restore a soft-deleted user by UUID, setting status back to ACTIVE."""
+        async with self._db.begin() as conn:
+            result = await conn.execute(
+                sa.update(users)
+                .values(status=UserStatus.ACTIVE, status_info="admin-requested")
+                .where(
+                    (users.c.uuid == user_uuid)
+                    & users.c.status.not_in(UserStatus.purge_in_progress())
+                )
+            )
+            if result.rowcount == 0:
+                await self._raise_missing_or_purging(conn, user_uuid)
+
+    async def _raise_missing_or_purging(self, conn: AsyncConnection, user_uuid: UUID) -> NoReturn:
+        """Name why a status write touched nothing: the row is gone, or a purge holds it."""
+        current = await conn.scalar(sa.select(users.c.status).where(users.c.uuid == user_uuid))
+        if current is None:
+            raise UserNotFound(f"User with UUID {user_uuid} not found.")
+        raise UserPurgeInProgress(f"User is being purged: {user_uuid}")
 
     async def purge_user_by_uuid(self, user_uuid: UUID) -> None:
         """Completely purge user and all associated data by UUID."""

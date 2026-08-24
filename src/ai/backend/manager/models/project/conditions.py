@@ -9,7 +9,7 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
-from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.data.project.types import ProjectStatus, ProjectType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
@@ -26,6 +26,15 @@ __all__ = ("ProjectConditions",)
 
 class ProjectConditions:
     """Query conditions for filtering groups/projects."""
+
+    @staticmethod
+    def not_being_purged() -> QueryCondition:
+        """Match the projects no purge is working through."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectRow.status.not_in(ProjectStatus.purge_in_progress())
+
+        return inner
 
     # ==================== Name Filters ====================
 

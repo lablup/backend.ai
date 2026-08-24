@@ -69,6 +69,10 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesAction,
     PurgeImagesActionResult,
 )
+from ai.backend.manager.services.image.actions.restore_image import (
+    RestoreImageByIdAction,
+    RestoreImageByIdActionResult,
+)
 from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
@@ -226,6 +230,17 @@ class ImageService:
             await self._validate_image_ownership(action.image_id, user.user_id)
         data = await self._image_repository.soft_delete_image_by_id(action.image_id)
         return ForgetImageByIdActionResult(image=data)
+
+    async def restore_image_by_id(
+        self, action: RestoreImageByIdAction
+    ) -> RestoreImageByIdActionResult:
+        # Regular users need ownership validation
+        user = current_user()
+        is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
+        if not is_superadmin and user is not None:
+            await self._validate_image_ownership(action.image_id, user.user_id)
+        data = await self._image_repository.restore_image_by_id(action.image_id)
+        return RestoreImageByIdActionResult(image=data)
 
     async def alias_image(self, action: AliasImageAction) -> AliasImageActionResult:
         """

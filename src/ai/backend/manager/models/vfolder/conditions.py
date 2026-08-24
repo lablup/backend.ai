@@ -25,6 +25,15 @@ class VFolderConditions:
     """Query conditions for vfolders."""
 
     @staticmethod
+    def not_being_purged() -> QueryCondition:
+        """Match the vfolders no purge is working through."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return VFolderRow.status.not_in(VFolderOperationStatus.purge_in_progress())
+
+        return inner
+
+    @staticmethod
     def by_id(vfolder_id: UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return VFolderRow.id == vfolder_id

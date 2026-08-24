@@ -120,6 +120,15 @@ class VFolderOperationStatus(enum.StrEnum):
     DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanently, only DB row remains
     DELETE_ERROR = "delete-error"
 
+    @classmethod
+    def purge_in_progress(cls) -> frozenset[VFolderOperationStatus]:
+        """Statuses a purge is working through. Writes are refused while in one.
+
+        ``DELETE_ONGOING`` and ``DELETE_ERROR`` name the two points the other entities
+        call ``purging`` and ``purge-error``.
+        """
+        return frozenset({cls.DELETE_ONGOING, cls.DELETE_ERROR})
+
     @override
     @classmethod
     def _missing_(cls, value: Any) -> VFolderOperationStatus | None:

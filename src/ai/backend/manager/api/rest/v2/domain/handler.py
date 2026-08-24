@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     CreateDomainInput,
     DeleteDomainInput,
     PurgeDomainInput,
+    RestoreDomainInput,
     UpdateDomainInput,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -83,7 +84,16 @@ class V2DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Soft-delete a domain (superadmin only)."""
-        result = await self._adapter.admin_delete(body.parsed, self._build_user_info(ctx))
+        result = await self._adapter.admin_delete(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_restore(
+        self,
+        body: BodyParam[RestoreDomainInput],
+        ctx: UserContext,
+    ) -> APIResponse:
+        """Restore a soft-deleted domain (superadmin only)."""
+        result = await self._adapter.admin_restore(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_purge(
@@ -92,5 +102,5 @@ class V2DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Permanently purge a domain (superadmin only)."""
-        result = await self._adapter.admin_purge(body.parsed, self._build_user_info(ctx))
+        result = await self._adapter.admin_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

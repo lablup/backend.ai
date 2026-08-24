@@ -7,8 +7,10 @@ write is picked.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Any
 
 import sqlalchemy as sa
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.errors.repository import EntityNotFoundError
@@ -78,6 +80,19 @@ class V2UpdateWriteOps(V2WriteOpsBase):
         if row is None:
             return None
         return updater.to_data(row)
+
+    async def row_exists[TRow: Base](
+        self, row_class: type[TRow], id_column: InstrumentedAttribute[Any], id_value: Any
+    ) -> bool:
+        """Report whether the row the id names is there.
+
+        Reads in the session the write ran in, so a guarded write that touched nothing
+        can tell a missing row from a refusing one without a second transaction.
+        """
+        stmt = (
+            sa.select(sa.literal(1)).select_from(row_class.__table__).where(id_column == id_value)
+        )
+        return (await self._sess.execute(stmt)).first() is not None
 
     async def partial_bulk_update_data[TRow: Base, TData](
         self, updaters: Mapping[EntityIdentifier, DataUpdater[TRow, TData]]

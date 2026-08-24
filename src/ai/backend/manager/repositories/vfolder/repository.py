@@ -543,8 +543,11 @@ class VfolderRepository:
             return data
 
         async with self._db.begin_readonly_session_read_committed() as session:
-            if await self._get_vfolder_by_id(session, updater.vfolder_id) is None:
+            refused = await self._get_vfolder_by_id(session, updater.vfolder_id)
+            if refused is None:
                 raise VFolderNotFound()
+            if refused.status in VFolderOperationStatus.purge_in_progress():
+                raise VFolderFilterStatusFailed(f"VFolder is being purged: {updater.vfolder_id}")
             mount_sessions = await get_sessions_by_mounted_folder(
                 session, VFolderID.from_str(mount_key)
             )
@@ -561,10 +564,10 @@ class VfolderRepository:
         Returns updated VFolderData.
         """
         async with self._v2_ops.write_ops() as w:
-            data = await w.update_data(updater)
-            if data is None:
-                raise VFolderNotFound()
-            return data
+            data = await w.update_guarded_data(updater)
+            if data is not None:
+                return data
+        raise await self._refusal_error(updater.vfolder_id)
 
     @vfolder_repository_resilience.apply()
     async def move_vfolders_to_trash(self, vfolder_ids: list[uuid.UUID]) -> list[VFolderData]:
@@ -597,6 +600,8 @@ class VfolderRepository:
             # This would need to be passed to the repository method or handled differently
             # For now, we'll update the status directly instead of using the full deletion process
             for vfolder_row in vfolder_rows:
+                if vfolder_row.status in VFolderOperationStatus.purge_in_progress():
+                    raise VFolderFilterStatusFailed(f"VFolder is being purged: {vfolder_row.id}")
                 mount_sessions = await get_sessions_by_mounted_folder(
                     session, VFolderID.from_row(vfolder_row)
                 )
@@ -624,6 +629,8 @@ class VfolderRepository:
             for vfolder_id in vfolder_ids:
                 vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
                 if vfolder_row:
+                    if vfolder_row.status in VFolderOperationStatus.purge_in_progress():
+                        raise VFolderFilterStatusFailed(f"VFolder is being purged: {vfolder_id}")
                     vfolder_row.status = VFolderOperationStatus.READY
                     vfolder_rows.append(vfolder_row)
 
@@ -631,6 +638,14 @@ class VfolderRepository:
             for row in vfolder_rows:
                 await session.refresh(row, attribute_names=["updated_at"])
             return [self._vfolder_row_to_data(row) for row in vfolder_rows]
+
+    async def _refusal_error(self, vfolder_id: uuid.UUID) -> BackendAIError:
+        """Name why a guarded write touched nothing: the row is gone, or a purge holds it."""
+        async with self._db.begin_readonly_session_read_committed() as session:
+            row = await self._get_vfolder_by_id(session, vfolder_id)
+        if row is None:
+            return VFolderNotFound()
+        return VFolderFilterStatusFailed(f"VFolder is being purged: {vfolder_id}")
 
     async def _fetch_vfolders_with_linked_model_cards(
         self,

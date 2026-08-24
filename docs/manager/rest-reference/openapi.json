@@ -8726,6 +8726,21 @@
         "title": "DeleteDomainInput",
         "type": "object"
       },
+      "RestoreDomainInput": {
+        "description": "Input for restoring a soft-deleted domain.",
+        "properties": {
+          "name": {
+            "description": "Name of the domain to restore.",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "RestoreDomainInput",
+        "type": "object"
+      },
       "PurgeDomainInput": {
         "description": "Input for permanently purging a domain and all associated data.",
         "properties": {
@@ -11616,6 +11631,22 @@
           "image_id"
         ],
         "title": "ForgetImageInput",
+        "type": "object"
+      },
+      "RestoreImageInput": {
+        "description": "Input for restoring a forgotten (soft-deleted) image.",
+        "properties": {
+          "image_id": {
+            "description": "ID of the image to restore",
+            "format": "uuid",
+            "title": "Image Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_id"
+        ],
+        "title": "RestoreImageInput",
         "type": "object"
       },
       "PurgeImageInput": {
@@ -15903,6 +15934,22 @@
           "group_id"
         ],
         "title": "DeleteProjectInput",
+        "type": "object"
+      },
+      "RestoreProjectInput": {
+        "description": "Input for restoring a soft-deleted group.",
+        "properties": {
+          "group_id": {
+            "description": "UUID of the group to restore.",
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id"
+        ],
+        "title": "RestoreProjectInput",
         "type": "object"
       },
       "PurgeProjectInput": {
@@ -30768,6 +30815,22 @@
         "title": "DeleteUserInput",
         "type": "object"
       },
+      "RestoreUserInput": {
+        "description": "Input for restoring a soft-deleted user.",
+        "properties": {
+          "user_id": {
+            "description": "UUID of the user to restore.",
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "RestoreUserInput",
+        "type": "object"
+      },
       "VFolderFilter": {
         "description": "Filter criteria for searching virtual folders.",
         "properties": {
@@ -44765,6 +44828,35 @@
         "description": "Soft-delete a domain (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/domains/restore": {
+      "post": {
+        "operationId": "v2/domains.admin_restore",
+        "tags": [
+          "v2/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreDomainInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Restore a soft-deleted domain (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
     "/v2/domains/purge": {
       "post": {
         "operationId": "v2/domains.admin_purge",
@@ -45654,6 +45746,35 @@
         },
         "parameters": [],
         "description": "Forget (soft-delete) an image.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/images/restore": {
+      "post": {
+        "operationId": "v2/images.admin_restore",
+        "tags": [
+          "v2/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreImageInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Restore a forgotten (soft-deleted) image.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/images/purge": {
@@ -47238,6 +47359,35 @@
         },
         "parameters": [],
         "description": "Soft-delete a project (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/projects/restore": {
+      "post": {
+        "operationId": "v2/projects.admin_restore",
+        "tags": [
+          "v2/projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreProjectInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Restore a soft-deleted project (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/projects/purge": {
@@ -52790,6 +52940,35 @@
         },
         "parameters": [],
         "description": "Soft-delete a user (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/users/restore": {
+      "post": {
+        "operationId": "v2/users.restore_user",
+        "tags": [
+          "v2/users"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreUserInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Restore a soft-deleted user (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/users/domains/{domain_name}/search": {

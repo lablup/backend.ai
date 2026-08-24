@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
     ProjectFilter,
     ProjectOrder,
     PurgeProjectInput,
+    RestoreProjectInput,
     UnassignUsersFromProjectInput,
     UpdateProjectInput,
 )
@@ -33,6 +34,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
     ProjectPayload,
     ProjectStorageInfo,
     PurgeProjectPayload,
+    RestoreProjectPayload,
     UnassignUserError,
     UnassignUsersFromProjectPayload,
     VFolderHostPermissionEntry,
@@ -65,7 +67,11 @@ from ai.backend.manager.models.project.scopes import (
     UserProjectOperationScope,
 )
 from ai.backend.manager.models.project.searchers import ProjectSearcher
-from ai.backend.manager.models.project.updaters import ProjectSoftDeleteUpdater, ProjectUpdater
+from ai.backend.manager.models.project.updaters import (
+    ProjectRestoreUpdater,
+    ProjectSoftDeleteUpdater,
+    ProjectUpdater,
+)
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
@@ -75,6 +81,7 @@ from ai.backend.manager.services.project.actions.assign_users_to_project import 
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.delete_project import DeleteProjectAction
 from ai.backend.manager.services.project.actions.purge_project import PurgeProjectAction
+from ai.backend.manager.services.project.actions.restore_project import RestoreProjectAction
 from ai.backend.manager.services.project.actions.search_projects import (
     GetProjectAction,
     GlobalSearchProjectsAction,
@@ -236,6 +243,14 @@ class ProjectAdapter(BaseAdapter):
             DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=project_id))
         )
         return DeleteProjectPayload(deleted=True)
+
+    async def admin_restore(self, input: RestoreProjectInput) -> RestoreProjectPayload:
+        """Restore a soft-deleted project (superadmin only)."""
+        project_id = ProjectID(input.group_id)
+        await self._processors.project.restore_project.run(
+            RestoreProjectAction(updater=ProjectRestoreUpdater(project_id=project_id))
+        )
+        return RestoreProjectPayload(restored=True)
 
     async def admin_purge(self, input: PurgeProjectInput) -> PurgeProjectPayload:
         """Permanently purge a project (superadmin only)."""

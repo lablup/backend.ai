@@ -21,6 +21,7 @@ __all__ = (
     "ContainerRegistryScopeInputDTO",
     "DealiasImageInput",
     "ForgetImageInput",
+    "RestoreImageInput",
     "ImageAliasFilterInputDTO",
     "ImageAliasNestedFilterInputDTO",
     "ImageAliasOrderByInputDTO",
@@ -185,6 +186,12 @@ class ForgetImageInput(BaseRequestModel):
     """Input for forgetting (soft-deleting) an image."""
 
     image_id: UUID = Field(description="ID of the image to forget")
+
+
+class RestoreImageInput(BaseRequestModel):
+    """Input for restoring a forgotten (soft-deleted) image."""
+
+    image_id: UUID = Field(description="ID of the image to restore")
 
 
 class PurgeImageInput(BaseRequestModel):

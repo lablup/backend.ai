@@ -8718,6 +8718,11 @@ type Mutation {
   adminDeleteDomainV2(domainName: String!): DeleteDomainPayload
 
   """
+  Added in 26.9.0. Restore a soft-deleted domain (admin only). Requires superadmin privileges.
+  """
+  adminRestoreDomainV2(domainName: String!): RestoreDomainPayload
+
+  """
   Added in 26.4.2. Permanently purge a domain and all associated data (admin only). Requires superadmin privileges.
   """
   adminPurgeDomainV2(domainName: String!): PurgeDomainPayload
@@ -8741,6 +8746,11 @@ type Mutation {
   Added in 26.4.2. Permanently purge a project and all associated data (admin only). Requires superadmin privileges.
   """
   adminPurgeProjectV2(projectId: UUID!): PurgeProjectPayload
+
+  """
+  Added in 26.9.0. Restore a soft-deleted project (admin only). Requires superadmin privileges.
+  """
+  adminRestoreProjectV2(projectId: UUID!): RestoreProjectPayload
 
   """
   Added in 26.4.2. Unassign users from a project. RBAC validates project admin permission.
@@ -8781,6 +8791,11 @@ type Mutation {
   Added in 26.2.0. Soft-delete a user (admin only). Requires superadmin privileges. Sets the user status to DELETED but preserves data
   """
   adminDeleteUserV2(userId: UUID!): DeleteUserV2Payload
+
+  """
+  Added in 26.9.0. Restore a soft-deleted user (admin only). Requires superadmin privileges. Sets the user status back to ACTIVE
+  """
+  adminRestoreUserV2(userId: UUID!): RestoreUserV2Payload
 
   """
   Added in 26.2.0. Soft-delete multiple users (admin only). Requires superadmin privileges. Sets user status to DELETED but preserves data
@@ -12867,6 +12882,24 @@ Added in 25.15.0. Response payload for artifact restoration operations. Contains
 type RestoreArtifactsPayload {
   """List of restored artifacts."""
   artifacts: [Artifact!]!
+}
+
+"""Added in 26.9.0. Payload for domain restore mutation."""
+type RestoreDomainPayload {
+  """Whether the restore was successful."""
+  restored: Boolean!
+}
+
+"""Added in 26.9.0. Payload for project restore mutation."""
+type RestoreProjectPayload {
+  """Whether the restore was successful."""
+  restored: Boolean!
+}
+
+"""Added in 26.9.0. Payload for single user restore mutation."""
+type RestoreUserV2Payload {
+  """Whether the restore was successful."""
+  success: Boolean!
 }
 
 """

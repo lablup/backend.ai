@@ -19,13 +19,15 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
+from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.types import OptionalState
 
 
 @dataclass
-class VFolderAttributeUpdater(DataUpdater[VFolderRow, VFolderData]):
-    """Edit a vfolder's name, cloneable flag and mount permission."""
+class VFolderAttributeUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
+    """Edit a vfolder's name, cloneable flag and mount permission; refuses while a
+    purge is working through it."""
 
     vfolder_id: VFolderUUID
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
@@ -46,6 +48,10 @@ class VFolderAttributeUpdater(DataUpdater[VFolderRow, VFolderData]):
     @override
     def target_id_value(self) -> VFolderUUID:
         return self.vfolder_id
+
+    @override
+    def guard_conditions(self) -> list[QueryCondition]:
+        return [VFolderConditions.not_being_purged()]
 
     @property
     @override
@@ -137,7 +143,7 @@ class VFolderTrashUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
                 )
             )
 
-        return [not_mounted]
+        return [VFolderConditions.not_being_purged(), not_mounted]
 
     @property
     @override

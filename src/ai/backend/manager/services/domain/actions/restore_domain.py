@@ -2,14 +2,14 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.manager.actions.v2.ops.base import RestoreSingleEntityOpsAction
+from ai.backend.manager.actions.v2.ops.base import RestoreSingleEntityGuardedOpsAction
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.domain.updaters import DomainRestoreUpdater
 
 
 @dataclass(frozen=True)
-class RestoreDomainAction(RestoreSingleEntityOpsAction[DomainRow, DomainData]):
+class RestoreDomainAction(RestoreSingleEntityGuardedOpsAction[DomainRow, DomainData]):
     """Put one retired domain back in service."""
 
     updater: DomainRestoreUpdater

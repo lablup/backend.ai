@@ -12,8 +12,13 @@ from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.dto.manager.v2.user.request import DeleteUserInput, PurgeUserInput
+from ai.backend.common.dto.manager.v2.user.request import (
+    DeleteUserInput,
+    PurgeUserInput,
+    RestoreUserInput,
+)
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AccessKey, ReadableCIDR
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.gql.decorators import (
@@ -37,6 +42,7 @@ from ai.backend.manager.api.gql.user.types import (
     DeleteUsersPayloadGQL,
     PurgeUserInputGQL,
     PurgeUserPayloadGQL,
+    RestoreUserPayloadGQL,
     UpdateMyAllowedClientIPInputGQL,
     UpdateMyAllowedClientIPPayloadGQL,
     UpdateUserPayloadGQL,
@@ -421,6 +427,23 @@ async def admin_delete_user_v2(
     ctx = info.context
     await ctx.adapters.user.delete_user_by_id(DeleteUserInput(user_id=user_id))
     return DeleteUserPayloadGQL(success=True)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Restore a soft-deleted user (admin only). Requires superadmin privileges. Sets the user status back to ACTIVE",
+    )
+)
+async def admin_restore_user_v2(
+    info: Info[StrawberryGQLContext],
+    user_id: UUID,
+) -> RestoreUserPayloadGQL | None:
+    """Restore a single soft-deleted user."""
+    check_admin_only()
+    ctx = info.context
+    await ctx.adapters.user.restore_user_by_id(RestoreUserInput(user_id=user_id))
+    return RestoreUserPayloadGQL(success=True)
 
 
 @gql_mutation(

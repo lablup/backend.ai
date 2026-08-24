@@ -150,8 +150,13 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> None:
-        """Soft delete user by UUID, setting status to DELETED and deactivating keypairs."""
+        """Soft delete user by UUID, setting status to DELETED."""
         await self._db_source.delete_user_by_uuid_validated(user_uuid)
+
+    @user_repository_resilience.apply()
+    async def restore_user_by_uuid_validated(self, user_uuid: UUID) -> None:
+        """Restore a soft-deleted user by UUID, setting status back to ACTIVE."""
+        await self._db_source.restore_user_by_uuid_validated(user_uuid)
 
     @user_repository_resilience.apply()
     async def purge_user_by_uuid(self, user_uuid: UUID) -> None:
