@@ -104,3 +104,16 @@ class SecretEncryptionMisconfigured(BackendAIError, web.HTTPInternalServerError)
             operation=ErrorOperation.SETUP,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class InvalidSecretBinding(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-secret-binding"
+    error_title = "A secret column accepts only a parsed secret value."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SECRET,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
