@@ -12759,6 +12759,225 @@
         "title": "UpdateLoginClientTypeInput",
         "type": "object"
       },
+      "ClientIPMaskingMode": {
+        "enum": [
+          "none",
+          "truncate",
+          "drop"
+        ],
+        "title": "ClientIPMaskingMode",
+        "type": "string"
+      },
+      "ClientIPMaskingPolicyFilter": {
+        "properties": {
+          "target_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClientIPMaskingTarget"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the governed target."
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClientIPMaskingMode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by masking mode."
+          }
+        },
+        "title": "ClientIPMaskingPolicyFilter",
+        "type": "object"
+      },
+      "ClientIPMaskingPolicyOrder": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ClientIPMaskingPolicyOrderField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "ClientIPMaskingPolicyOrder",
+        "type": "object"
+      },
+      "ClientIPMaskingPolicyOrderField": {
+        "enum": [
+          "target_type",
+          "mode",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ClientIPMaskingPolicyOrderField",
+        "type": "string"
+      },
+      "ClientIPMaskingTarget": {
+        "description": "Which recorded client IP a policy row governs.\n\n``DEFAULT`` is the fallback the other targets inherit; it is a target value rather\nthan a column so a row exists for each and no row has to be singled out.",
+        "enum": [
+          "default",
+          "login_history",
+          "audit_logs"
+        ],
+        "title": "ClientIPMaskingTarget",
+        "type": "string"
+      },
+      "AdminSearchClientIPMaskingPoliciesInput": {
+        "description": "Read the masking set for every target.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClientIPMaskingPolicyFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ClientIPMaskingPolicyOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset"
+          }
+        },
+        "title": "AdminSearchClientIPMaskingPoliciesInput",
+        "type": "object"
+      },
+      "AdminUpsertClientIPMaskingPolicyInput": {
+        "description": "Set the masking one target gets.",
+        "properties": {
+          "target_type": {
+            "$ref": "#/components/schemas/ClientIPMaskingTarget",
+            "description": "Which recorded client IP to govern"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ClientIPMaskingMode",
+            "description": "Masking applied before the address is stored"
+          }
+        },
+        "required": [
+          "target_type",
+          "mode"
+        ],
+        "title": "AdminUpsertClientIPMaskingPolicyInput",
+        "type": "object"
+      },
+      "AdminPurgeClientIPMaskingPolicyInput": {
+        "description": "Drop one target's policy so it falls back to the default.",
+        "properties": {
+          "id": {
+            "description": "Policy ID",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "AdminPurgeClientIPMaskingPolicyInput",
+        "type": "object"
+      },
       "LoginAttemptResult": {
         "description": "Result of a login attempt.",
         "enum": [
@@ -46033,6 +46252,93 @@
           }
         ],
         "description": "Delete a login client type (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/client-ip-masking-policies/search": {
+      "post": {
+        "operationId": "v2/client-ip-masking-policies.admin_search",
+        "tags": [
+          "v2/client-ip-masking-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSearchClientIPMaskingPoliciesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Read the masking set for every target.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/client-ip-masking-policies/upsert": {
+      "post": {
+        "operationId": "v2/client-ip-masking-policies.admin_upsert",
+        "tags": [
+          "v2/client-ip-masking-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUpsertClientIPMaskingPolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Set the masking one target gets.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/client-ip-masking-policies/purge": {
+      "post": {
+        "operationId": "v2/client-ip-masking-policies.admin_purge",
+        "tags": [
+          "v2/client-ip-masking-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminPurgeClientIPMaskingPolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Drop one target's policy so it falls back to the default.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/login-history/search": {
