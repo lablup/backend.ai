@@ -10,7 +10,9 @@ from uuid import UUID
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerms,
     create_v2_registry,
+    entity_label_filter_options,
     load_v2_config,
     print_result,
 )
@@ -192,15 +194,21 @@ def get(session_id: str) -> None:
 @click.argument("project_id", type=str)
 @click.option("--limit", type=int, default=20)
 @click.option("--offset", type=int, default=0)
-def project_search(project_id: str, limit: int, offset: int) -> None:
+@entity_label_filter_options
+def project_search(project_id: str, limit: int, offset: int, label: EntityLabelTerms) -> None:
     """Search sessions within a project."""
 
-    from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
+    from ai.backend.common.dto.manager.v2.session.request import (
+        AdminSearchSessionsInput,
+        SessionFilter,
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            request = AdminSearchSessionsInput(limit=limit, offset=offset)
+            request = AdminSearchSessionsInput(
+                filter=label.attach(SessionFilter()), limit=limit, offset=offset
+            )
             result = await registry.session.project_search(UUID(project_id), request)
             print_result(result)
         finally:

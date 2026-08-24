@@ -1758,6 +1758,10 @@ class DeploymentAdapter(BaseAdapter):
                 conditions.append(
                     negate_conditions([DeploymentConditions.by_replica_exists([violating_replica])])
                 )
+        if f.labels is not None:
+            conditions.extend(
+                self._convert_entity_label_nested_filter(f.labels, DeploymentConditions.labels)
+            )
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_deployment_filter(sub))

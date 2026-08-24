@@ -8,7 +8,9 @@ import uuid
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerms,
     create_v2_registry,
+    entity_label_filter_options,
     load_v2_config,
     parse_order_options,
     print_result,
@@ -40,6 +42,7 @@ def agent() -> None:
     default=None,
     help="Filter by schedulable flag.",
 )
+@entity_label_filter_options
 @click.option(
     "--order-by",
     multiple=True,
@@ -52,22 +55,23 @@ def search(
     scaling_group: str | None,
     schedulable: bool | None,
     order_by: tuple[str, ...],
+    label: EntityLabelTerms,
 ) -> None:
     """Search agents (superadmin only)."""
+    from ai.backend.common.dto.manager.query import StringFilter
     from ai.backend.common.dto.manager.v2.agent.request import (
         AdminSearchAgentsInput,
         AgentFilter,
         AgentOrder,
     )
-    from ai.backend.common.dto.manager.v2.agent.types import AgentOrderField
+    from ai.backend.common.dto.manager.v2.agent.types import (
+        AgentOrderField,
+        AgentStatusEnum,
+        AgentStatusFilter,
+    )
 
-    # Build filter only if any filter option is provided
-    filter_dto: AgentFilter | None = None
-    if any(opt is not None for opt in (status, scaling_group, schedulable)):
-        from ai.backend.common.dto.manager.query import StringFilter
-        from ai.backend.common.dto.manager.v2.agent.types import AgentStatusEnum, AgentStatusFilter
-
-        filter_dto = AgentFilter(
+    filter_dto = label.attach(
+        AgentFilter(
             status=(
                 AgentStatusFilter(equals=AgentStatusEnum(status.upper()))
                 if status is not None
@@ -78,6 +82,7 @@ def search(
             ),
             schedulable=schedulable,
         )
+    )
 
     # Build order only if --order-by is provided
     orders = parse_order_options(order_by, AgentOrderField, AgentOrder) if order_by else None

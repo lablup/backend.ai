@@ -15,7 +15,7 @@ from ai.backend.manager.services.entity_label.actions.lookup_owner import (
 
 
 @dataclass
-class RemoveEntityLabelAction(
+class PurgeEntityLabelAction(
     RuntimePurgeFieldOpsAction[EntityLabelID, EntityLabelRow, EntityLabelData]
 ):
     """Take one label off, named by its own id.
@@ -29,7 +29,7 @@ class RemoveEntityLabelAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "remove_entity_label"
+        return "purge_entity_label"
 
     @override
     def to_owner_lookup_action(self) -> LookupRuntimeFieldOwnerOpsAction[EntityLabelID]:

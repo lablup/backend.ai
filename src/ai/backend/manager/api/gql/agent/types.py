@@ -31,6 +31,7 @@ from ai.backend.common.dto.manager.v2.agent.types import (
     AgentStatusEnum,
     AgentStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -43,6 +44,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.entity_label.types import EntityLabelNestedFilterGQL
 from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticInputMixin,
     PydanticNodeMixin,
@@ -118,6 +120,14 @@ class AgentFilterGQL(PydanticInputMixin[AgentFilter]):
     status: AgentStatusFilterGQL | None = None
     schedulable: bool | None = None
     scaling_group: StringFilter | None = None
+
+    labels: EntityLabelNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Select entities by the labels on them.",
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

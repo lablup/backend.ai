@@ -97,6 +97,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.deployment.types.revision import EnvironmentVariablesGQL
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+from ai.backend.manager.api.gql.entity_label.types import EntityLabelNestedFilterGQL
 from ai.backend.manager.api.gql.image.types import ImageV2ConnectionGQL
 from ai.backend.manager.api.gql.kernel.types import (
     KernelV2ConnectionGQL,
@@ -182,6 +183,14 @@ class SessionV2FilterGQL(PydanticInputMixin[SessionFilter]):
     domain_name: StringFilter | None = None
     project_id: UUIDFilter | None = None
     user_uuid: UUIDFilter | None = None
+
+    labels: EntityLabelNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Select entities by the labels on them.",
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

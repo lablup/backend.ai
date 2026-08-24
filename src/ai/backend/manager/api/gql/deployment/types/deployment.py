@@ -101,6 +101,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     ReplicaGroupHistoryScopeDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     NullableDateTimeFilter,
@@ -160,6 +161,7 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     ModelRevisionOrderBy,
 )
 from ai.backend.manager.api.gql.domain import Domain
+from ai.backend.manager.api.gql.entity_label.types import EntityLabelNestedFilterGQL
 from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -786,6 +788,14 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
         BackendAIGQLMeta(
             added_version="26.8.0",
             description="Filter by conditions on deployment replicas.",
+        ),
+        default=None,
+    )
+
+    labels: EntityLabelNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Select entities by the labels on them.",
         ),
         default=None,
     )

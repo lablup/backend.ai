@@ -16,6 +16,8 @@ import click
 from pydantic import TypeAdapter, ValidationError
 from yarl import URL
 
+from ai.backend.common.api_handlers import BaseRequestModel
+
 if TYPE_CHECKING:
     from ai.backend.client.v2.v2_registry import V2ClientRegistry
 
@@ -219,3 +221,69 @@ def print_result(data: Any) -> None:
         dumped = data
     json_str = json.dumps(dumped, indent=2, ensure_ascii=False, default=str)
     sys.stdout.write(json_str + "\n")
+
+
+@dataclass(frozen=True)
+class EntityLabelTerms:
+    """The labels a search was narrowed by, ready to attach to any entity filter.
+
+    Each term is its own relation, because a relation matches a single label. What
+    combines them is the entity filter's own ``AND``, which is what requiring two
+    different labels means — so attaching is the same work for every entity and lives
+    here rather than in each command.
+    """
+
+    terms: tuple[Any, ...]
+
+    def attach[TFilter: BaseRequestModel](self, base: TFilter) -> TFilter | None:
+        """The filter to send, or ``None`` when nothing was asked for.
+
+        Answers ``None`` for an untouched base and no labels, so a command need not test
+        its own options before deciding whether to send a filter at all.
+        """
+        merged = base.model_copy(
+            update={"AND": [*(getattr(base, "AND", None) or []), *self._as_filters(type(base))]}
+            if self.terms
+            else {}
+        )
+        return merged if merged.model_dump(exclude_none=True) else None
+
+    def _as_filters(self, filter_cls: type[Any]) -> list[Any]:
+        return [filter_cls(labels=term) for term in self.terms]
+
+
+def _parse_entity_label_terms(
+    _ctx: click.Context, _param: click.Parameter, value: tuple[str, ...]
+) -> EntityLabelTerms:
+    """Turn each ``KEY=VALUE`` into the nested filter matching that one label."""
+    from ai.backend.common.dto.manager.query import StringFilter
+    from ai.backend.common.dto.manager.v2.entity_label.request import (
+        EntityLabelFilter,
+        EntityLabelNestedFilter,
+    )
+
+    def to_filter(term: str) -> EntityLabelFilter:
+        key, sep, val = term.partition("=")
+        if not key:
+            raise click.BadParameter(f"{term!r} names no label key")
+        return EntityLabelFilter(
+            key=StringFilter(equals=key),
+            value=StringFilter(equals=val) if sep else None,
+        )
+
+    return EntityLabelTerms(tuple(EntityLabelNestedFilter(some=to_filter(t)) for t in value))
+
+
+def entity_label_filter_options(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """Add ``--label`` to a search command, parsed into :class:`EntityLabelTerms`.
+
+    Takes ``KEY=VALUE``, or ``KEY`` alone to match the key whatever its value.
+    Repeating it narrows further: an entity must carry every label given.
+    """
+    return click.option(
+        "--label",
+        multiple=True,
+        metavar="KEY[=VALUE]",
+        callback=_parse_entity_label_terms,
+        help="Only entities carrying this label. Repeatable (all must match).",
+    )(fn)

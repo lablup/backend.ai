@@ -6,7 +6,13 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
+from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerms,
+    create_v2_registry,
+    entity_label_filter_options,
+    load_v2_config,
+    print_result,
+)
 
 
 @click.group()
@@ -22,6 +28,7 @@ def deployment() -> None:
 @click.option("--last", default=None, type=int, help="Cursor-based: return last N items.")
 @click.option("--before", default=None, type=str, help="Cursor-based: return items before cursor.")
 @click.option("--name-contains", default=None, type=str, help="Filter by name (contains).")
+@entity_label_filter_options
 @click.option(
     "--status",
     multiple=True,
@@ -36,6 +43,7 @@ def search(
     before: str | None,
     name_contains: str | None,
     status: tuple[str, ...],
+    label: EntityLabelTerms,
 ) -> None:
     """Search my deployments."""
 
@@ -46,12 +54,12 @@ def search(
         DeploymentStatusFilter,
     )
 
-    filter_dto: DeploymentFilter | None = None
-    if name_contains or status:
-        filter_dto = DeploymentFilter(
+    filter_dto = label.attach(
+        DeploymentFilter(
             name=StringFilter(contains=name_contains) if name_contains else None,
             status=DeploymentStatusFilter(in_=list(status)) if status else None,
         )
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())

@@ -8,7 +8,13 @@ from uuid import UUID
 
 import click
 
-from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
+from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerms,
+    create_v2_registry,
+    entity_label_filter_options,
+    load_v2_config,
+    print_result,
+)
 
 
 @click.group()
@@ -19,15 +25,21 @@ def vfolder() -> None:
 @vfolder.command(name="my-search")
 @click.option("--limit", type=int, default=20)
 @click.option("--offset", type=int, default=0)
-def my_search(limit: int, offset: int) -> None:
+@entity_label_filter_options
+def my_search(limit: int, offset: int, label: EntityLabelTerms) -> None:
     """Search vfolders owned by the current user."""
 
-    from ai.backend.common.dto.manager.v2.vfolder.request import SearchVFoldersInput
+    from ai.backend.common.dto.manager.v2.vfolder.request import (
+        SearchVFoldersInput,
+        VFolderFilter,
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            request = SearchVFoldersInput(limit=limit, offset=offset)
+            request = SearchVFoldersInput(
+                filter=label.attach(VFolderFilter()), limit=limit, offset=offset
+            )
             result = await registry.vfolder.my_search(request)
             print_result(result)
         finally:
@@ -40,15 +52,21 @@ def my_search(limit: int, offset: int) -> None:
 @click.argument("project_id", type=str)
 @click.option("--limit", type=int, default=20)
 @click.option("--offset", type=int, default=0)
-def project_search(project_id: str, limit: int, offset: int) -> None:
+@entity_label_filter_options
+def project_search(project_id: str, limit: int, offset: int, label: EntityLabelTerms) -> None:
     """Search vfolders within a project."""
 
-    from ai.backend.common.dto.manager.v2.vfolder.request import SearchVFoldersInput
+    from ai.backend.common.dto.manager.v2.vfolder.request import (
+        SearchVFoldersInput,
+        VFolderFilter,
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            request = SearchVFoldersInput(limit=limit, offset=offset)
+            request = SearchVFoldersInput(
+                filter=label.attach(VFolderFilter()), limit=limit, offset=offset
+            )
             result = await registry.vfolder.project_search(UUID(project_id), request)
             print_result(result)
         finally:
@@ -130,15 +148,21 @@ def upload(vfolder_id: UUID, filenames: tuple[str, ...]) -> None:
 @vfolder.command(name="admin-search")
 @click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
-def admin_search(limit: int, offset: int) -> None:
+@entity_label_filter_options
+def admin_search(limit: int, offset: int, label: EntityLabelTerms) -> None:
     """Search all vfolders (admin)."""
 
-    from ai.backend.common.dto.manager.v2.vfolder.request import SearchVFoldersInput
+    from ai.backend.common.dto.manager.v2.vfolder.request import (
+        SearchVFoldersInput,
+        VFolderFilter,
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            request = SearchVFoldersInput(limit=limit, offset=offset)
+            request = SearchVFoldersInput(
+                filter=label.attach(VFolderFilter()), limit=limit, offset=offset
+            )
             result = await registry.vfolder.admin_search(request)
             print_result(result)
         finally:

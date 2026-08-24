@@ -29,6 +29,7 @@ from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.api.adapters.entity.adapter import EntityAdapter
 from ai.backend.manager.api.adapters.entity.types import WiredEntityTypes
 from ai.backend.manager.api.adapters.entity_invitation.adapter import EntityInvitationAdapter
+from ai.backend.manager.api.adapters.entity_label.adapter import EntityLabelAdapter
 from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 from ai.backend.manager.api.adapters.huggingface_registry.adapter import HuggingFaceRegistryAdapter
 from ai.backend.manager.api.adapters.idle_checker.adapter import IdleCheckerAdapter
@@ -101,6 +102,7 @@ class Adapters:
         artifact_registry: ArtifactRegistryAdapter,
         audit_log: AuditLogAdapter,
         entity: EntityAdapter,
+        entity_label: EntityLabelAdapter,
         container_registry: ContainerRegistryAdapter,
         deployment: DeploymentAdapter,
         domain: DomainAdapter,
@@ -152,6 +154,7 @@ class Adapters:
         self.artifact_registry = artifact_registry
         self.audit_log = audit_log
         self.entity = entity
+        self.entity_label = entity_label
         self.container_registry = container_registry
         self.deployment = deployment
         self.domain = domain
@@ -225,6 +228,7 @@ class Adapters:
             artifact_registry=ArtifactRegistryAdapter(processors),
             audit_log=AuditLogAdapter(processors),
             entity=EntityAdapter(entity_types),
+            entity_label=EntityLabelAdapter(processors),
             container_registry=ContainerRegistryAdapter(processors),
             deployment=DeploymentAdapter(processors, deployment_coordinator),
             domain=DomainAdapter(processors),

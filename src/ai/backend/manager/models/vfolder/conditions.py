@@ -8,6 +8,11 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.manager.models.entity_label.conditions import (
+    make_entity_label_nested_conditions,
+)
+
 if TYPE_CHECKING:
     from ai.backend.common.data.filter_specs import StringMatchSpec
 
@@ -23,6 +28,9 @@ from .row import VFolderRow
 
 class VFolderConditions:
     """Query conditions for vfolders."""
+
+    labels = make_entity_label_nested_conditions(VFolderRow, VFolderRow.id, VFOLDER_ENTITY_TYPE)
+    """The `labels` nested filter: some / every / none over the labels on a vfolder."""
 
     @staticmethod
     def not_being_purged() -> QueryCondition:

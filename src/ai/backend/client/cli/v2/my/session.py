@@ -6,7 +6,13 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
+from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerms,
+    create_v2_registry,
+    entity_label_filter_options,
+    load_v2_config,
+    print_result,
+)
 
 
 @click.group()
@@ -21,6 +27,7 @@ def session() -> None:
 @click.option("--after", default=None, type=str, help="Cursor-based: return items after cursor.")
 @click.option("--last", default=None, type=int, help="Cursor-based: return last N items.")
 @click.option("--before", default=None, type=str, help="Cursor-based: return items before cursor.")
+@entity_label_filter_options
 def search(
     limit: int | None,
     offset: int | None,
@@ -28,15 +35,20 @@ def search(
     after: str | None,
     last: int | None,
     before: str | None,
+    label: EntityLabelTerms,
 ) -> None:
     """Search my sessions."""
 
-    from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
+    from ai.backend.common.dto.manager.v2.session.request import (
+        AdminSearchSessionsInput,
+        SessionFilter,
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             request = AdminSearchSessionsInput(
+                filter=label.attach(SessionFilter()),
                 first=first,
                 after=after,
                 last=last,

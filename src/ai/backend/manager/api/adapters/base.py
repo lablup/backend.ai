@@ -12,11 +12,20 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
 )
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.entity_label.conditions import (
+    EntityLabelConditions,
+    EntityLabelNestedConditions,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 if TYPE_CHECKING:
+    from ai.backend.common.dto.manager.v2.entity_label.request import (
+        EntityLabelFilter,
+        EntityLabelNestedFilter,
+    )
     from ai.backend.manager.services.processors import Processors
 
 
@@ -35,6 +44,89 @@ class BaseAdapter(BaseFilterAdapter):
 
     def __init__(self, processors: Processors) -> None:
         self._processors = processors
+
+    def _convert_entity_label_filter(self, f: EntityLabelFilter) -> list[QueryCondition]:
+        """Conditions matching a single label row.
+
+        One instance narrows one row, so a `key` and a `value` given together constrain
+        the same label rather than two different ones.
+        """
+        conditions: list[QueryCondition] = []
+        if f.key is not None:
+            condition = self.convert_string_filter(
+                f.key,
+                contains_factory=EntityLabelConditions.by_key_contains,
+                equals_factory=EntityLabelConditions.by_key_equals,
+                starts_with_factory=EntityLabelConditions.by_key_starts_with,
+                ends_with_factory=EntityLabelConditions.by_key_ends_with,
+                in_factory=EntityLabelConditions.by_key_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.value is not None:
+            condition = self.convert_string_filter(
+                f.value,
+                contains_factory=EntityLabelConditions.by_value_contains,
+                equals_factory=EntityLabelConditions.by_value_equals,
+                starts_with_factory=EntityLabelConditions.by_value_starts_with,
+                ends_with_factory=EntityLabelConditions.by_value_ends_with,
+                in_factory=EntityLabelConditions.by_value_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.entity_type is not None:
+            condition = self.convert_string_filter(
+                f.entity_type,
+                contains_factory=EntityLabelConditions.by_entity_type_contains,
+                equals_factory=EntityLabelConditions.by_entity_type_equals,
+                starts_with_factory=EntityLabelConditions.by_entity_type_starts_with,
+                ends_with_factory=EntityLabelConditions.by_entity_type_ends_with,
+                in_factory=EntityLabelConditions.by_entity_type_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.entity_id is not None:
+            condition = self.convert_uuid_filter(
+                f.entity_id,
+                equals_factory=EntityLabelConditions.by_entity_id_equals,
+                in_factory=EntityLabelConditions.by_entity_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_entity_label_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(self._convert_entity_label_filter(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(self._convert_entity_label_filter(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+        return conditions
+
+    def _convert_entity_label_nested_filter(
+        self, f: EntityLabelNestedFilter, nested: EntityLabelNestedConditions
+    ) -> list[QueryCondition]:
+        """Conditions selecting entities by the labels on them.
+
+        Each relation compiles to one correlated EXISTS, so a relation's `key` and
+        `value` land on the same label. Requiring two different labels is two relations
+        combined by the entity filter's own AND.
+        """
+        conditions: list[QueryCondition] = []
+        if f.some is not None:
+            conditions.append(nested.some(self._convert_entity_label_filter(f.some)))
+        if f.every is not None:
+            conditions.append(nested.every(self._convert_entity_label_filter(f.every)))
+        if f.none is not None:
+            conditions.append(nested.none(self._convert_entity_label_filter(f.none)))
+        return conditions
 
     def batch_load_failure(self, error: Exception | None) -> Exception | None:
         """What a DataLoader is handed for an id a bulk read returned no data for.

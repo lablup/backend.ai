@@ -146,6 +146,10 @@ class AgentAdapter(BaseAdapter):
             condition = self._convert_resource_group_filter(f.scaling_group)
             if condition is not None:
                 conditions.append(condition)
+        if f.labels is not None:
+            conditions.extend(
+                self._convert_entity_label_nested_filter(f.labels, AgentConditions.labels)
+            )
         if f.AND:
             for sub_filter in f.AND:
                 conditions.extend(self._convert_filter(sub_filter))

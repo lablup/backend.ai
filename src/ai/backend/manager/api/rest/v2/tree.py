@@ -56,6 +56,8 @@ def build_v2_routes(
     from .domain.registry import register_v2_domain_routes
     from .entity_invitation.handler import V2EntityInvitationHandler
     from .entity_invitation.registry import register_v2_entity_invitation_routes
+    from .entity_label.handler import V2EntityLabelHandler
+    from .entity_label.registry import register_v2_entity_label_routes
     from .entity_type.handler import V2EntityTypeHandler
     from .entity_type.registry import register_v2_entity_type_routes
     from .fair_share.handler import V2FairShareHandler
@@ -148,6 +150,7 @@ def build_v2_routes(
     artifact_handler = V2ArtifactHandler(adapter=adapters.artifact)
     artifact_registry_handler = V2ArtifactRegistryHandler(adapter=adapters.artifact_registry)
     audit_log_handler = V2AuditLogHandler(adapter=adapters.audit_log)
+    entity_label_handler = V2EntityLabelHandler(adapter=adapters.entity_label)
     container_registry_handler = V2ContainerRegistryHandler(adapter=adapters.container_registry)
     deployment_handler = V2DeploymentHandler(adapter=adapters.deployment)
     domain_handler = V2DomainHandler(adapter=adapters.domain)
@@ -225,6 +228,7 @@ def build_v2_routes(
         register_v2_artifact_registry_routes(artifact_registry_handler, route_deps)
     )
     v2_reg.add_subregistry(register_v2_audit_log_routes(audit_log_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_entity_label_routes(entity_label_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_container_registry_routes(container_registry_handler, route_deps)
     )

@@ -417,6 +417,9 @@ input AgentFilter
   status: AgentStatusFilter = null
   schedulable: Boolean = null
   scalingGroup: StringFilter = null
+
+  """Added in 26.9.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [AgentFilter!] = null
   OR: [AgentFilter!] = null
   NOT: [AgentFilter!] = null
@@ -6164,6 +6167,9 @@ input DeploymentFilter
 
   """Added in 26.8.0. Filter by conditions on deployment replicas."""
   replicas: ReplicaNestedFilter = null
+
+  """Added in 26.9.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [DeploymentFilter!] = null
   OR: [DeploymentFilter!] = null
   NOT: [DeploymentFilter!] = null
@@ -7798,6 +7804,32 @@ input EntityInvitationTargetScope
 
   """Id of the entity being offered."""
   entityId: UUID!
+}
+
+"""
+Added in 26.9.0. Filter matching a single label. A key and a value given together constrain the same label rather than two different ones.
+"""
+input EntityLabelFilter
+  @join__type(graph: STRAWBERRY)
+{
+  key: StringFilter = null
+  value: StringFilter = null
+  entityType: StringFilter = null
+  entityId: UUIDFilter = null
+  AND: [EntityLabelFilter!] = null
+  OR: [EntityLabelFilter!] = null
+  NOT: [EntityLabelFilter!] = null
+}
+
+"""
+Added in 26.9.0. Filter selecting entities by the labels on them. Each relation matches one label at a time; requiring two different labels is two relations combined by the entity filter's own AND.
+"""
+input EntityLabelNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  some: EntityLabelFilter = null
+  every: EntityLabelFilter = null
+  none: EntityLabelFilter = null
 }
 
 union EntityNode
@@ -20943,6 +20975,9 @@ input SessionV2Filter
   domainName: StringFilter = null
   projectId: UUIDFilter = null
   userUuid: UUIDFilter = null
+
+  """Added in 26.9.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [SessionV2Filter!] = null
   OR: [SessionV2Filter!] = null
   NOT: [SessionV2Filter!] = null
@@ -24253,6 +24288,9 @@ input VFolderFilter
   usageMode: VFolderUsageModeFilter = null
   cloneable: Boolean = null
   createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
   NOT: [VFolderFilter!] = null
