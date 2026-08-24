@@ -13,7 +13,7 @@ from ai.backend.client.cli.v2.helpers import (
     print_result,
 )
 
-_TARGET_TYPES = ["default", "login_history"]
+_TARGET_TYPES = ["default", "login_history", "audit_logs"]
 _MODES = ["none", "truncate", "drop"]
 
 

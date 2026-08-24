@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import override
 
+from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -12,12 +13,16 @@ from ai.backend.manager.actions.v2.lookup.bulk_monitor.base import BulkLookupAct
 from ai.backend.manager.actions.v2.lookup.bulk_result import BulkLookupActionProcessResult
 from ai.backend.manager.actions.v2.lookup.bulk_trigger import BulkLookupActionTriggerMeta
 from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.data.client_ip.masking import ClientIPMaskingTarget
 from ai.backend.manager.models.audit_log.creators import (
     LookupAuditLogCreator,
     MissedLookupAuditLogCreator,
 )
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.specs.creator import FieldToCreate
+from ai.backend.manager.repositories.client_ip_masking.repository import (
+    ClientIPMaskingRepository,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = ("BulkLookupActionAuditLogMonitor",)
@@ -33,10 +38,17 @@ class BulkLookupActionAuditLogMonitor(BulkLookupActionMonitor):
 
     _repository: OpsRepository[AuditLogData]
     _policy: AuditLogPolicy
+    _client_ip_masking: ClientIPMaskingRepository
 
-    def __init__(self, repository: OpsRepository[AuditLogData], policy: AuditLogPolicy) -> None:
+    def __init__(
+        self,
+        repository: OpsRepository[AuditLogData],
+        policy: AuditLogPolicy,
+        client_ip_masking: ClientIPMaskingRepository,
+    ) -> None:
         self._repository = repository
         self._policy = policy
+        self._client_ip_masking = client_ip_masking
 
     @override
     async def prepare(self, meta: BulkLookupActionTriggerMeta) -> None:
@@ -48,6 +60,9 @@ class BulkLookupActionAuditLogMonitor(BulkLookupActionMonitor):
     ) -> None:
         trigger = triggered_user()
         acting = current_user()
+        client_ip = await self._client_ip_masking.mask(
+            ClientIPMaskingTarget.AUDIT_LOGS, current_client_ip()
+        )
         request_id = current_request_id() or BLANK_ID
         resolved: list[FieldToCreate[EntityIdentifier, AuditLogRow, AuditLogData]] = []
         missed: list[MissedLookupAuditLogCreator] = []
@@ -70,6 +85,7 @@ class BulkLookupActionAuditLogMonitor(BulkLookupActionMonitor):
                         triggered_by=str(trigger.user_id) if trigger else None,
                         acted_as=acting.user_id if acting else None,
                         duration=result.meta.duration,
+                        client_ip=client_ip,
                     )
                 )
                 continue
@@ -89,6 +105,7 @@ class BulkLookupActionAuditLogMonitor(BulkLookupActionMonitor):
                         triggered_by=str(trigger.user_id) if trigger else None,
                         acted_as=acting.user_id if acting else None,
                         duration=result.meta.duration,
+                        client_ip=client_ip,
                     ),
                 )
             )

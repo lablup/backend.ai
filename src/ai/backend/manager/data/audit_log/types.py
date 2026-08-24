@@ -34,6 +34,7 @@ class AuditLogData(FieldData):
     triggered_by: str | None
     acted_as: uuid.UUID | None
     duration: timedelta | None
+    client_ip: str | None
 
 
 @dataclass

@@ -45,6 +45,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, Pydant
 class ClientIPMaskingTargetGQL(StrEnum):
     DEFAULT = "default"
     LOGIN_HISTORY = "login_history"
+    AUDIT_LOGS = "audit_logs"
 
 
 @gql_enum(

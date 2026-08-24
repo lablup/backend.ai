@@ -259,5 +259,6 @@ class AuditLogAdapter(BaseAdapter):
             acted_as=data.acted_as,
             description=data.description,
             duration=str(data.duration) if data.duration is not None else None,
+            client_ip=data.client_ip,
             status=AuditLogStatus(data.status.value),
         )

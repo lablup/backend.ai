@@ -14,6 +14,7 @@ class ClientIPMaskingTarget(enum.StrEnum):
 
     DEFAULT = "default"
     LOGIN_HISTORY = "login_history"
+    AUDIT_LOGS = "audit_logs"
 
 
 class ClientIPMaskingMode(enum.StrEnum):

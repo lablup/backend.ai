@@ -27,7 +27,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
-from ai.backend.manager.data.client_ip.masking import ClientIPMasker, ClientIPMaskingTarget
+from ai.backend.manager.data.client_ip.masking import ClientIPMaskingTarget
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.defs import DEFAULT_PROJECT_NAME
 from ai.backend.manager.errors.auth import (
@@ -447,11 +447,10 @@ class AuthService:
         )
 
     async def _recorded_client_ip(self) -> str | None:
-        """The caller's address as login history keeps it, masked per the stored setting."""
-        mode = await self._client_ip_masking_repository.resolve_mode(
-            ClientIPMaskingTarget.LOGIN_HISTORY
+        """The caller's address as login history keeps it, masked per the stored policy."""
+        return await self._client_ip_masking_repository.mask(
+            ClientIPMaskingTarget.LOGIN_HISTORY, current_client_ip()
         )
-        return ClientIPMasker(mode).mask(current_client_ip())
 
     async def _record_login_failure(
         self,

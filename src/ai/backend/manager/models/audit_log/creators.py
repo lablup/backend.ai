@@ -57,6 +57,7 @@ class BaseAuditLogFields:
     triggered_by: str | None
     acted_as: uuid.UUID | None
     duration: timedelta | None
+    client_ip: str | None
 
     @classmethod
     @abstractmethod
@@ -96,6 +97,7 @@ class BaseAuditLogFields:
             triggered_by=self.triggered_by,
             acted_as=self.acted_as,
             duration=self.duration,
+            client_ip=self.client_ip,
         )
 
 
