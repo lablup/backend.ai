@@ -17,19 +17,20 @@ Implemented-Version:
 
 ## Goal
 
-Define a **generalized `key=value` label** that any scope can define and attach to any entity, a
-**search over the labels themselves**, and a **filter that selects entities by their labels**.
+Define a **generalized `key=value` label** that can be put on any entity, a **search over the labels
+themselves**, and a **filter that selects entities by their labels**.
 
 This BEP decides four things:
 
 | Decision | Outcome |
 |----------|---------|
 | Label identity | A label is a `key=value` pair, not a map entry — a target may hold the same key twice with different values |
-| Structure | A scope-owned definition table plus an attachment table; the target is a polymorphic entity reference, never a foreign key |
+| Structure | One table; the entity it labels is a polymorphic reference, never a foreign key |
 | Filter | `some` / `every` / `none` nested filter per [BEP-1060](BEP-1060-v2-connection-type-nested-filters.md), one shared `LabelFilter` reused by every labelable entity |
-| API surface | One add and one remove operation, each naming scope, `key=value`, and target at once; label search as one admin entry point and one scoped entry point taking a scope argument, per `audit_log` |
+| API surface | One add, one remove, and one search, reusing the `audit_log` filter and page/order shape |
 
-The first targets are **session, deployment, vfolder, and agent**.
+A label goes on any entity. The `labels` filter is wired first for **session, deployment, vfolder,
+and agent**.
 
 Labels are a standalone facility. They do not extend RBAC and RBAC does not define them; a label is
 treated as a field of the entity it is attached to, so every permission check routes through that
@@ -41,11 +42,6 @@ There is no general way to annotate or group entities. Operators cannot answer "
 belong to the `prod` environment", "which vfolders does team `infra` own", or "which agents carry the
 `gpu-reserved` marking", because nothing in the schema records that intent.
 
-Labels are also the natural place to express **whose annotation this is**. The same key means
-different things to a user and to a project — `env=staging` set by a user on their own sessions is
-not the project's classification. A label therefore belongs to a scope rather than living as an
-anonymous column on the target.
-
 ## Current Design & Scope
 
 For each area, separate **✅ what already exists** from **➕ what to add**.
@@ -55,14 +51,13 @@ For each area, separate **✅ what already exists** from **➕ what to add**.
 | | Item |
 |---|---|
 | ✅ | `audit_logs` — the precedent for referring to an arbitrary entity by a polymorphic `(entity_type, entity_id)` pair instead of a foreign key |
-| ➕ | The label definition table and the attachment table |
+| ➕ | The label table |
 
 ### Type system
 
 | | Item |
 |---|---|
-| ✅ | `common/data/entity/types.py` — `EntityType`, `EntityID`, and `ScopeType`/`ScopeID`, which express that every entity doubles as a scope |
-| ➕ | The set of entity types enabled as label targets |
+| ✅ | `common/data/entity/types.py` — `EntityType` and `EntityID`, the polymorphic entity reference |
 
 ### Filtering
 
@@ -72,15 +67,14 @@ For each area, separate **✅ what already exists** from **➕ what to add**.
 | ✅ | `BaseFilterAdapter.convert_string_filter` — `StringFilter` → `QueryCondition` |
 | ✅ | `some` / `every` / `none` nested-filter convention (BEP-1060) |
 | ✅ | `AND` / `OR` / `NOT` composition on each entity filter (e.g. `SessionFilter`) |
-| ➕ | `LabelFilter`, and a `labels` nested field on the filter DTO of each of the four targets |
+| ➕ | `LabelFilter`, and a `labels` nested field on the filter DTO of each wired entity |
 
 ### API
 
 | | Item |
 |---|---|
-| ✅ | `audit_log` — admin search and scoped search as two entry points sharing one filter and one page/order shape |
-| ✅ | `AuditLogScope` — an explicit scope input whose items are OR'd, rejected when empty |
-| ➕ | Label search on both entry points, plus add / remove |
+| ✅ | `audit_log` — the filter and page/order shape to reuse: `AND`/`OR`/`NOT` composition, cursor and offset pagination |
+| ➕ | Label search, plus add / remove |
 
 ## Proposed Design
 
@@ -95,54 +89,33 @@ is recoverable as a service-layer rule if a caller needs it. The reverse is not.
 
 ### 2. Structure and relationships
 
-Two tables, and neither points at the target with a foreign key.
+One table (`labels`), holding one row per label put on one entity: the entity, the key, and the
+value.
 
-**The label definition table (`labels`)** holds one row per distinct `key=value` owned by a scope. It
-is the catalog, and it is what [label search](#3-searching-labels) reads. The scope is recorded as a
-`ScopeType`/`ScopeID` pair, so a label belongs to a domain, a project, or a user without any of those
-tables gaining a column.
+The entity is a polymorphic `(entity_type, entity_id)` reference in the shape `audit_logs` already
+uses — untyped at the DB level, discriminated by the accompanying type. No labelable table gains a
+column or a constraint, and no entity type has to be known to the schema, so a label goes on anything.
 
-**The attachment table (`entity_labels`)** holds one row per attachment, linking a definition to a
-target. The target is a polymorphic `(entity_type, entity_id)` reference in the shape `audit_logs`
-already uses — untyped at the DB level, discriminated by the accompanying type. Enabling a new target
-type is therefore filter-wiring work, not a schema change, and no labelable table gains a column or a
-constraint.
-
-The split keeps the catalog small — one row per distinct `key=value` per scope, regardless of how
-many entities carry it — which keeps the entity filter's extra hop cheap.
-
-**The catalog has no lifecycle of its own.** A definition row appears when a label is first added to
-some target in that scope, and is reclaimed when the last target drops it. Nothing creates or deletes
-one directly, so the split stays an internal storage choice and never surfaces as a second thing for
-a caller to manage.
-
-Purging a target removes its labels through the existing entity purger, so a dangling target
-reference is not a reachable state.
+Purging an entity removes its labels through the existing entity purger, so a dangling reference is
+not a reachable state.
 
 Column-level definitions, indexes, and constraints are settled in the implementing PR.
 
 ### 3. Searching labels
 
-Label search reads the catalog and answers "which labels are in use here" — distinct from
+Label search answers "which labels are in use" — distinct from
 [filtering entities](#4-filtering-entities-by-label), which answers "which entities carry this
 label". Both are needed and neither substitutes for the other.
 
-There are two entry points, as in `audit_log`.
+**One entry point, `search_labels`**, filtering on `key`, `value`, `entity_type`, and `entity_id`. It
+returns the labels on entities the requester may read; an admin sees more because RBAC gives them
+more entities, not because a second entry point exists. A label is a field of its entity, and a field
+does not get an admin surface separate from a scoped one.
 
-| Entry point | Bounding |
-|-------------|----------|
-| `admin_search_labels` | No scope input; superadmin only. Mirrors `AdminSearchAuditLogsInput` |
-| `scoped_search_labels` | An explicit scope input whose items are OR'd and which is rejected when empty. Mirrors `ScopedSearchAuditLogsInput` / `AuditLogScope` |
+It is exposed on **GraphQL and REST v2 alike** — the SDK and CLI reach the API over REST.
 
-There is no unscoped label search for non-admins.
-
-Both are exposed on **GraphQL and REST v2 alike**. `audit_log` registers only its admin route over
-REST and leaves the scoped one to GraphQL; labels cannot follow that, because the SDK and CLI reach
-the API over REST and a scoped search is the call a non-admin makes.
-
-Both share one filter and one page/order shape, taken from `audit_log`: `AND` / `OR` / `NOT`
-composition on the filter, and both cursor and offset pagination on the input. A result is a
-definition — scope, key, value — not an attachment.
+The filter and page/order shapes are taken from `audit_log`: `AND` / `OR` / `NOT` composition on the
+filter, and both cursor and offset pagination on the input.
 
 ### 4. Filtering entities by label
 
@@ -152,8 +125,6 @@ The shared v2 filter DTO drives GraphQL, REST v2, the SDK, and the CLI at once.
 input LabelFilter {
   key: StringFilter
   value: StringFilter
-  scopeType: StringFilter
-  scopeId: StringFilter
 }
 
 input LabelNestedFilter {
@@ -192,33 +163,27 @@ Keys and values compare **case-sensitively** — `env=Prod` and `env=prod` are t
 
 Two contract points bind the implementation:
 
-- **Query shape.** A correlated `EXISTS` over the attachment table against the target row, with the
-  definition predicate applied as a subquery on the definition reference. The extra hop is bounded by
-  the catalog's size (§2).
-- **Visibility.** Attachments whose definition lies outside what the requester may read are excluded
-  **before** matching, not after. Otherwise a label filter becomes an oracle for labels the requester
-  cannot see: `none: {key: {equals: "x"}}` would leak the existence of `x` by the rows it removes.
+- **Query shape.** A correlated `EXISTS` over the label table against the entity row, with the key
+  and value predicates applied inside it.
+- **Visibility.** A label is readable exactly when its entity is, so the entity's own filtering
+  already bounds what a label filter can match. Nothing further is needed, and a `none:` clause
+  cannot become an oracle for labels the requester cannot see.
 
 ### 5. Write operations
 
 Audit records are written by the system and only read through the API; labels are written by users.
 These operations therefore have no `audit_log` counterpart.
 
-There are two, and both name the scope, the `key=value`, and the target in a single call.
+There are two, and both name the entity and the `key=value` in a single call.
 
 | Operation | Shape |
 |-----------|-------|
-| Add | Puts `key=value`, owned by the named scope, on the target |
-| Remove | Takes it off the target |
+| Add | Puts `key=value` on the entity |
+| Remove | Takes it off the entity |
 
-Defining a label and putting it on something are not separable steps: a label that sits in a scope
-attached to nothing has no meaning this BEP assigns it, and no rule anywhere restricts attachment to
-labels declared in advance. Splitting the two would add a call and a state without adding a
-capability.
-
-A managed vocabulary — a scope declaring which labels its members may use — is the one thing the
-split would buy. It is not required here, and it can be added later as a per-scope restriction on
-`Add` without changing the storage or these two operations.
+Defining a label and putting it on something are not separable steps: a label attached to nothing
+has no meaning this BEP assigns it, and no rule anywhere restricts a label to one declared in
+advance. Splitting the two would add a call and a state without adding a capability.
 
 ### 6. Layout
 
@@ -243,30 +208,30 @@ check against something that already exists.
 |--------|-----------------|
 | Add / remove | The entity, as a write to it |
 | Read a label on an entity | The entity, as a read of it |
-| Label search | The entities carrying the label — a catalog entry is visible when at least one carrier is |
+| Label search | The entities carrying the labels — a label is returned when its entity is readable |
 
 Two things follow. Labels add no permission surface of their own: a label neither widens nor narrows
-what its entity exposes, so nothing has to be re-derived when one is added or removed. And the
-visibility rule in §4 stops being a special case — a label the requester cannot read is one whose
-entity they cannot read, which the entity's own filtering already excludes.
+what its entity exposes, so nothing has to be re-derived when one is added or removed. And label
+visibility needs no rule of its own — a label the requester cannot read is one whose entity they
+cannot read, which the entity's own filtering already excludes.
 
 ## Migration / Compatibility
 
-- **Additive only.** Two new tables and one optional filter field on each of the four target filters. No existing query changes shape, and no existing table gains a column.
+- **Additive only.** One new table and one optional filter field per wired entity. No existing query changes shape, and no existing table gains a column.
 - **No backfill.** Labels start empty.
 
 ## Implementation Plan
 
 | Phase | Work |
 |-------|------|
-| 1 | Domain types and the two tables, with the alembic revision |
-| 2 | Repository and service layers: add, remove, and both label searches, with grammar and scope validation |
+| 1 | Domain types and the label table, with the alembic revision |
+| 2 | Repository and service layers: add, remove, and search |
 | 3 | DTO, adapter, GraphQL, and REST v2 surfaces |
 | 4 | `LabelFilter` wiring for session, deployment, vfolder, and agent |
 | 5 | SDK and CLI |
 | 6 | Tests across the layers, and live verification against a running server |
 
-Each target beyond the initial four is filter wiring alone.
+Each entity beyond the initial four is filter wiring alone.
 
 ## Open Questions
 
