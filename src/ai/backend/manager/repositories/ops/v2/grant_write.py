@@ -1,4 +1,5 @@
-"""Grant writes of the v2 ops: access to an existing entity, handed out and taken back.
+"""Grant writes of the v2 ops: access to an existing entity, offered, handed out and
+taken back.
 
 A grant records the entity as a member of the grantee's virtual scope carrying a
 permission cap, which is what
@@ -15,6 +16,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.data.entity_invitation.types import EntityInvitationData
+from ai.backend.manager.models.entity_invitation.updaters import EntityInvitationAcceptUpdater
 from ai.backend.manager.models.specs.membership import EntityGrant
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
@@ -68,3 +71,33 @@ class V2GrantWriteOps(V2WriteOpsBase):
                 ]),
             )
         )
+
+    async def accept_entity_invitation(
+        self, updater: EntityInvitationAcceptUpdater
+    ) -> EntityInvitationData | None:
+        """Settle the invitation as accepted and hand its entity to the invitee.
+
+        ``None`` when nothing was settled — the invitation is gone, already answered,
+        or addressed to somebody else; the guards do not say which. Turning one down
+        grants nothing and goes through the plain guarded update instead, which is why
+        only this direction is a primitive: the settle and the grant cannot come apart.
+        """
+        row = await self._update_guarded_row_returning(
+            updater.row_class,
+            updater.target_id_column(),
+            updater.target_id_value(),
+            updater.guard_conditions(),
+            updater.build_values(),
+            updater.integrity_error_checks,
+        )
+        if row is None:
+            return None
+        data = updater.to_data(row)
+        await self.grant_entities([
+            EntityGrant(
+                entity=data.target(),
+                grantee=updater.accepter_user_id,
+                permission_cap=data.permission_cap,
+            )
+        ])
+        return data
