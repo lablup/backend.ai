@@ -57,6 +57,7 @@ from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHi
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import TableOrORM, with_tables
@@ -507,7 +508,7 @@ class TestCancelFreesResourceAllocations:
         pending_session: tuple[SessionId, KernelId],
     ) -> None:
         session_id, kernel_id = pending_session
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         result = await db_source.mark_sessions_terminating([session_id])
 
@@ -520,7 +521,7 @@ class TestCancelFreesResourceAllocations:
         pulling_session_on_agent: tuple[SessionId, KernelId, str],
     ) -> None:
         session_id, kernel_id, agent_id = pulling_session_on_agent
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         affected = await db_source.cancel_kernels_for_failed_image(
             AgentId(agent_id), "python:3.8", "image pull failed for test"
@@ -566,7 +567,7 @@ class TestCancelFreesResourceAllocations:
         await self._seed_agent_reserved(
             db_with_cleanup, agent_id, cpu=Decimal("2"), mem=Decimal("4096")
         )
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         await db_source.cancel_kernels_for_failed_image(
             AgentId(agent_id), "python:3.8", "image pull failed for test"
@@ -586,7 +587,7 @@ class TestCancelFreesResourceAllocations:
         await self._seed_agent_reserved(
             db_with_cleanup, agent_id, cpu=Decimal("2"), mem=Decimal("4096")
         )
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         await db_source.mark_session_cancelled(
             session_id, convert_to_status_data(RuntimeError("failed to start"))

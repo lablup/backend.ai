@@ -1,6 +1,18 @@
-from typing import NewType
-from uuid import UUID
+"""Field type and id of the kernel scheduling history table."""
 
-__all__ = ("KernelSchedulingHistoryID",)
+from typing import override
 
-KernelSchedulingHistoryID = NewType("KernelSchedulingHistoryID", UUID)
+from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+
+__all__ = ("KERNEL_SCHEDULING_HISTORY_FIELD_TYPE", "KernelSchedulingHistoryID")
+
+KERNEL_SCHEDULING_HISTORY_FIELD_TYPE = FieldType("kernel_scheduling_history")
+
+
+class KernelSchedulingHistoryID(FieldIdentifier):
+    """A kernel scheduling history row's id."""
+
+    @override
+    @classmethod
+    def field_type(cls) -> FieldType:
+        return KERNEL_SCHEDULING_HISTORY_FIELD_TYPE

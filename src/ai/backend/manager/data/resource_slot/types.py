@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import override
 
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
-from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 
 
@@ -80,7 +80,7 @@ class AgentResourceSearchResult:
 
 
 @dataclass(frozen=True)
-class ResourceAllocationData:
+class ResourceAllocationData(FieldData):
     kernel_id: uuid.UUID
     slot_name: str
     requested: Decimal

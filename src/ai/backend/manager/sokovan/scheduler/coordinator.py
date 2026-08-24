@@ -9,6 +9,7 @@ from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.kernel.anycast import (
     KernelCancelledAnycastEvent,
@@ -39,17 +40,14 @@ from ai.backend.manager.data.session.types import (
 )
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.models.kernel.conditions import KernelConditions
+from ai.backend.manager.models.scheduling_history.creators import SessionSchedulingHistoryCreator
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.conditions import SessionConditions
+from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatchUpdaterSpec
-from ai.backend.manager.repositories.scheduling_history.creators import (
-    SessionSchedulingHistoryCreatorSpec,
-)
+from ai.backend.manager.repositories.scheduler.types.session import SessionHistoryToCreate
 from ai.backend.manager.sokovan.recorder.pool import RecordPool
 from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
 from ai.backend.manager.sokovan.recorder.utils import extract_sub_steps_for_entity
@@ -1330,30 +1328,28 @@ class ScheduleCoordinator:
 
         # Session status update
         if transition.session:
-            updater = BatchUpdater(
-                spec=SessionStatusBatchUpdaterSpec(
-                    to_status=transition.session,
-                    status_changed_at=status_changed_at,
-                    reason="" if transition.session == SessionStatus.RUNNING else None,
-                ),
-                conditions=[SessionConditions.by_ids(session_ids)],
+            updater = SessionStatusBatchUpdater(
+                session_ids=session_ids,
+                to_status=transition.session,
+                status_changed_at=status_changed_at,
+                reason="" if transition.session == SessionStatus.RUNNING else None,
             )
-            history_specs = [
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=info.session_id,
-                    phase=handler_name,
-                    result=scheduling_result,
-                    message=f"{handler_name} {scheduling_result.value.lower()}",
-                    from_status=info.from_status,
-                    to_status=transition.session,
-                    error_code=info.error_code,
-                    sub_steps=extract_sub_steps_for_entity(info.session_id, records),
+            histories = [
+                SessionHistoryToCreate(
+                    session_id=SessionID(info.session_id),
+                    creator=SessionSchedulingHistoryCreator(
+                        phase=handler_name,
+                        result=scheduling_result,
+                        message=f"{handler_name} {scheduling_result.value.lower()}",
+                        from_status=info.from_status,
+                        to_status=transition.session,
+                        error_code=info.error_code,
+                        sub_steps=extract_sub_steps_for_entity(info.session_id, records),
+                    ),
                 )
                 for info in session_infos
             ]
-            updated = await self._repository.update_with_history(
-                updater, BulkCreator(specs=history_specs)
-            )
+            updated = await self._repository.update_with_history(updater, histories)
             log.debug(
                 "{}: Updated {} sessions to {} ({})",
                 handler_name,
@@ -1441,20 +1437,22 @@ class ScheduleCoordinator:
         if not session_infos:
             return
 
-        history_specs = [
-            SessionSchedulingHistoryCreatorSpec(
-                session_id=info.session_id,
-                phase=handler_name,
-                result=scheduling_result,
-                message=info.reason or f"{handler_name} {scheduling_result.value.lower()}",
-                from_status=info.from_status,
-                to_status=info.from_status,  # No status change
-                error_code=info.error_code,
-                sub_steps=extract_sub_steps_for_entity(info.session_id, records),
+        histories = [
+            SessionHistoryToCreate(
+                session_id=SessionID(info.session_id),
+                creator=SessionSchedulingHistoryCreator(
+                    phase=handler_name,
+                    result=scheduling_result,
+                    message=info.reason or f"{handler_name} {scheduling_result.value.lower()}",
+                    from_status=info.from_status,
+                    to_status=info.from_status,  # No status change
+                    error_code=info.error_code,
+                    sub_steps=extract_sub_steps_for_entity(info.session_id, records),
+                ),
             )
             for info in session_infos
         ]
-        await self._repository.create_scheduling_history(BulkCreator(specs=history_specs))
+        await self._repository.create_scheduling_history(histories)
         log.debug(
             "{}: Recorded {} sessions in history as {} without status change",
             handler_name,

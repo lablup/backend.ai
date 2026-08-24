@@ -15,8 +15,9 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_dependency import SessionDependencyID
 from ai.backend.common.data.entity.session_group import SessionGroupID
-from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.entity.types import EntityData, FieldData
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.vfolder.types import VFolderMountData
 from ai.backend.common.types import (
@@ -311,6 +312,15 @@ class SessionEntityData(EntityData):
 
 
 @dataclass(frozen=True)
+class SessionDependencyData(FieldData):
+    """One edge of the dependency graph: the session and what it waits for."""
+
+    id: SessionDependencyID
+    session_id: SessionID
+    depends_on: SessionID
+
+
+@dataclass(frozen=True)
 class SessionRoutingInfo:
     """Minimal session data needed to start an app service in a session.
 
@@ -496,7 +506,7 @@ class SubStepResult(BackendAISchema):
 
 
 @dataclass
-class SessionSchedulingHistoryData:
+class SessionSchedulingHistoryData(FieldData):
     """Domain model for session scheduling history."""
 
     id: UUID

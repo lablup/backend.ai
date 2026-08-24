@@ -24,17 +24,16 @@ from sqlalchemy.orm import load_only, selectinload
 from ai.backend.common import msgpack
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import (
     ResourceGroupID,
     ResourceGroupName,
 )
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.permission.types import (
-    RBACElementType,
-)
 from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
@@ -56,7 +55,6 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry, SSHKeypair
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
@@ -64,7 +62,12 @@ from ai.backend.manager.data.session.creation import (
     ResourceGroupNetworkInfo,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
-from ai.backend.manager.data.session.types import SchedulingResult, SessionInfo, SessionStatus
+from ai.backend.manager.data.session.types import (
+    SchedulingResult,
+    SessionInfo,
+    SessionSchedulingHistoryData,
+    SessionStatus,
+)
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ResourceGroupNotFound
@@ -78,6 +81,7 @@ from ai.backend.manager.models.kernel import (
     KernelRow,
 )
 from ai.backend.manager.models.kernel.conditions import KernelConditions
+from ai.backend.manager.models.kernel.creators import KernelCreator
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.project import ProjectRow, query_group_dotfiles
 from ai.backend.manager.models.resource_group import ResourceGroupRow, query_allowed_sgroups
@@ -94,13 +98,18 @@ from ai.backend.manager.models.resource_slot.aggregates import (
     batch_load_kernel_allocations,
     kernel_requested_slots_expr,
 )
+from ai.backend.manager.models.resource_slot.creators import KernelResourceAllocationCreator
+from ai.backend.manager.models.scheduling_history.creators import SessionSchedulingHistoryCreator
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import (
     PRIVATE_SESSION_TYPES,
     SessionDependencyRow,
     SessionRow,
 )
+from ai.backend.manager.models.session.creators import SessionCreator, SessionDependencyCreator
+from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.specs.creator import FieldToCreate, NestedFieldToCreate
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
@@ -110,34 +119,23 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
 )
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACBulkEntityCreator,
-    RBACEntityCreator,
-    execute_rbac_bulk_entity_creator,
-    execute_rbac_entity_creator,
-)
-from ai.backend.manager.repositories.base.updater import BatchUpdater, execute_batch_updater
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.write import BatchReconcileTransition
 from ai.backend.manager.repositories.resource_slot.types import (
     resource_slot_to_quantities,
-)
-from ai.backend.manager.repositories.scheduler.creators import (
-    KernelRowFromSpec,
-    SessionRowFromSpec,
 )
 from ai.backend.manager.repositories.scheduler.options import ImageConditions
 from ai.backend.manager.repositories.scheduler.types.resource_group import ResourceGroupFetch
 from ai.backend.manager.repositories.scheduler.types.scheduling import SchedulingFetch
-from ai.backend.manager.repositories.scheduler.types.session import PendingSessions
+from ai.backend.manager.repositories.scheduler.types.session import (
+    PendingSessions,
+    SessionHistoryToCreate,
+)
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedResourceGroup,
     ComputeScheduleFetch,
     SessionSpecFetch,
     UserEnqueueFetch,
-)
-from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatchUpdaterSpec
-from ai.backend.manager.repositories.scheduling_history import (
-    SessionSchedulingHistoryCreatorSpec,
 )
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.views.sokovan.agent import (
@@ -263,12 +261,15 @@ class ScheduleDBSource:
     """
 
     _db: ExtendedAsyncSAEngine
+    _reconcile_ops: ReconcileOpsProvider
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
+        reconcile_ops_provider: ReconcileOpsProvider,
     ) -> None:
         self._db = db
+        self._reconcile_ops = reconcile_ops_provider
 
     async def fetch_scheduling_fetch(
         self, resource_group_id: ResourceGroupID
@@ -1226,44 +1227,53 @@ class ScheduleDBSource:
         if not session_ids:
             return []
 
-        async with self._db.begin_session_read_committed() as db_sess:
-            now = await self._get_db_now_in_session(db_sess)
-            markable = sa.and_(
-                SessionRow.id.in_(session_ids),
-                SessionRow.status.not_in(SessionStatus.terminal_statuses()),
-            )
-            status_result = await db_sess.execute(
-                sa.select(SessionRow.id, SessionRow.status).where(markable)
+        async with self._db.begin_readonly_session_read_committed() as read_sess:
+            now = await self._get_db_now_in_session(read_sess)
+            status_result = await read_sess.execute(
+                sa.select(SessionRow.id, SessionRow.status).where(
+                    sa.and_(
+                        SessionRow.id.in_(session_ids),
+                        SessionRow.status.not_in(SessionStatus.terminal_statuses()),
+                    )
+                )
             )
             source_statuses: dict[SessionId, SessionStatus] = {
                 cast(SessionId, row.id): SessionStatus(row.status) for row in status_result
             }
-            values = SessionStatusBatchUpdaterSpec(
-                to_status=to_status,
-                status_changed_at=now,
-                reason=reason,
-            ).build_values()
-            mark_result = await db_sess.execute(
-                sa.update(SessionRow).values(**values).where(markable).returning(SessionRow.id)
-            )
-            marked_sessions = [cast(SessionId, row.id) for row in mark_result]
+        if not source_statuses:
+            return []
+
+        phase = f"mark_{to_status.name.lower()}"
+        updater = SessionStatusBatchUpdater(
+            session_ids=session_ids,
+            to_status=to_status,
+            status_changed_at=now,
+            reason=reason,
+            except_statuses=SessionStatus.terminal_statuses(),
+        )
+        async with self._reconcile_ops.write_ops() as w:
+            marked = await w.batch_update_in_global(updater)
+            marked_sessions = [SessionId(data.id) for data in marked]
             if not marked_sessions:
                 return []
-
-            phase = f"mark_{to_status.name.lower()}"
-            history_specs = [
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=session_id,
-                    phase=phase,
-                    result=SchedulingResult.SUCCESS,
-                    message=f"{phase} success",
-                    from_status=source_statuses.get(session_id),
-                    to_status=to_status,
+            await w.apply_batch_transition(
+                BatchReconcileTransition(
+                    histories=[
+                        FieldToCreate(
+                            owner_id=SessionID(session_id),
+                            creator=SessionSchedulingHistoryCreator(
+                                phase=phase,
+                                result=SchedulingResult.SUCCESS,
+                                message=f"{phase} success",
+                                from_status=source_statuses.get(session_id),
+                                to_status=to_status,
+                            ),
+                        )
+                        for session_id in marked_sessions
+                    ],
+                    owner_column=SessionSchedulingHistoryRow.session_id,
                 )
-                for session_id in marked_sessions
-            ]
-            await self._record_scheduling_history(db_sess, BulkCreator(specs=history_specs))
-
+            )
             return marked_sessions
 
     async def get_resource_group_preemption_mode(
@@ -1486,18 +1496,20 @@ class ScheduleDBSource:
             await self._free_kernel_allocations(db_sess, cancelled_kernel_ids, now)
 
             # Record scheduling history for cancel transition
-            history_specs = [
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=sid,
-                    phase="cancel",
-                    result=SchedulingResult.SUCCESS,
-                    message=reason,
-                    from_status=from_statuses.get(sid),
-                    to_status=SessionStatus.CANCELLED,
+            histories = [
+                SessionHistoryToCreate(
+                    session_id=SessionID(sid),
+                    creator=SessionSchedulingHistoryCreator(
+                        phase="cancel",
+                        result=SchedulingResult.SUCCESS,
+                        message=reason,
+                        from_status=from_statuses.get(sid),
+                        to_status=SessionStatus.CANCELLED,
+                    ),
                 )
                 for sid in cancelled_sessions
             ]
-            await self._record_scheduling_history(db_sess, BulkCreator(specs=history_specs))
+            await self._record_scheduling_history(db_sess, histories)
 
         return cancelled_sessions
 
@@ -1567,18 +1579,20 @@ class ScheduleDBSource:
             )
 
             # Record scheduling history for terminating transition
-            history_specs = [
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=session_id,
-                    phase="mark_terminating",
-                    result=SchedulingResult.SUCCESS,
-                    message=message,
-                    from_status=from_statuses.get(session_id),
-                    to_status=SessionStatus.TERMINATING,
+            histories = [
+                SessionHistoryToCreate(
+                    session_id=SessionID(session_id),
+                    creator=SessionSchedulingHistoryCreator(
+                        phase="mark_terminating",
+                        result=SchedulingResult.SUCCESS,
+                        message=message,
+                        from_status=from_statuses.get(session_id),
+                        to_status=SessionStatus.TERMINATING,
+                    ),
                 )
                 for session_id in terminating_sessions
             ]
-            await self._record_scheduling_history(db_sess, BulkCreator(specs=history_specs))
+            await self._record_scheduling_history(db_sess, histories)
 
         return terminating_sessions
 
@@ -1665,18 +1679,20 @@ class ScheduleDBSource:
             await self._free_allocations_and_release(db_sess, force_terminated_kernel_ids, now)
 
             # Record scheduling history for force-terminate transition
-            history_specs = [
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=sid,
-                    phase="force_terminate",
-                    result=SchedulingResult.SUCCESS,
-                    message="force_terminate success",
-                    from_status=from_statuses.get(sid),
-                    to_status=SessionStatus.TERMINATED,
+            histories = [
+                SessionHistoryToCreate(
+                    session_id=SessionID(sid),
+                    creator=SessionSchedulingHistoryCreator(
+                        phase="force_terminate",
+                        result=SchedulingResult.SUCCESS,
+                        message="force_terminate success",
+                        from_status=from_statuses.get(sid),
+                        to_status=SessionStatus.TERMINATED,
+                    ),
                 )
                 for sid in force_terminated_sessions
             ]
-            await self._record_scheduling_history(db_sess, BulkCreator(specs=history_specs))
+            await self._record_scheduling_history(db_sess, histories)
 
         return force_terminated_sessions
 
@@ -1839,8 +1855,9 @@ class ScheduleDBSource:
         comes from the spec the caller assembled upstream.
         """
         enqueue_time = datetime.now().astimezone()
+        session_id = SessionID(spec.resource_spec.identity.session_id)
 
-        async with self._db.begin_session_read_committed() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as read_sess:
             image_ids = {
                 kernel.execution_spec.resource_input.image_id
                 for kernel in spec.resource_spec.kernel_specs
@@ -1849,7 +1866,7 @@ class ScheduleDBSource:
             image_metadata: dict[ImageID, ImageInfo] = {}
             if image_ids:
                 rows = (
-                    await db_sess.scalars(
+                    await read_sess.scalars(
                         sa.select(ImageRow).where(ImageRow.id.in_(list(image_ids)))
                     )
                 ).all()
@@ -1874,9 +1891,9 @@ class ScheduleDBSource:
                     )
 
             # Validate dependencies — each dependency session must exist.
-            matched_dependency_ids: list[SessionId] = []
+            matched_dependency_ids: list[SessionID] = []
             for dependency_id in spec.resource_spec.dependencies:
-                result = await db_sess.execute(
+                result = await read_sess.execute(
                     sa.select(SessionRow.id).where(SessionRow.id == dependency_id)
                 )
                 if not result.scalar():
@@ -1884,93 +1901,68 @@ class ScheduleDBSource:
                         "Unknown session ID in the dependency list",
                         extra_data={"session_ref": str(dependency_id)},
                     )
-                matched_dependency_ids.append(SessionId(dependency_id))
+                matched_dependency_ids.append(SessionID(dependency_id))
 
-            session_creator_spec = SessionRowFromSpec(
+        kernel_creators = [
+            KernelCreator(
                 spec=spec,
-                image_infos=image_metadata,
+                kernel_spec=kernel,
+                image_info=(
+                    image_metadata.get(kernel.execution_spec.resource_input.image_id)
+                    if kernel.execution_spec.resource_input.image_id is not None
+                    else None
+                ),
                 enqueue_time=enqueue_time,
             )
-            kernel_creator_specs: list[KernelRowFromSpec] = [
-                KernelRowFromSpec(
+            for kernel in spec.resource_spec.kernel_specs
+        ]
+
+        async with self._reconcile_ops.write_ops() as w:
+            await w.create_entity(
+                SessionCreator(
                     spec=spec,
-                    kernel_spec=kernel,
-                    image_info=(
-                        image_metadata.get(kernel.execution_spec.resource_input.image_id)
-                        if kernel.execution_spec.resource_input.image_id is not None
-                        else None
-                    ),
+                    image_infos=image_metadata,
                     enqueue_time=enqueue_time,
                 )
-                for kernel in spec.resource_spec.kernel_specs
-            ]
-
-            rbac_creator = RBACEntityCreator(
-                spec=session_creator_spec,
-                element_type=RBACElementType.SESSION,
-                scope_ref=RBACElementRef(
-                    element_type=RBACElementType.USER,
-                    element_id=str(spec.resource_spec.identity.user_uuid),
-                ),
-                additional_scope_refs=[
-                    RBACElementRef(
-                        element_type=RBACElementType.PROJECT,
-                        element_id=str(spec.scope.project_id),
-                    )
+            )
+            kernels = await w.atomic_create_field_entities(session_id, kernel_creators)
+            await w.atomic_create_nested_fields([
+                NestedFieldToCreate(
+                    owner_id=KernelID(kernel.id),
+                    creator=KernelResourceAllocationCreator(
+                        slot_name=quantity.slot_name,
+                        requested=quantity.quantity,
+                    ),
+                )
+                for creator, kernel in zip(kernel_creators, kernels, strict=True)
+                for quantity in resource_slot_to_quantities(creator.requested_slots())
+            ])
+            await w.atomic_create_field_entities(
+                session_id,
+                [
+                    SessionDependencyCreator(depends_on=dependency_id)
+                    for dependency_id in matched_dependency_ids
                 ],
             )
-            await execute_rbac_entity_creator(db_sess, rbac_creator)
-
-            kernel_rbac_creator = RBACBulkEntityCreator(
-                specs=kernel_creator_specs,
-                element_type=RBACElementType.KERNEL,
-                scope_ref=RBACElementRef(
-                    element_type=RBACElementType.SESSION,
-                    element_id=str(spec.resource_spec.identity.session_id),
-                ),
+            await w.apply_batch_transition(
+                BatchReconcileTransition(
+                    histories=[
+                        FieldToCreate(
+                            owner_id=session_id,
+                            creator=SessionSchedulingHistoryCreator(
+                                phase="enqueue",
+                                result=SchedulingResult.SUCCESS,
+                                message="enqueue success",
+                                from_status=None,
+                                to_status=SessionStatus.PENDING,
+                            ),
+                        )
+                    ],
+                    owner_column=SessionSchedulingHistoryRow.session_id,
+                )
             )
-            kernel_result = await execute_rbac_bulk_entity_creator(db_sess, kernel_rbac_creator)
 
-            for kernel_spec, kernel_row in zip(
-                kernel_creator_specs, kernel_result.rows, strict=False
-            ):
-                quantities = resource_slot_to_quantities(kernel_spec.requested_slots())
-                if quantities:
-                    await db_sess.execute(
-                        sa.insert(ResourceAllocationRow),
-                        [
-                            {
-                                "kernel_id": kernel_row.id,
-                                "slot_name": q.slot_name,
-                                "requested": q.quantity,
-                            }
-                            for q in quantities
-                        ],
-                    )
-
-            if matched_dependency_ids:
-                dependency_rows = [
-                    SessionDependencyRow(
-                        session_id=spec.resource_spec.identity.session_id,
-                        depends_on=depend_id,
-                    )
-                    for depend_id in matched_dependency_ids
-                ]
-                db_sess.add_all(dependency_rows)
-
-            history_spec = SessionSchedulingHistoryCreatorSpec(
-                session_id=SessionId(spec.resource_spec.identity.session_id),
-                phase="enqueue",
-                result=SchedulingResult.SUCCESS,
-                message="enqueue success",
-                from_status=None,
-                to_status=SessionStatus.PENDING,
-            )
-            await self._record_scheduling_history(db_sess, BulkCreator(specs=[history_spec]))
-
-            await db_sess.commit()
-
-        return SessionId(spec.resource_spec.identity.session_id)
+        return SessionId(session_id)
 
     async def fetch_session_spec_fetch(
         self,
@@ -4057,90 +4049,76 @@ class ScheduleDBSource:
 
     async def update_with_history(
         self,
-        updater: BatchUpdater[SessionRow],
-        bulk_creator: BulkCreator[SessionSchedulingHistoryRow],
+        updater: SessionStatusBatchUpdater,
+        histories: Sequence[SessionHistoryToCreate],
     ) -> int:
-        """Update session statuses and record history in same transaction.
+        """Move the sessions the updater selects and record each transition, in one
+        transaction. A repeated transition is counted onto the session's latest
+        history row instead of inserting another.
 
-        This method combines batch status update with history recording,
-        ensuring both operations are atomic within a single transaction.
-        Uses merge logic to prevent duplicate history records when status
-        doesn't change.
-
-        Args:
-            updater: BatchUpdater containing spec and conditions for session update
-            bulk_creator: BulkCreator containing specs for history records
-
-        Returns:
-            Number of sessions updated
+        Returns the number of sessions updated.
         """
-        async with self._db.begin_session_read_committed() as db_sess:
-            # 1. Execute batch update
-            update_result = await execute_batch_updater(db_sess, updater)
-
-            # 2. Record history
-            await self._record_scheduling_history(db_sess, bulk_creator)
-
-            return update_result.updated_count
+        async with self._reconcile_ops.write_ops() as w:
+            updated = await w.apply_batch_transition(
+                BatchReconcileTransition(
+                    histories=self._to_field_creations(histories),
+                    owner_column=SessionSchedulingHistoryRow.session_id,
+                    status_updater=updater,
+                )
+            )
+            return len(updated)
 
     async def create_scheduling_history(
         self,
-        bulk_creator: BulkCreator[SessionSchedulingHistoryRow],
-    ) -> int:
-        """Create scheduling history records without status update.
+        histories: Sequence[SessionHistoryToCreate],
+    ) -> None:
+        """Record scheduling history for sessions that stay in their current status,
+        merging a repeat as the transition path does."""
+        if not histories:
+            return
+        async with self._reconcile_ops.write_ops() as w:
+            await w.apply_batch_transition(
+                BatchReconcileTransition(
+                    histories=self._to_field_creations(histories),
+                    owner_column=SessionSchedulingHistoryRow.session_id,
+                )
+            )
 
-        Used for recording skipped sessions where no status change occurs
-        but the scheduling attempt should be recorded in history.
-
-        Args:
-            bulk_creator: BulkCreator containing specs for history records
-
-        Returns:
-            Number of history records created
-        """
-        if not bulk_creator.specs:
-            return 0
-
-        async with self._db.begin_session_read_committed() as db_sess:
-            return await self._record_scheduling_history(db_sess, bulk_creator)
+    def _to_field_creations(
+        self, histories: Sequence[SessionHistoryToCreate]
+    ) -> list[FieldToCreate[SessionID, SessionSchedulingHistoryRow, SessionSchedulingHistoryData]]:
+        return [
+            FieldToCreate(owner_id=history.session_id, creator=history.creator)
+            for history in histories
+        ]
 
     async def _record_scheduling_history(
         self,
         db_sess: SASession,
-        bulk_creator: BulkCreator[SessionSchedulingHistoryRow],
+        histories: Sequence[SessionHistoryToCreate],
     ) -> int:
-        """Record scheduling history with merge logic.
+        """Record scheduling history inside a transaction this source already owns.
 
-        Uses merge logic to prevent duplicate history records when status
-        doesn't change - increments attempts count instead of creating new records.
+        Same merge rule as the ops-side transition — ``should_merge_with`` on the row
+        decides both — for the status changes whose transaction carries SQL no spec
+        expresses (kernel statuses, the agent resource ledger).
 
-        Args:
-            db_sess: Database session
-            bulk_creator: BulkCreator containing specs for history records
-
-        Returns:
-            Number of history records affected (merged + created)
+        Returns the number of history rows affected (merged + created).
         """
-        # Build rows from specs
-        new_rows = [spec.build_row() for spec in bulk_creator.specs]
+        new_rows = [history.creator.build_row(history.session_id) for history in histories]
         session_ids = [SessionId(row.session_id) for row in new_rows]
 
-        # Get last history records for all sessions
         last_records = await self._get_last_session_histories_bulk(db_sess, session_ids)
 
-        # Separate rows into merge and create groups
         merge_ids: list[UUID] = []
         create_rows: list[SessionSchedulingHistoryRow] = []
-
         for new_row in new_rows:
             last_row = last_records.get(SessionId(new_row.session_id))
-
             if last_row is not None and last_row.should_merge_with(new_row):
                 merge_ids.append(last_row.id)
             else:
                 create_rows.append(new_row)
 
-        # Batch update attempts for merge group
         if merge_ids:
             await db_sess.execute(
                 sa.update(SessionSchedulingHistoryRow)
@@ -4148,7 +4126,6 @@ class ScheduleDBSource:
                 .values(attempts=SessionSchedulingHistoryRow.attempts + 1)
             )
 
-        # Batch insert for create group
         if create_rows:
             db_sess.add_all(create_rows)
             await db_sess.flush()

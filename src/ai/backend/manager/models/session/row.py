@@ -38,6 +38,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_dependency import SessionDependencyID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
@@ -1258,6 +1259,13 @@ def by_raw_filter(filter_spec: FieldSpecType, raw_filter: str) -> QueryCondition
 
 class SessionDependencyRow(Base):
     __tablename__ = "session_dependencies"
+    id: Mapped[SessionDependencyID] = mapped_column(
+        "id",
+        GUID(SessionDependencyID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
     session_id: Mapped[SessionID] = mapped_column(
         "session_id",
         GUID(SessionID),

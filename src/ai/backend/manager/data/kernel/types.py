@@ -10,6 +10,7 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import FieldData
 from ai.backend.common.types import (
     CIStrEnum,
     KernelId,
@@ -301,7 +302,7 @@ class Metadata:
 
 
 @dataclass
-class KernelInfo:
+class KernelInfo(FieldData):
     id: KernelId
     session: RelatedSessionInfo
     user_permission: UserPermission
@@ -339,7 +340,7 @@ class KernelSchedulingPhase(StrEnum):
 
 
 @dataclass
-class KernelSchedulingHistoryData:
+class KernelSchedulingHistoryData(FieldData):
     """Domain model for kernel scheduling history."""
 
     id: KernelSchedulingHistoryID

@@ -26,6 +26,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
@@ -73,6 +74,7 @@ def agent_processors(
     )
     scheduler_repository = SchedulerRepository(
         database_engine,
+        ReconcileOpsProvider(database_engine),
         valkey_stat=valkey_clients.stat,
         valkey_schedule=valkey_clients.schedule,
         config_provider=config_provider,
