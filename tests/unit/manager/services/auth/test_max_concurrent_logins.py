@@ -129,6 +129,7 @@ def auth_service(
     mock_user_resource_policy_repository: AsyncMock,
     mock_user_repository: AsyncMock,
     mock_group_repository: AsyncMock,
+    mock_client_ip_masking_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
@@ -139,6 +140,7 @@ def auth_service(
         user_repository=mock_user_repository,
         group_repository=mock_group_repository,
         ssh_key_validator=AsyncMock(),
+        client_ip_masking_repository=mock_client_ip_masking_repository,
     )
 
 
@@ -358,6 +360,6 @@ class TestMaxConcurrentLoginsEnforcement:
             delete_mock.assert_not_called()
         else:
             delete_mock.assert_called_once_with(
-                case.expected_evicted_tokens, LoginAttemptResult.EVICTED
+                case.expected_evicted_tokens, LoginAttemptResult.EVICTED, None
             )
         assert result.authorization_result is not None

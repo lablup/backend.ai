@@ -10,6 +10,7 @@ from typing import Any, cast
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql as pgsql
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
@@ -350,6 +351,7 @@ class AuthDBSource:
         domain_name: str,
         result: LoginAttemptResult,
         fail_reason: str | None,
+        client_ip: str | None,
     ) -> None:
         """Insert a login history record (internal, within an existing connection)."""
         await conn.execute(
@@ -358,6 +360,7 @@ class AuthDBSource:
                 domain_name=domain_name,
                 result=result,
                 fail_reason=fail_reason,
+                client_ip=client_ip,
             )
         )
 
@@ -368,6 +371,7 @@ class AuthDBSource:
         domain_name: str,
         result: LoginAttemptResult,
         fail_reason: str | None = None,
+        client_ip: str | None = None,
     ) -> None:
         """Insert a login history record (public, manages its own transaction)."""
         async with self._db.begin_session() as db_session:
@@ -377,6 +381,7 @@ class AuthDBSource:
                     domain_name=domain_name,
                     result=result,
                     fail_reason=fail_reason,
+                    client_ip=client_ip,
                 )
             )
 
@@ -444,6 +449,7 @@ class AuthDBSource:
         self,
         session_tokens: list[str],
         result: LoginAttemptResult,
+        client_ip: str | None = None,
     ) -> None:
         """Delete the given login sessions and record history for each.
 
@@ -462,11 +468,12 @@ class AuthDBSource:
                 .cte("deleted")
             )
             insert_query = lh.insert().from_select(
-                ["user_id", "domain_name", "result"],
+                ["user_id", "domain_name", "result", "client_ip"],
                 sa.select(
                     deleted.c.user_id,
                     users.c.domain_name,
                     sa.literal(result.value).label("result"),
+                    sa.literal(client_ip, type_=pgsql.INET).label("client_ip"),
                 ).select_from(deleted.join(users, deleted.c.user_id == users.c.uuid)),
             )
             await conn.execute(insert_query)
@@ -480,6 +487,7 @@ class AuthDBSource:
         domain_name: str,
         *,
         login_client_type_id: UUID | None = None,
+        client_ip: str | None = None,
     ) -> LoginSessionCreationResult:
         """Create a new active login session and record a successful login history entry.
 
@@ -502,7 +510,12 @@ class AuthDBSource:
 
             # Record successful login in the same transaction.
             await self._record_login_history(
-                conn, user_id, domain_name, LoginAttemptResult.SUCCESS, fail_reason=None
+                conn,
+                user_id,
+                domain_name,
+                LoginAttemptResult.SUCCESS,
+                fail_reason=None,
+                client_ip=client_ip,
             )
 
             await conn.commit()
@@ -588,6 +601,7 @@ class AuthDBSource:
         self,
         session_token: str,
         result: LoginAttemptResult,
+        client_ip: str | None = None,
     ) -> None:
         """Delete a single login session by its token and record history.
 
@@ -604,11 +618,12 @@ class AuthDBSource:
                 .cte("deleted")
             )
             insert_query = lh.insert().from_select(
-                ["user_id", "domain_name", "result"],
+                ["user_id", "domain_name", "result", "client_ip"],
                 sa.select(
                     deleted.c.user_id,
                     users.c.domain_name,
                     sa.literal(result.value).label("result"),
+                    sa.literal(client_ip, type_=pgsql.INET).label("client_ip"),
                 ).select_from(deleted.join(users, deleted.c.user_id == users.c.uuid)),
             )
             await conn.execute(insert_query)
@@ -620,6 +635,7 @@ class AuthDBSource:
         user_id: UUID,
         domain_name: str,
         result: LoginAttemptResult,
+        client_ip: str | None = None,
     ) -> list[str]:
         """Delete all login sessions for a user, record history, return tokens.
 
@@ -641,6 +657,7 @@ class AuthDBSource:
                             "user_id": user_id,
                             "domain_name": domain_name,
                             "result": result,
+                            "client_ip": client_ip,
                         }
                         for _ in deleted_tokens
                     ],
@@ -653,6 +670,7 @@ class AuthDBSource:
         self,
         session_id: UUID,
         result: LoginAttemptResult,
+        client_ip: str | None = None,
     ) -> str:
         """Delete a login session by its ID, record history, return session_token.
 
@@ -686,6 +704,7 @@ class AuthDBSource:
                     user_id=row.user_id,
                     domain_name=domain_name,
                     result=result,
+                    client_ip=client_ip,
                 )
             )
             await conn.commit()

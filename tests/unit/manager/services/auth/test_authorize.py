@@ -12,8 +12,7 @@ from ai.backend.common.data.entity.resource_policy import (
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
-from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
+from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
@@ -47,20 +46,6 @@ def mock_auth_repository() -> AsyncMock:
 
 
 @pytest.fixture
-def mock_config_provider() -> MagicMock:
-    mock_provider = MagicMock(spec=ManagerConfigProvider)
-    mock_provider.config = MagicMock(spec=ManagerConfig)
-    mock_provider.config.auth = AuthConfig(
-        max_password_age=timedelta(days=90),
-        password_hash_algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
-        password_hash_rounds=100_000,
-        password_hash_salt_size=32,
-        login_session_max_age=604800,
-    )
-    return mock_provider
-
-
-@pytest.fixture
 def mock_valkey_session_client() -> AsyncMock:
     return AsyncMock(spec=ValkeySessionClient)
 
@@ -90,6 +75,7 @@ def auth_service(
     mock_user_resource_policy_repository: AsyncMock,
     mock_user_repository: AsyncMock,
     mock_group_repository: AsyncMock,
+    mock_client_ip_masking_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
@@ -100,6 +86,7 @@ def auth_service(
         user_repository=mock_user_repository,
         group_repository=mock_group_repository,
         ssh_key_validator=AsyncMock(),
+        client_ip_masking_repository=mock_client_ip_masking_repository,
     )
 
 
@@ -436,7 +423,7 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
 
     # Stale session should have been invalidated in DB
     mock_auth_repository.delete_login_session_by_token.assert_awaited_once_with(
-        "stale_token", LoginAttemptResult.EXPIRED
+        "stale_token", LoginAttemptResult.EXPIRED, None
     )
     assert result.authorization_result is not None
     assert result.authorization_result.session_token == "new_session_token"
@@ -505,7 +492,7 @@ async def test_authorize_force_invalidates_existing_sessions(
 
     # Eviction happens via a dedicated repository call before create_login_session.
     mock_auth_repository.delete_login_sessions_by_tokens.assert_awaited_once_with(
-        ["existing_live_token"], LoginAttemptResult.EVICTED
+        ["existing_live_token"], LoginAttemptResult.EVICTED, None
     )
     mock_auth_repository.create_login_session.assert_awaited_once()
     create_kwargs = mock_auth_repository.create_login_session.call_args.kwargs

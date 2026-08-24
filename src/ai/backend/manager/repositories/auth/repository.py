@@ -130,19 +130,24 @@ class AuthRepository:
         domain_name: str,
         *,
         login_client_type_id: UUID | None = None,
+        client_ip: str | None = None,
     ) -> LoginSessionCreationResult:
         return await self._db_source.create_login_session(
             user_id,
             access_key,
             domain_name,
             login_client_type_id=login_client_type_id,
+            client_ip=client_ip,
         )
 
     @auth_repository_resilience.apply()
     async def delete_login_sessions_by_tokens(
-        self, session_tokens: list[str], result: LoginAttemptResult
+        self,
+        session_tokens: list[str],
+        result: LoginAttemptResult,
+        client_ip: str | None = None,
     ) -> None:
-        await self._db_source.delete_sessions_by_tokens(session_tokens, result)
+        await self._db_source.delete_sessions_by_tokens(session_tokens, result, client_ip)
 
     @auth_repository_resilience.apply()
     async def check_credential_without_migration(
@@ -177,20 +182,34 @@ class AuthRepository:
 
     @auth_repository_resilience.apply()
     async def delete_login_session_by_token(
-        self, session_token: str, result: LoginAttemptResult
+        self,
+        session_token: str,
+        result: LoginAttemptResult,
+        client_ip: str | None = None,
     ) -> None:
-        await self._db_source.delete_session_by_token(session_token, result)
+        await self._db_source.delete_session_by_token(session_token, result, client_ip)
 
     @auth_repository_resilience.apply()
     async def delete_user_login_sessions(
-        self, user_id: UUID, domain_name: str, result: LoginAttemptResult
+        self,
+        user_id: UUID,
+        domain_name: str,
+        result: LoginAttemptResult,
+        client_ip: str | None = None,
     ) -> list[str]:
-        return await self._db_source.delete_sessions_by_user(user_id, domain_name, result)
+        return await self._db_source.delete_sessions_by_user(
+            user_id, domain_name, result, client_ip
+        )
 
     @auth_repository_resilience.apply()
-    async def delete_login_session_by_id(self, session_id: UUID, result: LoginAttemptResult) -> str:
+    async def delete_login_session_by_id(
+        self,
+        session_id: UUID,
+        result: LoginAttemptResult,
+        client_ip: str | None = None,
+    ) -> str:
         """Delete a login session, record history, and return its session_token."""
-        return await self._db_source.delete_session_by_id(session_id, result)
+        return await self._db_source.delete_session_by_id(session_id, result, client_ip)
 
     @auth_repository_resilience.apply()
     async def record_login_history(
@@ -199,5 +218,8 @@ class AuthRepository:
         domain_name: str,
         result: LoginAttemptResult,
         fail_reason: str | None = None,
+        client_ip: str | None = None,
     ) -> None:
-        await self._db_source.record_login_history(user_id, domain_name, result, fail_reason)
+        await self._db_source.record_login_history(
+            user_id, domain_name, result, fail_reason, client_ip
+        )

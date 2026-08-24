@@ -22,7 +22,7 @@ from ai.backend.manager.errors.common import (
     ServerMisconfiguredError,
 )
 
-from .middleware import build_api_metric_middleware, request_id_middleware
+from .middleware import build_api_metric_middleware, client_ip_middleware, request_id_middleware
 from .routing import RouteRegistry
 
 if TYPE_CHECKING:
@@ -181,6 +181,7 @@ def build_root_app(
     app = web.Application(
         middlewares=[
             request_id_middleware,
+            client_ip_middleware,
             # exception_middleware and auth_middleware are inserted later
             # in server_main() after dependencies are available.
             api_middleware,

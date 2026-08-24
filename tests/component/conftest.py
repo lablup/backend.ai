@@ -144,6 +144,9 @@ from ai.backend.manager.notification.notification_center import NotificationCent
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.client_ip_masking.repository import (
+    ClientIPMaskingRepository,
+)
 from ai.backend.manager.repositories.db.engine import (
     connect_database,
     create_async_engine,
@@ -1450,6 +1453,7 @@ def auth_processors(
         user_repository=user_repository,
         group_repository=group_repository,
         ssh_key_validator=SSHKeyValidator(),
+        client_ip_masking_repository=ClientIPMaskingRepository(database_engine),
     )
     return AuthProcessors(
         processor_registry.group(GroupMeta(AUTH_ENTITY_TYPE)),
@@ -1500,9 +1504,10 @@ async def server(
         # JWT validator mock — HMAC auth only, JWT not called in tests
         jwt_validator = MagicMock()
 
-        # Insert DI-based middlewares with real plugin contexts
+        # Insert DI-based middlewares with real plugin contexts.
+        # Same order as server_main(): request_id(0) → client_ip(1) → exception(2) → auth(3)
         app.middlewares.insert(
-            1,
+            2,
             build_exception_middleware(
                 error_monitor=error_monitor,
                 stats_monitor=stats_monitor,
@@ -1510,7 +1515,7 @@ async def server(
             ),
         )
         app.middlewares.insert(
-            2,
+            3,
             build_auth_middleware(
                 db=db,
                 jwt_validator=jwt_validator,

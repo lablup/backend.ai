@@ -69,6 +69,11 @@ from .artifact import (
 from .artifact_registry import default_artifact_registry
 from .audit_log import admin_audit_logs_v2, scoped_audit_logs_v2
 from .background_task import background_task_events
+from .client_ip_masking import (
+    admin_client_ip_masking_policies,
+    admin_purge_client_ip_masking_policy,
+    admin_upsert_client_ip_masking_policy,
+)
 from .container_registry import (
     admin_container_registries_v2,
     admin_create_container_registry_v2,
@@ -741,6 +746,8 @@ class Query:
     # Runtime Variant APIs
     runtime_variants = runtime_variants
     runtime_variant = runtime_variant
+    # Client IP Masking APIs
+    admin_client_ip_masking_policies = admin_client_ip_masking_policies
     # Retention Policy APIs
     admin_retention_policies = admin_retention_policies
     admin_retention_policy = admin_retention_policy
@@ -988,6 +995,9 @@ class Mutation:
     admin_update_runtime_variant = admin_update_runtime_variant
     admin_delete_runtime_variant = admin_delete_runtime_variant
     admin_delete_runtime_variants = admin_delete_runtime_variants
+    # Client IP Masking mutations
+    admin_upsert_client_ip_masking_policy = admin_upsert_client_ip_masking_policy
+    admin_purge_client_ip_masking_policy = admin_purge_client_ip_masking_policy
     # Retention Policy mutations
     admin_create_retention_policy = admin_create_retention_policy
     admin_update_retention_policy = admin_update_retention_policy

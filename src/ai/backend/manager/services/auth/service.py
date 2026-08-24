@@ -16,6 +16,7 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionInner,
     LoginSessionTokenData,
 )
+from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters, UserResourcePolicyNotFound
@@ -26,6 +27,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
+from ai.backend.manager.data.client_ip.masking import ClientIPMasker, ClientIPMaskingTarget
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.defs import DEFAULT_PROJECT_NAME
 from ai.backend.manager.errors.auth import (
@@ -56,6 +58,9 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.client_ip_masking.repository import (
+    ClientIPMaskingRepository,
+)
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
@@ -138,6 +143,7 @@ class AuthService:
     _user_repository: UserRepository
     _group_repository: ProjectRepository
     _ssh_key_validator: SSHKeyValidator
+    _client_ip_masking_repository: ClientIPMaskingRepository
 
     def __init__(
         self,
@@ -149,6 +155,7 @@ class AuthService:
         user_repository: UserRepository,
         group_repository: ProjectRepository,
         ssh_key_validator: SSHKeyValidator,
+        client_ip_masking_repository: ClientIPMaskingRepository,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx
         self._auth_repository = auth_repository
@@ -158,6 +165,7 @@ class AuthService:
         self._user_repository = user_repository
         self._group_repository = group_repository
         self._ssh_key_validator = ssh_key_validator
+        self._client_ip_masking_repository = client_ip_masking_repository
 
     async def get_role(self, action: PublicGetRoleAction) -> PublicGetRoleActionResult:
         group_role = None
@@ -313,7 +321,9 @@ class AuthService:
                 live_sessions.append(session_info)
             else:
                 await self._auth_repository.delete_login_session_by_token(
-                    session_info.session_token, LoginAttemptResult.EXPIRED
+                    session_info.session_token,
+                    LoginAttemptResult.EXPIRED,
+                    await self._recorded_client_ip(),
                 )
 
         return default_keypair, live_sessions
@@ -394,13 +404,14 @@ class AuthService:
             access_key=keypair.access_key,
             domain_name=action.domain_name,
             login_client_type_id=login_client_type_id,
+            client_ip=await self._recorded_client_ip(),
         )
 
         if tokens_to_invalidate:
             for token in tokens_to_invalidate:
                 await self._valkey_session_client.delete_login_session(token)
             await self._auth_repository.delete_login_sessions_by_tokens(
-                tokens_to_invalidate, LoginAttemptResult.EVICTED
+                tokens_to_invalidate, LoginAttemptResult.EVICTED, await self._recorded_client_ip()
             )
 
         session_data = LoginSessionData(
@@ -435,6 +446,13 @@ class AuthService:
             ),
         )
 
+    async def _recorded_client_ip(self) -> str | None:
+        """The caller's address as login history keeps it, masked per the stored setting."""
+        mode = await self._client_ip_masking_repository.resolve_mode(
+            ClientIPMaskingTarget.LOGIN_HISTORY
+        )
+        return ClientIPMasker(mode).mask(current_client_ip())
+
     async def _record_login_failure(
         self,
         user_uuid: uuid.UUID,
@@ -442,7 +460,9 @@ class AuthService:
         result: LoginAttemptResult,
     ) -> None:
         try:
-            await self._auth_repository.record_login_history(user_uuid, domain_name, result)
+            await self._auth_repository.record_login_history(
+                user_uuid, domain_name, result, client_ip=await self._recorded_client_ip()
+            )
         except Exception:
             log.warning("Failed to record login history: {} for user {}", result, user_uuid)
 
@@ -550,7 +570,7 @@ class AuthService:
 
     async def logout(self, action: LogoutAction) -> LogoutActionResult:
         await self._auth_repository.delete_login_session_by_token(
-            action.session_token, LoginAttemptResult.LOGOUT
+            action.session_token, LoginAttemptResult.LOGOUT, await self._recorded_client_ip()
         )
         await self._valkey_session_client.delete_login_session(action.session_token)
         return LogoutActionResult(success=True)
@@ -559,7 +579,7 @@ class AuthService:
         self, action: GlobalRevokeLoginSessionAction
     ) -> RevokeLoginSessionActionResult:
         session_token = await self._auth_repository.delete_login_session_by_id(
-            action.session_id, LoginAttemptResult.REVOKED_BY_ADMIN
+            action.session_id, LoginAttemptResult.REVOKED_BY_ADMIN, await self._recorded_client_ip()
         )
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
@@ -568,7 +588,7 @@ class AuthService:
         self, action: RevokeLoginSessionAction
     ) -> RevokeLoginSessionActionResult:
         session_token = await self._auth_repository.delete_login_session_by_id(
-            action.session_id, LoginAttemptResult.REVOKED_BY_USER
+            action.session_id, LoginAttemptResult.REVOKED_BY_USER, await self._recorded_client_ip()
         )
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
@@ -589,7 +609,10 @@ class AuthService:
             action.password,
         )
         deleted_tokens = await self._auth_repository.delete_user_login_sessions(
-            action.user_id, action.domain_name, LoginAttemptResult.LOGOUT
+            action.user_id,
+            action.domain_name,
+            LoginAttemptResult.LOGOUT,
+            await self._recorded_client_ip(),
         )
         for token in deleted_tokens:
             await self._valkey_session_client.delete_login_session(token)

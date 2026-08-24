@@ -70,6 +70,9 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.auth.processors import AuthProcessors
     from ai.backend.manager.services.auth.service import AuthService
+    from ai.backend.manager.services.client_ip_masking.processors import (
+        ClientIPMaskingProcessors,
+    )
     from ai.backend.manager.services.container_registry.processors import (
         ContainerRegistryProcessors,
     )
@@ -416,6 +419,7 @@ class Processors:
     retention_policy: RetentionPolicyProcessors
     role_preset: RolePresetProcessors
     runtime_variant: RuntimeVariantProcessors
+    client_ip_masking: ClientIPMaskingProcessors
     runtime_variant_preset: RuntimeVariantPresetProcessors
     deployment_revision_preset: DeploymentPresetProcessors
     model_card: ModelCardProcessors
