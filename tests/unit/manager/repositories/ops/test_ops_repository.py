@@ -43,6 +43,7 @@ from ai.backend.manager.errors.repository import (
     EntityNotFoundError,
 )
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.label.row import LabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.purgers import RolePresetPurger
@@ -292,6 +293,7 @@ async def database(
             VirtualScopeRow,
             EntityMembershipRow,
             ScopeBindingRow,
+            LabelRow,
             RoleRow,
             PermissionRow,
             RolePresetRow,

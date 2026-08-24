@@ -25,6 +25,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.label.row import LabelRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -63,6 +64,7 @@ class TestDomainPurgersIntegration:
                 VirtualScopeRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
+                LabelRow,
                 DomainRow,
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,

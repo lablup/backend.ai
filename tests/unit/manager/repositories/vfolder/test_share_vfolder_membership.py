@@ -32,6 +32,7 @@ from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.label.row import LabelRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -116,6 +117,7 @@ class TestShareVfolderWithUsersMembership:
                 AssociationScopesEntitiesRow,
                 VirtualScopeRow,
                 EntityMembershipRow,
+                LabelRow,
             ],
         ):
             yield database_connection

@@ -42,6 +42,7 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.label.row import LabelRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -173,6 +174,7 @@ class TestReplicaGroupRepository:
                 VirtualScopeRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
+                LabelRow,
                 PermissionRow,
                 DomainRow,
                 ResourceGroupRow,

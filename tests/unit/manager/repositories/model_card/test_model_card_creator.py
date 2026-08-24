@@ -28,6 +28,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.label.row import LabelRow
 from ai.backend.manager.models.model_card.creators import (
     ModelCardCreator,
     ModelCardResourceRequirementCreator,
@@ -92,6 +93,7 @@ class TestModelCardCreatorResourceRequirements:
                 KeyPairResourcePolicyRow,
                 VirtualScopeRow,
                 ScopeBindingRow,
+                LabelRow,
                 EntityMembershipRow,
                 RoleRow,
                 UserRoleRow,

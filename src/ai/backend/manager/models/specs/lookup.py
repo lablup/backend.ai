@@ -9,7 +9,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, FieldIdentifier
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 
@@ -76,30 +76,35 @@ class FieldOwnerLookup[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](AB
     recorded against. The id read never reaches the service layer.
 
     A query rather than conditions, unlike :class:`DataLookup`, so an owner reached
-    through a join is expressible. It selects the pair, so one spec serves a single row
-    and a batch alike: which row each owner belongs to survives.
+    through a join is expressible. It selects the triple, so one spec serves a single
+    row and a batch alike: which row each owner belongs to survives.
+
+    The owner's type is selected beside its id because an identifier answers for the
+    entity it names, and a row whose owner is a polymorphic reference carries the type
+    as a value. Where the type is fixed it is a literal, stated rather than implied.
 
     Example:
         class ReplicaOwnerLookup(FieldOwnerLookup):
             def build_query(self, field_ids):
-                return sa.select(ReplicaRow.id, ReplicaRow.deployment_id).where(
-                    ReplicaRow.id.in_(field_ids)
-                )
+                return sa.select(
+                    ReplicaRow.id,
+                    ReplicaRow.deployment_id,
+                    sa.literal(DEPLOYMENT_ENTITY_TYPE),
+                ).where(ReplicaRow.id.in_(field_ids))
 
-            def to_entity_id(self, value: UUID) -> DeploymentID:
+            def to_entity_id(self, value: UUID, owner_type: EntityType) -> DeploymentID:
                 return DeploymentID(value)
     """
 
     @abstractmethod
-    def build_query(
-        self, field_ids: Sequence[TFieldID]
-    ) -> sa.sql.Select[tuple[TFieldID, TOwnerID]]:
-        """Build the query selecting each named row's id and its owning entity's id."""
+    def build_query(self, field_ids: Sequence[TFieldID]) -> sa.sql.Select[Any]:
+        """Build the query selecting each named row's id, its owning entity's id, and
+        that entity's type, in that order."""
         raise NotImplementedError
 
     @abstractmethod
-    def to_entity_id(self, value: UUID) -> TOwnerID:
-        """Convert the selected value into the owning entity's identifier."""
+    def to_entity_id(self, value: UUID, owner_type: EntityType) -> TOwnerID:
+        """Convert the selected values into the owning entity's identifier."""
         raise NotImplementedError
 
 

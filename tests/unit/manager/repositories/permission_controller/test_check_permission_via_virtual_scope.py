@@ -42,6 +42,7 @@ from ai.backend.manager.models.agent import AgentRow
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.label.row import LabelRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -121,6 +122,7 @@ class TestCheckPermissionViaVirtualScope:
                 AssociationScopesEntitiesRow,
                 VirtualScopeRow,
                 ScopeBindingRow,
+                LabelRow,
                 EntityMembershipRow,
             ],
         ):

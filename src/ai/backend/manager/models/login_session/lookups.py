@@ -10,7 +10,8 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.login_history import LoginHistoryID
 from ai.backend.common.data.entity.login_session import LoginSessionID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.specs.lookup import FieldOwnerLookup
 
@@ -20,12 +21,12 @@ class LoginSessionOwnerLookup(FieldOwnerLookup[LoginSessionID, UserID]):
 
     @override
     def build_query(self, field_ids: Sequence[LoginSessionID]) -> sa.sql.Select[Any]:
-        return sa.select(LoginSessionRow.id, LoginSessionRow.user_id).where(
-            LoginSessionRow.id.in_(field_ids)
-        )
+        return sa.select(
+            LoginSessionRow.id, LoginSessionRow.user_id, sa.literal(USER_ENTITY_TYPE)
+        ).where(LoginSessionRow.id.in_(field_ids))
 
     @override
-    def to_entity_id(self, value: UUID) -> UserID:
+    def to_entity_id(self, value: UUID, owner_type: EntityType) -> UserID:
         return UserID(value)
 
 
@@ -34,10 +35,10 @@ class LoginHistoryOwnerLookup(FieldOwnerLookup[LoginHistoryID, UserID]):
 
     @override
     def build_query(self, field_ids: Sequence[LoginHistoryID]) -> sa.sql.Select[Any]:
-        return sa.select(LoginHistoryRow.id, LoginHistoryRow.user_id).where(
-            LoginHistoryRow.id.in_(field_ids)
-        )
+        return sa.select(
+            LoginHistoryRow.id, LoginHistoryRow.user_id, sa.literal(USER_ENTITY_TYPE)
+        ).where(LoginHistoryRow.id.in_(field_ids))
 
     @override
-    def to_entity_id(self, value: UUID) -> UserID:
+    def to_entity_id(self, value: UUID, owner_type: EntityType) -> UserID:
         return UserID(value)

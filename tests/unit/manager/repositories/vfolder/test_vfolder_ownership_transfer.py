@@ -39,6 +39,7 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.label.row import LabelRow
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -134,6 +135,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 PermissionRow,
                 VirtualScopeRow,
                 EntityMembershipRow,
+                LabelRow,
             ],
         ):
             yield database_connection
