@@ -38,7 +38,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
-from ai.backend.manager.data.project.types import ProjectData, ProjectType
+from ai.backend.manager.data.project.types import ProjectData, ProjectStatus, ProjectType
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.association_container_registries_groups import (
@@ -50,6 +50,7 @@ from ai.backend.manager.models.base import (
     EnumValueType,
     ResourceSlotColumn,
     SlugType,
+    StrEnumType,
     StructuredJSONColumn,
     VFolderHostPermissionColumn,
 )
@@ -158,6 +159,14 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     )
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool | None] = mapped_column("is_active", sa.Boolean, default=True)
+    status: Mapped[ProjectStatus] = mapped_column(
+        "status",
+        StrEnumType(ProjectStatus),
+        default=ProjectStatus.ACTIVE,
+        server_default=ProjectStatus.ACTIVE,
+        nullable=False,
+        index=True,
+    )
     #: Field for synchronization with external services.
     integration_id: Mapped[str | None] = mapped_column("integration_id", sa.String(length=512))
     domain_name: Mapped[str] = mapped_column(

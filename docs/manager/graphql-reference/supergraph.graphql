@@ -8681,6 +8681,8 @@ enum ImageStatus
 {
   ALIVE @join__enumValue(graph: GRAPHENE)
   DELETED @join__enumValue(graph: GRAPHENE)
+  PURGING @join__enumValue(graph: GRAPHENE)
+  PURGE_ERROR @join__enumValue(graph: GRAPHENE)
 }
 
 """Added in 25.12.0."""

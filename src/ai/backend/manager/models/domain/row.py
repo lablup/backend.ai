@@ -24,7 +24,7 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.types import ScopeID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.domain.types import DomainData, DomainStatus
 from ai.backend.manager.data.permission.permission_defs import DomainPermission
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.base import (
@@ -32,6 +32,7 @@ from ai.backend.manager.models.base import (
     Base,
     ResourceSlotColumn,
     SlugType,
+    StrEnumType,
     VFolderHostPermissionColumn,
 )
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
@@ -90,6 +91,14 @@ class DomainRow(LifecycleTimestampsMixin, Base):
     )
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool] = mapped_column("is_active", sa.Boolean, default=True, nullable=False)
+    status: Mapped[DomainStatus] = mapped_column(
+        "status",
+        StrEnumType(DomainStatus),
+        default=DomainStatus.ACTIVE,
+        server_default=DomainStatus.ACTIVE,
+        nullable=False,
+        index=True,
+    )
     is_default: Mapped[bool] = mapped_column(
         "is_default", sa.Boolean, nullable=False, default=False, server_default=sa.false()
     )

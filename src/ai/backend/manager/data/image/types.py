@@ -16,6 +16,8 @@ type Resources = dict[SlotName, dict[str, Any]]
 class ImageStatus(enum.StrEnum):
     ALIVE = "ALIVE"
     DELETED = "DELETED"
+    PURGING = "PURGING"
+    PURGE_ERROR = "PURGE_ERROR"
 
 
 class ImageOrderField(enum.StrEnum):

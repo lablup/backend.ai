@@ -22,6 +22,15 @@ from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
+class ProjectStatus(enum.StrEnum):
+    """Lifecycle status of a project."""
+
+    ACTIVE = "active"
+    DELETED = "deleted"
+    PURGING = "purging"
+    PURGE_ERROR = "purge-error"
+
+
 class ProjectType(enum.StrEnum):
     GENERAL = "general"
     MODEL_STORE = "model-store"
