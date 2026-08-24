@@ -7764,28 +7764,19 @@ type EntityInvitationPayload
 }
 
 """
-Added in 26.8.3. One side invitations are read from; RECEIVED and SENT name nothing else.
+Added in 26.8.3. Scope for the scoped entity invitation query. All items are OR'd; raises an error if every field is empty.
 """
-input EntityInvitationScopeItem
+input EntityInvitationScope
   @join__type(graph: STRAWBERRY)
 {
-  """Which side the read comes in through."""
-  side: EntityInvitationSide!
+  """Users the invitations are addressed to."""
+  invitee: [UUIDScope!] = null
 
-  """Type of the entity being offered; TARGET only."""
-  targetEntityType: String = null
+  """Users who sent the invitations."""
+  inviter: [UUIDScope!] = null
 
-  """Id of the entity being offered; TARGET only."""
-  targetEntityId: UUID = null
-}
-
-"""Added in 26.8.3. Which side of an invitation a read comes in through."""
-enum EntityInvitationSide
-  @join__type(graph: STRAWBERRY)
-{
-  RECEIVED @join__enumValue(graph: STRAWBERRY)
-  SENT @join__enumValue(graph: STRAWBERRY)
-  TARGET @join__enumValue(graph: STRAWBERRY)
+  """Entities the invitations offer."""
+  target: [EntityInvitationTargetScope!] = null
 }
 
 """Added in 26.8.3. Whether an invitation is still open."""
@@ -7796,6 +7787,17 @@ enum EntityInvitationStatus
   ACCEPTED @join__enumValue(graph: STRAWBERRY)
   REJECTED @join__enumValue(graph: STRAWBERRY)
   CANCELED @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.8.3. One entity whose invitations are being read."""
+input EntityInvitationTargetScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Type of the entity being offered."""
+  entityType: String!
+
+  """Id of the entity being offered."""
+  entityId: UUID!
 }
 
 union EntityNode
@@ -16881,9 +16883,9 @@ type Query
   entityInvitation(id: UUID!): EntityInvitation @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.8.3. Page through the invitations the named sides reach, combined with OR. RECEIVED and SENT are answered for by the caller and name nobody.
+  Added in 26.8.3. Page through the invitations the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
-  entityInvitations(scope: [EntityInvitationScopeItem!]!, filter: EntityInvitationFilter = null, orderBy: [EntityInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityInvitationConnection @join__field(graph: STRAWBERRY)
+  entityInvitations(scope: EntityInvitationScope!, filter: EntityInvitationFilter = null, orderBy: [EntityInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityInvitationConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Search runtime variant presets."""
   runtimeVariantPresets(filter: RuntimeVariantPresetFilter = null, orderBy: [RuntimeVariantPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantPresetConnection @join__field(graph: STRAWBERRY)

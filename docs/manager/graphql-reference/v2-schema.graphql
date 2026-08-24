@@ -5375,24 +5375,17 @@ type EntityInvitationPayload {
 }
 
 """
-Added in 26.8.3. One side invitations are read from; RECEIVED and SENT name nothing else.
+Added in 26.8.3. Scope for the scoped entity invitation query. All items are OR'd; raises an error if every field is empty.
 """
-input EntityInvitationScopeItem {
-  """Which side the read comes in through."""
-  side: EntityInvitationSide!
+input EntityInvitationScope {
+  """Users the invitations are addressed to."""
+  invitee: [UUIDScope!] = null
 
-  """Type of the entity being offered; TARGET only."""
-  targetEntityType: String = null
+  """Users who sent the invitations."""
+  inviter: [UUIDScope!] = null
 
-  """Id of the entity being offered; TARGET only."""
-  targetEntityId: UUID = null
-}
-
-"""Added in 26.8.3. Which side of an invitation a read comes in through."""
-enum EntityInvitationSide {
-  RECEIVED
-  SENT
-  TARGET
+  """Entities the invitations offer."""
+  target: [EntityInvitationTargetScope!] = null
 }
 
 """Added in 26.8.3. Whether an invitation is still open."""
@@ -5401,6 +5394,15 @@ enum EntityInvitationStatus {
   ACCEPTED
   REJECTED
   CANCELED
+}
+
+"""Added in 26.8.3. One entity whose invitations are being read."""
+input EntityInvitationTargetScope {
+  """Type of the entity being offered."""
+  entityType: String!
+
+  """Id of the entity being offered."""
+  entityId: UUID!
 }
 
 union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
@@ -11723,9 +11725,9 @@ type Query {
   entityInvitation(id: UUID!): EntityInvitation
 
   """
-  Added in 26.8.3. Page through the invitations the named sides reach, combined with OR. RECEIVED and SENT are answered for by the caller and name nobody.
+  Added in 26.8.3. Page through the invitations the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
-  entityInvitations(scope: [EntityInvitationScopeItem!]!, filter: EntityInvitationFilter = null, orderBy: [EntityInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityInvitationConnection
+  entityInvitations(scope: EntityInvitationScope!, filter: EntityInvitationFilter = null, orderBy: [EntityInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityInvitationConnection
 
   """Added in 26.4.2. Search runtime variant presets."""
   runtimeVariantPresets(filter: RuntimeVariantPresetFilter = null, orderBy: [RuntimeVariantPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantPresetConnection

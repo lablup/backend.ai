@@ -16127,73 +16127,60 @@
         "title": "EntityInvitationOrderField",
         "type": "string"
       },
-      "EntityInvitationScopeDTO": {
-        "description": "The sides the read covers, combined with OR.",
+      "EntityInvitationScope": {
+        "description": "Scope for the scoped entity invitation query.\n\nEach list is OR'd internally and across lists. Raises an error if every field is\nempty. Naming a user reads the invitations they were sent or sent themselves, which\nthe permission check on that user's scope is what allows.",
         "properties": {
-          "items": {
-            "description": "Sides to read from (OR across all items).",
-            "items": {
-              "$ref": "#/components/schemas/EntityInvitationScopeItemDTO"
-            },
-            "minItems": 1,
-            "title": "Items",
-            "type": "array"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "title": "EntityInvitationScopeDTO",
-        "type": "object"
-      },
-      "EntityInvitationScopeItemDTO": {
-        "description": "One side invitations are read from.\n\n``RECEIVED`` and ``SENT`` are answered for by the requester themselves and name\nnothing else; ``TARGET`` names the entity whose invitations are being read.",
-        "properties": {
-          "side": {
-            "$ref": "#/components/schemas/EntityInvitationSideDTO",
-            "description": "Which side the read comes in through."
-          },
-          "target_entity_type": {
+          "invitee": {
             "anyOf": [
               {
-                "type": "string"
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Type of the entity being offered; TARGET only.",
-            "title": "Target Entity Type"
+            "description": "Users the invitations are addressed to",
+            "title": "Invitee"
           },
-          "target_entity_id": {
+          "inviter": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EntityID"
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Id of the entity being offered; TARGET only."
+            "description": "Users who sent the invitations",
+            "title": "Inviter"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityInvitationTargetScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities the invitations offer",
+            "title": "Target"
           }
         },
-        "required": [
-          "side"
-        ],
-        "title": "EntityInvitationScopeItemDTO",
+        "title": "EntityInvitationScope",
         "type": "object"
-      },
-      "EntityInvitationSideDTO": {
-        "description": "Which side of an invitation a read comes in through.",
-        "enum": [
-          "received",
-          "sent",
-          "target"
-        ],
-        "title": "EntityInvitationSideDTO",
-        "type": "string"
       },
       "EntityInvitationStatusDTO": {
         "enum": [
@@ -16237,11 +16224,46 @@
         "title": "EntityInvitationStatusFilter",
         "type": "object"
       },
+      "EntityInvitationTargetScope": {
+        "description": "One entity whose invitations are being read.\n\nIts own pair rather than the shared ``EntityTypeScope``: what an invitation offers\nis an open entity type, which that closed element enum cannot name.",
+        "properties": {
+          "entity_type": {
+            "description": "Type of the entity being offered",
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "entity_id": {
+            "$ref": "#/components/schemas/EntityID",
+            "description": "Id of the entity being offered"
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_id"
+        ],
+        "title": "EntityInvitationTargetScope",
+        "type": "object"
+      },
+      "UUIDScope": {
+        "description": "Single-UUID scope item wrapper.\n\nA thin wrapper around a UUID used as a scope item. The wrapper exists so\nthat scope-input lists stay structurally uniform with other scope item\ntypes and leave room for per-item metadata in the future.",
+        "properties": {
+          "value": {
+            "format": "uuid",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "UUIDScope",
+        "type": "object"
+      },
       "ScopedSearchEntityInvitationsInput": {
         "properties": {
           "scope": {
-            "$ref": "#/components/schemas/EntityInvitationScopeDTO",
-            "description": "Sides to read from."
+            "$ref": "#/components/schemas/EntityInvitationScope",
+            "description": "Scope (OR across all items)"
           },
           "filter": {
             "anyOf": [
@@ -27436,21 +27458,6 @@
           }
         },
         "title": "KernelHistoryScopeDTO",
-        "type": "object"
-      },
-      "UUIDScope": {
-        "description": "Single-UUID scope item wrapper.\n\nA thin wrapper around a UUID used as a scope item. The wrapper exists so\nthat scope-input lists stay structurally uniform with other scope item\ntypes and leave room for per-item metadata in the future.",
-        "properties": {
-          "value": {
-            "format": "uuid",
-            "title": "Value",
-            "type": "string"
-          }
-        },
-        "required": [
-          "value"
-        ],
-        "title": "UUIDScope",
         "type": "object"
       },
       "ScopedSearchKernelHistoriesInput": {
