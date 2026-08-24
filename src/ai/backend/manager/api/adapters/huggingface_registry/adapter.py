@@ -26,16 +26,10 @@ from ai.backend.manager.data.artifact_registries.types import (
 )
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.models.huggingface_registry.conditions import HuggingFaceRegistryConditions
+from ai.backend.manager.models.huggingface_registry.creators import HuggingFaceRegistryCreator
+from ai.backend.manager.models.huggingface_registry.searchers import HuggingFaceRegistrySearcher
+from ai.backend.manager.models.huggingface_registry.updaters import HuggingFaceRegistryUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    Updater,
-)
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.huggingface_registry import HuggingFaceRegistryCreatorSpec
-from ai.backend.manager.repositories.huggingface_registry.updaters import (
-    HuggingFaceRegistryUpdaterSpec,
-)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
 )
@@ -68,12 +62,7 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
         """Create a new HuggingFace registry."""
         action_result = await self._processors.artifact_registry.create_huggingface_registry.run(
             CreateHuggingFaceRegistryAction(
-                creator=Creator(
-                    spec=HuggingFaceRegistryCreatorSpec(
-                        url=input.url,
-                        token=input.token,
-                    )
-                ),
+                creator=HuggingFaceRegistryCreator(url=input.url, token=input.token),
                 meta=ArtifactRegistryCreatorMeta(name=input.name),
             )
         )
@@ -89,9 +78,9 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
             limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
             offset=input.offset if input.offset is not None else 0,
         )
-        querier = BatchQuerier(conditions=[], orders=[], pagination=pagination)
+        searcher = HuggingFaceRegistrySearcher(pagination=pagination, conditions=[], orders=[])
         action_result = await self._processors.artifact_registry.search_huggingface_registries.run(
-            SearchHuggingFaceRegistriesAction(querier=querier)
+            SearchHuggingFaceRegistriesAction(searcher=searcher)
         )
         return AdminSearchHuggingFaceRegistriesPayload(
             items=[
@@ -113,7 +102,8 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
         self, input: UpdateHuggingFaceRegistryInput
     ) -> UpdateHuggingFaceRegistryPayload:
         """Update an existing HuggingFace registry."""
-        spec = HuggingFaceRegistryUpdaterSpec(
+        updater = HuggingFaceRegistryUpdater(
+            registry_id=ArtifactRegistryID(input.id),
             url=OptionalState.update(input.url) if input.url is not None else OptionalState.nop(),
             token=(
                 OptionalState.update(input.token)
@@ -129,7 +119,7 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
         action_result = await self._processors.artifact_registry.update_huggingface_registry.run(
             UpdateHuggingFaceRegistryAction(
                 registry_id=ArtifactRegistryID(input.id),
-                updater=Updater(spec=spec, pk_value=input.id),
+                updater=updater,
                 meta=meta,
             )
         )
@@ -151,12 +141,12 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
         """
         if not ids:
             return []
-        querier = BatchQuerier(
+        searcher = HuggingFaceRegistrySearcher(
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[HuggingFaceRegistryConditions.by_ids(ids)],
         )
         action_result = await self._processors.artifact_registry.search_huggingface_registries.run(
-            SearchHuggingFaceRegistriesAction(querier=querier)
+            SearchHuggingFaceRegistriesAction(searcher=searcher)
         )
         registry_map = {
             item.id: self._huggingface_registry_data_to_dto(item)

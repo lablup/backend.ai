@@ -5,7 +5,7 @@ from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.artifact.searchers import ArtifactWithRevisionsSearcher
 
 from .base import ArtifactAction
 
@@ -14,7 +14,7 @@ from .base import ArtifactAction
 class SearchArtifactsWithRevisionsAction(ArtifactAction):
     """Action to search artifacts with their revisions."""
 
-    querier: BatchQuerier
+    searcher: ArtifactWithRevisionsSearcher
 
     @override
     @classmethod

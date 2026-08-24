@@ -32,6 +32,16 @@ class ArtifactRevisionConditions:
         return inner
 
     @staticmethod
+    def by_artifact_and_version(artifact_id: uuid.UUID, version: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                ArtifactRevisionRow.artifact_id == artifact_id,
+                ArtifactRevisionRow.version == version,
+            )
+
+        return inner
+
+    @staticmethod
     def by_artifact_ids(artifact_ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ArtifactRevisionRow.artifact_id.in_(artifact_ids)
