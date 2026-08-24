@@ -93,7 +93,11 @@ class EntityInvitationGQL(PydanticNodeMixin[NodeDTO]):
     updated_at: datetime = gql_field(description="When it was last written.")
 
 
-EntityInvitationEdge = Edge[EntityInvitationGQL]
+@gql_connection_type(
+    BackendAIGQLMeta(added_version=_ADDED, description="One entity invitation within a connection.")
+)
+class EntityInvitationEdge(Edge[EntityInvitationGQL]):
+    pass
 
 
 @gql_connection_type(
