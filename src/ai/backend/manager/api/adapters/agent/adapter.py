@@ -270,6 +270,7 @@ class AgentAdapter(BaseAdapter):
         data = detail.agent
         return AgentNode(
             id=str(data.id),
+            uuid=data.uuid,
             resource_info=AgentResourceInfo(
                 capacity=dict(data.available_slots.to_json()),
                 used=dict(data.occupied_slots.to_json()),

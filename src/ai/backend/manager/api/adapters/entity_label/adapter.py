@@ -8,6 +8,7 @@ from ai.backend.common.data.entity.entity_label import EntityLabelID, EntityLabe
 from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.dto.manager.v2.entity_label.request import (
     EntityLabelOrder,
+    EntityLabelPageInput,
     SearchEntityLabelsInput,
     UpsertEntityLabelInput,
 )
@@ -74,6 +75,18 @@ class EntityLabelAdapter(BaseAdapter):
     async def search(self, input: SearchEntityLabelsInput) -> SearchEntityLabelsPayload:
         """Read a page of the labels on the entities named, OR'd across them and
         restricted to the ones the caller is RBAC-authorized for."""
+        return await self._search([self._target(scope) for scope in input.scope], input)
+
+    async def search_on(
+        self, owner: RuntimeEntityID, input: EntityLabelPageInput
+    ) -> SearchEntityLabelsPayload:
+        """Read a page of the labels on one entity the caller already holds, so the
+        entity names itself rather than being named again as a scope."""
+        return await self._search([owner], input)
+
+    async def _search(
+        self, owners: list[RuntimeEntityID], input: EntityLabelPageInput
+    ) -> SearchEntityLabelsPayload:
         conditions = self._convert_entity_label_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         searcher = self._build_searcher(
@@ -89,9 +102,7 @@ class EntityLabelAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._processors.entity_label.search.run(
-            SearchEntityLabelsAction(
-                owners=[self._target(scope) for scope in input.scope], searcher=searcher
-            )
+            SearchEntityLabelsAction(owners=owners, searcher=searcher)
         )
         return SearchEntityLabelsPayload(
             items=[self._data_to_node(item) for item in action_result.items],

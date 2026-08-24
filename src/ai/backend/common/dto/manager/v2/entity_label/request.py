@@ -15,6 +15,7 @@ __all__ = (
     "EntityLabelFilter",
     "EntityLabelNestedFilter",
     "EntityLabelOrder",
+    "EntityLabelPageInput",
     "SearchEntityLabelsInput",
 )
 
@@ -78,12 +79,9 @@ class UpsertEntityLabelInput(BaseRequestModel):
     value: str = Field(min_length=1, max_length=255, description="Label value")
 
 
-class SearchEntityLabelsInput(BaseRequestModel):
-    """Input for reading the labels on the entities named."""
+class EntityLabelPageInput(BaseRequestModel):
+    """One page of labels, over whatever entities the caller has already been fixed to."""
 
-    scope: list[EntityTypeScope] = Field(
-        min_length=1, description="The entities whose labels to read (OR across items)"
-    )
     filter: EntityLabelFilter | None = Field(default=None, description="Filter criteria")
     order: list[EntityLabelOrder] | None = Field(default=None, description="Sort order")
     first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")
@@ -92,3 +90,11 @@ class SearchEntityLabelsInput(BaseRequestModel):
     before: str | None = Field(default=None, description="Cursor-backward end cursor")
     limit: int | None = Field(default=None, ge=1, description="Offset-based page size")
     offset: int | None = Field(default=None, ge=0, description="Offset-based page offset")
+
+
+class SearchEntityLabelsInput(EntityLabelPageInput):
+    """Input for reading the labels on the entities named."""
+
+    scope: list[EntityTypeScope] = Field(
+        min_length=1, description="The entities whose labels to read (OR across items)"
+    )

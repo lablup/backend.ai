@@ -142,6 +142,11 @@ from .entity_invitation import (
     entity_invitations,
     reject_entity_invitation,
 )
+from .entity_label.resolver import (
+    entity_labels,
+    purge_entity_label,
+    upsert_entity_label,
+)
 from .fair_share import (
     admin_bulk_upsert_domain_fair_share_weight,
     admin_bulk_upsert_project_fair_share_weight,
@@ -631,6 +636,8 @@ class Query:
     scoped_audit_logs_v2 = scoped_audit_logs_v2
     # Entity APIs
     entity_types = entity_types
+    # Entity Label APIs
+    entity_labels = entity_labels
     admin_container_registries_v2 = admin_container_registries_v2
     admin_login_sessions_v2 = admin_login_sessions_v2
     admin_login_history_v2 = admin_login_history_v2
@@ -1062,6 +1069,9 @@ class Mutation:
     terminate_sessions_v2 = terminate_sessions_v2
     exclude_session_idle_checks = exclude_session_idle_checks
     include_session_idle_checks = include_session_idle_checks
+    # Entity Label mutations
+    upsert_entity_label = upsert_entity_label
+    purge_entity_label = purge_entity_label
 
 
 @strawberry.type
