@@ -538,8 +538,6 @@ class MemoryPlugin(AbstractComputePlugin):
     async def cleanup(self) -> None:
         await self._docker.close()
 
-<<<<<<< HEAD
-=======
     async def _get_graph_root_prefix(self) -> str | None:
         try:
             docker_info = await self._docker.system.info()
@@ -567,8 +565,6 @@ class MemoryPlugin(AbstractComputePlugin):
             return False
         return DeviceId(disk_info.device) not in per_disk_stat
 
-    @override
->>>>>>> bd4fddc2 (fix(BA-7393): skip the Podman graph root in node disk statistics (#13843))
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
         pass
 
