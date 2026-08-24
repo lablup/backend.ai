@@ -16,6 +16,7 @@ from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
     LoginSessionStatus,
 )
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.models.agent import AgentRow
 
@@ -36,6 +37,8 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import AuthDBSource
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
@@ -77,7 +80,10 @@ class TestLoginSessionForce:
 
     @pytest.fixture
     async def auth_db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> AuthDBSource:
-        return AuthDBSource(db_with_cleanup)
+        return AuthDBSource(
+            db_with_cleanup,
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
     @pytest.fixture
     async def sample_user(
@@ -147,7 +153,7 @@ class TestLoginSessionForce:
 
             keypair = KeyPairRow(
                 access_key=access_key,
-                secret_key="test_secret_key",
+                secret_key=SecretValue("test_secret_key"),
                 user=user_uuid,
                 is_active=True,
                 is_default=True,

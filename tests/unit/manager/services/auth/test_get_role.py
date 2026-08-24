@@ -3,12 +3,14 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.actions.get_role import PublicGetRoleAction
 from ai.backend.manager.services.auth.service import AuthService
 
@@ -37,6 +39,7 @@ def auth_service(
         group_repository=mock_group_repository,
         ssh_key_validator=AsyncMock(),
         client_ip_masking_repository=mock_client_ip_masking_repository,
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
 
 

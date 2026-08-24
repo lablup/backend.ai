@@ -61,6 +61,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -183,7 +184,7 @@ async def test_user(
         sess.add(
             KeyPairRow(
                 access_key="TESTKEY",
-                secret_key="TESTSECRET",
+                secret_key=SecretValue("TESTSECRET"),
                 is_active=True,
                 is_admin=True,
                 user=user_id,

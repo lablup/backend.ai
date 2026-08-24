@@ -68,6 +68,7 @@ from ai.backend.manager.api.adapters.storage_namespace.adapter import StorageNam
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.api.adapters.vfs_storage.adapter import VFSStorageAdapter
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 if TYPE_CHECKING:
     from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -190,6 +191,7 @@ class Adapters:
         cls,
         processors: Processors,
         auth_config: AuthConfig,
+        key_provider_pool: KeyProviderPool,
         deployment_coordinator: DeploymentCoordinator,
         schedule_coordinator: ScheduleCoordinator,
         config_provider: ManagerConfigProvider | None = None,
@@ -251,7 +253,7 @@ class Adapters:
             session=SessionAdapter(processors),
             storage_host=StorageHostAdapter(processors),
             storage_namespace=StorageNamespaceAdapter(processors),
-            user=UserAdapter(processors, auth_config),
+            user=UserAdapter(processors, auth_config, key_provider_pool),
             vfolder=VFolderAdapter(processors),
             vfs_storage=VFSStorageAdapter(processors),
         )

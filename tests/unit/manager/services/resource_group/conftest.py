@@ -72,6 +72,7 @@ from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRo
 from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.resource_group.service import ResourceGroupService
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
@@ -278,7 +279,7 @@ async def admin_user_fixture(
         await conn.execute(
             sa.insert(KeyPairRow.__table__).values(
                 access_key=access_key,
-                secret_key=secret_key,
+                secret_key=SecretValue(secret_key),
                 is_active=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
@@ -327,7 +328,7 @@ async def regular_user_fixture(
         await conn.execute(
             sa.insert(KeyPairRow.__table__).values(
                 access_key=access_key,
-                secret_key=secret_key,
+                secret_key=SecretValue(secret_key),
                 is_active=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,

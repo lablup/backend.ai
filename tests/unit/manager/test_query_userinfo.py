@@ -53,6 +53,7 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.utils import query_userinfo, query_userinfo_from_session
 from ai.backend.testutils.db import TableOrORM, with_tables
 
@@ -205,7 +206,7 @@ class TestQueryUserinfo:
             sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key="secret",
+                    secret_key=SecretValue("secret"),
                     user=user_uuid,
                     is_active=True,
                     resource_policy=kp_policy,
@@ -331,7 +332,7 @@ class TestQueryUserinfo:
             sess.add(
                 KeyPairRow(
                     access_key=ak,
-                    secret_key="secret",
+                    secret_key=SecretValue("secret"),
                     user=user_uuid,
                     is_active=True,
                     resource_policy=seed.kp_policy_name,
@@ -364,7 +365,7 @@ class TestQueryUserinfo:
             sess.add(
                 KeyPairRow(
                     access_key=admin_ak,
-                    secret_key="secret",
+                    secret_key=SecretValue("secret"),
                     user=admin_uuid,
                     is_active=True,
                     resource_policy=seed.kp_policy_name,
@@ -604,7 +605,7 @@ class TestQueryUserinfoFromSession:
             sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key="secret",
+                    secret_key=SecretValue("secret"),
                     user=user_uuid,
                     is_active=True,
                     resource_policy=kp_policy,

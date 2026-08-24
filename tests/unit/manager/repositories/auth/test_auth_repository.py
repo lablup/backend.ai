@@ -21,6 +21,7 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -62,6 +63,8 @@ from ai.backend.manager.models.virtual_scope.entity_membership import EntityMemb
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
@@ -140,7 +143,12 @@ class TestAuthRepository:
 
     @pytest.fixture
     async def auth_repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> AuthRepository:
-        return AuthRepository(db=db_with_cleanup)
+        return AuthRepository(
+            db=db_with_cleanup,
+            key_provider_pool=KeyProviderPool(
+                providers=[], write_provider_type=KeyProviderType.PLAIN
+            ),
+        )
 
     @pytest.fixture
     async def default_domain(
@@ -262,7 +270,7 @@ class TestAuthRepository:
             # Create test keypair with SSH keys
             keypair = KeyPairRow(
                 access_key=access_key,
-                secret_key="test_secret_key",
+                secret_key=SecretValue("test_secret_key"),
                 user=user_uuid,
                 is_active=True,
                 is_default=True,

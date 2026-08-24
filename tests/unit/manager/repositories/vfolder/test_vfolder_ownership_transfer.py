@@ -63,6 +63,7 @@ from ai.backend.manager.models.virtual_scope.entity_membership import EntityMemb
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -344,7 +345,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
             keypair = KeyPairRow(
                 user=user_uuid,
                 access_key=f"AK{user_uuid.hex[:18].upper()}",
-                secret_key=f"SK{user_uuid.hex[:38]}",
+                secret_key=SecretValue(f"SK{user_uuid.hex[:38]}"),
                 is_active=True,
                 is_admin=False,
                 resource_policy=kp_policy_name,

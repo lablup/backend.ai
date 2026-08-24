@@ -55,6 +55,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -228,7 +229,7 @@ class TestSessionRepository:
             keypair = KeyPairRow(
                 user=user_id,
                 access_key=access_key,
-                secret_key="test-secret-key",
+                secret_key=SecretValue("test-secret-key"),
                 is_active=True,
                 is_admin=False,
                 resource_policy=keypair_resource_policy.name,
@@ -509,7 +510,7 @@ class TestSessionRepository:
                 KeyPairRow(
                     user=session_with_kernel.user_id,
                     access_key=other_key,
-                    secret_key="other-secret-key",
+                    secret_key=SecretValue("other-secret-key"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default-keypair-policy",
@@ -716,7 +717,7 @@ class TestBatchLoadSessionAllocations:
             keypair = KeyPairRow(
                 user=user_id,
                 access_key=access_key,
-                secret_key="test-secret-key",
+                secret_key=SecretValue("test-secret-key"),
                 is_active=True,
                 is_admin=False,
                 resource_policy=keypair_resource_policy.name,

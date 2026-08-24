@@ -20,7 +20,9 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.user.handler import UserHandler
 from ai.backend.manager.api.rest.user.registry import register_user_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 
@@ -135,7 +137,11 @@ def server_module_registries(
     mock_gql_deps = MagicMock()
     mock_gql_deps.processors = mock_processors
     mock_gql_deps.config_provider = config_provider
-    mock_gql_deps.adapters.user = UserAdapter(processors=mock_processors, auth_config=None)  # type: ignore[arg-type]
+    mock_gql_deps.adapters.user = UserAdapter(
+        processors=mock_processors,
+        auth_config=None,  # type: ignore[arg-type]
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
 
     user_registry = register_user_routes(
         UserHandler(

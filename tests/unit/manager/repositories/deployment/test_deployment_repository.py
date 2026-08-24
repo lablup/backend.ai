@@ -126,6 +126,7 @@ from ai.backend.manager.repositories.base.purger import Purger, PurgerSpec
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -471,7 +472,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             # Get user email for user_id field
             keypair = KeyPairRow(
                 access_key=access_key,
-                secret_key="dummy-secret",
+                secret_key=SecretValue("dummy-secret"),
                 user=test_user_uuid,
                 is_active=True,
                 resource_policy=test_keypair_resource_policy_name,

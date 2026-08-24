@@ -43,6 +43,7 @@ from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_routes
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.vfolder.types import (
     VFolderInvitationState,
     VFolderMountPermission,
@@ -67,6 +68,7 @@ from ai.backend.manager.models.vfolder import (
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
 from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
@@ -120,7 +122,11 @@ def vfolder_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> VFolderProcessors:
     vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
-    user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = VFolderService(
         config_provider=config_provider,
         etcd=async_etcd,
@@ -141,7 +147,11 @@ def vfolder_file_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> VFolderFileProcessors:
     vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
-    user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = VFolderFileService(
         config_provider=config_provider,
         storage_manager=storage_manager,
@@ -158,7 +168,11 @@ def vfolder_invite_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> VFolderInviteProcessors:
     vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
-    user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = VFolderInviteService(
         config_provider=config_provider,
         vfolder_repository=vfolder_repository,
@@ -176,7 +190,11 @@ def vfolder_sharing_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> VFolderSharingProcessors:
     vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
-    user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = VFolderSharingService(
         config_provider=config_provider,
         vfolder_repository=vfolder_repository,

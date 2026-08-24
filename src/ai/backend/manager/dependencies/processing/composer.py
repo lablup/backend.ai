@@ -107,6 +107,7 @@ from ai.backend.manager.reporters.smtp import SMTPReporter, SMTPSenderArgs
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.service.container_registry.harbor import (
     AbstractPerProjectContainerRegistryQuotaService,
 )
@@ -159,6 +160,7 @@ class ProcessingInput:
     repositories: Repositories
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
+    key_provider_pool: KeyProviderPool
     event_producer: EventProducer
 
     # Processors creation (ServiceArgs additional)
@@ -367,6 +369,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             appproxy_client_pool=setup_input.appproxy_client_pool,
             prometheus_client=setup_input.prometheus_client,
             ssh_key_validator=ssh_key_validator,
+            key_provider_pool=setup_input.key_provider_pool,
             registry_quota_service=setup_input.registry_quota_service,
         )
 

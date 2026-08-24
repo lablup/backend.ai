@@ -56,7 +56,6 @@ from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.keypair import generate_keypair_data
 from ai.backend.manager.models.keypair.creators import DefaultKeypairCreator
 from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -162,15 +161,18 @@ class ScopeCreationResult[TRow: Base]:
 @dataclass
 class FullUserCreation:
     """Everything needed to provision a user in full: the user-scope creation, the
-    scopes to enroll in, and the default keypair's policy. ``keypair_secrets`` overrides
-    the generated key material (e.g. pre-issued keys)."""
+    scopes to enroll in, the default keypair's policy, and that keypair's key material.
+
+    The caller generates ``keypair_secrets`` because the secret key is encrypted through
+    the key provider pool before it is bound.
+    """
 
     creation: ScopeCreation[UserRow]
     domain_id: DomainID
     project_ids: Collection[ProjectID]
     keypair_resource_policy: str
+    keypair_secrets: KeyPairSecrets
     keypair_rate_limit: int | None = None
-    keypair_secrets: KeyPairSecrets | None = None
 
 
 @dataclass
@@ -997,7 +999,7 @@ class RBACWriteOps(WriteOps):
         keypair = await self.create_field(
             user_id,
             DefaultKeypairCreator(
-                secrets=full_creation.keypair_secrets or generate_keypair_data(),
+                secrets=full_creation.keypair_secrets,
                 is_active=user_row.status == UserStatus.ACTIVE,
                 is_admin=user_row.role in (UserRole.SUPERADMIN, UserRole.ADMIN),
                 resource_policy=full_creation.keypair_resource_policy,

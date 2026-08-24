@@ -140,6 +140,7 @@ from ai.backend.manager.models.resource_group.row import (
 )
 from ai.backend.manager.models.vfolder import ensure_quota_scope_accessible_by_user
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 from .acl import PredefinedAtomicPermission
 from .agent import (
@@ -318,6 +319,7 @@ class GraphQueryContext:
     schema: graphene.Schema
     dataloader_manager: DataLoaderManager[Any, Any, Any]
     config_provider: ManagerConfigProvider
+    key_provider_pool: KeyProviderPool
     etcd: AsyncEtcd
     user: Mapping[str, Any]  # TODO: express using typed dict
     access_key: str

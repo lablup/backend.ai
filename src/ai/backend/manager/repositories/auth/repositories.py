@@ -11,4 +11,4 @@ class AuthRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        return cls(repository=AuthRepository(args.db))
+        return cls(repository=AuthRepository(args.db, args.key_provider_pool))

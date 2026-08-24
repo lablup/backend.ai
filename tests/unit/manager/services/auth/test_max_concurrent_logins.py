@@ -17,6 +17,7 @@ from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import TooManyConcurrentLoginSessions
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
@@ -27,6 +28,8 @@ from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
 from ai.backend.manager.services.auth.service import AuthService
 
@@ -59,7 +62,7 @@ def _make_mock_keypair() -> MagicMock:
     """The keypair data a default-keypair read answers with."""
     mock_keypair = MagicMock()
     mock_keypair.access_key = "AKIAIOSFODNN7EXAMPLE"
-    mock_keypair.secret_key = "secret"
+    mock_keypair.secret_key = SecretValue("secret")
     return mock_keypair
 
 
@@ -141,6 +144,7 @@ def auth_service(
         group_repository=mock_group_repository,
         ssh_key_validator=AsyncMock(),
         client_ip_masking_repository=mock_client_ip_masking_repository,
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
 
 

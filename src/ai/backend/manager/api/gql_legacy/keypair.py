@@ -20,6 +20,7 @@ from ai.backend.manager.models.keypair import (
     KeyPairRow,
     keypairs,
 )
+from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 
 from .session import ComputeSession
 
@@ -135,6 +136,14 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             "Moved to KeyPairResourcePolicy object as the max_concurrent_sessions field."
         )
     )
+
+    async def resolve_secret_key(self, info: graphene.ResolveInfo) -> str | None:
+        """The stored secret key as plaintext; the column holds it encrypted once a
+        write provider is named."""
+        if self.secret_key is None:
+            return None
+        ctx: GraphQueryContext = info.context
+        return await ctx.key_provider_pool.decrypt(self.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
 
     async def resolve_user_info(
         self,

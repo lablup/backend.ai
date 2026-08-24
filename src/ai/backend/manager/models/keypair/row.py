@@ -4,7 +4,7 @@ import base64
 import secrets
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Final, TypedDict
 
 import sqlalchemy as sa
 from cryptography.hazmat.backends import default_backend as crypto_default_backend
@@ -23,8 +23,11 @@ from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    SecretColumn,
 )
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.secret.types import SecretValue
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.resource_group import ResourceGroupForKeypairsRow
@@ -32,6 +35,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.user import UserRow
 
 __all__: Sequence[str] = (
+    "KEYPAIR_SECRET_KEY_CONTEXT",
     "MAXIMUM_DOTFILE_SIZE",
     "Dotfile",
     "KeyPairRow",
@@ -43,6 +47,9 @@ __all__: Sequence[str] = (
 
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
+
+# The associated data every secret key is encrypted and decrypted under.
+KEYPAIR_SECRET_KEY_CONTEXT: Final[str] = "keypairs.secret_key"
 
 
 class KeyPairRow(LifecycleTimestampsMixin, Base):
@@ -67,7 +74,9 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
     access_key: Mapped[AccessKey] = mapped_column(
         "access_key", sa.String(length=20), primary_key=True
     )
-    secret_key: Mapped[str] = mapped_column("secret_key", sa.String(length=40), nullable=False)
+    secret_key: Mapped[SecretValue] = mapped_column(
+        "secret_key", SecretColumn(KEYPAIR_SECRET_KEY_CONTEXT), nullable=False
+    )
     is_active: Mapped[bool] = mapped_column("is_active", sa.Boolean, index=True, nullable=False)
     is_admin: Mapped[bool] = mapped_column(
         "is_admin", sa.Boolean, index=True, default=False, server_default=false(), nullable=False
@@ -118,7 +127,7 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
             id=self.id,
             user_id=self.user,
             access_key=AccessKey(self.access_key),
-            secret_key=SecretKey(self.secret_key),
+            secret_key=self.secret_key,
             is_active=self.is_active,
             is_default=self.is_default,
             is_admin=self.is_admin,
@@ -182,12 +191,12 @@ def generate_ssh_keypair() -> tuple[str, str]:
     return (public_key, private_key)
 
 
-def generate_keypair_data() -> KeyPairSecrets:
+async def generate_keypair_data(key_provider_pool: KeyProviderPool) -> KeyPairSecrets:
     ak, sk = generate_keypair()
     pubkey, privkey = generate_ssh_keypair()
     return KeyPairSecrets(
         access_key=ak,
-        secret_key=sk,
+        secret_key=await key_provider_pool.encrypt(sk, KEYPAIR_SECRET_KEY_CONTEXT),
         ssh_public_key=pubkey,
         ssh_private_key=privkey,
     )

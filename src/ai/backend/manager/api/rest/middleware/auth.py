@@ -58,13 +58,14 @@ from ai.backend.manager.errors.auth import (
     UserNotFound,
 )
 from ai.backend.manager.errors.common import GenericForbidden, RejectedByHook
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT, KeyPairRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import execute_with_retry
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -603,6 +604,7 @@ class _AuthContext:
 
 async def _query_auth_context_by_access_key(
     db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
     access_key: str,
 ) -> _AuthContext | None:
     """Resolve an access key into the context an authenticated request carries.
@@ -660,7 +662,11 @@ async def _query_auth_context_by_access_key(
             ),
             keypair=AuthenticatedKeypair(
                 access_key=AccessKey(keypair_row.access_key),
-                secret_key=SecretKey(keypair_row.secret_key),
+                secret_key=SecretKey(
+                    await key_provider_pool.decrypt(
+                        keypair_row.secret_key, KEYPAIR_SECRET_KEY_CONTEXT
+                    )
+                ),
                 is_admin=bool(keypair_row.is_admin),
                 rate_limit=keypair_row.rate_limit,
                 resource_policy=keypair_policy_row.to_dataclass(),
@@ -670,6 +676,7 @@ async def _query_auth_context_by_access_key(
 
 async def _authenticate_via_jwt(
     db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
     jwt_validator: JWTValidator,
     valkey_stat: ValkeyStatClient,
     jwt_token: str,
@@ -683,7 +690,7 @@ async def _authenticate_via_jwt(
         if not access_key:
             raise AuthorizationFailed("Access key not found in JWT token")
 
-        context = await _query_auth_context_by_access_key(db, access_key)
+        context = await _query_auth_context_by_access_key(db, key_provider_pool, access_key)
 
         if context is None:
             raise AuthorizationFailed("Access key not found in database")
@@ -702,6 +709,7 @@ async def _authenticate_via_jwt(
 async def _authenticate_via_hmac(
     request: web.Request,
     db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
     valkey_stat: ValkeyStatClient,
 ) -> _AuthContext | None:
     if not check_date(request):
@@ -713,7 +721,7 @@ async def _authenticate_via_hmac(
 
     sign_method, access_key, signature = params
 
-    context = await _query_auth_context_by_access_key(db, access_key)
+    context = await _query_auth_context_by_access_key(db, key_provider_pool, access_key)
 
     if context is None:
         raise AuthorizationFailed("Access key not found in HMAC")
@@ -729,6 +737,7 @@ async def _authenticate_via_hmac(
 async def _authenticate_via_hook(
     request: web.Request,
     db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
     valkey_stat: ValkeyStatClient,
     hook_plugin_ctx: HookPluginContext,
 ) -> _AuthContext | None:
@@ -748,7 +757,7 @@ async def _authenticate_via_hook(
     if access_key is None:
         return None
 
-    context = await _query_auth_context_by_access_key(db, access_key)
+    context = await _query_auth_context_by_access_key(db, key_provider_pool, access_key)
 
     if context is None:
         raise AuthorizationFailed("Access key not found in hook")
@@ -918,6 +927,7 @@ def superadmin_required_for_method(
 def build_auth_middleware(
     *,
     db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
     jwt_validator: JWTValidator,
     valkey_stat: ValkeyStatClient,
     hook_plugin_ctx: HookPluginContext,
@@ -940,11 +950,15 @@ def build_auth_middleware(
         jwt_token = request.headers.get("X-BackendAI-Token")
         auth_header = request.headers.get("Authorization")
         if jwt_token:
-            context = await _authenticate_via_jwt(db, jwt_validator, valkey_stat, jwt_token)
+            context = await _authenticate_via_jwt(
+                db, key_provider_pool, jwt_validator, valkey_stat, jwt_token
+            )
         elif auth_header:
-            context = await _authenticate_via_hmac(request, db, valkey_stat)
+            context = await _authenticate_via_hmac(request, db, key_provider_pool, valkey_stat)
         else:
-            context = await _authenticate_via_hook(request, db, valkey_stat, hook_plugin_ctx)
+            context = await _authenticate_via_hook(
+                request, db, key_provider_pool, valkey_stat, hook_plugin_ctx
+            )
 
         authenticated_user: UserData | None = None
         if context is not None:

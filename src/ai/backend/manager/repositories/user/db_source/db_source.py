@@ -52,8 +52,9 @@ from ai.backend.manager.models.kernel import (
     RESOURCE_USAGE_KERNEL_STATUSES,
     kernels,
 )
-from ai.backend.manager.models.keypair import (
+from ai.backend.manager.models.keypair.row import (
     KeyPairRow,
+    generate_keypair_data,
     keypairs,
 )
 from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
@@ -122,6 +123,7 @@ from ai.backend.manager.repositories.user.purgers import (
     create_user_vfolder_permission_purger,
 )
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -132,11 +134,18 @@ class UserDBSource:
     _db: ExtendedAsyncSAEngine
     _v2_ops: V2DBOpsProvider
     _rbac_ops_provider: RBACOpsProvider
+    _key_provider_pool: KeyProviderPool
 
-    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
+        key_provider_pool: KeyProviderPool,
+    ) -> None:
         self._db = db
         self._v2_ops = v2_ops_provider
         self._rbac_ops_provider = RBACOpsProvider(db)
+        self._key_provider_pool = key_provider_pool
 
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
         """
@@ -205,6 +214,7 @@ class UserDBSource:
                 domain_id=creator.domain_id,
                 project_ids=[ProjectID(UUID(gid)) for gid in group_ids or []],
                 keypair_resource_policy=keypair_resource_policy,
+                keypair_secrets=await generate_keypair_data(self._key_provider_pool),
             )
         )
         return UserCreateResultData(

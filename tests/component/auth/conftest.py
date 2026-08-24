@@ -34,6 +34,7 @@ from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.project import association_groups_users
 from ai.backend.manager.models.user import users
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -157,7 +158,7 @@ async def auth_user_fixture(
         await conn.execute(
             sa.insert(keypairs).values(
                 access_key=data.access_key,
-                secret_key=data.secret_key,
+                secret_key=SecretValue(data.secret_key),
                 is_active=True,
                 is_default=True,
                 resource_policy=resource_policy_fixture,
@@ -256,7 +257,7 @@ async def _create_auth_user(
         await conn.execute(
             sa.insert(keypairs).values(
                 access_key=data.access_key,
-                secret_key=data.secret_key,
+                secret_key=SecretValue(data.secret_key),
                 is_active=True,
                 is_default=True,
                 resource_policy=resource_policy,

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.v2.validators import ActionValidators
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 # fmt: off
 if TYPE_CHECKING:
@@ -327,6 +328,7 @@ class ServiceArgs:
     appproxy_client_pool: AppProxyClientPool
     prometheus_client: PrometheusClient
     ssh_key_validator: SSHKeyValidator
+    key_provider_pool: KeyProviderPool
     registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None
 
 

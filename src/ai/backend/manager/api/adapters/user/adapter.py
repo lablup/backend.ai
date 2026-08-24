@@ -94,7 +94,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserStatus as UserStatusDTO,
 )
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.types import AccessKey
+from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
@@ -173,6 +173,8 @@ if TYPE_CHECKING:
 
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
+from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 _USER_PAGINATION_SPEC = PaginationSpec(
     forward_order=UserOrders.created_at(ascending=False),
@@ -194,9 +196,15 @@ _KEYPAIR_PAGINATION_SPEC = PaginationSpec(
 class UserAdapter(BaseAdapter):
     """Adapter for user domain operations."""
 
-    def __init__(self, processors: Processors, auth_config: AuthConfig) -> None:
+    def __init__(
+        self,
+        processors: Processors,
+        auth_config: AuthConfig,
+        key_provider_pool: KeyProviderPool,
+    ) -> None:
         super().__init__(processors)
         self._auth_config = auth_config
+        self._key_provider_pool = key_provider_pool
 
     async def resolve_domain_id(self, domain_name: str) -> DomainID:
         """The domain's id, for callers that only hold its name."""
@@ -448,7 +456,7 @@ class UserAdapter(BaseAdapter):
         )
         return CreateUserPayload(
             user=await self._user_node(result.data.user),
-            keypair=self._keypair_data_to_created_payload(result.data.keypair),
+            keypair=await self._keypair_data_to_created_payload(result.data.keypair),
         )
 
     async def update_user_by_id(self, user_id: UUID, input: UpdateUserInput) -> UpdateUserPayload:
@@ -612,7 +620,7 @@ class UserAdapter(BaseAdapter):
         created = [
             CreateUserPayload(
                 user=node,
-                keypair=self._keypair_data_to_created_payload(item.keypair),
+                keypair=await self._keypair_data_to_created_payload(item.keypair),
             )
             for item, node in zip(result.data.successes, created_nodes, strict=True)
         ]
@@ -686,7 +694,7 @@ class UserAdapter(BaseAdapter):
         )
         return IssueMyKeypairPayload(
             keypair=self._keypair_data_to_node(result.generated_data.keypair),
-            secret_key=str(result.generated_data.keypair.secret_key),
+            secret_key=await self._secret_key_of(result.generated_data.keypair),
         )
 
     async def revoke_my_keypair(self, access_key: str) -> RevokeMyKeypairPayload:
@@ -769,12 +777,17 @@ class UserAdapter(BaseAdapter):
             user_id=data.user_id,
         )
 
-    @staticmethod
-    def _keypair_data_to_created_payload(data: KeyPairData) -> CreateKeypairPayload:
+    async def _secret_key_of(self, data: KeyPairData) -> SecretKey:
+        """The keypair's secret key as plaintext, whatever form it is stored in."""
+        return SecretKey(
+            await self._key_provider_pool.decrypt(data.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
+        )
+
+    async def _keypair_data_to_created_payload(self, data: KeyPairData) -> CreateKeypairPayload:
         """Convert KeyPairData to a CreateKeypairPayload, including the one-time secret key."""
         return CreateKeypairPayload(
             keypair=UserAdapter._keypair_data_to_node(data),
-            secret_key=data.secret_key,
+            secret_key=await self._secret_key_of(data),
         )
 
     # ------------------------------------------------------------------ admin keypair operations
@@ -794,7 +807,7 @@ class UserAdapter(BaseAdapter):
         )
         return AdminCreateKeypairPayload(
             keypair=self._keypair_data_to_node(result.generated_data.keypair),
-            secret_key=str(result.generated_data.keypair.secret_key),
+            secret_key=await self._secret_key_of(result.generated_data.keypair),
         )
 
     async def _resolve_keypair_owner(self, access_key: str) -> UserID:

@@ -45,6 +45,7 @@ from ai.backend.manager.api.rest.v2.rbac.registry import register_v2_rbac_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project.row import ProjectRow
@@ -66,6 +67,7 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.services.model_card.service import ModelCardService
 from ai.backend.manager.services.permission_contoller.processors import (
@@ -174,7 +176,11 @@ def user_processors(
         storage_manager=AsyncMock(),
         valkey_stat_client=AsyncMock(),
         agent_registry=AsyncMock(),
-        user_repository=UserRepository(database_engine, V2DBOpsProvider(database_engine)),
+        user_repository=UserRepository(
+            database_engine,
+            V2DBOpsProvider(database_engine),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        ),
         scheduling_controller=AsyncMock(),
     )
     return UserProcessors(processor_registry.group(GroupMeta(USER_ENTITY_TYPE)), service)

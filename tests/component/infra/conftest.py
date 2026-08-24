@@ -34,6 +34,7 @@ from ai.backend.manager.api.rest.resource_group.registry import register_resourc
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
@@ -51,6 +52,7 @@ from ai.backend.manager.repositories.resource_group.repository import ResourceGr
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
@@ -189,7 +191,11 @@ def user_processors(
     storage_manager: AsyncMock,
     processor_registry: ProcessorRegistry[Any],
 ) -> UserProcessors:
-    user_repo = UserRepository(database_engine, V2DBOpsProvider(database_engine))
+    user_repo = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = UserService(storage_manager, valkey_clients.stat, AsyncMock(), user_repo, AsyncMock())
     return UserProcessors(
         processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),

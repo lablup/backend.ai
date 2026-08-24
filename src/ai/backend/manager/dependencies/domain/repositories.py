@@ -10,6 +10,7 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 from .base import DomainDependency
 
@@ -33,6 +34,7 @@ class RepositoriesInput:
     db: ExtendedAsyncSAEngine
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
+    key_provider_pool: KeyProviderPool
     valkey_stat: ValkeyStatClient
     valkey_live: ValkeyLiveClient
     valkey_schedule: ValkeyScheduleClient
@@ -73,6 +75,7 @@ class RepositoriesDependency(DomainDependency[RepositoriesInput, Repositories]):
                 reconcile_ops_provider=ReconcileOpsProvider(setup_input.db),
                 storage_manager=setup_input.storage_manager,
                 config_provider=setup_input.config_provider,
+                key_provider_pool=setup_input.key_provider_pool,
                 valkey_stat_client=setup_input.valkey_stat,
                 valkey_live_client=setup_input.valkey_live,
                 valkey_schedule_client=setup_input.valkey_schedule,

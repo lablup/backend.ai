@@ -113,6 +113,7 @@ class AdminHandler:
             schema=self._gql_schema,
             dataloader_manager=DataLoaderManager(),
             config_provider=gql_deps.config_provider,
+            key_provider_pool=gql_deps.key_provider_pool,
             etcd=gql_deps.etcd,
             user=request["user"],
             access_key=request["keypair"]["access_key"],

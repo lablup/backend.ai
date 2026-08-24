@@ -40,6 +40,7 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.stream.repository import StreamRepository
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -339,7 +340,7 @@ class TestStreamRepository:
                 KeyPairRow(
                     user=user_uuid,
                     access_key=active_access_key,
-                    secret_key="active-secret",
+                    secret_key=SecretValue("active-secret"),
                     is_active=True,
                     is_admin=False,
                     resource_policy=keypair_resource_policy.name,
@@ -350,7 +351,7 @@ class TestStreamRepository:
                 KeyPairRow(
                     user=user_uuid,
                     access_key=inactive_access_key,
-                    secret_key="inactive-secret",
+                    secret_key=SecretValue("inactive-secret"),
                     is_active=False,
                     is_admin=False,
                     resource_policy=keypair_resource_policy.name,
@@ -361,7 +362,7 @@ class TestStreamRepository:
                 KeyPairRow(
                     user=other_user_uuid,
                     access_key=other_user_access_key,
-                    secret_key="other-secret",
+                    secret_key=SecretValue("other-secret"),
                     is_active=True,
                     is_admin=False,
                     resource_policy=keypair_resource_policy.name,

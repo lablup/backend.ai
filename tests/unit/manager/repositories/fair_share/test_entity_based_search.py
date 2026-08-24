@@ -73,6 +73,7 @@ from ai.backend.manager.repositories.fair_share import (
     ProjectFairShareCreatorSpec,
     UserFairShareCreatorSpec,
 )
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -1234,7 +1235,7 @@ class TestSearchUserFairSharesEntityBased:
                 KeyPairRow(
                     user=user_uuid,
                     access_key=f"AKIATEST{uuid.uuid4().hex[:12].upper()}",
-                    secret_key="test-secret-key",
+                    secret_key=SecretValue("test-secret-key"),
                     is_active=True,
                     resource_policy=kp_policy_name,
                 )

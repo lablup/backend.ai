@@ -14,6 +14,7 @@ from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -51,6 +52,7 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.db_source import UserDBSource
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.testutils.db import TableOrORM, with_tables
 
 # Row imports above ensure mapper initialization (FK dependency order).
@@ -415,7 +417,13 @@ class TestUserNestedSearchIntegration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> UserDBSource:
-        return UserDBSource(db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup))
+        return UserDBSource(
+            db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+            key_provider_pool=KeyProviderPool(
+                providers=[], write_provider_type=KeyProviderType.PLAIN
+            ),
+        )
 
     @pytest.fixture
     async def search_fixture(

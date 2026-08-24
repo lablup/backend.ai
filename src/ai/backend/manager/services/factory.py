@@ -397,6 +397,7 @@ def create_services(args: ServiceArgs) -> Services:
             group_repository=repositories.project.repository,
             ssh_key_validator=args.ssh_key_validator,
             client_ip_masking_repository=repositories.client_ip_masking.repository,
+            key_provider_pool=args.key_provider_pool,
         ),
         notification=NotificationService(
             repository=repositories.notification.repository,

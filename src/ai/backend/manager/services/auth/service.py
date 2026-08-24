@@ -45,7 +45,8 @@ from ai.backend.manager.errors.common import (
 )
 from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import (
+from ai.backend.manager.models.keypair.row import (
+    KEYPAIR_SECRET_KEY_CONTEXT,
     generate_ssh_keypair,
 )
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
@@ -66,6 +67,7 @@ from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
     AuthorizeActionResult,
@@ -156,6 +158,7 @@ class AuthService:
         group_repository: ProjectRepository,
         ssh_key_validator: SSHKeyValidator,
         client_ip_masking_repository: ClientIPMaskingRepository,
+        key_provider_pool: KeyProviderPool,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx
         self._auth_repository = auth_repository
@@ -166,6 +169,7 @@ class AuthService:
         self._group_repository = group_repository
         self._ssh_key_validator = ssh_key_validator
         self._client_ip_masking_repository = client_ip_masking_repository
+        self._key_provider_pool = key_provider_pool
 
     async def get_role(self, action: PublicGetRoleAction) -> PublicGetRoleActionResult:
         group_role = None
@@ -192,11 +196,15 @@ class AuthService:
             group_role=group_role,
         )
 
-    def _keypair_hook_payload(self, keypair: KeyPairData) -> dict[str, object]:
+    async def _secret_key_of(self, keypair: KeyPairData) -> str:
+        """The keypair's secret key as plaintext, whatever form it is stored in."""
+        return await self._key_provider_pool.decrypt(keypair.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
+
+    async def _keypair_hook_payload(self, keypair: KeyPairData) -> dict[str, object]:
         """The keypair columns POST_AUTHORIZE hands to its plugins."""
         return {
             "access_key": keypair.access_key,
-            "secret_key": keypair.secret_key,
+            "secret_key": await self._secret_key_of(keypair),
             "is_active": keypair.is_active,
             "is_admin": keypair.is_admin,
             "created_at": keypair.created_at,
@@ -302,7 +310,7 @@ class AuthService:
                 action.request,
                 action.hook_params,
                 user,
-                self._keypair_hook_payload(default_keypair),
+                await self._keypair_hook_payload(default_keypair),
             ),
             return_when=FIRST_COMPLETED,
         )
@@ -414,6 +422,7 @@ class AuthService:
                 tokens_to_invalidate, LoginAttemptResult.EVICTED, await self._recorded_client_ip()
             )
 
+        secret_key = await self._secret_key_of(keypair)
         session_data = LoginSessionData(
             created=int(time.time()),
             expiration_dt=int(time.time()) + auth_config.login_session_max_age,
@@ -422,7 +431,7 @@ class AuthService:
                 token=LoginSessionTokenData(
                     type="keypair",
                     access_key=keypair.access_key,
-                    secret_key=keypair.secret_key,
+                    secret_key=secret_key,
                     role=user.role,
                     status=user.status,
                 ),
@@ -438,7 +447,7 @@ class AuthService:
             stream_response=None,
             authorization_result=AuthorizationResult(
                 access_key=AccessKey(keypair.access_key),
-                secret_key=SecretKey(keypair.secret_key),
+                secret_key=SecretKey(secret_key),
                 user_id=UserID(user.uuid),
                 role=UserRole(user.role),
                 status=user.status,
@@ -564,7 +573,7 @@ class AuthService:
         return SignupActionResult(
             user_id=user.uuid,
             access_key=keypair.access_key,
-            secret_key=keypair.secret_key,
+            secret_key=await self._secret_key_of(keypair),
         )
 
     async def logout(self, action: LogoutAction) -> LogoutActionResult:

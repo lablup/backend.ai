@@ -90,6 +90,7 @@ from ai.backend.manager.repositories.resource_group.scope_binders import (
     ResourceGroupDomainEntityUnbinder,
     ResourceGroupProjectEntityUnbinder,
 )
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
@@ -1069,7 +1070,7 @@ class TestScalingGroupRepositoryDB:
             keypair = KeyPairRow(
                 user=test_user_uuid,
                 access_key=access_key,
-                secret_key=f"SK{uuid.uuid4().hex}",
+                secret_key=SecretValue(f"SK{uuid.uuid4().hex}"),
                 is_active=True,
                 is_admin=False,
                 resource_policy=keypair_policy_name,
