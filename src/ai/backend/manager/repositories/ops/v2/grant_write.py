@@ -52,6 +52,43 @@ class V2GrantWriteOps(V2WriteOpsBase):
             )
         )
 
+    async def widen_entity_grants(self, grants: Sequence[EntityGrant]) -> None:
+        """Add each grant's cap to what the grantee already holds, never taking away.
+
+        Where :meth:`grant_entities` states the ceiling that holds now, this only ever
+        raises it: a grantee reached by two offers keeps the wider one, and an offer of
+        less than they already have changes nothing. ``None`` means no ceiling, so it
+        wins over any mask on either side.
+        """
+        if not grants:
+            return
+        scope_ids = await self._resolve_virtual_scope_ids([g.grantee for g in grants])
+        stmt = pg_insert(EntityMembershipRow).values([
+            {
+                "virtual_scope_id": scope_ids[(g.grantee.entity_type(), g.grantee)],
+                "entity_type": g.entity.entity_type(),
+                "entity_id": g.entity,
+                "permission_cap": g.permission_cap,
+            }
+            for g in grants
+        ])
+        existing = EntityMembershipRow.permission_cap
+        offered = stmt.excluded.permission_cap
+        await self._sess.execute(
+            stmt.on_conflict_do_update(
+                index_elements=["virtual_scope_id", "entity_type", "entity_id"],
+                set_={
+                    "permission_cap": sa.case(
+                        (
+                            sa.or_(existing.is_(None), offered.is_(None)),
+                            sa.null(),
+                        ),
+                        else_=existing.op("|")(offered),
+                    )
+                },
+            )
+        )
+
     async def revoke_entities(
         self, entities: Sequence[EntityIdentifier], grantee: EntityIdentifier
     ) -> None:
@@ -81,6 +118,10 @@ class V2GrantWriteOps(V2WriteOpsBase):
         or addressed to somebody else; the guards do not say which. Turning one down
         grants nothing and goes through the plain guarded update instead, which is why
         only this direction is a primitive: the settle and the grant cannot come apart.
+
+        The grant widens rather than states: an offer is somebody else's, and accepting
+        one must not cost the invitee access they already had. Setting a cap exactly is
+        :meth:`grant_entities`, which an invitation never reaches.
         """
         row = await self._update_guarded_row_returning(
             updater.row_class,
@@ -93,7 +134,7 @@ class V2GrantWriteOps(V2WriteOpsBase):
         if row is None:
             return None
         data = updater.to_data(row)
-        await self.grant_entities([
+        await self.widen_entity_grants([
             EntityGrant(
                 entity=data.target(),
                 grantee=updater.invitee_user_id,
