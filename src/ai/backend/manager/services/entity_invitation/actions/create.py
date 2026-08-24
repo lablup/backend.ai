@@ -8,13 +8,10 @@ from typing import override
 
 from ai.backend.common.data.entity.entity_invitation import ENTITY_INVITATION_ENTITY_TYPE
 from ai.backend.common.data.entity.types import (
-    EntityIdentifier,
     EntityType,
     ScopeRef,
     ScopeType,
 )
-from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.actions.v2.ops.base import CreateEntityOpsAction
 from ai.backend.manager.data.entity_invitation.types import EntityInvitationData
 from ai.backend.manager.models.entity_invitation.creators import EntityInvitationCreator
@@ -34,10 +31,7 @@ class CreateEntityInvitationAction(
     allowed to hand out.
     """
 
-    inviter_user_id: UserID
-    invitee_email: str
-    target: EntityIdentifier
-    permission_cap: Permission | None
+    creator: EntityInvitationCreator
 
     @override
     @classmethod
@@ -51,13 +45,9 @@ class CreateEntityInvitationAction(
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=ScopeType(self.target.entity_type()), scope_id=self.target),)
+        target = self.creator.target
+        return (ScopeRef(scope_type=ScopeType(target.entity_type()), scope_id=target),)
 
     @override
     def to_creator(self) -> EntityInvitationCreator:
-        return EntityInvitationCreator(
-            inviter_user_id=self.inviter_user_id,
-            invitee_email=self.invitee_email,
-            target=self.target,
-            permission_cap=self.permission_cap,
-        )
+        return self.creator

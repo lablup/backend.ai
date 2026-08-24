@@ -60,3 +60,37 @@ class EntityInvitationConditions:
             return EntityInvitationRow.target_entity_type == entity_type
 
         return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Compares against the cursor row's ``created_at``, which is what the page is
+        ordered by.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(EntityInvitationRow.created_at)
+                .where(EntityInvitationRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return EntityInvitationRow.created_at > subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor)."""
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(EntityInvitationRow.created_at)
+                .where(EntityInvitationRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return EntityInvitationRow.created_at < subquery
+
+        return inner
