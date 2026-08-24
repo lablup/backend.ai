@@ -28,6 +28,7 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
@@ -108,6 +109,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
                 AssociationScopesEntitiesRow,
                 VirtualScopeRow,
                 ScopeBindingRow,
+                EntityLabelRow,
                 EntityMembershipRow,
             ],
         ):

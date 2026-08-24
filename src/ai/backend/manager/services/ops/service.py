@@ -24,11 +24,13 @@ from ai.backend.manager.actions.v2.bulk.result import (
 from ai.backend.manager.actions.v2.field.bulk_lookup import (
     BulkFieldOwnerLookupOpsResult,
     LookupBulkFieldOwnerOpsAction,
+    LookupBulkRuntimeFieldOwnerOpsAction,
 )
 from ai.backend.manager.actions.v2.field.lookup import (
     FieldKeyLookupOpsAction,
     FieldOwnerKeyLookupOpsAction,
     FieldOwnerLookupOpsAction,
+    RuntimeFieldOwnerLookupOpsAction,
 )
 from ai.backend.manager.actions.v2.lookup.bulk_base import BulkLookupKeyResult
 from ai.backend.manager.actions.v2.ops.base import (
@@ -278,6 +280,23 @@ class FieldKeyLookupService:
         return FieldKeyLookupOpsResult(field_id=field_id, owner_entity_id=owner_entity_id)
 
 
+class RuntimeFieldOwnerLookupService:
+    """Reads the id of the polymorphic entity that owns a field row."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: RuntimeFieldOwnerLookupOpsAction[Any]
+    ) -> FieldOwnerLookupOpsResult:
+        owner_entity_id = await self._repository.runtime_field_owner(
+            action.to_owner_lookup(), action.field_id()
+        )
+        return FieldOwnerLookupOpsResult(owner_entity_id=owner_entity_id)
+
+
 class BulkFieldOwnerLookupService:
     """Reads the entities owning the field rows an action names, answering per row."""
 
@@ -291,6 +310,35 @@ class BulkFieldOwnerLookupService:
     ) -> BulkFieldOwnerLookupOpsResult[Any]:
         field_ids = action.field_ids()
         owners = await self._repository.field_owners(action.to_owner_lookup(), field_ids)
+        found = ActionRunStatus.success()
+        key_results = [
+            BulkLookupKeyResult(
+                key=action.to_lookup_key(field_id),
+                status=found.status if field_id in owners else OperationStatus.ERROR,
+                description=found.description
+                if field_id in owners
+                else "No field row matches the given id.",
+                error_code=None,
+                entity_id=owners.get(field_id),
+            )
+            for field_id in field_ids
+        ]
+        return BulkFieldOwnerLookupOpsResult(owners=owners, key_results=key_results)
+
+
+class BulkRuntimeFieldOwnerLookupService:
+    """Reads the polymorphic entities owning the field rows an action names."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: LookupBulkRuntimeFieldOwnerOpsAction[Any]
+    ) -> BulkFieldOwnerLookupOpsResult[Any]:
+        field_ids = action.field_ids()
+        owners = await self._repository.runtime_field_owners(action.to_owner_lookup(), field_ids)
         found = ActionRunStatus.success()
         key_results = [
             BulkLookupKeyResult(

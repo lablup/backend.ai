@@ -11,10 +11,15 @@ from ai.backend.manager.actions.v2.lookup.bulk_base import (
     BulkLookupKeyResult,
 )
 from ai.backend.manager.actions.v2.ops.backend import OpsBackendAction
-from ai.backend.manager.models.specs.lookup import FieldOwnerLookup
+from ai.backend.manager.models.specs.lookup import (
+    FieldOwnerLookup,
+    RuntimeFieldOwnerLookup,
+)
 
 __all__ = (
     "BulkFieldOwnerLookupOpsAction",
+    "BulkRuntimeFieldOwnerLookupOpsAction",
+    "LookupBulkRuntimeFieldOwnerOpsAction",
     "LookupBulkFieldOwnerOpsAction",
     "BulkFieldOwnerLookupOpsResult",
 )
@@ -43,6 +48,35 @@ class LookupBulkFieldOwnerOpsAction[TFieldID: FieldIdentifier, TOwnerID: EntityI
 
     ``lookup_keys()`` is derived, so a key and the row it stands for cannot come apart.
     """
+
+    @abstractmethod
+    def to_lookup_key(self, field_id: TFieldID) -> LookupKey:
+        """Return the key that names one row, for the record."""
+        raise NotImplementedError
+
+    @override
+    def lookup_keys(self) -> Sequence[LookupKey]:
+        return tuple(self.to_lookup_key(field_id) for field_id in self.field_ids())
+
+
+class BulkRuntimeFieldOwnerLookupOpsAction[TFieldID: FieldIdentifier](OpsBackendAction):
+    """A read of the polymorphic entities owning several field rows."""
+
+    @abstractmethod
+    def field_ids(self) -> Sequence[TFieldID]:
+        """Return the ids of the field rows whose owners are read."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_owner_lookup(self) -> RuntimeFieldOwnerLookup[TFieldID]:
+        """Return the spec this action executes."""
+        raise NotImplementedError
+
+
+class LookupBulkRuntimeFieldOwnerOpsAction[TFieldID: FieldIdentifier](
+    BaseBulkLookupAction, BulkRuntimeFieldOwnerLookupOpsAction[TFieldID], ABC
+):
+    """The polymorphic owner read of several rows, keyed by their ids."""
 
     @abstractmethod
     def to_lookup_key(self, field_id: TFieldID) -> LookupKey:

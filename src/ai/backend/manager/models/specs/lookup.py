@@ -9,7 +9,12 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
+from ai.backend.common.data.entity.types import (
+    EntityIdentifier,
+    EntityType,
+    FieldIdentifier,
+    RuntimeEntityID,
+)
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 
@@ -100,6 +105,39 @@ class FieldOwnerLookup[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](AB
     @abstractmethod
     def to_entity_id(self, value: UUID) -> TOwnerID:
         """Convert the selected value into the owning entity's identifier."""
+        raise NotImplementedError
+
+
+class RuntimeFieldOwnerLookup[TFieldID: FieldIdentifier](ABC):
+    """Resolves a field row's id into the id of the polymorphic entity that owns it.
+
+    Unrelated to :class:`FieldOwnerLookup`, which answers for an owner whose kind its id
+    class names. Here the kind is a value on the row, so the query selects it third —
+    after the row's id and the owner's — and the identifier is built from both.
+
+    The two are separate roots down to the ops methods that execute them, so a lookup
+    cannot reach the path that would drop the type it carries.
+
+    Example:
+        class EntityLabelOwnerLookup(RuntimeFieldOwnerLookup[EntityLabelID]):
+            def build_query(self, field_ids):
+                return sa.select(
+                    EntityLabelRow.id, EntityLabelRow.entity_id, EntityLabelRow.entity_type
+                ).where(EntityLabelRow.id.in_(field_ids))
+
+            def owner_of(self, entity_type, entity_id) -> RuntimeEntityID:
+                return RuntimeEntityID(entity_type, entity_id)
+    """
+
+    @abstractmethod
+    def build_query(self, field_ids: Sequence[TFieldID]) -> sa.sql.Select[Any]:
+        """Build the query selecting each named row's id, its owning entity's id, and
+        that entity's type, in that order."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def owner_of(self, entity_type: EntityType, entity_id: UUID) -> RuntimeEntityID:
+        """Build the owner's identifier from the type and id the row carried."""
         raise NotImplementedError
 
 

@@ -58,6 +58,7 @@ from ai.backend.manager.errors.repository import (
     RepositoryIntegrityError,
 )
 from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
@@ -298,6 +299,7 @@ async def database(
             VirtualScopeRow,
             EntityMembershipRow,
             ScopeBindingRow,
+            EntityLabelRow,
             RolePresetRow,
             RolePermissionPresetRow,
             RoleRow,

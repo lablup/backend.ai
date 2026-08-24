@@ -33,6 +33,7 @@ from ai.backend.manager.errors.repository import (
     UpsertEmptyResultError,
 )
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.specs.membership import EntityMembershipEntry
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
@@ -95,8 +96,8 @@ class V2WriteOpsBase(V2OpsBase):
         await self._sess.execute(binding_stmt)
 
     async def _teardown_entity(self, entity: EntityIdentifier) -> None:
-        """Remove what the entity left in the RBAC graph: permissions granted on it,
-        its virtual scope node if it provisioned one, and its membership edges.
+        """Remove what the entity left: permissions granted on it, its virtual scope node
+        if it provisioned one, its membership edges, and the labels put on it.
 
         The permission delete keys on the id alone, which is a UUID and so already
         names one entity; the type would only narrow it to what it already is.
@@ -120,6 +121,12 @@ class V2WriteOpsBase(V2OpsBase):
             sa.delete(EntityMembershipRow).where(
                 EntityMembershipRow.entity_type == entity.entity_type(),
                 EntityMembershipRow.entity_id == entity,
+            )
+        )
+        await self._sess.execute(
+            sa.delete(EntityLabelRow).where(
+                EntityLabelRow.entity_type == entity.entity_type(),
+                EntityLabelRow.entity_id == entity,
             )
         )
 

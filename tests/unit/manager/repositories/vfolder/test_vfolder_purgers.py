@@ -18,6 +18,7 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission, VFolderOwnershipType
 from ai.backend.manager.models.agent import AgentRow  # noqa: F401
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow  # noqa: F401
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -73,6 +74,7 @@ class TestVFolderPurgersIntegration:
                 VirtualScopeRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
+                EntityLabelRow,
                 RoleRow,
                 PermissionRow,
             ],

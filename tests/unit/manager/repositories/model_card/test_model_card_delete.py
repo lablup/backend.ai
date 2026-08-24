@@ -34,6 +34,7 @@ from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -130,6 +131,7 @@ class TestModelCardDelete:
                 KeyPairResourcePolicyRow,
                 VirtualScopeRow,
                 ScopeBindingRow,
+                EntityLabelRow,
                 EntityMembershipRow,
                 RoleRow,
                 PermissionRow,

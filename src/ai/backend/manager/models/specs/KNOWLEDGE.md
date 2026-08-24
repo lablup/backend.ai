@@ -80,8 +80,9 @@ The create side removed the asymmetry of tearing down what was never built.
 
 ## A field row carries an id of its own
 
-- A row with exactly one owning entity and a cascading FK is a field row. Whether an
-  API names one individually today is not the test — that arrives later.
+- A row with exactly one owning entity is a field row. How it points at that owner —
+  a cascading FK, or a polymorphic `(entity_type, entity_id)` pair — is not the test,
+  and neither is whether an API names one individually today.
 - So such a table gets an `id` uuid. Where the primary key is composite it stays as it
   is and `id` is added as a unique column: every existing query and index survives, and
   a `FieldIdentifier` becomes expressible.

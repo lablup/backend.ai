@@ -34,6 +34,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -151,6 +152,7 @@ async def database_fixture(
             VirtualScopeRow,
             EntityMembershipRow,
             ScopeBindingRow,
+            EntityLabelRow,
             ResourceGroupForDomainRow,
             ResourceGroupForProjectRow,
             UserResourcePolicyRow,
