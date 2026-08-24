@@ -2685,8 +2685,8 @@ class DockerContext(Context):
         base_path = self.install_info.base_path
         base_path.mkdir(parents=True, exist_ok=True)
         # Operator staging dir for extra plugin wheels (e.g. accelerator
-        # plugins), mounted read-only at /app/wheelhouse of the manager and
-        # agent containers.
+        # plugins), mounted read-write at /app/wheelhouse of the manager and
+        # agent containers (the install unpacks the wheels in place).
         (base_path / "wheelhouse").mkdir(exist_ok=True)
         # The daemon-visible state lives under fixed root-owned system paths
         # (/var/lib/backend.ai, /tmp/backend.ai, /vfroot/local) — the Docker
@@ -2772,6 +2772,7 @@ class DockerContext(Context):
         self.log_header("Configuring agent...")
         await self.configure_agent()
         await self._fixup_agent_paths()
+        await self._fixup_agent_bind_addresses()
         self.log_header("Configuring storage-proxy...")
         await self.configure_storage_proxy()
         self.log_header("Configuring webserver and webui...")
@@ -2839,6 +2840,45 @@ class DockerContext(Context):
                 ),
             ],
         )
+
+    async def _fixup_agent_bind_addresses(self) -> None:
+        """
+        Move the agent's two bind addresses off the loopback interface.
+
+        The bundled ``agent.toml`` pins both to 127.0.0.1, which is right for
+        the DEVELOP/PACKAGE modes: there the agent, the app-proxy workers and
+        the published kernel ports all share the host loopback. Here the
+        workers are bridge containers that cannot reach it, so kernel service
+        ports published on 127.0.0.1 would be unroutable and the manager
+        would record a loopback contact address for the agent.
+
+        This is DOCKER-mode only — the DEVELOP/PACKAGE modes keep the
+        loopback defaults, which do not expose these ports off-host.
+        """
+        toml_path = self.install_info.base_path / "agent.toml"
+        self.sed_in_place_multi(
+            toml_path,
+            self.agent_bind_address_subs(
+                public_addr=self.install_variable.public_facing_address,
+                rpc_port=self.install_info.service_config.agent_rpc_addr.bind.port,
+            ),
+        )
+
+    @staticmethod
+    def agent_bind_address_subs(
+        *, public_addr: str, rpc_port: int
+    ) -> list[tuple[str | re.Pattern[str], str]]:
+        """The substitutions of :meth:`_fixup_agent_bind_addresses`."""
+        return [
+            (
+                re.compile(r"^bind-host = .*$", flags=re.MULTILINE),
+                f'bind-host = "{public_addr}"',
+            ),
+            (
+                re.compile(r"^rpc-listen-addr = .*$", flags=re.MULTILINE),
+                f'rpc-listen-addr = {{ host = "{public_addr}", port = {rpc_port} }}',
+            ),
+        ]
 
     @override
     def _fixup_appproxy_alembic_ini(self, alembic_ini: Path) -> None:

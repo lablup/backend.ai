@@ -99,7 +99,7 @@ Shared prerequisites:
 | halfstack services (PostgreSQL, Valkey/Redis, etcd) | all | the reference definitions live in `docker-compose.halfstack-main.yml` |
 | `supergraph.graphql` + a GraphQL gateway (e.g. `ghcr.io/graphql-hive/gateway`) | GraphQL federation | the supergraph schema is generated per release (`scripts/generate-graphql-schema.sh`); the gateway composes manager subgraphs |
 | RPC auth key distribution | manager, agent | the agent needs the manager's RPC **public** key to authenticate RPC calls — e.g. share the parity-mounted fixtures directory across nodes, or mount a common key directory at `/etc/backend.ai/keys:ro` |
-| `wheelhouse/` mount at `/app/wheelhouse` | manager, agent | staging dir for extra plugin wheels (e.g. accelerator plugins) — the DOCKER install mode creates and mounts `<install-dir>/wheelhouse` read-only by default; nothing in the images consumes it automatically, so install with `docker exec <container> pip install /app/wheelhouse/*.whl` or build a derived image |
+| `wheelhouse/` mount at `/app/wheelhouse` | manager, agent | staging dir for extra plugin wheels (e.g. accelerator plugins) — the DOCKER install mode creates and mounts `<install-dir>/wheelhouse` read-write (installing from it unpacks the wheels in place); nothing in the images consumes it automatically, so install with `docker exec <container> pip install /app/wheelhouse/*.whl` or build a derived image |
 
 ## Container privileges
 
@@ -173,6 +173,30 @@ resolve on the host. The agent container itself does not need the vfroot mount
 mounts become visible inside the container. Also, `scratch-type = "memory"` is
 unsupported in the containerized agent — a tmpfs mounted inside the container's
 namespace is invisible to the host daemon — use `hostdir`.
+
+### Agent bind addresses
+
+The bundled `agent.toml` pins both of the agent's bind addresses to
+`127.0.0.1`, which is correct for the DEVELOP/PACKAGE modes: there the agent,
+the app-proxy workers and the published kernel ports all share the host
+loopback. In this deployment the workers are **bridge** containers that cannot
+reach it, so the DOCKER install mode rewrites both to the public facing
+address:
+
+| Config knob (`agent.toml`) | DOCKER-mode value | Reaches |
+|---|---|---|
+| `[container] bind-host` | public facing address | Host interface the kernel service ports are published on |
+| `[agent] rpc-listen-addr.host` | public facing address | Interface the agent's RPC listener binds, and the address it registers as its contact |
+
+Left on loopback, kernel apps are unroutable from the proxy and the manager
+records a loopback contact address for the agent. The rewrite is DOCKER-mode
+only — DEVELOP/PACKAGE keep the defaults, which do not expose these ports
+off-host. Since these now listen on a routable interface, firewall the kernel
+port range and the agent RPC port if the host is exposed.
+
+The equivalent for a hand-rolled deployment is either editing those two lines
+or setting `BACKEND_BIND_HOST_OVERRIDE` / `BACKEND_AGENT_HOST_OVERRIDE` on the
+agent container.
 
 ## Reference compose file
 
