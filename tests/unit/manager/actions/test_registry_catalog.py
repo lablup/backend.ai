@@ -35,6 +35,7 @@ from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_
 from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.entity_invitation import ENTITY_INVITATION_ENTITY_TYPE
 from ai.backend.common.data.entity.entity_label import ENTITY_LABEL_FIELD_TYPE
 from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
 from ai.backend.common.data.entity.fair_share import (
@@ -119,6 +120,9 @@ from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.entity_invitation.processors import (
+    EntityInvitationProcessors,
+)
 from ai.backend.manager.services.entity_label.actions.lookup_owner import (
     LookupBulkEntityLabelOwnerAction,
     LookupEntityLabelOwnerAction,
@@ -267,6 +271,9 @@ def test_every_defined_v2_action_is_wired() -> None:
     UserResourcePolicyProcessors(registry.group(GroupMeta(USER_RESOURCE_POLICY_ENTITY_TYPE)))
     KeypairResourcePolicyProcessors(registry.group(GroupMeta(KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE)))
     RolePresetProcessors(registry.group(GroupMeta(ROLE_PRESET_ENTITY_TYPE)), MagicMock())
+    EntityInvitationProcessors(
+        registry.group(GroupMeta(ENTITY_INVITATION_ENTITY_TYPE)), MagicMock()
+    )
     RuntimeVariantProcessors(registry.group(GroupMeta(RUNTIME_VARIANT_ENTITY_TYPE)))
     ObjectStorageProcessors(
         registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)),

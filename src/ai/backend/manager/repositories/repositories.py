@@ -18,6 +18,9 @@ from ai.backend.manager.repositories.deployment_revision_preset.repositories imp
     DeploymentPresetRepositories,
 )
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
+from ai.backend.manager.repositories.entity_invitation.repositories import (
+    EntityInvitationRepositories,
+)
 from ai.backend.manager.repositories.error_log.repositories import ErrorLogRepositories
 from ai.backend.manager.repositories.etcd_config.repositories import EtcdConfigRepositories
 from ai.backend.manager.repositories.events.repositories import EventsRepositories
@@ -98,6 +101,7 @@ class Repositories:
     model_serving: ModelServingRepositories
     notification: NotificationRepositories
     permission_controller: PermissionControllerRepositories
+    entity_invitation: EntityInvitationRepositories
     prometheus_query_preset: PrometheusQueryPresetRepositories
     replica_group: ReplicaGroupRepositories
     reservoir_registry: ReservoirRegistryRepositories
@@ -147,6 +151,7 @@ class Repositories:
         notification_repositories = NotificationRepositories.create(args)
         permission_controller_repositories = PermissionControllerRepositories.create(args)
         prometheus_query_preset_repositories = PrometheusQueryPresetRepositories.create(args)
+        entity_invitation_repositories = EntityInvitationRepositories.create(args)
         replica_group_repositories = ReplicaGroupRepositories.create(args)
         reservoir_registry_repositories = ReservoirRegistryRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
@@ -197,6 +202,7 @@ class Repositories:
             permission_controller=permission_controller_repositories,
             prometheus_query_preset=prometheus_query_preset_repositories,
             replica_group=replica_group_repositories,
+            entity_invitation=entity_invitation_repositories,
             reservoir_registry=reservoir_registry_repositories,
             resource_preset=resource_preset_repositories,
             resource_slot=resource_slot_repositories,
