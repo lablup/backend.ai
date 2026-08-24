@@ -38,6 +38,8 @@ live in `models/specs/` — read `models/specs/AGENTS.md` before touching them.
 
 - Where possible, reuse the existing `TypeDecorator` wrappers in `models/base.py`.
 - Add new `TypeDecorator`s only to `models/base.py` — not in individual row files.
+- A `SecretColumn` takes a `SecretValue`. Encrypt through the key provider pool before
+  binding it — the column performs no cryptography and refuses a bare string.
 
 ## `__init__.py` rules
 

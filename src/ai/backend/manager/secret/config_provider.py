@@ -43,7 +43,7 @@ class ConfigKeyProvider(KeyProvider):
     @classmethod
     def _decode(cls, key_id: SecretKeyId, material: SecretKeyMaterial) -> bytes:
         try:
-            return base64.b64decode(material, validate=True)
+            return base64.b64decode(material, altchars=b"-_", validate=True)
         except (binascii.Error, ValueError) as e:
             raise InvalidSecretKeyMaterial(
                 f"The key encryption key {key_id!r} is not valid base64."

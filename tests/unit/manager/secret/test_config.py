@@ -38,6 +38,13 @@ class TestConfigKeyProviderConfig:
                 "keys": {"v1": base64.b64encode(b"short").decode()},
             })
 
+    def test_the_url_safe_alphabet_is_accepted(self) -> None:
+        material = base64.urlsafe_b64encode(bytes([0xFB, 0xEF] * 16)).decode()
+        assert "-" in material and "_" in material
+        assert _provider(**{"active-key-id": "v1", "keys": {"v1": material}}).keys == {
+            "v1": material
+        }
+
     def test_a_non_base64_key_is_rejected(self) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
             _provider(**{"active-key-id": "v1", "keys": {"v1": "!!!!"}})

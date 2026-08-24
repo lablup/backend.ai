@@ -19,6 +19,7 @@ api/ → services/ → repositories/ → models/
 - `data/` — immutable value objects converted to DTOs
 - `dto/` — manager-only request/response DTOs
 - `views/` — internal-only value objects
+- `secret/` — at-rest encryption for secret columns
 - `sokovan/` — coordinator and scheduling
 
 ## Cross-layer rules

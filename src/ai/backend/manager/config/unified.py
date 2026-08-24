@@ -559,9 +559,11 @@ class ConfigKeyProviderConfig(BaseConfigSchema):
         Field(),
         BackendAIConfigMeta(
             description=(
-                "Key encryption keys by id, as base64-encoded 32-byte values. Each wraps "
-                "the per-value data encryption keys rather than the values themselves, so "
-                "an id may be retired only once no stored value still names it."
+                "Key encryption keys by id, each 32 random bytes in base64 as produced by "
+                "`openssl rand -base64 32`; the standard and url-safe alphabets are both "
+                "accepted. A key wraps the per-value data encryption keys rather than the "
+                "values themselves, so an id may be retired only once no stored value still "
+                "names it."
             ),
             added_version=NEXT_RELEASE_VERSION,
             secret=True,
@@ -574,7 +576,7 @@ class ConfigKeyProviderConfig(BaseConfigSchema):
             if not key_id:
                 raise ValueError("A key encryption key id must not be empty.")
             try:
-                decoded = base64.b64decode(material, validate=True)
+                decoded = base64.b64decode(material, altchars=b"-_", validate=True)
             except (binascii.Error, ValueError) as e:
                 raise ValueError(f"The key {key_id!r} is not valid base64.") from e
             if len(decoded) != 32:
