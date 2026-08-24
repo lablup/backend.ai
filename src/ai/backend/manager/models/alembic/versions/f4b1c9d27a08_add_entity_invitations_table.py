@@ -47,11 +47,11 @@ def upgrade() -> None:
         ),
     )
     op.create_index(
-        "uq_entity_invitations_open",
+        "uq_entity_invitations_pending",
         "entity_invitations",
         ["invitee_email", "target_entity_type", "target_entity_id"],
         unique=True,
-        postgresql_where=sa.text("status != 'accepted'"),
+        postgresql_where=sa.text("status = 'pending'"),
     )
     op.create_index(
         "ix_entity_invitations_target",
@@ -68,5 +68,5 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index("ix_entity_invitations_invitee_email", table_name="entity_invitations")
     op.drop_index("ix_entity_invitations_target", table_name="entity_invitations")
-    op.drop_index("uq_entity_invitations_open", table_name="entity_invitations")
+    op.drop_index("uq_entity_invitations_pending", table_name="entity_invitations")
     op.drop_table("entity_invitations")

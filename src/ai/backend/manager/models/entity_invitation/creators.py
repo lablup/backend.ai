@@ -47,7 +47,7 @@ class EntityInvitationCreator(EntityCreator[EntityInvitationRow, EntityInvitatio
         return (
             IntegrityErrorCheck(
                 violation_type=UniqueConstraintViolationError,
-                constraint_name="uq_entity_invitations_open",
+                constraint_name="uq_entity_invitations_pending",
                 error=DuplicateEntityInvitationError(
                     f"{self.invitee_email} already holds an open invitation to this entity"
                 ),

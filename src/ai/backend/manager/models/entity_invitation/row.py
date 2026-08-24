@@ -32,12 +32,12 @@ class EntityInvitationRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "entity_invitations"
     __table_args__ = (
         sa.Index(
-            "uq_entity_invitations_open",
+            "uq_entity_invitations_pending",
             "invitee_email",
             "target_entity_type",
             "target_entity_id",
             unique=True,
-            postgresql_where=sa.text("status != 'accepted'"),
+            postgresql_where=sa.text("status = 'pending'"),
         ),
         sa.Index(
             "ix_entity_invitations_target",
