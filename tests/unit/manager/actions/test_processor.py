@@ -26,6 +26,9 @@ from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.models.audit_log.creators import LegacyAuditLogCreator
+from ai.backend.manager.repositories.client_ip_masking.repository import (
+    ClientIPMaskingRepository,
+)
 
 _MOCK_ACTION_TYPE: Final[str] = "test"
 _MOCK_OPERATION_TYPE: Final[str] = "create"
@@ -183,7 +186,13 @@ class TestAuditLogMonitorExclusionAtSetupTime:
 
     @pytest.fixture
     def audit_log_monitor(self, mock_audit_log_repository: MagicMock) -> AuditLogMonitor:
-        return AuditLogMonitor(repository=mock_audit_log_repository, policy=AuditLogPolicy([]))
+        masking_repository = AsyncMock(spec=ClientIPMaskingRepository)
+        masking_repository.mask.return_value = None
+        return AuditLogMonitor(
+            repository=mock_audit_log_repository,
+            policy=AuditLogPolicy([]),
+            client_ip_masking=masking_repository,
+        )
 
     @pytest.fixture
     def mock_action(self) -> MockAction:
@@ -231,7 +240,13 @@ class TestAuditLogMonitorActorIdentities:
 
     @pytest.fixture
     def audit_log_monitor(self, mock_audit_log_repository: MagicMock) -> AuditLogMonitor:
-        return AuditLogMonitor(repository=mock_audit_log_repository, policy=AuditLogPolicy([]))
+        masking_repository = AsyncMock(spec=ClientIPMaskingRepository)
+        masking_repository.mask.return_value = None
+        return AuditLogMonitor(
+            repository=mock_audit_log_repository,
+            policy=AuditLogPolicy([]),
+            client_ip_masking=masking_repository,
+        )
 
     def _result(self) -> ProcessResult:
         now = datetime.now(tz=UTC)

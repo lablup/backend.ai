@@ -143,7 +143,15 @@ class ClientIPMaskingPolicyPayloadGQL(PydanticOutputMixin[PolicyPayloadDTO]):
     policy: ClientIPMaskingPolicyGQL = gql_field(description="The policy the operation left.")
 
 
-ClientIPMaskingPolicyEdgeGQL = Edge[ClientIPMaskingPolicyGQL]
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="An edge of the client IP masking policy connection.",
+    ),
+    name="ClientIPMaskingPolicyEdge",
+)
+class ClientIPMaskingPolicyEdgeGQL(Edge[ClientIPMaskingPolicyGQL]):
+    pass
 
 
 @gql_connection_type(
