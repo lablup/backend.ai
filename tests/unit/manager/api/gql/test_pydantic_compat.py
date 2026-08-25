@@ -201,12 +201,12 @@ class TestPydanticNodeMixin:
         assert "id" in field_names
 
     def test_resolver_backed_field_shadowing_dto_field(self) -> None:
-        """A resolver-backed GQL field whose name matches a DTO field is skipped.
+        """A resolver-backed GQL field shadowing a same-named DTO field is
+        skipped during conversion instead of raising TypeError (regression:
+        ModelCardGQL.min_resource vs ModelCardNode.min_resource)."""
 
-        Regression test: ModelCardGQL.min_resource is a resolver field while the
-        ModelCardNode DTO carries a min_resource attribute; passing it to the
-        generated __init__ raised TypeError.
-        """
+        async def resolve_min_resource() -> list[str] | None:
+            return None
 
         class LazyNode(BaseModel):
             id: str = Field(description="Unique ID")
@@ -217,10 +217,9 @@ class TestPydanticNodeMixin:
         class LazyGQL(PydanticNodeMixin[Any]):
             id: NodeID[str] = strawberry.field(description="Relay ID")
             name: str = strawberry.field(description="Name")
-
-            @strawberry.field(description="Resolved on demand")  # type: ignore[misc]
-            async def min_resource(self) -> list[str] | None:
-                return None
+            min_resource: list[str] | None = strawberry.field(
+                description="Resolved on demand", resolver=resolve_min_resource
+            )
 
         dto = LazyNode(id="lz1", name="Lazy", min_resource=["cpu"])
 
