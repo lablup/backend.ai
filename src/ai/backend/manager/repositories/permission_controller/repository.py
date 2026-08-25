@@ -46,9 +46,7 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.types import (
-    EntityType,
     ScopeListResult,
-    ScopeType,
 )
 from ai.backend.manager.data.permission.virtual_scope import (
     EntityPermissionCheckKey,
@@ -183,9 +181,9 @@ class PermissionControllerRepository:
         failures = [
             BulkRolePermissionAddFailure(
                 role_id=(spec := cast(PermissionCreatorSpec, error.spec)).role_id,
-                scope_type=ScopeType(spec.scope_type.value),
+                scope_type=spec.scope_type,
                 scope_id=spec.scope_id,
-                entity_type=EntityType(spec.entity_type.value),
+                entity_type=spec.entity_type,
                 operation=spec.operation,
                 message=str(error.exception),
             )
@@ -224,9 +222,9 @@ class PermissionControllerRepository:
         failures = [
             BulkRolePermissionAddFailure(
                 role_id=(spec := cast(PermissionCreatorSpec, error.spec)).role_id,
-                scope_type=ScopeType(spec.scope_type.value),
+                scope_type=spec.scope_type,
                 scope_id=spec.scope_id,
-                entity_type=EntityType(spec.entity_type.value),
+                entity_type=spec.entity_type,
                 operation=spec.operation,
                 message=str(error.exception),
             )

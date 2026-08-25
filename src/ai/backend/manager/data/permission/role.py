@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from ai.backend.common.data.entity.types import EntityType, ScopeType
 from ai.backend.manager.data.common.types import SearchResult
 
 from .id import ObjectId, ScopeId
@@ -14,11 +15,12 @@ from .object_permission import (
 from .permission import PermissionData, ScopedPermissionCreateInput
 from .status import RoleStatus
 from .types import (
-    EntityType,
+    EntityType as LegacyEntityType,
+)
+from .types import (
     OperationType,
     RBACElementType,
     RoleSource,
-    ScopeType,
 )
 
 
@@ -75,7 +77,7 @@ class RoleDetailData:
 @dataclass(frozen=True)
 class ScopePermissionCheckInput:
     user_id: uuid.UUID
-    target_entity_type: EntityType
+    target_entity_type: LegacyEntityType
     target_scope_id: ScopeId
     operation: OperationType
 
