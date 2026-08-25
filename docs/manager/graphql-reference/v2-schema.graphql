@@ -5586,6 +5586,11 @@ type EntityType implements Node {
 
   """The entity type, as a request names it."""
   name: String!
+
+  """
+  The scope types an operation on this entity type may be targeted at; `global` where the caller names the scope type, empty where no operation on it names a scope.
+  """
+  scopeTypes: [String!]!
 }
 
 """Added in 26.4.4. Entity reference parametrized by RBAC element type."""
@@ -11412,11 +11417,6 @@ type Query {
   entityTypes: [EntityType!]!
 
   """
-  Added in 26.9.0. Every operation the manager targets by scope, in entity type then name order, with the scope types each one accepts.
-  """
-  scopeOperations: [ScopeOperation!]!
-
-  """
   Added in 26.9.0. Read the labels on the entities named. Scope items are OR'd, and naming an entity the caller cannot read refuses the whole read.
   """
   entityLabels(scope: [EntityTarget!]!, filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
@@ -14542,28 +14542,6 @@ Added in 26.4.2. Scope reference for associating an entity with a scope.
 input ScopeInput {
   scopeType: RBACElementType!
   scopeId: String!
-}
-
-"""
-Added in 26.9.0. One operation the manager targets by scope rather than by entity id. The scope types it accepts are the action's own declaration, so this is what a permission over it may be configured at.
-"""
-type ScopeOperation implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-
-  """The name the operation is recorded under."""
-  actionName: String!
-
-  """The entity type the operation acts on."""
-  entityType: String!
-
-  """The operation performed within the scopes."""
-  operation: String!
-
-  """
-  The scope types the operation may be targeted at; `global` where the caller names the scope type, empty where the operation names no scope.
-  """
-  scopeTypes: [String!]!
 }
 
 """

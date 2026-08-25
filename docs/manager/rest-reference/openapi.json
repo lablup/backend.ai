@@ -52513,26 +52513,6 @@
         "description": "Search route histories scoped to a specific route.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
-    "/v2/scope-operations": {
-      "get": {
-        "operationId": "v2/scope-operations.list_scope_operations",
-        "tags": [
-          "v2/scope-operations"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "parameters": [],
-        "description": "List every operation the wiring targets by scope.\n\n**Preconditions:**\n* User privilege required.\n"
-      }
-    },
     "/v2/service-catalogs/search": {
       "post": {
         "operationId": "v2/service-catalogs.admin_search_service_catalogs",
