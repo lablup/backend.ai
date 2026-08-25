@@ -2856,7 +2856,7 @@ type CreateDownloadSessionV2Payload {
   url: String!
 }
 
-"""Added in 26.8.3. Create entity invitation input."""
+"""Added in 26.9.0. Create entity invitation input."""
 input CreateEntityInvitationInput {
   """Type of the entity being offered."""
   targetEntityType: String!
@@ -5293,7 +5293,7 @@ input EntityFilter {
 }
 
 """
-Added in 26.8.3. An offer of one existing entity to one address, settled by the answer.
+Added in 26.9.0. An offer of one existing entity to one address, settled by the answer.
 """
 type EntityInvitation implements Node {
   """The Globally Unique ID of this object"""
@@ -5324,7 +5324,7 @@ type EntityInvitation implements Node {
   updatedAt: DateTime!
 }
 
-"""Added in 26.8.3. Paginated list of entity invitations."""
+"""Added in 26.9.0. Paginated list of entity invitations."""
 type EntityInvitationConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -5334,7 +5334,7 @@ type EntityInvitationConnection {
   count: Int!
 }
 
-"""Added in 26.8.3. One entity invitation within a connection."""
+"""Added in 26.9.0. One entity invitation within a connection."""
 type EntityInvitationEdge {
   """A cursor for use in pagination"""
   cursor: String!
@@ -5343,7 +5343,7 @@ type EntityInvitationEdge {
   node: EntityInvitation!
 }
 
-"""Added in 26.8.3. Filter for entity invitations."""
+"""Added in 26.9.0. Filter for entity invitations."""
 input EntityInvitationFilter {
   """Status filter."""
   status: EntityInvitationStatus = null
@@ -5352,7 +5352,7 @@ input EntityInvitationFilter {
   inviteeEmail: String = null
 }
 
-"""Added in 26.8.3. Order specification."""
+"""Added in 26.9.0. Order specification."""
 input EntityInvitationOrderBy {
   """Field to order by."""
   field: EntityInvitationOrderField!
@@ -5361,21 +5361,21 @@ input EntityInvitationOrderBy {
   direction: String! = "DESC"
 }
 
-"""Added in 26.8.3. Order fields for entity invitations."""
+"""Added in 26.9.0. Order fields for entity invitations."""
 enum EntityInvitationOrderField {
   CREATED_AT
   UPDATED_AT
   STATUS
 }
 
-"""Added in 26.8.3. Entity invitation payload."""
+"""Added in 26.9.0. Entity invitation payload."""
 type EntityInvitationPayload {
   """The invitation the run touched."""
   invitation: EntityInvitation!
 }
 
 """
-Added in 26.8.3. Scope for the scoped entity invitation query. All items are OR'd; raises an error if every field is empty.
+Added in 26.9.0. Scope for the scoped entity invitation query. All items are OR'd; raises an error if every field is empty.
 """
 input EntityInvitationScope {
   """Users the invitations are addressed to."""
@@ -5388,7 +5388,7 @@ input EntityInvitationScope {
   target: [EntityInvitationTargetScope!] = null
 }
 
-"""Added in 26.8.3. Whether an invitation is still open."""
+"""Added in 26.9.0. Whether an invitation is still open."""
 enum EntityInvitationStatus {
   PENDING
   ACCEPTED
@@ -5396,7 +5396,7 @@ enum EntityInvitationStatus {
   CANCELED
 }
 
-"""Added in 26.8.3. One entity whose invitations are being read."""
+"""Added in 26.9.0. One entity whose invitations are being read."""
 input EntityInvitationTargetScope {
   """Type of the entity being offered."""
   entityType: String!
@@ -9185,16 +9185,16 @@ type Mutation {
   """Added in 26.8.0. Create a retention policy (superadmin only)."""
   adminCreateRetentionPolicy(input: CreateRetentionPolicyInput!): CreateRetentionPolicyPayload
 
-  """Added in 26.8.3. Offer one entity to one address."""
+  """Added in 26.9.0. Offer one entity to one address."""
   createEntityInvitation(input: CreateEntityInvitationInput!): EntityInvitationPayload
 
-  """Added in 26.8.3. Take what was offered."""
+  """Added in 26.9.0. Take what was offered."""
   acceptEntityInvitation(id: UUID!): EntityInvitationPayload
 
-  """Added in 26.8.3. Turn down what was offered."""
+  """Added in 26.9.0. Turn down what was offered."""
   rejectEntityInvitation(id: UUID!): EntityInvitationPayload
 
-  """Added in 26.8.3. Withdraw an offer before it was answered."""
+  """Added in 26.9.0. Withdraw an offer before it was answered."""
   cancelEntityInvitation(id: UUID!): EntityInvitationPayload
 
   """Added in 26.8.0. Update a retention policy (superadmin only)."""
@@ -9706,7 +9706,7 @@ type Permission implements Node {
 }
 
 """
-Added in 26.8.3. One bit of a permission mask; distinct from OperationType, which names an action.
+Added in 26.9.0. One bit of a permission mask; distinct from OperationType, which names an action.
 """
 enum PermissionBit {
   READ
@@ -11720,12 +11720,12 @@ type Query {
   adminRetentionPolicy(id: UUID!): RetentionPolicy
 
   """
-  Added in 26.8.3. Read one invitation by id, from the side that offered it. The invitee reaches theirs through the search addressed to them.
+  Added in 26.9.0. Read one invitation by id, from the side that offered it. The invitee reaches theirs through the search addressed to them.
   """
   entityInvitation(id: UUID!): EntityInvitation
 
   """
-  Added in 26.8.3. Page through the invitations the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  Added in 26.9.0. Page through the invitations the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
   entityInvitations(scope: EntityInvitationScope!, filter: EntityInvitationFilter = null, orderBy: [EntityInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityInvitationConnection
 
