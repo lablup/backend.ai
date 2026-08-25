@@ -122,6 +122,21 @@ def test_the_listing_help_explains_the_column_values() -> None:
     assert ActionBacking.GENERIC.describe() in result.output
 
 
+def test_only_a_scope_shaped_operation_declares_scope_types() -> None:
+    rows = _list()
+    scoped = [row for row in rows if row["kind"] == ActionKind.SCOPE.value]
+    assert scoped
+    assert all(row["scope_types"] != "-" for row in scoped)
+    assert all(row["scope_types"] == "-" for row in rows if row["kind"] != ActionKind.SCOPE.value)
+
+
+def test_a_caller_named_scope_type_is_declared_alone() -> None:
+    """`global` bounds nothing, so listing it beside a concrete type claims both."""
+    for row in _list():
+        declared = row["scope_types"].split(",")
+        assert "global" not in declared or declared == ["global"]
+
+
 def test_no_type_name_carries_a_colon() -> None:
     for entry in _list():
         assert ":" not in entry["entity_type"]

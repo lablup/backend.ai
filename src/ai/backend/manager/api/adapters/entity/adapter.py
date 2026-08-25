@@ -20,7 +20,16 @@ class EntityAdapter:
     def list_entity_types(self) -> ListEntityTypesPayload:
         """Every entity type a request may name."""
         return ListEntityTypesPayload(
-            items=[EntityTypeNode(name=str(t)) for t in self._entity_types.all()]
+            items=[
+                EntityTypeNode(
+                    name=str(entity_type),
+                    scope_types=[
+                        str(scope_type)
+                        for scope_type in self._entity_types.scope_types(entity_type)
+                    ],
+                )
+                for entity_type in self._entity_types.all()
+            ]
         )
 
 

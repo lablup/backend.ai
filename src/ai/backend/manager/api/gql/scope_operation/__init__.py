@@ -1,1 +1,0 @@
-"""Scope operation GQL module."""

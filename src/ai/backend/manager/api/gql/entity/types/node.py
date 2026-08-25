@@ -30,3 +30,10 @@ __all__ = ("EntityTypeGQL",)
 class EntityTypeGQL(PydanticNodeMixin[EntityTypeNode]):
     id: NodeID[str] = gql_field(description="The entity type, which is its own id.")
     name: str = gql_field(description="The entity type, as a request names it.")
+    scope_types: list[str] = gql_field(
+        description=(
+            "The scope types an operation on this entity type may be targeted at; "
+            "`global` where the caller names the scope type, empty where no operation "
+            "on it names a scope."
+        )
+    )

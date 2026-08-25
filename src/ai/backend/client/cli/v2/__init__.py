@@ -236,15 +236,6 @@ def entity_type() -> None:
     """Read-only commands for inspecting the entity types a request may name."""
 
 
-@v2.group(
-    cls=LazyGroup,
-    import_name="ai.backend.client.cli.v2.scope_operation.commands:scope_operation",
-    name="scope-operation",
-)
-def scope_operation() -> None:
-    """Read-only commands for inspecting the scope types an operation accepts."""
-
-
 @v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.rbac:rbac")
 def rbac() -> None:
     """RBAC commands."""

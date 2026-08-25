@@ -19,6 +19,7 @@ from ai.backend.manager.actions.types import (
     ActionKind,
     ActionOperationType,
 )
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.services.catalog import load_wiring_catalog
 
 _COLUMNS: Final[tuple[str, ...]] = (
@@ -30,6 +31,7 @@ _COLUMNS: Final[tuple[str, ...]] = (
     "kind",
     "gate",
     "backing",
+    "scope_types",
 )
 # The columns of an entity block, which its area heads.
 _ENTITY_BLOCK_COLUMNS: Final[tuple[str, ...]] = (
@@ -39,6 +41,7 @@ _ENTITY_BLOCK_COLUMNS: Final[tuple[str, ...]] = (
     "kind",
     "gate",
     "backing",
+    "scope_types",
 )
 # The columns of a field block, whose header names the field type and its owner.
 _FIELD_BLOCK_COLUMNS: Final[tuple[str, ...]] = tuple(
@@ -47,6 +50,8 @@ _FIELD_BLOCK_COLUMNS: Final[tuple[str, ...]] = tuple(
 _ENTITY_COLUMNS: Final[tuple[str, ...]] = ("concern", "entity_type", "field_type", "operations")
 # Stands for a column a wiring leaves unset, so every line has the same shape.
 _ABSENT: Final[str] = "-"
+# Stands for a scope operation whose declaration is empty, which names no scope at all.
+_NO_SCOPE: Final[str] = "(none)"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -61,6 +66,7 @@ class CatalogEntry:
     kind: str
     gate: str
     backing: str
+    scope_types: str
     action_cls: type[Any]
 
     @classmethod
@@ -74,6 +80,7 @@ class CatalogEntry:
             kind=str(wiring.kind),
             gate=str(wiring.gate),
             backing=str(wiring.backing),
+            scope_types=_render_scope_types(wiring.action_cls),
             action_cls=wiring.action_cls,
         )
 
@@ -124,6 +131,14 @@ class EntityFields:
             (self.concern, self.entity_type, field, str(count)) for field, count in self.fields
         )
         return rows
+
+
+def _render_scope_types(action_cls: type[Any]) -> str:
+    """The scope types a scope action declares; `-` where the shape is not scope."""
+    if not issubclass(action_cls, BaseScopeAction):
+        return _ABSENT
+    scope_types = action_cls.available_scope_types()
+    return ",".join(str(scope_type) for scope_type in scope_types) or _NO_SCOPE
 
 
 def _type_name(annotation: Any) -> str:
@@ -219,6 +234,10 @@ def _column_legend() -> str:
         width = max(len(member.value) for member in members)
         for member in members:
             lines.append(f"    {member.value:<{width}}  {member.describe()}")
+    lines.append("  scope_types")
+    lines.append(f"    {_ABSENT:<8}  the operation is not scope-shaped")
+    lines.append(f"    {_NO_SCOPE:<8}  it is, and names no scope at all")
+    lines.append(f"    {'global':<8}  the caller names the scope type, which no set bounds")
     return "\n".join(lines)
 
 

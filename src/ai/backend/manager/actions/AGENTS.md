@@ -36,7 +36,7 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   bounds the run: every type `scope_targets()` can return is listed.
 - `global` is the declaration for a scope type the caller names, which no fixed set
   bounds. The empty sequence is an action that names no scope at all.
-- Read the declared list with `./bai scope-operation list`. Do NOT transcribe it into a
+- The declared list is a column of `backend.ai mgr ops list`. Do NOT transcribe it into a
   document (`KNOWLEDGE.md`).
 
 ## Actions naming a field row

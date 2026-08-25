@@ -78,7 +78,6 @@ Check options with `--help`.
 ### Access Control & Auth
 
 - **entity-type**: user(list)
-- **scope-operation**: user(list)
 - **rbac**: sub assignment(assign, revoke, search), entity(search), permission(search),
   invitation(create, accept, reject, cancel, my-search, my-sent-search, role-search),
   role(create, get, search, update, delete, project-search, add-permission, remove-permission, replace-permission)
