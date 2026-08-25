@@ -200,10 +200,10 @@ class TestPydanticNodeMixin:
         assert "type" in field_names
         assert "id" in field_names
 
-    def test_resolver_backed_field_shadowing_dto_field(self) -> None:
-        """A resolver-backed GQL field shadowing a same-named DTO field is
-        skipped during conversion instead of raising TypeError (regression:
-        ModelCardGQL.min_resource vs ModelCardNode.min_resource)."""
+    def test_dto_field_excluded_via_from_pydantic_exclude(self) -> None:
+        """A DTO field named in __from_pydantic_exclude__ is kept out of the
+        generated __init__ (regression: resolver-backed ModelCardGQL.min_resource
+        shadowing ModelCardNode.min_resource raised TypeError)."""
 
         async def resolve_min_resource() -> list[str] | None:
             return None
@@ -215,6 +215,8 @@ class TestPydanticNodeMixin:
 
         @strawberry.type(name="LazyV2")
         class LazyGQL(PydanticNodeMixin[Any]):
+            __from_pydantic_exclude__ = frozenset({"min_resource"})
+
             id: NodeID[str] = strawberry.field(description="Relay ID")
             name: str = strawberry.field(description="Name")
             min_resource: list[str] | None = strawberry.field(

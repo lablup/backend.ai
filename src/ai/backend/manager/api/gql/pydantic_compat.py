@@ -73,13 +73,11 @@ def _from_pydantic_kwargs(
     Recursively converts nested Pydantic models and enums via _convert_value.
     """
     resolved_hints = get_type_hints(cls, include_extras=True)
+    excluded: frozenset[str] = getattr(cls, "__from_pydantic_exclude__", frozenset())
     kwargs: dict[str, Any] = {}
     for field in dataclasses.fields(cls):
         field_name = field.name
-        if not field.init:
-            # Resolver-backed fields are excluded from __init__; passing them raises TypeError.
-            continue
-        if field_name in skip_fields:
+        if field_name in skip_fields or field_name in excluded:
             continue
         if field_name in extra:
             kwargs[field_name] = extra[field_name]
@@ -109,6 +107,10 @@ class PydanticNodeMixin[T_DTO: BaseModel](Node):
     ``is_interface=False``, the MRO scan skips it and only picks up
     ``Node`` itself — so the interface is registered exactly once.
     """
+
+    # DTO fields a concrete type deliberately keeps out of constructor mapping
+    # (e.g. a resolver-backed GQL field shadowing a same-named DTO field).
+    __from_pydantic_exclude__: ClassVar[frozenset[str]] = frozenset()
 
     __strawberry_definition__ = StrawberryObjectDefinition(
         name="PydanticNodeMixin",
@@ -159,6 +161,8 @@ class PydanticNodeMixin[T_DTO: BaseModel](Node):
               or passed through when the types match.
             * Fields not present on the DTO are skipped (left to their
               Strawberry default, typically ``UNSET`` or resolver-provided).
+            * Fields listed in the type's ``__from_pydantic_exclude__`` are
+              skipped even when the DTO carries a same-named attribute.
         """
         combined_extra = dict(extra or {})
         kwargs = _from_pydantic_kwargs(cls, dto, combined_extra, skip_fields=frozenset({"id"}))

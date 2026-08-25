@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Self
+from typing import TYPE_CHECKING, Annotated, ClassVar, Self
 from uuid import UUID
 
 import strawberry
@@ -193,6 +193,10 @@ class ModelCardMetadataGQL(PydanticOutputMixin[ModelCardMetadataDTO]):
     name="ModelCardV2",
 )
 class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
+    # min_resource is resolver-backed (read on demand from its own table), so the
+    # DTO's eager field must not be mapped into the generated __init__.
+    __from_pydantic_exclude__: ClassVar[frozenset[str]] = frozenset({"min_resource"})
+
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
     name: str = gql_field(description="Display name of the registered model.")
     vfolder_id: UUID = gql_field(
