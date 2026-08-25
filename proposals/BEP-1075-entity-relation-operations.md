@@ -13,6 +13,7 @@ Implemented-Version:
 
 - BA-7467 (how an action designates an entity)
 - BA-7468 · BA-7469 · BA-7470 (relocating the resource group, fair share and usage history specs)
+- BEP-1076 (Project Membership) — the contained case
 
 ## Motivation
 
@@ -44,6 +45,7 @@ logic reads, and the permission of that operation is answered by the two scopes 
 | `association_groups_users` | user ↔ project | none | no |
 | `user_roles` | user ↔ role | `granted_by` · `granted_at` | no |
 | `idle_checker_bindings` | idle checker ↔ scope | `enabled` | yes |
+| `association_container_registries_groups` | container registry ↔ project | none | no |
 
 No relation links three or more.
 
@@ -79,17 +81,28 @@ Neither entity nor field. An individual relation table is treated as neither of 
 | Any other link between two entities | **relation — its own table, its own operations** |
 | The other side is a value that does not hold the relation | field |
 
-### The operation takes two scopes and has no entity type
+### The action decides the permission, not ops
 
-Both sides arrive as scopes. `entity_type` is `None`: what is created is not an entity, so there
-is no "permission on this type within this scope" to ask. With no type, the only thing to ask is
-the permission on each named scope itself.
+The relation ops take a pair and write a row; they know nothing about permission. Who may run it
+is the action's, and the action's shape splits on **whether one side is contained in the other**.
+
+| | Example | Shape |
+|---|---|---|
+| Contained | project ⊃ user | `scope_targets` = the container alone, `entity_type` = what it contains |
+| Not contained | resource group ↔ domain | `scope_targets` = both, no `entity_type` |
+
+A resource group is a cluster resource several domains share, so neither side is inside the other.
+There the permission is asked of each named scope itself.
 
 ```
 link · unlink  →  permission on the left scope  AND  permission on the right scope
 ```
 
-You must be able to touch both to link them, which is the same statement as both owning it.
+With no `entity_type` there is no "permission on this type within this scope" to ask, so the only
+thing left to ask is the permission on the scope itself.
+
+The contained case is the scope shape as it already exists. Project membership is that case, and
+BEP-1076 covers it.
 
 ### ops
 
@@ -163,6 +176,20 @@ what those reads decide.
 The permission graph edges the resource group relations wrote. Leaving them means only the
 relations made through that path stay inherited by the domain's administrators.
 
+### A relation is not carried as an updater field
+
+Two updaters carry a relation today and say so themselves.
+
+| Updater | Field | What it writes |
+|---|---|---|
+| `UserUpdater` | `group_ids` | the user's project memberships |
+| `ContainerRegistryUpdater` | `allowed_groups` | the registry's project associations |
+
+Neither field reaches `build_values()`; the repository writes those rows beside the update. This is
+the rule soft delete already follows — a value whose change drags other writes along does not
+belong on the general updater, because an edit path that can make the transition is an edit path
+that can make it wrong. Both fields move to the relation operations.
+
 ### When a referenced entity is removed
 
 `purge_relation` takes both values to remove a row. There is no operation that knows one side and
@@ -199,3 +226,4 @@ Decided once this BEP settles.
 - `src/ai/backend/manager/models/specs/KNOWLEDGE.md` — write spec selection criteria
 - `src/ai/backend/manager/actions/KNOWLEDGE.md` — the v2 action shapes
 - BEP-1008 · BEP-1012 (RBAC)
+- BEP-1076 (Project Membership)

@@ -146,6 +146,7 @@ BEP numbers start from 1000.
 | [1073](BEP-1073-entity-labels.md) | Entity Labels | Sanghun Lee | Draft |
 | [1074](BEP-1074-container-secret-references.md) | Container Secret References | HyeokJin Kim | Draft |
 | [1075](BEP-1075-entity-relation-operations.md) | Entity Relation Operations | HyeokJin Kim | Draft |
+| [1076](BEP-1076-project-membership.md) | Project Membership | HyeokJin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
