@@ -200,6 +200,35 @@ class TestPydanticNodeMixin:
         assert "type" in field_names
         assert "id" in field_names
 
+    def test_resolver_backed_field_shadowing_dto_field(self) -> None:
+        """A resolver-backed GQL field whose name matches a DTO field is skipped.
+
+        Regression test: ModelCardGQL.min_resource is a resolver field while the
+        ModelCardNode DTO carries a min_resource attribute; passing it to the
+        generated __init__ raised TypeError.
+        """
+
+        class LazyNode(BaseModel):
+            id: str = Field(description="Unique ID")
+            name: str = Field(description="Name")
+            min_resource: list[str] | None = Field(default=None, description="Lazy field")
+
+        @strawberry.type(name="LazyV2")
+        class LazyGQL(PydanticNodeMixin[Any]):
+            id: NodeID[str] = strawberry.field(description="Relay ID")
+            name: str = strawberry.field(description="Name")
+
+            @strawberry.field(description="Resolved on demand")  # type: ignore[misc]
+            async def min_resource(self) -> list[str] | None:
+                return None
+
+        dto = LazyNode(id="lz1", name="Lazy", min_resource=["cpu"])
+
+        gql = LazyGQL.from_pydantic(dto)
+
+        assert gql.id == "lz1"
+        assert gql.name == "Lazy"
+
 
 class TestExperimentalPydanticInput:
     """Verify strawberry.experimental.pydantic.input works with our Pydantic models."""

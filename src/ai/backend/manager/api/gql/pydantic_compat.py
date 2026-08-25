@@ -76,6 +76,9 @@ def _from_pydantic_kwargs(
     kwargs: dict[str, Any] = {}
     for field in dataclasses.fields(cls):
         field_name = field.name
+        if not field.init:
+            # Resolver-backed fields are excluded from __init__; passing them raises TypeError.
+            continue
         if field_name in skip_fields:
             continue
         if field_name in extra:
