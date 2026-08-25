@@ -7895,6 +7895,20 @@ type EntityTimestamps
   modifiedAt: DateTime
 }
 
+"""
+Added in 26.9.0. One entity type the manager has operations wired for. An entity type is declared where its operations are wired, not as a fixed enum, so this is what a request may name.
+"""
+type EntityType implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The entity type, as a request names it."""
+  name: String!
+}
+
 """Added in 26.4.4. Entity reference parametrized by RBAC element type."""
 input EntityTypeScope
   @join__type(graph: STRAWBERRY)
@@ -16432,6 +16446,11 @@ type Query
   Added in 26.4.4. Query audit logs within a scope (non-admin accessible, subject to RBAC). All scope items are OR'd; raises an error if every field is empty.
   """
   scopedAuditLogsV2(scope: AuditLogScope!, filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Every entity type the manager has operations wired for, in name order. What a field taking an entity type may be given is what this lists.
+  """
+  entityTypes: [EntityType!]! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. List container registries with filtering, ordering, and pagination (admin only).

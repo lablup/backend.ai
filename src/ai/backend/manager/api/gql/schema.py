@@ -133,6 +133,7 @@ from .domain_v2 import (
     domain_v2,
     rg_domains_v2,
 )
+from .entity.resolver import entity_types
 from .entity_invitation import (
     accept_entity_invitation,
     cancel_entity_invitation,
@@ -628,6 +629,8 @@ class Query:
     admin_kernels_v2 = admin_kernels_v2
     admin_audit_logs_v2 = admin_audit_logs_v2
     scoped_audit_logs_v2 = scoped_audit_logs_v2
+    # Entity APIs
+    entity_types = entity_types
     admin_container_registries_v2 = admin_container_registries_v2
     admin_login_sessions_v2 = admin_login_sessions_v2
     admin_login_history_v2 = admin_login_history_v2

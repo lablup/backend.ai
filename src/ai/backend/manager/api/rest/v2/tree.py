@@ -56,6 +56,8 @@ def build_v2_routes(
     from .domain.registry import register_v2_domain_routes
     from .entity_invitation.handler import V2EntityInvitationHandler
     from .entity_invitation.registry import register_v2_entity_invitation_routes
+    from .entity_type.handler import V2EntityTypeHandler
+    from .entity_type.registry import register_v2_entity_type_routes
     from .fair_share.handler import V2FairShareHandler
     from .fair_share.registry import register_v2_fair_share_routes
     from .huggingface_registry.handler import V2HuggingFaceRegistryHandler
@@ -149,6 +151,7 @@ def build_v2_routes(
     container_registry_handler = V2ContainerRegistryHandler(adapter=adapters.container_registry)
     deployment_handler = V2DeploymentHandler(adapter=adapters.deployment)
     domain_handler = V2DomainHandler(adapter=adapters.domain)
+    entity_type_handler = V2EntityTypeHandler(adapter=adapters.entity)
     fair_share_handler = V2FairShareHandler(adapter=adapters.fair_share)
     huggingface_registry_handler = V2HuggingFaceRegistryHandler(
         adapter=adapters.huggingface_registry
@@ -232,6 +235,7 @@ def build_v2_routes(
         )
     )
     v2_reg.add_subregistry(register_v2_domain_routes(domain_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_entity_type_routes(entity_type_handler, route_deps))
     v2_reg.add_subregistry(register_v2_fair_share_routes(fair_share_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_huggingface_registry_routes(huggingface_registry_handler, route_deps)

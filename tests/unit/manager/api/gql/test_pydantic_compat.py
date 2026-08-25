@@ -356,6 +356,7 @@ class TestAdaptersRegistry:
     def test_create_registry(self) -> None:
         adapters = Adapters.create(
             processors=MagicMock(),
+            action_registry=MagicMock(wired_processors=lambda: ()),
             auth_config=MagicMock(),
             key_provider_pool=MagicMock(),
             deployment_coordinator=MagicMock(),
@@ -366,6 +367,7 @@ class TestAdaptersRegistry:
     def test_container_registry_adapter_available(self) -> None:
         adapters = Adapters.create(
             processors=MagicMock(),
+            action_registry=MagicMock(wired_processors=lambda: ()),
             auth_config=MagicMock(),
             key_provider_pool=MagicMock(),
             deployment_coordinator=MagicMock(),
