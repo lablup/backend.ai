@@ -223,27 +223,18 @@ type AdminGetSSHKeypairPayload {
   keypair: SSHKeypairNode!
 }
 
-"""Added in 26.9.0. Which key each stored keypair secret sits on."""
-type AdminKeypairSecretStatusPayload {
-  """The key provider new and re-encrypted secrets are written through."""
-  writeProviderType: String!
-
-  """The stored secrets, grouped by the key holding them."""
-  counts: [KeypairSecretKeyCount!]!
-}
-
 """
-Added in 26.9.0. What one re-encryption pass wrote, and what the column holds afterwards.
+Added in 26.9.0. What one re-encryption pass wrote, and what the columns hold afterwards.
 """
-type AdminReencryptKeypairSecretsPayload {
+type AdminReencryptSecretsPayload {
   """How many rows this pass read."""
   scanned: Int!
 
   """How many rows this pass wrote back."""
   reencrypted: Int!
 
-  """The count per key id after this pass."""
-  status: AdminKeypairSecretStatusPayload!
+  """The count per column and key id after this pass."""
+  status: AdminSecretStatusPayload!
 }
 
 """
@@ -274,6 +265,17 @@ Added in 26.4.2. Payload returned after admin registers a user's SSH keypair.
 type AdminRegisterSSHKeypairPayload {
   """Access key whose SSH keypair was updated."""
   accessKey: String!
+}
+
+"""
+Added in 26.9.0. Which key each stored secret sits on, across every encrypted column.
+"""
+type AdminSecretStatusPayload {
+  """The key provider new and re-encrypted secrets are written through."""
+  writeProviderType: String!
+
+  """The stored secrets, grouped by column and by the key holding them."""
+  counts: [SecretKeyCount!]!
 }
 
 """Added in 26.4.2. Admin input for updating a keypair."""
@@ -7068,22 +7070,6 @@ enum KeypairResourcePolicyV2OrderField {
   MAX_PRIORITY
 }
 
-"""
-Added in 26.9.0. How many stored keypair secrets one provider's one key still holds.
-"""
-type KeypairSecretKeyCount {
-  """
-  The key provider holding these secrets. 'plain' means legacy plaintext.
-  """
-  providerType: String!
-
-  """The key within that provider. Unset for plaintext."""
-  keyId: String
-
-  """How many stored secrets that key holds."""
-  count: Int!
-}
-
 """Added in 26.4.2. Input for listing files in a virtual folder."""
 input ListFilesV2Input {
   """Directory path to list files from."""
@@ -8893,9 +8879,9 @@ type Mutation {
   adminDeleteSshKeypairV2(accessKey: String!): AdminDeleteSSHKeypairPayload
 
   """
-  Added in 26.9.0. Admin encrypts every stored keypair secret again through the configured write provider, under a fresh data encryption key. The pass runs in chunks and reports the count per key id afterwards.
+  Added in 26.9.0. Admin encrypts every stored secret again through the configured write provider, under a fresh data encryption key. The pass runs in chunks and reports the count per column and key id afterwards.
   """
-  adminReencryptKeypairSecrets: AdminReencryptKeypairSecretsPayload
+  adminReencryptSecrets: AdminReencryptSecretsPayload
 
   """Added in 26.4.2. Revoke a login session. (admin only)"""
   adminRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload
@@ -11301,9 +11287,9 @@ type Query {
   adminSshKeypairV2(accessKey: String!): AdminGetSSHKeypairPayload
 
   """
-  Added in 26.9.0. Report the stored keypair secrets per key id (admin only). Requires superadmin privileges.
+  Added in 26.9.0. Report the stored secrets of every encrypted column per key id (admin only). Requires superadmin privileges.
   """
-  adminKeypairSecretStatusV2: AdminKeypairSecretStatusPayload
+  adminSecretStatus: AdminSecretStatusPayload
 
   """
   Added in 26.4.2. Query login sessions of the current user with pagination and filtering.
@@ -14440,6 +14426,25 @@ input ScopedUpsertAppConfigFragmentsInput {
 
   """The (config_name, config) pairs to upsert."""
   items: [AppConfigFragmentUpsertItem!]!
+}
+
+"""
+Added in 26.9.0. How many stored secrets of one column one provider's one key holds.
+"""
+type SecretKeyCount {
+  """The encrypted column these secrets are stored in."""
+  column: String!
+
+  """
+  The key provider holding these secrets. 'plain' means legacy plaintext.
+  """
+  providerType: String!
+
+  """The key within that provider. Unset for plaintext."""
+  keyId: String
+
+  """How many stored secrets that key holds."""
+  count: Int!
 }
 
 """Added in 26.3.0. A registered service instance in the catalog."""

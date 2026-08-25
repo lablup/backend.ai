@@ -281,21 +281,10 @@ type AdminGetSSHKeypairPayload
   keypair: SSHKeypairNode!
 }
 
-"""Added in 26.9.0. Which key each stored keypair secret sits on."""
-type AdminKeypairSecretStatusPayload
-  @join__type(graph: STRAWBERRY)
-{
-  """The key provider new and re-encrypted secrets are written through."""
-  writeProviderType: String!
-
-  """The stored secrets, grouped by the key holding them."""
-  counts: [KeypairSecretKeyCount!]!
-}
-
 """
-Added in 26.9.0. What one re-encryption pass wrote, and what the column holds afterwards.
+Added in 26.9.0. What one re-encryption pass wrote, and what the columns hold afterwards.
 """
-type AdminReencryptKeypairSecretsPayload
+type AdminReencryptSecretsPayload
   @join__type(graph: STRAWBERRY)
 {
   """How many rows this pass read."""
@@ -304,8 +293,8 @@ type AdminReencryptKeypairSecretsPayload
   """How many rows this pass wrote back."""
   reencrypted: Int!
 
-  """The count per key id after this pass."""
-  status: AdminKeypairSecretStatusPayload!
+  """The count per column and key id after this pass."""
+  status: AdminSecretStatusPayload!
 }
 
 """
@@ -342,6 +331,19 @@ type AdminRegisterSSHKeypairPayload
 {
   """Access key whose SSH keypair was updated."""
   accessKey: String!
+}
+
+"""
+Added in 26.9.0. Which key each stored secret sits on, across every encrypted column.
+"""
+type AdminSecretStatusPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The key provider new and re-encrypted secrets are written through."""
+  writeProviderType: String!
+
+  """The stored secrets, grouped by column and by the key holding them."""
+  counts: [SecretKeyCount!]!
 }
 
 """Added in 26.4.2. Admin input for updating a keypair."""
@@ -10155,24 +10157,6 @@ enum KeypairResourcePolicyV2OrderField
 }
 
 """
-Added in 26.9.0. How many stored keypair secrets one provider's one key still holds.
-"""
-type KeypairSecretKeyCount
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  The key provider holding these secrets. 'plain' means legacy plaintext.
-  """
-  providerType: String!
-
-  """The key within that provider. Unset for plaintext."""
-  keyId: String
-
-  """How many stored secrets that key holds."""
-  count: Int!
-}
-
-"""
 Added in 26.4.2. Keypair entity representing an API access key. The access_key field serves as the unique identifier. Secret key and private SSH key are excluded for security reasons.
 """
 type KeyPairV2 implements Node
@@ -13189,9 +13173,9 @@ type Mutation
   adminDeleteSshKeypairV2(accessKey: String!): AdminDeleteSSHKeypairPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Admin encrypts every stored keypair secret again through the configured write provider, under a fresh data encryption key. The pass runs in chunks and reports the count per key id afterwards.
+  Added in 26.9.0. Admin encrypts every stored secret again through the configured write provider, under a fresh data encryption key. The pass runs in chunks and reports the count per column and key id afterwards.
   """
-  adminReencryptKeypairSecrets: AdminReencryptKeypairSecretsPayload @join__field(graph: STRAWBERRY)
+  adminReencryptSecrets: AdminReencryptSecretsPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Revoke a login session. (admin only)"""
   adminRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload @join__field(graph: STRAWBERRY)
@@ -16440,9 +16424,9 @@ type Query
   adminSshKeypairV2(accessKey: String!): AdminGetSSHKeypairPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Report the stored keypair secrets per key id (admin only). Requires superadmin privileges.
+  Added in 26.9.0. Report the stored secrets of every encrypted column per key id (admin only). Requires superadmin privileges.
   """
-  adminKeypairSecretStatusV2: AdminKeypairSecretStatusPayload @join__field(graph: STRAWBERRY)
+  adminSecretStatus: AdminSecretStatusPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Query login sessions of the current user with pagination and filtering.
@@ -20207,6 +20191,27 @@ type ScopeResourceUsageV2
 
   """Assignable resources within policy limits (limits - used)."""
   assignable: [ResourceLimitEntry!]!
+}
+
+"""
+Added in 26.9.0. How many stored secrets of one column one provider's one key holds.
+"""
+type SecretKeyCount
+  @join__type(graph: STRAWBERRY)
+{
+  """The encrypted column these secrets are stored in."""
+  column: String!
+
+  """
+  The key provider holding these secrets. 'plain' means legacy plaintext.
+  """
+  providerType: String!
+
+  """The key within that provider. Unset for plaintext."""
+  keyId: String
+
+  """How many stored secrets that key holds."""
+  count: Int!
 }
 
 """Added in 26.3.0. A registered service instance in the catalog."""
