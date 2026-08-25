@@ -177,7 +177,8 @@
   client_pool_cleanup_interval = 60.0
   # Skip idle-session cleanup for sessions with a request still in flight, so
   # streamed responses longer than client_pool_cleanup_interval are not cut off.
-  # Experimental; off by default.
+  # Experimental; off by default. A session holding an unreleased response is
+  # never evicted.
   # Added in 26.9.0
   client_pool_keep_inflight_sessions = false
   # The address this worker announces to the service discovery system. Other

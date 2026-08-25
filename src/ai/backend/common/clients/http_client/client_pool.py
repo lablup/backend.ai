@@ -56,8 +56,12 @@ def _has_inflight_requests(session: aiohttp.ClientSession) -> bool:
     connector = session.connector
     if connector is None:
         return False
-    # Private aiohttp attribute, verified on 3.13; absent means fall back to time-based eviction.
-    return bool(getattr(connector, "_acquired", None))
+    # Private aiohttp attribute, verified on 3.13.
+    acquired = getattr(connector, "_acquired", None)
+    if acquired is None:
+        log.warning("aiohttp connector has no _acquired; falling back to time-based eviction")
+        return False
+    return bool(acquired)
 
 
 @dataclass(slots=True)

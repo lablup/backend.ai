@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 from collections.abc import AsyncIterator
 from functools import partial
 
@@ -34,11 +33,10 @@ async def _slow_stream(request: web.Request) -> web.StreamResponse:
 async def _read_stream(pool: ClientPool, upstream_url: str) -> list[bytes]:
     session = pool.load_client_session(ClientKey(endpoint=upstream_url, domain="test"))
     chunks: list[bytes] = []
-    with contextlib.suppress(TimeoutError, aiohttp.ClientError):
-        async with asyncio.timeout(READ_DEADLINE):
-            async with session.get("/stream") as response:
-                async for line in response.content:
-                    chunks.append(line)
+    async with asyncio.timeout(READ_DEADLINE):
+        async with session.get("/stream") as response:
+            async for line in response.content:
+                chunks.append(line)
     return chunks
 
 
@@ -104,8 +102,9 @@ async def test_idle_session_is_still_evicted(
 ) -> None:
     key = ClientKey(endpoint=streaming_upstream_url, domain="test")
     session = pool.load_client_session(key)
-    async with session.get("/stream") as response:
-        await response.read()
+    async with asyncio.timeout(READ_DEADLINE):
+        async with session.get("/stream") as response:
+            await response.read()
 
     await _wait_closed(session)
 
@@ -116,6 +115,13 @@ async def test_flag_off_keeps_time_based_eviction(
     legacy_pool: ClientPool,
     streaming_upstream_url: str,
 ) -> None:
-    chunks = await _read_stream(legacy_pool, streaming_upstream_url)
+    session = legacy_pool.load_client_session(
+        ClientKey(endpoint=streaming_upstream_url, domain="test")
+    )
+    reader = asyncio.create_task(_read_stream(legacy_pool, streaming_upstream_url))
+    try:
+        await _wait_closed(session)
+    finally:
+        reader.cancel()
 
-    assert len(chunks) < STREAM_CHUNKS
+    assert session.closed

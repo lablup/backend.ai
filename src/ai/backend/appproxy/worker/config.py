@@ -779,7 +779,7 @@ class ProxyWorkerConfig(BaseSchema):
             description=(
                 "Skip idle-session cleanup for sessions with a request still in flight, "
                 "so streamed responses longer than client_pool_cleanup_interval are not cut off. "
-                "Experimental; off by default."
+                "Experimental; off by default. A session holding an unreleased response is never evicted."
             ),
             added_version="26.9.0",
             example=ConfigExample(local="false", prod="false"),
