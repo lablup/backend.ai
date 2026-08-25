@@ -223,6 +223,29 @@ type AdminGetSSHKeypairPayload {
   keypair: SSHKeypairNode!
 }
 
+"""Added in 26.9.0. Which key each stored keypair secret sits on."""
+type AdminKeypairSecretStatusPayload {
+  """The key provider new and re-encrypted secrets are written through."""
+  writeProviderType: String!
+
+  """The stored secrets, grouped by the key holding them."""
+  counts: [KeypairSecretKeyCount!]!
+}
+
+"""
+Added in 26.9.0. What one re-encryption pass wrote, and what the column holds afterwards.
+"""
+type AdminReencryptKeypairSecretsPayload {
+  """How many rows this pass read."""
+  scanned: Int!
+
+  """How many rows this pass wrote back."""
+  reencrypted: Int!
+
+  """The count per key id after this pass."""
+  status: AdminKeypairSecretStatusPayload!
+}
+
 """
 Added in 26.4.3. Payload for admin bulk revision refresh mutation result.
 """
@@ -7045,6 +7068,22 @@ enum KeypairResourcePolicyV2OrderField {
   MAX_PRIORITY
 }
 
+"""
+Added in 26.9.0. How many stored keypair secrets one provider's one key still holds.
+"""
+type KeypairSecretKeyCount {
+  """
+  The key provider holding these secrets. 'plain' means legacy plaintext.
+  """
+  providerType: String!
+
+  """The key within that provider. Unset for plaintext."""
+  keyId: String
+
+  """How many stored secrets that key holds."""
+  count: Int!
+}
+
 """Added in 26.4.2. Input for listing files in a virtual folder."""
 input ListFilesV2Input {
   """Directory path to list files from."""
@@ -8852,6 +8891,11 @@ type Mutation {
 
   """Added in 26.4.2. Admin clears a user's SSH keypair."""
   adminDeleteSshKeypairV2(accessKey: String!): AdminDeleteSSHKeypairPayload
+
+  """
+  Added in 26.9.0. Admin encrypts every stored keypair secret again through the configured write provider, under a fresh data encryption key. The pass runs in chunks and reports the count per key id afterwards.
+  """
+  adminReencryptKeypairSecrets: AdminReencryptKeypairSecretsPayload
 
   """Added in 26.4.2. Revoke a login session. (admin only)"""
   adminRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload
@@ -11255,6 +11299,11 @@ type Query {
   Added in 26.4.2. Get a user's SSH public key (admin only). The private key is never returned.
   """
   adminSshKeypairV2(accessKey: String!): AdminGetSSHKeypairPayload
+
+  """
+  Added in 26.9.0. Report the stored keypair secrets per key id (admin only). Requires superadmin privileges.
+  """
+  adminKeypairSecretStatusV2: AdminKeypairSecretStatusPayload
 
   """
   Added in 26.4.2. Query login sessions of the current user with pagination and filtering.

@@ -46058,6 +46058,46 @@
         "description": "Search all keypairs (admin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/keypairs/secret/reencrypt": {
+      "post": {
+        "operationId": "v2/keypairs.admin_reencrypt_secrets",
+        "tags": [
+          "v2/keypairs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Move stored keypair secrets onto the configured write key (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/keypairs/secret/status": {
+      "get": {
+        "operationId": "v2/keypairs.admin_secret_status",
+        "tags": [
+          "v2/keypairs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Report the stored keypair secrets per key id (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
     "/v2/keypairs/ssh": {
       "post": {
         "operationId": "v2/keypairs.admin_register_ssh_keypair",

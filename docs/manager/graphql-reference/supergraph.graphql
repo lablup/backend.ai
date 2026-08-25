@@ -281,6 +281,33 @@ type AdminGetSSHKeypairPayload
   keypair: SSHKeypairNode!
 }
 
+"""Added in 26.9.0. Which key each stored keypair secret sits on."""
+type AdminKeypairSecretStatusPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The key provider new and re-encrypted secrets are written through."""
+  writeProviderType: String!
+
+  """The stored secrets, grouped by the key holding them."""
+  counts: [KeypairSecretKeyCount!]!
+}
+
+"""
+Added in 26.9.0. What one re-encryption pass wrote, and what the column holds afterwards.
+"""
+type AdminReencryptKeypairSecretsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """How many rows this pass read."""
+  scanned: Int!
+
+  """How many rows this pass wrote back."""
+  reencrypted: Int!
+
+  """The count per key id after this pass."""
+  status: AdminKeypairSecretStatusPayload!
+}
+
 """
 Added in 26.4.3. Payload for admin bulk revision refresh mutation result.
 """
@@ -10128,6 +10155,24 @@ enum KeypairResourcePolicyV2OrderField
 }
 
 """
+Added in 26.9.0. How many stored keypair secrets one provider's one key still holds.
+"""
+type KeypairSecretKeyCount
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  The key provider holding these secrets. 'plain' means legacy plaintext.
+  """
+  providerType: String!
+
+  """The key within that provider. Unset for plaintext."""
+  keyId: String
+
+  """How many stored secrets that key holds."""
+  count: Int!
+}
+
+"""
 Added in 26.4.2. Keypair entity representing an API access key. The access_key field serves as the unique identifier. Secret key and private SSH key are excluded for security reasons.
 """
 type KeyPairV2 implements Node
@@ -13142,6 +13187,11 @@ type Mutation
 
   """Added in 26.4.2. Admin clears a user's SSH keypair."""
   adminDeleteSshKeypairV2(accessKey: String!): AdminDeleteSSHKeypairPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Admin encrypts every stored keypair secret again through the configured write provider, under a fresh data encryption key. The pass runs in chunks and reports the count per key id afterwards.
+  """
+  adminReencryptKeypairSecrets: AdminReencryptKeypairSecretsPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Revoke a login session. (admin only)"""
   adminRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload @join__field(graph: STRAWBERRY)
@@ -16388,6 +16438,11 @@ type Query
   Added in 26.4.2. Get a user's SSH public key (admin only). The private key is never returned.
   """
   adminSshKeypairV2(accessKey: String!): AdminGetSSHKeypairPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Report the stored keypair secrets per key id (admin only). Requires superadmin privileges.
+  """
+  adminKeypairSecretStatusV2: AdminKeypairSecretStatusPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Query login sessions of the current user with pagination and filtering.
