@@ -51,32 +51,14 @@ class V2UpdateWriteOps(V2WriteOpsBase):
         between the check and the write. Callers that must tell the two misses apart
         read the row themselves.
         """
-        row_class = updater.row_class
-        table = row_class.__table__
-        values = updater.build_values()
-        if not values:
-            # Nothing to set: read the current row so callers can tell "nothing to
-            # change" apart from "row not found", as the plain update does.
-            existing = await self._sess.execute(
-                sa.select(row_class).where(updater.target_id_column() == updater.target_id_value())
-            )
-            row = existing.scalar_one_or_none()
-            return None if row is None else updater.to_data(row)
-        stmt = (
-            sa.update(table)
-            .values(values)
-            .where(updater.target_id_column() == updater.target_id_value())
+        row = await self._update_guarded_row_returning(
+            updater.row_class,
+            updater.target_id_column(),
+            updater.target_id_value(),
+            updater.guard_conditions(),
+            updater.build_values(),
+            updater.integrity_error_checks,
         )
-        for condition in updater.guard_conditions():
-            stmt = stmt.where(condition())
-        stmt = stmt.returning(*table.columns)
-        try:
-            result = await self._sess.execute(sa.select(row_class).from_statement(stmt))
-        except sa.exc.IntegrityError as e:
-            self._match_integrity_error(
-                self._parse_integrity_error(e), updater.integrity_error_checks
-            )
-        row = result.scalar_one_or_none()
         if row is None:
             return None
         return updater.to_data(row)

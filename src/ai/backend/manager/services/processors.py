@@ -96,6 +96,12 @@ if TYPE_CHECKING:
         DomainProcessors,
     )
     from ai.backend.manager.services.domain.service import DomainService
+    from ai.backend.manager.services.entity_invitation.processors import (
+        EntityInvitationProcessors,
+    )
+    from ai.backend.manager.services.entity_invitation.service import (
+        EntityInvitationService,
+    )
     from ai.backend.manager.services.entity_label.processors import (
         EntityLabelProcessors,
     )
@@ -359,6 +365,7 @@ class Services:
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
     role_preset: RolePresetService
+    entity_invitation: EntityInvitationService
     runtime_variant_preset: RuntimeVariantPresetService
     deployment_revision_preset: DeploymentPresetService
     model_card: ModelCardService
@@ -423,6 +430,7 @@ class Processors:
     resource_slot: ResourceSlotProcessors
     retention_policy: RetentionPolicyProcessors
     role_preset: RolePresetProcessors
+    entity_invitation: EntityInvitationProcessors
     runtime_variant: RuntimeVariantProcessors
     client_ip_masking: ClientIPMaskingProcessors
     runtime_variant_preset: RuntimeVariantPresetProcessors

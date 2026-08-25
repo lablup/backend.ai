@@ -257,6 +257,15 @@ def audit_log() -> None:
 
 @v2.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.entity_invitation:entity_invitation",
+    name="entity-invitation",
+)
+def entity_invitation() -> None:
+    """Entity invitation commands."""
+
+
+@v2.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.idle_checker_assignment:idle_checker_assignment",
     name="idle-checker-assignment",
 )

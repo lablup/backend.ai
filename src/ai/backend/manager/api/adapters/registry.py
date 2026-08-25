@@ -25,6 +25,7 @@ from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
 )
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
+from ai.backend.manager.api.adapters.entity_invitation.adapter import EntityInvitationAdapter
 from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 from ai.backend.manager.api.adapters.huggingface_registry.adapter import HuggingFaceRegistryAdapter
 from ai.backend.manager.api.adapters.idle_checker.adapter import IdleCheckerAdapter
@@ -120,6 +121,7 @@ class Adapters:
         resource_policy: ResourcePolicyAdapter,
         resource_preset: ResourcePresetAdapter,
         resource_slot: ResourceSlotAdapter,
+        entity_invitation: EntityInvitationAdapter,
         retention_policy: RetentionPolicyAdapter,
         runtime_variant: RuntimeVariantAdapter,
         runtime_variant_preset: RuntimeVariantPresetAdapter,
@@ -169,6 +171,7 @@ class Adapters:
         self.resource_policy = resource_policy
         self.resource_preset = resource_preset
         self.resource_slot = resource_slot
+        self.entity_invitation = entity_invitation
         self.retention_policy = retention_policy
         self.runtime_variant = runtime_variant
         self.runtime_variant_preset = runtime_variant_preset
@@ -240,6 +243,7 @@ class Adapters:
             resource_policy=ResourcePolicyAdapter(processors),
             resource_preset=ResourcePresetAdapter(processors),
             resource_slot=ResourceSlotAdapter(processors),
+            entity_invitation=EntityInvitationAdapter(processors),
             retention_policy=RetentionPolicyAdapter(processors),
             runtime_variant=RuntimeVariantAdapter(processors),
             runtime_variant_preset=RuntimeVariantPresetAdapter(processors),

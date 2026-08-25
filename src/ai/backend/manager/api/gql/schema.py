@@ -133,6 +133,14 @@ from .domain_v2 import (
     domain_v2,
     rg_domains_v2,
 )
+from .entity_invitation import (
+    accept_entity_invitation,
+    cancel_entity_invitation,
+    create_entity_invitation,
+    entity_invitation,
+    entity_invitations,
+    reject_entity_invitation,
+)
 from .fair_share import (
     admin_bulk_upsert_domain_fair_share_weight,
     admin_bulk_upsert_project_fair_share_weight,
@@ -754,6 +762,8 @@ class Query:
     # Retention Policy APIs
     admin_retention_policies = admin_retention_policies
     admin_retention_policy = admin_retention_policy
+    entity_invitation = entity_invitation
+    entity_invitations = entity_invitations
     # Runtime Variant Preset APIs
     runtime_variant_presets = runtime_variant_presets
     runtime_variant_preset = runtime_variant_preset
@@ -1006,6 +1016,10 @@ class Mutation:
     admin_purge_client_ip_masking_policy = admin_purge_client_ip_masking_policy
     # Retention Policy mutations
     admin_create_retention_policy = admin_create_retention_policy
+    create_entity_invitation = create_entity_invitation
+    accept_entity_invitation = accept_entity_invitation
+    reject_entity_invitation = reject_entity_invitation
+    cancel_entity_invitation = cancel_entity_invitation
     admin_update_retention_policy = admin_update_retention_policy
     admin_delete_retention_policy = admin_delete_retention_policy
     admin_purge_retention_policy = admin_purge_retention_policy

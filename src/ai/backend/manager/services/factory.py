@@ -17,6 +17,7 @@ from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_
 from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.entity_invitation import ENTITY_INVITATION_ENTITY_TYPE
 from ai.backend.common.data.entity.entity_label import ENTITY_LABEL_FIELD_TYPE
 from ai.backend.common.data.entity.etcd_config import ETCD_CONFIG_ENTITY_TYPE
 from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
@@ -124,6 +125,10 @@ from ai.backend.manager.services.deployment_revision_preset.service import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.entity_invitation.processors import (
+    EntityInvitationProcessors,
+)
+from ai.backend.manager.services.entity_invitation.service import EntityInvitationService
 from ai.backend.manager.services.entity_label.actions.lookup_owner import (
     LookupBulkEntityLabelOwnerAction,
     LookupEntityLabelOwnerAction,
@@ -357,6 +362,9 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         resource_slot=ResourceSlotService(repositories.resource_slot.repository),
         role_preset=RolePresetService(OpsRepository(repositories.v2_ops_provider)),
+        entity_invitation=EntityInvitationService(
+            repositories.entity_invitation.repository,
+        ),
         runtime_variant_preset=RuntimeVariantPresetService(
             repositories.runtime_variant_preset.repository,
             OpsRepository(repositories.v2_ops_provider),
@@ -648,6 +656,10 @@ def create_processors(
         ),
         client_ip_masking=ClientIPMaskingProcessors(
             system_groups.group(GroupMeta(CLIENT_IP_MASKING_POLICY_ENTITY_TYPE))
+        ),
+        entity_invitation=EntityInvitationProcessors(
+            rbac_groups.group(GroupMeta(ENTITY_INVITATION_ENTITY_TYPE)),
+            services.entity_invitation,
         ),
         runtime_variant_preset=RuntimeVariantPresetProcessors(
             system_groups.group(GroupMeta(RUNTIME_VARIANT_PRESET_ENTITY_TYPE)),

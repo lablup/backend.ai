@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from .domains_v2.deployment import V2DeploymentClient
     from .domains_v2.deployment_revision_preset import V2DeploymentRevisionPresetClient
     from .domains_v2.domain import V2DomainClient
+    from .domains_v2.entity_invitation import V2EntityInvitationClient
     from .domains_v2.export import V2ExportClient
     from .domains_v2.fair_share import V2FairShareClient
     from .domains_v2.gql import V2GQLClient
@@ -142,6 +143,12 @@ class V2ClientRegistry:
         from .domains_v2.audit_log import V2AuditLogClient
 
         return V2AuditLogClient(self._client)
+
+    @cached_property
+    def entity_invitation(self) -> V2EntityInvitationClient:
+        from .domains_v2.entity_invitation import V2EntityInvitationClient
+
+        return V2EntityInvitationClient(self._client)
 
     @cached_property
     def idle_checker_assignment(self) -> V2IdleCheckerAssignmentClient:
