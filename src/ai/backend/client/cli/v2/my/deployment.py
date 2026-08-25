@@ -7,9 +7,10 @@ import asyncio
 import click
 
 from ai.backend.client.cli.v2.helpers import (
-    EntityLabelTerms,
+    EntityLabelTerm,
     create_v2_registry,
     entity_label_filter_options,
+    entity_label_relations,
     load_v2_config,
     print_result,
 )
@@ -43,7 +44,7 @@ def search(
     before: str | None,
     name_contains: str | None,
     status: tuple[str, ...],
-    label: EntityLabelTerms,
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search my deployments."""
 
@@ -54,12 +55,14 @@ def search(
         DeploymentStatusFilter,
     )
 
-    filter_dto = label.attach(
-        DeploymentFilter(
+    relations = entity_label_relations(label)
+    filter_dto: DeploymentFilter | None = None
+    if relations or name_contains or status:
+        filter_dto = DeploymentFilter(
             name=StringFilter(contains=name_contains) if name_contains else None,
             status=DeploymentStatusFilter(in_=list(status)) if status else None,
+            AND=[DeploymentFilter(labels=rel) for rel in relations] or None,
         )
-    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())

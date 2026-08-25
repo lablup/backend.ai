@@ -9,9 +9,10 @@ from uuid import UUID
 import click
 
 from ai.backend.client.cli.v2.helpers import (
-    EntityLabelTerms,
+    EntityLabelTerm,
     create_v2_registry,
     entity_label_filter_options,
+    entity_label_relations,
     load_v2_config,
     print_result,
 )
@@ -26,7 +27,7 @@ def vfolder() -> None:
 @click.option("--limit", type=int, default=20)
 @click.option("--offset", type=int, default=0)
 @entity_label_filter_options
-def my_search(limit: int, offset: int, label: EntityLabelTerms) -> None:
+def my_search(limit: int, offset: int, label: tuple[EntityLabelTerm, ...]) -> None:
     """Search vfolders owned by the current user."""
 
     from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -34,11 +35,19 @@ def my_search(limit: int, offset: int, label: EntityLabelTerms) -> None:
         VFolderFilter,
     )
 
+    relations = entity_label_relations(label)
+
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             request = SearchVFoldersInput(
-                filter=label.attach(VFolderFilter()), limit=limit, offset=offset
+                filter=(
+                    VFolderFilter(AND=[VFolderFilter(labels=rel) for rel in relations])
+                    if relations
+                    else None
+                ),
+                limit=limit,
+                offset=offset,
             )
             result = await registry.vfolder.my_search(request)
             print_result(result)
@@ -53,7 +62,9 @@ def my_search(limit: int, offset: int, label: EntityLabelTerms) -> None:
 @click.option("--limit", type=int, default=20)
 @click.option("--offset", type=int, default=0)
 @entity_label_filter_options
-def project_search(project_id: str, limit: int, offset: int, label: EntityLabelTerms) -> None:
+def project_search(
+    project_id: str, limit: int, offset: int, label: tuple[EntityLabelTerm, ...]
+) -> None:
     """Search vfolders within a project."""
 
     from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -61,11 +72,19 @@ def project_search(project_id: str, limit: int, offset: int, label: EntityLabelT
         VFolderFilter,
     )
 
+    relations = entity_label_relations(label)
+
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             request = SearchVFoldersInput(
-                filter=label.attach(VFolderFilter()), limit=limit, offset=offset
+                filter=(
+                    VFolderFilter(AND=[VFolderFilter(labels=rel) for rel in relations])
+                    if relations
+                    else None
+                ),
+                limit=limit,
+                offset=offset,
             )
             result = await registry.vfolder.project_search(UUID(project_id), request)
             print_result(result)
@@ -149,7 +168,7 @@ def upload(vfolder_id: UUID, filenames: tuple[str, ...]) -> None:
 @click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
 @entity_label_filter_options
-def admin_search(limit: int, offset: int, label: EntityLabelTerms) -> None:
+def admin_search(limit: int, offset: int, label: tuple[EntityLabelTerm, ...]) -> None:
     """Search all vfolders (admin)."""
 
     from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -157,11 +176,19 @@ def admin_search(limit: int, offset: int, label: EntityLabelTerms) -> None:
         VFolderFilter,
     )
 
+    relations = entity_label_relations(label)
+
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             request = SearchVFoldersInput(
-                filter=label.attach(VFolderFilter()), limit=limit, offset=offset
+                filter=(
+                    VFolderFilter(AND=[VFolderFilter(labels=rel) for rel in relations])
+                    if relations
+                    else None
+                ),
+                limit=limit,
+                offset=offset,
             )
             result = await registry.vfolder.admin_search(request)
             print_result(result)

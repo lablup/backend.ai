@@ -7,9 +7,10 @@ import asyncio
 import click
 
 from ai.backend.client.cli.v2.helpers import (
-    EntityLabelTerms,
+    EntityLabelTerm,
     create_v2_registry,
     entity_label_filter_options,
+    entity_label_relations,
     load_v2_config,
     print_result,
 )
@@ -35,7 +36,7 @@ def search(
     after: str | None,
     last: int | None,
     before: str | None,
-    label: EntityLabelTerms,
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search my sessions."""
 
@@ -44,11 +45,17 @@ def search(
         SessionFilter,
     )
 
+    relations = entity_label_relations(label)
+
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             request = AdminSearchSessionsInput(
-                filter=label.attach(SessionFilter()),
+                filter=(
+                    SessionFilter(AND=[SessionFilter(labels=rel) for rel in relations])
+                    if relations
+                    else None
+                ),
                 first=first,
                 after=after,
                 last=last,

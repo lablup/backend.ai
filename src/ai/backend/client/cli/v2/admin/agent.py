@@ -8,9 +8,10 @@ import uuid
 import click
 
 from ai.backend.client.cli.v2.helpers import (
-    EntityLabelTerms,
+    EntityLabelTerm,
     create_v2_registry,
     entity_label_filter_options,
+    entity_label_relations,
     load_v2_config,
     parse_order_options,
     print_result,
@@ -55,7 +56,7 @@ def search(
     scaling_group: str | None,
     schedulable: bool | None,
     order_by: tuple[str, ...],
-    label: EntityLabelTerms,
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search agents (superadmin only)."""
     from ai.backend.common.dto.manager.query import StringFilter
@@ -70,8 +71,10 @@ def search(
         AgentStatusFilter,
     )
 
-    filter_dto = label.attach(
-        AgentFilter(
+    relations = entity_label_relations(label)
+    filter_dto: AgentFilter | None = None
+    if relations or any(opt is not None for opt in (status, scaling_group, schedulable)):
+        filter_dto = AgentFilter(
             status=(
                 AgentStatusFilter(equals=AgentStatusEnum(status.upper()))
                 if status is not None
@@ -81,8 +84,8 @@ def search(
                 StringFilter(contains=scaling_group) if scaling_group is not None else None
             ),
             schedulable=schedulable,
+            AND=[AgentFilter(labels=rel) for rel in relations] or None,
         )
-    )
 
     # Build order only if --order-by is provided
     orders = parse_order_options(order_by, AgentOrderField, AgentOrder) if order_by else None

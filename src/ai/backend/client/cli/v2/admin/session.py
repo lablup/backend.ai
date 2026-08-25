@@ -7,9 +7,10 @@ import asyncio
 import click
 
 from ai.backend.client.cli.v2.helpers import (
-    EntityLabelTerms,
+    EntityLabelTerm,
     create_v2_registry,
     entity_label_filter_options,
+    entity_label_relations,
     load_v2_config,
     parse_order_options,
     print_result,
@@ -57,7 +58,7 @@ def search(
     domain_name: str | None,
     agent_id: str | None,
     order_by: tuple[str, ...],
-    label: EntityLabelTerms,
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search sessions with admin scope.
 
@@ -75,16 +76,17 @@ def search(
         SessionStatusFilter,
     )
 
-    # Build filter only if any filter option is provided
-    filter_dto = label.attach(
-        SessionFilter(
+    relations = entity_label_relations(label)
+    filter_dto: SessionFilter | None = None
+    if relations or any([name_contains is not None, status, domain_name is not None]):
+        filter_dto = SessionFilter(
             name=StringFilter(contains=name_contains) if name_contains is not None else None,
             status=(
                 SessionStatusFilter(in_=[SessionStatusEnum(s) for s in status]) if status else None
             ),
             domain_name=(StringFilter(contains=domain_name) if domain_name is not None else None),
+            AND=[SessionFilter(labels=rel) for rel in relations] or None,
         )
-    )
 
     # Build order only if --order-by is provided
     orders = parse_order_options(order_by, SessionOrderField, SessionOrder) if order_by else None
