@@ -224,6 +224,20 @@ type AdminGetSSHKeypairPayload {
 }
 
 """
+Added in 26.9.0. What one re-encryption pass wrote, and what the columns hold afterwards.
+"""
+type AdminReencryptSecretsPayload {
+  """How many rows this pass read."""
+  scanned: Int!
+
+  """How many rows this pass wrote back."""
+  reencrypted: Int!
+
+  """The count per column and key id after this pass."""
+  status: AdminSecretStatusPayload!
+}
+
+"""
 Added in 26.4.3. Payload for admin bulk revision refresh mutation result.
 """
 type AdminRefreshDeploymentRevisionsPayload {
@@ -251,6 +265,17 @@ Added in 26.4.2. Payload returned after admin registers a user's SSH keypair.
 type AdminRegisterSSHKeypairPayload {
   """Access key whose SSH keypair was updated."""
   accessKey: String!
+}
+
+"""
+Added in 26.9.0. Which key each stored secret sits on, across every encrypted column.
+"""
+type AdminSecretStatusPayload {
+  """The key provider new and re-encrypted secrets are written through."""
+  writeProviderType: String!
+
+  """The stored secrets, grouped by column and by the key holding them."""
+  counts: [SecretKeyCount!]!
 }
 
 """Added in 26.4.2. Admin input for updating a keypair."""
@@ -9100,6 +9125,11 @@ type Mutation {
   """Added in 26.4.2. Admin clears a user's SSH keypair."""
   adminDeleteSshKeypairV2(accessKey: String!): AdminDeleteSSHKeypairPayload
 
+  """
+  Added in 26.9.0. Admin encrypts every stored secret again through the configured write provider, under a fresh data encryption key. The pass runs in chunks and reports the count per column and key id afterwards.
+  """
+  adminReencryptSecrets: AdminReencryptSecretsPayload
+
   """Added in 26.4.2. Revoke a login session. (admin only)"""
   adminRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload
 
@@ -11551,6 +11581,11 @@ type Query {
   Added in 26.4.2. Get a user's SSH public key (admin only). The private key is never returned.
   """
   adminSshKeypairV2(accessKey: String!): AdminGetSSHKeypairPayload
+
+  """
+  Added in 26.9.0. Report the stored secrets of every encrypted column per key id (admin only). Requires superadmin privileges.
+  """
+  adminSecretStatus: AdminSecretStatusPayload
 
   """
   Added in 26.4.2. Query login sessions of the current user with pagination and filtering.
@@ -14697,6 +14732,25 @@ input ScopedUpsertAppConfigFragmentsInput {
 
   """The (config_name, config) pairs to upsert."""
   items: [AppConfigFragmentUpsertItem!]!
+}
+
+"""
+Added in 26.9.0. How many stored secrets of one column one provider's one key holds.
+"""
+type SecretKeyCount {
+  """The encrypted column these secrets are stored in."""
+  column: String!
+
+  """
+  The key provider holding these secrets. 'plain' means legacy plaintext.
+  """
+  providerType: String!
+
+  """The key within that provider. Unset for plaintext."""
+  keyId: String
+
+  """How many stored secrets that key holds."""
+  count: Int!
 }
 
 """Added in 26.3.0. A registered service instance in the catalog."""

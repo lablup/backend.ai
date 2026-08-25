@@ -243,6 +243,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.scheduling_history.service import (
         SchedulingHistoryService,
     )
+    from ai.backend.manager.services.secret.processors import SecretProcessors
+    from ai.backend.manager.services.secret.service import SecretService
     from ai.backend.manager.services.service_catalog.processors import (
         ServiceCatalogProcessors,
     )
@@ -361,6 +363,7 @@ class Services:
     vfolder_sharing: VFolderSharingService
     session: SessionService
     manager_admin: ManagerAdminService
+    secret: SecretService
     prometheus_query_preset: PrometheusQueryPresetService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
@@ -422,6 +425,7 @@ class Processors:
     container_registry: ContainerRegistryProcessors
     keypair_resource_policy: KeypairResourcePolicyProcessors
     manager_admin: ManagerAdminProcessors
+    secret: SecretProcessors
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
     prometheus_query_preset: PrometheusQueryPresetProcessors

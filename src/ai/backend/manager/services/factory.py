@@ -54,6 +54,7 @@ from ai.backend.common.data.entity.retention_policy import RETENTION_POLICY_ENTI
 from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.runtime_variant import RUNTIME_VARIANT_ENTITY_TYPE
 from ai.backend.common.data.entity.runtime_variant_preset import RUNTIME_VARIANT_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.secret import SECRET_ENTITY_TYPE
 from ai.backend.common.data.entity.service_catalog import SERVICE_CATALOG_ENTITY_TYPE
 from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
 from ai.backend.common.data.entity.session_template import SESSION_TEMPLATE_ENTITY_TYPE
@@ -217,6 +218,8 @@ from ai.backend.manager.services.runtime_variant_preset.processors import (
 from ai.backend.manager.services.runtime_variant_preset.service import RuntimeVariantPresetService
 from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
 from ai.backend.manager.services.scheduling_history.service import SchedulingHistoryService
+from ai.backend.manager.services.secret.processors import SecretProcessors
+from ai.backend.manager.services.secret.service import SecretService
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
@@ -343,6 +346,7 @@ def create_services(args: ServiceArgs) -> Services:
                 user_repository=repositories.user.repository,
             )
         ),
+        secret=SecretService(repositories.secret.repository),
         manager_admin=ManagerAdminService(
             repository=repositories.manager_admin.repository,
             config_provider=args.config_provider,
@@ -621,6 +625,9 @@ def create_processors(
         ),
         manager_admin=ManagerAdminProcessors(
             system_groups.group(GroupMeta(MANAGER_ADMIN_ENTITY_TYPE)), services.manager_admin
+        ),
+        secret=SecretProcessors(
+            system_groups.group(GroupMeta(SECRET_ENTITY_TYPE)), services.secret
         ),
         user_resource_policy=UserResourcePolicyProcessors(
             resource_policy_groups.group(GroupMeta(USER_RESOURCE_POLICY_ENTITY_TYPE))

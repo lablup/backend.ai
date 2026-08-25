@@ -66,6 +66,7 @@ from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
 )
 from ai.backend.manager.api.adapters.scheduling_handler.adapter import SchedulingHandlerAdapter
 from ai.backend.manager.api.adapters.scheduling_history.adapter import SchedulingHistoryAdapter
+from ai.backend.manager.api.adapters.secret.adapter import SecretAdapter
 from ai.backend.manager.api.adapters.service_catalog.adapter import ServiceCatalogAdapter
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.api.adapters.storage_host.adapter import StorageHostAdapter
@@ -113,6 +114,7 @@ class Adapters:
         image: ImageAdapter,
         login_client_type: LoginClientTypeAdapter,
         client_ip_masking: ClientIPMaskingAdapter,
+        secret: SecretAdapter,
         login_history: LoginHistoryAdapter,
         login_session: LoginSessionAdapter,
         notification: NotificationAdapter,
@@ -165,6 +167,7 @@ class Adapters:
         self.image = image
         self.login_client_type = login_client_type
         self.client_ip_masking = client_ip_masking
+        self.secret = secret
         self.login_history = login_history
         self.login_session = login_session
         self.notification = notification
@@ -239,6 +242,7 @@ class Adapters:
             image=ImageAdapter(processors),
             login_client_type=LoginClientTypeAdapter(processors),
             client_ip_masking=ClientIPMaskingAdapter(processors),
+            secret=SecretAdapter(processors),
             login_history=LoginHistoryAdapter(processors),
             login_session=LoginSessionAdapter(processors),
             notification=NotificationAdapter(processors),
