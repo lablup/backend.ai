@@ -772,6 +772,20 @@ class ProxyWorkerConfig(BaseSchema):
         ),
     ]
 
+    client_pool_keep_inflight_sessions: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description=(
+                "Skip idle-session cleanup for sessions with a request still in flight, "
+                "so streamed responses longer than client_pool_cleanup_interval are not cut off. "
+                "Experimental; off by default."
+            ),
+            added_version="26.9.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+
     announce_addr: Annotated[
         HostPortPair | None,
         Field(default=None),
