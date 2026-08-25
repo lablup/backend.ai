@@ -25,7 +25,6 @@ from ai.backend.manager.models.keypair.updaters import (
     KeypairDotfilesUpdater,
 )
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.secret.repository import SecretRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
@@ -72,14 +71,10 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminSearchKeypairsActionResult,
     GetKeypairAction,
     GetKeypairActionResult,
-    GetKeypairSecretStatusAction,
-    GetKeypairSecretStatusActionResult,
     IssueMyKeypairAction,
     IssueMyKeypairActionResult,
     PurgeKeypairAction,
     PurgeKeypairActionResult,
-    ReencryptKeypairSecretsAction,
-    ReencryptKeypairSecretsActionResult,
     SearchMyKeypairsAction,
     SearchMyKeypairsActionResult,
     SwitchDefaultAccessKeyAction,
@@ -128,7 +123,6 @@ class UserService:
     _valkey_stat_client: ValkeyStatClient
     _agent_registry: AgentRegistry
     _user_repository: UserRepository
-    _secret_repository: SecretRepository
     _scheduling_controller: SchedulingController
 
     def __init__(
@@ -137,13 +131,11 @@ class UserService:
         valkey_stat_client: ValkeyStatClient,
         agent_registry: AgentRegistry,
         user_repository: UserRepository,
-        secret_repository: SecretRepository,
         scheduling_controller: SchedulingController,
     ) -> None:
         self._storage_manager = storage_manager
         self._valkey_stat_client = valkey_stat_client
         self._user_repository = user_repository
-        self._secret_repository = secret_repository
         self._agent_registry = agent_registry
         self._scheduling_controller = scheduling_controller
 
@@ -371,20 +363,6 @@ class UserService:
         """Admin search all keypairs."""
         result = await self._user_repository.admin_search_keypairs(querier=action.querier)
         return AdminSearchKeypairsActionResult(result=result)
-
-    async def reencrypt_keypair_secrets(
-        self, action: ReencryptKeypairSecretsAction
-    ) -> ReencryptKeypairSecretsActionResult:
-        """Move stored keypair secrets onto the key the write provider setting names."""
-        progress = await self._secret_repository.reencrypt_keypair_secrets()
-        return ReencryptKeypairSecretsActionResult(progress=progress)
-
-    async def get_keypair_secret_status(
-        self, action: GetKeypairSecretStatusAction
-    ) -> GetKeypairSecretStatusActionResult:
-        """Count the stored keypair secrets by the key holding them."""
-        status = await self._secret_repository.keypair_secret_status()
-        return GetKeypairSecretStatusActionResult(status=status)
 
     # ------------------------------------------------------------------ admin SSH keypair operations
 

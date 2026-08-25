@@ -194,6 +194,8 @@ Rotating a key is **adding a new key to the config and changing the active key i
 
 **No row is treated differently.** There is no path that skips a value already on the active key, and none that rewraps its data encryption key alone. Whatever key a value sat on, it gets the same work.
 
+**The pass covers every encrypted column at once**, not one named by the caller. The columns are a catalog the pass reads, so a column joins it by being listed there rather than by gaining an operation of its own. Each column is read under the associated data its own column type carries, which is what keeps a column holding no secret out of the catalog.
+
 An old key left in the config keeps its values readable. Convergence is needed when that key is to be dropped, and a batch pass is what does it.
 
 The batch takes no direction flag.
@@ -223,7 +225,7 @@ Re-encryption has one constraint to honor.
 | GQL mutation (admin) | Management console integration |
 | `mgr` admin CLI | Run directly outside the server, for migration work |
 
-Common requirements: sweep the target column **in chunks**, report the count per key id, and allow the stored state to be queried. The chunk size is the implementation's to decide and is not passed by the caller. An interrupted pass is continued by running it again.
+Common requirements: sweep every encrypted column **in chunks**, report the count per column and key id, and allow the stored state to be queried. The chunk size is the implementation's to decide and is not passed by the caller. An interrupted pass is continued by running it again.
 
 ### 3.5 Where the key material lives
 
@@ -273,7 +275,8 @@ Rollout order:
 | Key rotation | Adding a key to the config and changing the active id is the whole procedure. **A batch pass encrypts every value again under a fresh data encryption key** |
 | Immediate convergence | Not performed. An old key left in the config keeps its values readable, and convergence happens in a batch when that key is dropped |
 | Re-encryption constraint | **Conditional UPDATE** (guards against a reissue race) |
-| Batch surfaces | **REST admin API, GQL mutation, and the `mgr` admin CLI - all three.** Chunked, reporting the count per key id |
+| Batch scope | **Every encrypted column at once**, named by a catalog rather than by the caller. A column joins by being listed, not by gaining its own operation |
+| Batch surfaces | **REST admin API, GQL mutation, and the `mgr` admin CLI - all three.** Chunked, reporting the count per column and key id |
 | Batch direction | No direction flag. It **normalizes to whatever the current write target specifies**, so `plain` yields conversion to plaintext |
 | Column type change | `String(40)` to `Text`, **with no length limit** - the stored size follows the provider implementation, so no limit can be known. `varchar` to `text` needs no table rewrite |
 | Backward compatibility | Plaintext and encrypted rows coexist indefinitely. No bulk conversion, forced re-login, or key reissue |

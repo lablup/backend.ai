@@ -15,12 +15,6 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
     AdminGetSSHKeypairPayload as AdminGetSSHKeypairPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.keypair.response import (
-    AdminKeypairSecretStatusPayload as AdminKeypairSecretStatusPayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.keypair.response import (
-    AdminReencryptKeypairSecretsPayload as AdminReencryptKeypairSecretsPayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.keypair.response import (
     AdminRegisterSSHKeypairPayload as AdminRegisterSSHKeypairPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.keypair.response import (
@@ -31,9 +25,6 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
 )
 from ai.backend.common.dto.manager.v2.keypair.response import (
     IssueMyKeypairPayload as IssueMyKeypairPayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.keypair.response import (
-    KeypairSecretKeyCount as KeypairSecretKeyCountDTO,
 )
 from ai.backend.common.dto.manager.v2.keypair.response import (
     RevokeMyKeypairPayload as RevokeMyKeypairPayloadDTO,
@@ -47,7 +38,6 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
 from ai.backend.common.dto.manager.v2.keypair.response import (
     UpdateMyKeypairPayload as UpdateMyKeypairPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -212,54 +202,3 @@ class AdminDeleteSSHKeypairPayloadGQL(PydanticOutputMixin[AdminDeleteSSHKeypairP
 )
 class AdminGetSSHKeypairPayloadGQL(PydanticOutputMixin[AdminGetSSHKeypairPayloadDTO]):
     keypair: SSHKeypairNodeGQL = gql_field(description="SSH keypair public information.")
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="How many stored keypair secrets one provider's one key still holds.",
-    ),
-    model=KeypairSecretKeyCountDTO,
-    name="KeypairSecretKeyCount",
-)
-class KeypairSecretKeyCountGQL(PydanticOutputMixin[KeypairSecretKeyCountDTO]):
-    provider_type: str = gql_field(
-        description="The key provider holding these secrets. 'plain' means legacy plaintext."
-    )
-    key_id: str | None = gql_field(description="The key within that provider. Unset for plaintext.")
-    count: int = gql_field(description="How many stored secrets that key holds.")
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Which key each stored keypair secret sits on.",
-    ),
-    model=AdminKeypairSecretStatusPayloadDTO,
-    name="AdminKeypairSecretStatusPayload",
-)
-class AdminKeypairSecretStatusPayloadGQL(PydanticOutputMixin[AdminKeypairSecretStatusPayloadDTO]):
-    write_provider_type: str = gql_field(
-        description="The key provider new and re-encrypted secrets are written through."
-    )
-    counts: list[KeypairSecretKeyCountGQL] = gql_field(
-        description="The stored secrets, grouped by the key holding them."
-    )
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="What one re-encryption pass wrote, and what the column holds afterwards.",
-    ),
-    model=AdminReencryptKeypairSecretsPayloadDTO,
-    name="AdminReencryptKeypairSecretsPayload",
-)
-class AdminReencryptKeypairSecretsPayloadGQL(
-    PydanticOutputMixin[AdminReencryptKeypairSecretsPayloadDTO]
-):
-    scanned: int = gql_field(description="How many rows this pass read.")
-    reencrypted: int = gql_field(description="How many rows this pass wrote back.")
-    status: AdminKeypairSecretStatusPayloadGQL = gql_field(
-        description="The count per key id after this pass."
-    )

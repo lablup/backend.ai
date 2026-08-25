@@ -169,7 +169,6 @@ def user_processors(
         valkey_stat_client=valkey_clients.stat,
         agent_registry=agent_registry,
         user_repository=repo,
-        secret_repository=AsyncMock(),
         scheduling_controller=AsyncMock(),
     )
     return UserProcessors(

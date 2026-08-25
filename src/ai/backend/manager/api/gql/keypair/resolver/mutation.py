@@ -9,7 +9,6 @@ from strawberry import Info
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -20,7 +19,6 @@ from ai.backend.manager.api.gql.keypair.types import (
     AdminCreateKeypairPayloadGQL,
     AdminDeleteKeypairPayloadGQL,
     AdminDeleteSSHKeypairPayloadGQL,
-    AdminReencryptKeypairSecretsPayloadGQL,
     AdminRegisterSSHKeypairInputGQL,
     AdminRegisterSSHKeypairPayloadGQL,
     AdminUpdateKeypairInputGQL,
@@ -182,21 +180,3 @@ async def admin_delete_ssh_keypair_v2(
     check_admin_only()
     payload = await info.context.adapters.user.admin_delete_ssh_keypair(access_key)
     return AdminDeleteSSHKeypairPayloadGQL.from_pydantic(payload)
-
-
-@gql_mutation(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Admin encrypts every stored keypair secret again through the configured write "
-            "provider, under a fresh data encryption key. The pass runs in chunks and reports "
-            "the count per key id afterwards."
-        ),
-    )
-)
-async def admin_reencrypt_keypair_secrets(
-    info: Info[StrawberryGQLContext],
-) -> AdminReencryptKeypairSecretsPayloadGQL | None:
-    check_admin_only()
-    payload = await info.context.adapters.user.admin_reencrypt_keypair_secrets()
-    return AdminReencryptKeypairSecretsPayloadGQL.from_pydantic(payload)

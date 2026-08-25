@@ -67,14 +67,10 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     GetDefaultKeypairsAction,
     GetKeypairAction,
     GetKeypairActionResult,
-    GetKeypairSecretStatusAction,
-    GetKeypairSecretStatusActionResult,
     IssueMyKeypairAction,
     IssueMyKeypairActionResult,
     PurgeKeypairAction,
     PurgeKeypairActionResult,
-    ReencryptKeypairSecretsAction,
-    ReencryptKeypairSecretsActionResult,
     SearchMyKeypairsAction,
     SearchMyKeypairsActionResult,
     SwitchDefaultAccessKeyAction,
@@ -175,12 +171,6 @@ class UserProcessors:
     admin_search_keypairs: GlobalActionProcessor[
         AdminSearchKeypairsAction, AdminSearchKeypairsActionResult
     ]
-    reencrypt_keypair_secrets: GlobalActionProcessor[
-        ReencryptKeypairSecretsAction, ReencryptKeypairSecretsActionResult
-    ]
-    get_keypair_secret_status: GlobalActionProcessor[
-        GetKeypairSecretStatusAction, GetKeypairSecretStatusActionResult
-    ]
     admin_register_ssh_keypair: SingleEntityActionProcessor[
         AdminRegisterSSHKeypairAction, AdminRegisterSSHKeypairActionResult
     ]
@@ -252,12 +242,6 @@ class UserProcessors:
         )
         self.admin_search_keypairs = group.global_scope(
             AdminSearchKeypairsAction, user_service.admin_search_keypairs
-        )
-        self.reencrypt_keypair_secrets = group.global_scope(
-            ReencryptKeypairSecretsAction, user_service.reencrypt_keypair_secrets
-        )
-        self.get_keypair_secret_status = group.global_scope(
-            GetKeypairSecretStatusAction, user_service.get_keypair_secret_status
         )
         self.admin_register_ssh_keypair = group.single_entity(
             AdminRegisterSSHKeypairAction, user_service.admin_register_ssh_keypair

@@ -134,16 +134,6 @@ class V2KeypairHandler:
         result = await self._adapter.admin_delete_keypair(path.parsed.access_key)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def admin_reencrypt_secrets(self) -> APIResponse:
-        """Move stored keypair secrets onto the configured write key (superadmin only)."""
-        result = await self._adapter.admin_reencrypt_keypair_secrets()
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
-
-    async def admin_secret_status(self) -> APIResponse:
-        """Report the stored keypair secrets per key id (superadmin only)."""
-        result = await self._adapter.admin_keypair_secret_status()
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
-
     async def admin_register_ssh_keypair(
         self,
         body: BodyParam[AdminRegisterSSHKeypairInput],

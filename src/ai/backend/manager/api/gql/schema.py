@@ -199,10 +199,8 @@ from .keypair import (
     admin_create_keypair_v2,
     admin_delete_keypair_v2,
     admin_delete_ssh_keypair_v2,
-    admin_keypair_secret_status_v2,
     admin_keypair_v2,
     admin_keypairs_v2,
-    admin_reencrypt_keypair_secrets,
     admin_register_ssh_keypair_v2,
     admin_ssh_keypair_v2,
     admin_update_keypair_v2,
@@ -481,6 +479,7 @@ from .scheduling_history import (
     session_scheduling_histories,
     session_scoped_scheduling_histories,
 )
+from .secret import admin_reencrypt_secrets, admin_secret_status
 from .service_catalog import admin_service_catalogs
 from .session.resolver import (
     admin_sessions_v2,
@@ -656,7 +655,7 @@ class Query:
     admin_keypair_v2 = admin_keypair_v2
     admin_keypairs_v2 = admin_keypairs_v2
     admin_ssh_keypair_v2 = admin_ssh_keypair_v2
-    admin_keypair_secret_status_v2 = admin_keypair_secret_status_v2
+    admin_secret_status = admin_secret_status
     # Login session/history self-service queries
     my_login_sessions_v2 = my_login_sessions_v2
     my_login_history_v2 = my_login_history_v2
@@ -937,7 +936,7 @@ class Mutation:
     admin_delete_keypair_v2 = admin_delete_keypair_v2
     admin_register_ssh_keypair_v2 = admin_register_ssh_keypair_v2
     admin_delete_ssh_keypair_v2 = admin_delete_ssh_keypair_v2
-    admin_reencrypt_keypair_secrets = admin_reencrypt_keypair_secrets
+    admin_reencrypt_secrets = admin_reencrypt_secrets
     # Login session mutations
     admin_revoke_login_session = admin_revoke_login_session
     my_revoke_login_session = my_revoke_login_session

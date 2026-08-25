@@ -113,7 +113,6 @@ def user_processors(
             V2DBOpsProvider(database_engine),
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ),
-        secret_repository=AsyncMock(),
         scheduling_controller=AsyncMock(),
     )
     return UserProcessors(processor_registry.group(GroupMeta(USER_ENTITY_TYPE)), service)

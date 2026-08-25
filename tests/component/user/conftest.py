@@ -48,8 +48,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.ops.v2.secret.provider import SecretOpsProvider
-from ai.backend.manager.repositories.secret.repository import SecretRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.domain.processors import DomainProcessors
@@ -82,14 +80,16 @@ def user_processors(
     valkey_clients: Any,
     processor_registry: ProcessorRegistry[Any],
 ) -> UserProcessors:
-    pool = KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN)
-    user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine), pool)
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = UserService(
         storage_manager=storage_manager,
         valkey_stat_client=valkey_clients.stat,
         agent_registry=agent_registry,
         user_repository=user_repository,
-        secret_repository=SecretRepository(SecretOpsProvider(database_engine), pool),
         scheduling_controller=AsyncMock(),
     )
     return UserProcessors(

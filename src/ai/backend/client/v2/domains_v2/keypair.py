@@ -20,8 +20,6 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
     AdminDeleteKeypairPayload,
     AdminDeleteSSHKeypairPayload,
     AdminGetSSHKeypairPayload,
-    AdminKeypairSecretStatusPayload,
-    AdminReencryptKeypairSecretsPayload,
     AdminRegisterSSHKeypairPayload,
     AdminSearchKeypairsPayload,
     AdminUpdateKeypairPayload,
@@ -138,24 +136,6 @@ class V2KeypairClient(BaseDomainClient):
             "DELETE",
             f"{_ADMIN_PATH}/{access_key}",
             response_model=AdminDeleteKeypairPayload,
-        )
-
-    # ------------------------------------------------------------------ admin secret sweep
-
-    async def admin_reencrypt_secrets(self) -> AdminReencryptKeypairSecretsPayload:
-        """Move stored keypair secrets onto the configured write key (superadmin only)."""
-        return await self._client.typed_request(
-            "POST",
-            f"{_ADMIN_PATH}/secret/reencrypt",
-            response_model=AdminReencryptKeypairSecretsPayload,
-        )
-
-    async def admin_secret_status(self) -> AdminKeypairSecretStatusPayload:
-        """Report the stored keypair secrets per key id (superadmin only)."""
-        return await self._client.typed_request(
-            "GET",
-            f"{_ADMIN_PATH}/secret/status",
-            response_model=AdminKeypairSecretStatusPayload,
         )
 
     # ------------------------------------------------------------------ admin SSH keypair

@@ -2,7 +2,6 @@ from .mutation import (
     admin_create_keypair_v2,
     admin_delete_keypair_v2,
     admin_delete_ssh_keypair_v2,
-    admin_reencrypt_keypair_secrets,
     admin_register_ssh_keypair_v2,
     admin_update_keypair_v2,
     issue_my_keypair,
@@ -10,23 +9,15 @@ from .mutation import (
     switch_my_main_access_key,
     update_my_keypair,
 )
-from .query import (
-    admin_keypair_secret_status_v2,
-    admin_keypair_v2,
-    admin_keypairs_v2,
-    admin_ssh_keypair_v2,
-    my_keypairs,
-)
+from .query import admin_keypair_v2, admin_keypairs_v2, admin_ssh_keypair_v2, my_keypairs
 
 __all__ = [
     "admin_create_keypair_v2",
     "admin_delete_keypair_v2",
     "admin_delete_ssh_keypair_v2",
-    "admin_keypair_secret_status_v2",
     "admin_keypair_v2",
     "admin_keypairs_v2",
     "admin_register_ssh_keypair_v2",
-    "admin_reencrypt_keypair_secrets",
     "admin_ssh_keypair_v2",
     "admin_update_keypair_v2",
     "issue_my_keypair",

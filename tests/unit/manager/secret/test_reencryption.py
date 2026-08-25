@@ -1,11 +1,14 @@
-"""The stored secret re-encryption pass: what it writes and what it reports."""
+"""The stored secret re-encryption pass: what it writes and what it reports.
+
+The fake ops stand in for one encrypted column, which is what the catalog holds today.
+"""
 
 from __future__ import annotations
 
 import base64
 from collections.abc import AsyncGenerator, MutableMapping, Sequence
 from contextlib import asynccontextmanager
-from typing import override
+from typing import Any, override
 
 import pytest
 
@@ -13,7 +16,11 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.config.unified import SecretEncryptionConfig
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.repositories.ops.v2.secret.provider import SecretOpsProvider
-from ai.backend.manager.repositories.ops.v2.secret.read import SecretReadOps, StoredKeypairSecret
+from ai.backend.manager.repositories.ops.v2.secret.read import (
+    SecretReadOps,
+    SecretTarget,
+    StoredSecret,
+)
 from ai.backend.manager.repositories.ops.v2.secret.write import SecretWriteOps
 from ai.backend.manager.repositories.secret.db_source.db_source import _CHUNK_SIZE
 from ai.backend.manager.repositories.secret.repository import SecretRepository
@@ -46,22 +53,21 @@ class _FakeWriteOps(SecretWriteOps):
         self._store = store
 
     @override
-    async def scan_keypair_secrets(
-        self, after: AccessKey | None, limit: int
-    ) -> Sequence[StoredKeypairSecret]:
+    async def scan_secrets(
+        self, target: SecretTarget, after: Any | None, limit: int
+    ) -> Sequence[StoredSecret]:
         keys = sorted(key for key in self._store if after is None or key > after)
         return [
-            StoredKeypairSecret(access_key=key, value=SecretValue.parse(self._store[key]))
-            for key in keys[:limit]
+            StoredSecret(key=key, value=SecretValue.parse(self._store[key])) for key in keys[:limit]
         ]
 
     @override
-    async def rewrite_keypair_secret(
-        self, access_key: AccessKey, expected: SecretValue, replacement: SecretValue
+    async def rewrite_secret(
+        self, target: SecretTarget, key: Any, expected: SecretValue, replacement: SecretValue
     ) -> bool:
-        if self._store.get(access_key) != expected.serialize():
+        if self._store.get(key) != expected.serialize():
             return False
-        self._store[access_key] = replacement.serialize()
+        self._store[key] = replacement.serialize()
         return True
 
 
@@ -92,7 +98,7 @@ class TestReencryption:
         pool = _pool("config", "v1")
         repository = SecretRepository(_FakeOpsProvider(store), pool)
 
-        progress = await repository.reencrypt_keypair_secrets()
+        progress = await repository.reencrypt()
 
         assert (progress.scanned, progress.reencrypted) == (2, 2)
         for stored in store.values():
@@ -105,7 +111,7 @@ class TestReencryption:
         store: dict[AccessKey, str] = {AccessKey("AKIA1"): before.serialize()}
         repository = SecretRepository(_FakeOpsProvider(store), pool)
 
-        progress = await repository.reencrypt_keypair_secrets()
+        progress = await repository.reencrypt()
 
         after = SecretValue.parse(store[AccessKey("AKIA1")])
         assert isinstance(after.content, EncryptedData)
@@ -122,7 +128,7 @@ class TestReencryption:
         }
         pool = _pool("config", "v2")
 
-        await SecretRepository(_FakeOpsProvider(store), pool).reencrypt_keypair_secrets()
+        await SecretRepository(_FakeOpsProvider(store), pool).reencrypt()
 
         moved = SecretValue.parse(store[AccessKey("AKIA1")])
         assert isinstance(moved.content, EncryptedData)
@@ -135,7 +141,7 @@ class TestReencryption:
         }
         repository = SecretRepository(_FakeOpsProvider(store), _pool("plain"))
 
-        progress = await repository.reencrypt_keypair_secrets()
+        progress = await repository.reencrypt()
 
         assert progress.reencrypted == 1
         assert store[AccessKey("AKIA1")] == "sk-one"
@@ -146,12 +152,16 @@ class TestReencryption:
 
         class _ReissuingOps(_FakeWriteOps):
             @override
-            async def rewrite_keypair_secret(
-                self, access_key: AccessKey, expected: SecretValue, replacement: SecretValue
+            async def rewrite_secret(
+                self,
+                target: SecretTarget,
+                key: Any,
+                expected: SecretValue,
+                replacement: SecretValue,
             ) -> bool:
                 # The keypair is reissued between the read and the write.
-                store[access_key] = "sk-new"
-                return await super().rewrite_keypair_secret(access_key, expected, replacement)
+                store[key] = "sk-new"
+                return await super().rewrite_secret(target, key, expected, replacement)
 
         class _ReissuingProvider(_FakeOpsProvider):
             @asynccontextmanager
@@ -159,9 +169,7 @@ class TestReencryption:
             async def write_ops(self) -> AsyncGenerator[SecretWriteOps]:
                 yield _ReissuingOps(store)
 
-        progress = await SecretRepository(
-            _ReissuingProvider(store), pool
-        ).reencrypt_keypair_secrets()
+        progress = await SecretRepository(_ReissuingProvider(store), pool).reencrypt()
 
         assert progress.reencrypted == 0
         assert store[AccessKey("AKIA1")] == "sk-new"
@@ -172,7 +180,7 @@ class TestReencryption:
         }
         repository = SecretRepository(_FakeOpsProvider(store), _pool("config", "v1"))
 
-        progress = await repository.reencrypt_keypair_secrets()
+        progress = await repository.reencrypt()
 
         assert (progress.scanned, progress.reencrypted) == (len(store), len(store))
 
@@ -184,15 +192,16 @@ class TestStatus:
             AccessKey("AKIA2"): await _encrypted(_pool("config", "v1"), "sk-two"),
             AccessKey("AKIA3"): await _encrypted(_pool("config", "v2"), "sk-three"),
         }
-        status = await SecretRepository(
-            _FakeOpsProvider(store), _pool("config", "v2")
-        ).keypair_secret_status()
+        status = await SecretRepository(_FakeOpsProvider(store), _pool("config", "v2")).status()
 
         assert status.write_provider_type is KeyProviderType.CONFIG
-        assert [(count.provider_type, count.key_id, count.count) for count in status.counts] == [
-            (KeyProviderType.CONFIG, "v1", 1),
-            (KeyProviderType.CONFIG, "v2", 1),
-            (KeyProviderType.PLAIN, None, 1),
+        assert [
+            (count.column, count.provider_type, count.key_id, count.count)
+            for count in status.counts
+        ] == [
+            (_CONTEXT, KeyProviderType.CONFIG, "v1", 1),
+            (_CONTEXT, KeyProviderType.CONFIG, "v2", 1),
+            (_CONTEXT, KeyProviderType.PLAIN, None, 1),
         ]
 
     @pytest.mark.parametrize("write_provider_type", ["plain", "config"])
@@ -202,7 +211,7 @@ class TestStatus:
         store: dict[AccessKey, str] = {AccessKey("AKIA1"): "sk-one", AccessKey("AKIA2"): "sk-two"}
         repository = SecretRepository(_FakeOpsProvider(store), _pool(write_provider_type))
 
-        progress = await repository.reencrypt_keypair_secrets()
+        progress = await repository.reencrypt()
 
         assert [count.provider_type for count in progress.status.counts] == [
             KeyProviderType(write_provider_type)

@@ -31,20 +31,6 @@ def register_v2_keypair_routes(
     reg.add("POST", "/my/switch-main", handler.switch_main, middlewares=[auth_required])
     # Admin routes
     reg.add("POST", "/search", handler.admin_search, middlewares=[superadmin_required])
-    # The secret sweep routes, like the SSH ones below, are registered before
-    # /{access_key} so their first path segment is not read as an access key.
-    reg.add(
-        "POST",
-        "/secret/reencrypt",
-        handler.admin_reencrypt_secrets,
-        middlewares=[superadmin_required],
-    )
-    reg.add(
-        "GET",
-        "/secret/status",
-        handler.admin_secret_status,
-        middlewares=[superadmin_required],
-    )
     # Admin SSH keypair routes must be registered before /{access_key} to avoid
     # capturing "ssh" as an access_key path parameter.
     reg.add(

@@ -31,29 +31,30 @@ class KeyProviderType(enum.StrEnum):
 
 
 @dataclass(frozen=True)
-class SecretKeyIdCount:
-    """How many stored secrets one provider's one key holds.
+class SecretKeyCount:
+    """How many stored secrets of one column one provider's one key holds.
 
     ``key_id`` is unset for legacy plaintext, which names no provider.
     """
 
+    column: str
     provider_type: KeyProviderType
     key_id: SecretKeyId | None
     count: int
 
 
 @dataclass(frozen=True)
-class SecretSweepStatus:
-    """The stored secrets of one column, grouped by the key that holds them."""
+class SecretStatus:
+    """Every encrypted column, grouped by the key each stored secret sits on."""
 
     write_provider_type: KeyProviderType
-    counts: Sequence[SecretKeyIdCount]
+    counts: Sequence[SecretKeyCount]
 
 
 @dataclass(frozen=True)
-class SecretSweepProgress:
-    """What one re-encryption pass wrote, and what the column holds afterwards."""
+class SecretReencryptProgress:
+    """What one re-encryption pass wrote, and what the columns hold afterwards."""
 
     scanned: int
     reencrypted: int
-    status: SecretSweepStatus
+    status: SecretStatus

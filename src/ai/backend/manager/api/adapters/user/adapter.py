@@ -36,13 +36,10 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
     AdminDeleteKeypairPayload,
     AdminDeleteSSHKeypairPayload,
     AdminGetSSHKeypairPayload,
-    AdminKeypairSecretStatusPayload,
-    AdminReencryptKeypairSecretsPayload,
     AdminRegisterSSHKeypairPayload,
     AdminSearchKeypairsPayload,
     AdminUpdateKeypairPayload,
     IssueMyKeypairPayload,
-    KeypairSecretKeyCount,
     RevokeMyKeypairPayload,
     SSHKeypairNode,
     SwitchMyMainAccessKeyPayload,
@@ -102,7 +99,6 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
-from ai.backend.manager.data.secret.types import SecretSweepStatus
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.data.user.types import UserStatus as DataUserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -141,10 +137,8 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminSearchKeypairsAction,
     GetDefaultKeypairsAction,
     GetKeypairAction,
-    GetKeypairSecretStatusAction,
     IssueMyKeypairAction,
     PurgeKeypairAction,
-    ReencryptKeypairSecretsAction,
     SearchMyKeypairsAction,
     SwitchDefaultAccessKeyAction,
     UpdateKeypairAction,
@@ -864,38 +858,6 @@ class UserAdapter(BaseAdapter):
     async def admin_delete_keypair(self, access_key: str) -> AdminDeleteKeypairPayload:
         """Admin deletes any keypair."""
         return AdminDeleteKeypairPayload(access_key=await self._purge_keypair(access_key))
-
-    async def admin_reencrypt_keypair_secrets(self) -> AdminReencryptKeypairSecretsPayload:
-        """Move stored keypair secrets onto the key the write provider setting names."""
-        result = await self._processors.user.reencrypt_keypair_secrets.run(
-            ReencryptKeypairSecretsAction()
-        )
-        progress = result.progress
-        return AdminReencryptKeypairSecretsPayload(
-            scanned=progress.scanned,
-            reencrypted=progress.reencrypted,
-            status=self._secret_status_payload(progress.status),
-        )
-
-    async def admin_keypair_secret_status(self) -> AdminKeypairSecretStatusPayload:
-        """Count the stored keypair secrets by the key holding them."""
-        result = await self._processors.user.get_keypair_secret_status.run(
-            GetKeypairSecretStatusAction()
-        )
-        return self._secret_status_payload(result.status)
-
-    def _secret_status_payload(self, status: SecretSweepStatus) -> AdminKeypairSecretStatusPayload:
-        return AdminKeypairSecretStatusPayload(
-            write_provider_type=status.write_provider_type.value,
-            counts=[
-                KeypairSecretKeyCount(
-                    provider_type=count.provider_type.value,
-                    key_id=count.key_id,
-                    count=count.count,
-                )
-                for count in status.counts
-            ],
-        )
 
     async def admin_get_keypair(self, access_key: str) -> KeypairNode:
         """Admin retrieves a single keypair by access key."""

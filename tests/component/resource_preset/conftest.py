@@ -42,12 +42,10 @@ from ai.backend.manager.repositories.ops.v2.container_registry.provider import (
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
-from ai.backend.manager.repositories.ops.v2.secret.provider import SecretOpsProvider
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.repositories.secret.repository import SecretRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.agent.processors import AgentProcessors
@@ -171,17 +169,12 @@ def user_processors(
     storage_manager: AsyncMock,
     processor_registry: ProcessorRegistry[Any],
 ) -> UserProcessors:
-    pool = KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN)
-    user_repo = UserRepository(database_engine, V2DBOpsProvider(database_engine), pool)
-    secret_repo = SecretRepository(SecretOpsProvider(database_engine), pool)
-    service = UserService(
-        storage_manager,
-        valkey_clients.stat,
-        AsyncMock(),
-        user_repo,
-        secret_repo,
-        AsyncMock(),
+    user_repo = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
+    service = UserService(storage_manager, valkey_clients.stat, AsyncMock(), user_repo, AsyncMock())
     return UserProcessors(
         processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
         service,

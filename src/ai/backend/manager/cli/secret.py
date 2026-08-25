@@ -12,7 +12,7 @@ import click
 from tabulate import tabulate
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.secret.types import SecretSweepStatus
+from ai.backend.manager.data.secret.types import SecretStatus
 from ai.backend.manager.secret.keys import KEY_SIZE
 
 if TYPE_CHECKING:
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_STATUS_COLUMNS = ("provider type", "key id", "count")
+_STATUS_COLUMNS = ("column", "provider type", "key id", "count")
 # Stands for the key id of a plaintext row, which names no provider key.
 _ABSENT = "-"
 
@@ -76,12 +76,12 @@ def generate_key(key_id: str) -> None:
 
 @cli.command()
 @click.pass_obj
-def reencrypt_keypairs(cli_ctx: CLIContext) -> None:
-    """Encrypt every stored keypair secret again through the write provider."""
+def reencrypt(cli_ctx: CLIContext) -> None:
+    """Encrypt every stored secret again through the write provider."""
 
     async def _impl() -> None:
         async with _repository_ctx(cli_ctx) as repository:
-            progress = await repository.reencrypt_keypair_secrets()
+            progress = await repository.reencrypt()
         log.info("Read {} row(s) and wrote {}.", progress.scanned, progress.reencrypted)
         _print_status(progress.status)
 
@@ -91,23 +91,23 @@ def reencrypt_keypairs(cli_ctx: CLIContext) -> None:
 @cli.command()
 @click.pass_obj
 def status(cli_ctx: CLIContext) -> None:
-    """Report the stored keypair secrets per key id."""
+    """Report the stored secrets per column and key id."""
 
     async def _impl() -> None:
         async with _repository_ctx(cli_ctx) as repository:
-            swept = await repository.keypair_secret_status()
-        _print_status(swept)
+            reported = await repository.status()
+        _print_status(reported)
 
     asyncio.run(_impl())
 
 
-def _print_status(swept: SecretSweepStatus) -> None:
-    click.echo(f"write provider: {swept.write_provider_type.value}")
+def _print_status(reported: SecretStatus) -> None:
+    click.echo(f"write provider: {reported.write_provider_type.value}")
     click.echo(
         tabulate(
             [
-                (count.provider_type.value, count.key_id or _ABSENT, count.count)
-                for count in swept.counts
+                (count.column, count.provider_type.value, count.key_id or _ABSENT, count.count)
+                for count in reported.counts
             ],
             headers=_STATUS_COLUMNS,
         )
