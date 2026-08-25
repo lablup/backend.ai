@@ -135,6 +135,11 @@ class _ProjectCreateScopeAction(BaseScopeAction):
 
     @classmethod
     @override
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (EntityType("domain"),)
+
+    @classmethod
+    @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 

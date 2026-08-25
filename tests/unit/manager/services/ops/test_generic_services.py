@@ -661,6 +661,11 @@ class _CreateAction(BaseScopeAction, EntityCreateOpsAction[RolePresetRow, _Prese
 
     @classmethod
     @override
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (EntityType("project"),)
+
+    @classmethod
+    @override
     def entity_type(cls) -> EntityType:
         return _ENTITY_TYPE
 
@@ -849,6 +854,11 @@ class _BulkCreateAction(BaseScopeAction, EntityAtomicCreateOpsAction[RolePresetR
 
     @classmethod
     @override
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (EntityType("project"),)
+
+    @classmethod
+    @override
     def entity_type(cls) -> EntityType:
         return _ENTITY_TYPE
 
@@ -1028,6 +1038,11 @@ class _RoleManagedCreateAction(
 
     @classmethod
     @override
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (EntityType("project"),)
+
+    @classmethod
+    @override
     def entity_type(cls) -> EntityType:
         return _ENTITY_TYPE
 
@@ -1056,6 +1071,11 @@ class _RoleManagedBulkCreateAction(
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (self.scope,)
+
+    @classmethod
+    @override
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (EntityType("project"),)
 
     @classmethod
     @override
@@ -1093,6 +1113,11 @@ class _BatchUpdateAction(BaseScopeAction, BatchUpdateOpsAction[RolePresetRow, _P
 
     @classmethod
     @override
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (EntityType("project"),)
+
+    @classmethod
+    @override
     def entity_type(cls) -> EntityType:
         return _ENTITY_TYPE
 
@@ -1124,6 +1149,11 @@ class _BatchPurgeAction(BaseScopeAction, BatchPurgeOpsAction[RolePresetRow, _Pre
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (self.scope,)
+
+    @classmethod
+    @override
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (EntityType("project"),)
 
     @classmethod
     @override
@@ -1184,6 +1214,11 @@ class _SearchAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _PresetData]
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (self.scope,)
+
+    @classmethod
+    @override
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (EntityType("project"),)
 
     @classmethod
     @override
