@@ -303,3 +303,4 @@ def main(
     )
     app = InstallerApp(args)
     app.run(headless=headless)
+    sys.exit(app.return_code or 0)
