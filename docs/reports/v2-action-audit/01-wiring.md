@@ -1,14 +1,15 @@
-# BA-7486 — v2 액션 배선 감사
+# 1. 코드 상 wiring 조사
 
-프로세서 조립이 만드는 모든 배선을 카탈로그 행 하나당 한 줄로 적고, 판정에 따라 나눈 뒤
-concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에서 각 섹션 제목이 대신하는
-`concern`을 뺀 나머지에 `판정`과 `사유`를 더한 구성이다.
+배선 카탈로그와 코드를 대조한 정적 조사. 서버를 띄우지 않고 읽기만으로 답할 수 있는 것까지가
+범위다. 요청이 실제로 어떻게 처리되는지는 2부(실 동작 테스트), 검사되는 권한이 옳은지는
+3부(권한 검사 로직 확인)에서 다룬다. 세 조사의 관계와 진행 상태는 [README](./README.md)에 있다.
 
 | | |
 |---|---|
+| Jira | BA-7486 |
 | 기준 커밋 | `b2b200c0da` |
-| 출처 | BA-7486에 기록된 조사 결과를 그 커밋의 트리에 대조해 재현 |
-| 살아 있는 목록을 읽는 방법 | `backend.ai mgr ops list` |
+| 방법 | `ai.backend.manager` 전 모듈을 import해 v2 베이스 9개의 `__subclasses__()`를 훑고, `load_wiring_catalog()`와 대조 |
+| 살아 있는 목록 | `backend.ai mgr ops list` |
 
 ## 총계
 
@@ -23,34 +24,29 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 | 발견이 하나 이상 달린 고유 액션 | 65 |
 
 정의된 652 = 배선된 651 + 정의만 되고 배선되지 않은 1. 카탈로그 652행 = 고유 클래스 651 +
-두 번 배선된 `lookup_bulk_kernel_owner`. 한 행이 발견을 최대 세 개까지 달기 때문에 아래 발견
-건수의 합은 실패 행 수보다 크다.
+두 번 배선된 `lookup_bulk_kernel_owner`.
 
-## 발견 코드
+## 실패 분류
 
-| 코드 | 발견 | 행 수 |
-|---|---|---:|
-| `F1` | 정의됐지만 배선되지 않음 | 1 |
-| `F2` | 배선됐지만 호출되지 않음 | 12 |
-| `F3` | 프로세서 우회 | 3 |
-| `F4` | 도달 불가 owner lookup | 12 |
-| `F5` | field row 쓰기의 operation 오선언 | 4 |
-| `F6` | soft delete 역전이의 operation 오선언 | 1 |
-| `F7` | upsert의 operation 오선언 | 8 |
-| `F8` | v1과 v2가 같은 작업을 다르게 선언 | 8 |
-| `F9` | 카탈로그 기록 결함 | 4 |
-| `F10` | 카탈로그 entity type이 감사 기록과 어긋남 | 6 |
-| `F11` | action_name에 클래스명 자동 변환 흔적 | 9 |
-| `F12` | 게이트 근거 미흡 (검토 중 추가) | 1 |
-| | **합계** | **69** |
+| 판정 | 분류 | 뜻 | 세부 케이스 | 건수 | 분류 합 |
+|---|---|---|---|---:|---:|
+| `W` | 죽은 배선 | 배선은 있으나 실행에 도달하지 않는다 | 정의됐지만 배선 안 됨 | 1 | **28** |
+| | | | 배선됐지만 호출 안 됨 | 12 | |
+| | | | 프로세서 우회 | 3 | |
+| | | | 도달 불가 owner lookup | 12 | |
+| `O` | operation 오선언 | 선언된 operation이 실제 동작과 달라 RBAC가 다른 권한을 검사한다 | field row 쓰기 | 4 | **21** |
+| | | | soft delete 역전이 | 1 | |
+| | | | upsert | 8 | |
+| | | | v1/v2 불일치 | 8 | |
+| `R` | 기록 결함 | 카탈로그나 감사 기록이 실제와 어긋난다 | 카탈로그 기록 결함 | 4 | **19** |
+| | | | entity type 불일치 | 6 | |
+| | | | action_name 자동 변환 | 9 | |
+| `G` | 게이트 근거 미흡 | 게이트를 정당화하는 근거가 조건부다 | 게이트 근거 미흡 | 1 | **1** |
+| | | | **합계** | **69** | **69** |
 
-`F12`는 원 코멘트에 없던 것으로, 조사 결과를 재현하는 과정에서 나왔다. 나머지는 전부 그대로
-재현됐고, 코멘트의 "확인 결과 이상 없음" 절에 정정이 하나 필요하다. 인증 미들웨어가 없는 REST
-라우트가 GraphiQL 페이지와 public GraphQL 서브그래프 둘뿐이라는 서술은 사실이 아니다.
-`POST /auth/authorize`, `/auth/signup`, `/auth/update-password-no-auth`,
-`/app-config/public/get`, `/container-registries/webhook/harbor`도 인증 미들웨어를 달지 않는다.
-다만 이들이 실어 나르는 액션은 모두 anonymous 게이트이므로, 결론인 "permission 게이트 액션이
-무인증 라우트에 올라간 사례는 없다"는 그대로 유지된다.
+행 기준으로는 `W` 28행, `O` 21행, `R` 19행, `G` 1행이다.
+한 행이 두 판정을 함께 다는 경우가 있어 발견 건수의 합이 실패 행 수보다 크다 —
+`upsert_artifacts`, `associate_with_storage`, `disassociate_with_storage` 세 건이 그렇다.
 
 ## concern별 행 수
 
@@ -73,6 +69,9 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 | [visibility](#visibility) | 9 | 4 | 13 |
 | **합계** | **66** | **587** | **653** |
 
+컬럼은 `backend.ai mgr ops list`의 것에서 각 섹션 제목이 대신하는 `concern`을 뺀 나머지에
+`판정`과 `사유`를 더한 구성이다. 사유는 `세부 케이스 — 내용` 꼴로 적는다.
+
 ## app_config
 
 21행 — 실패 0, 성공 21.
@@ -85,7 +84,7 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 
 | entity_type | field_type | operation | action_name | kind | gate | backing | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|
-| `app_config` | — | `search` | `anonymous_search_app_configs` | `scope` | `anonymous` | `custom` | `성공` | anonymous 게이트 — `anonymous_scope` 팩토리가 쓰기를 거부한다(group.py:296) |
+| `app_config` | — | `search` | `anonymous_search_app_configs` | `scope` | `anonymous` | `custom` | `성공` | anonymous 게이트 — `anonymous_scope`가 쓰기를 거부(group.py:296) |
 | `app_config` | — | `search` | `search_app_configs` | `scope` | `permission` | `custom` | `성공` | — |
 | `app_config_allow_list` | — | `search` | `admin_search_app_config_allow_lists` | `global` | `permission` | `generic` | `성공` | — |
 | `app_config_allow_list` | — | `get` | `bulk_get_app_config_allow_lists` | `bulk` | `permission` | `generic` | `성공` | — |
@@ -101,9 +100,9 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 | `app_config_fragment` | — | `search` | `admin_search_app_config_fragments` | `global` | `permission` | `generic` | `성공` | — |
 | `app_config_fragment` | — | `get` | `bulk_get_app_config_fragments` | `bulk` | `permission` | `generic` | `성공` | — |
 | `app_config_fragment` | — | `purge` | `bulk_purge_app_config_fragments` | `bulk` | `permission` | `generic` | `성공` | — |
-| `app_config_fragment` | — | `upsert` | `bulk_upsert_app_config_fragments` | `scope` | `permission` | `generic` | `성공` | UPSERT 선언 — 검사가 CREATE\|UPDATE가 된다 |
+| `app_config_fragment` | — | `upsert` | `bulk_upsert_app_config_fragments` | `scope` | `permission` | `generic` | `성공` | UPSERT 선언 — 검사가 CREATE\|UPDATE |
 | `app_config_fragment` | — | `get` | `get_app_config_fragment` | `single_entity` | `permission` | `generic` | `성공` | — |
-| `app_config_fragment` | — | `upsert` | `global_bulk_upsert_app_config_fragments` | `global` | `permission` | `generic` | `성공` | UPSERT 선언 — 검사가 CREATE\|UPDATE가 된다 |
+| `app_config_fragment` | — | `upsert` | `global_bulk_upsert_app_config_fragments` | `global` | `permission` | `generic` | `성공` | UPSERT 선언 — 검사가 CREATE\|UPDATE |
 | `app_config_fragment` | — | `purge` | `purge_app_config_fragment` | `single_entity` | `permission` | `generic` | `성공` | — |
 | `app_config_fragment` | — | `search` | `search_app_config_fragments` | `scope` | `permission` | `generic` | `성공` | — |
 
@@ -115,19 +114,19 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 
 | entity_type | field_type | operation | action_name | kind | gate | backing | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|
-| — | — | `create` | `import_artifact_batch` | — | — | — | `F1` | **F1** — import하는 모듈이 하나도 없다. `delegate_import_revision_batch`로 대체된 잔재다. 가드 테스트의 `_concrete_v2_action_classes()`(test_registry_catalog.py:208)는 그 테스트의 import closure 위에서 `__subclasses__()`를 훑으므로 애초에 수집되지 않는다 |
-| `artifact` | — | `create` | `delegate_import_artifact_revision_batch` | `global` | `permission` | `custom` | `F10` | **F10** — 카탈로그는 `artifact`, 감사 기록은 `global`(revision/actions/base.py:21) |
-| `artifact` | — | `search` | `get_artifact_revisions` | `single_entity` | `permission` | `custom` | `F2` | **F2** — 액션을 구성하는 호출자가 없음 |
-| `artifact` | — | `lookup` | `lookup_bulk_artifact_revision_owner` | `lookup` | `permission` | `generic` | `F4` | **F4** — `field_group()`이 single과 bulk 룩업을 둘 다 등록하지만, 이 도메인은 bulk field 연산을 배선하지 않는다 |
-| `artifact` | — | `update` | `restore_artifacts` | `global` | `permission` | `custom` | `F6` | **F6** — UPDATE를 선언하지만(restore_multi.py:21) 실제로는 availability를 DELETED에서 ALIVE로 되돌린다(artifact/db_source.py:283). `delete_artifacts`의 정확한 역전이이며, 나머지 restore 6건은 RESTORE로 선언한다 |
-| `artifact` | — | `search` | `search_artifact_revisions` | `global` | `permission` | `custom` | `F10` | **F10** — 카탈로그는 `artifact`로 적지만 감사 행은 `global`로 기록한다. 감사 행이 `action.entity_type()`을 쓰는데(reporter.py:29) revision/actions/base.py:21이 GLOBAL_ENTITY_TYPE을 선언하기 때문이다. 형제인 `ArtifactAction`은 ARTIFACT_ENTITY_TYPE을 선언한다 |
-| `artifact` | — | `update` | `upsert_artifacts` | `global` | `permission` | `custom` | `F3` `F7` | **F3** — 서비스가 프로세서 대신 자기 메서드를 직접 호출한다(artifact/service.py:334,651). 게이트·모니터·감사 기록이 모두 건너뛰어진다 <br> **F7** — UPDATE만 선언해 검사가 CREATE\|UPDATE가 되지 않는다(upsert_multi.py:21) |
-| `artifact` | `artifact_revision` | `create` | `associate_with_storage` | `single_entity` | `permission` | `custom` | `F3` `F5` | **F3** — 서비스가 프로세서 대신 자기 메서드를 직접 호출한다(revision/service.py:586). 게이트·모니터·감사 기록이 모두 건너뛰어진다 <br> **F5** — CREATE를 선언해 RBAC가 소유 artifact에 CREATE 권한을 요구한다(associate_with_storage.py:26) |
-| `artifact` | `artifact_revision` | `delete` | `cleanup_artifact_revision` | `single_entity` | `permission` | `custom` | `F5` | **F5** — DELETE를 선언해 RBAC가 소유 artifact에 SOFT_DELETE 권한을 요구한다(cleanup.py:21) |
-| `artifact` | `artifact_revision` | `delete` | `disassociate_with_storage` | `single_entity` | `permission` | `custom` | `F3` `F5` | **F3** — 서비스가 프로세서 대신 자기 메서드를 직접 호출한다(revision/service.py:676). 게이트·모니터·감사 기록이 모두 건너뛰어진다 <br> **F5** — DELETE를 선언해 RBAC가 소유 artifact에 SOFT_DELETE 권한을 요구한다(disassociate_with_storage.py:24) |
-| `artifact` | `artifact_revision` | `create` | `import_artifact_revision` | `single_entity` | `permission` | `custom` | `F5` | **F5** — CREATE를 선언해 RBAC가 소유 artifact에 CREATE 권한을 요구한다(import_revision.py:26). field row 쓰기는 UPDATE를 선언해야 한다 |
-| `artifact_registry` | — | `search` | `list_hugging_face_registry` | `global` | `permission` | `custom` | `F2` | **F2** — 액션을 구성하는 호출자가 없음 |
-| `artifact_registry` | — | `search` | `list_reservoir_registries` | `global` | `permission` | `custom` | `F2` | **F2** — 액션을 구성하는 호출자가 없음 |
+| — | — | `create` | `import_artifact_batch` | — | — | — | `W` | **정의됐지만 배선 안 됨** — import하는 모듈이 없다. `delegate_import_revision_batch`로 대체된 잔재. 가드 테스트는 자기 import closure만 훑어 수집하지 못한다(test_registry_catalog.py:208) |
+| `artifact` | — | `create` | `delegate_import_artifact_revision_batch` | `global` | `permission` | `custom` | `R` | **entity type 불일치** — 카탈로그 `artifact` / 감사 `global`(base.py:21) |
+| `artifact` | — | `search` | `get_artifact_revisions` | `single_entity` | `permission` | `custom` | `W` | **배선됐지만 호출 안 됨** — 호출자 없음 |
+| `artifact` | — | `lookup` | `lookup_bulk_artifact_revision_owner` | `lookup` | `permission` | `generic` | `W` | **도달 불가 owner lookup** — `field_group()`이 등록하지만 이 도메인은 bulk field 연산을 배선하지 않는다 |
+| `artifact` | — | `update` | `restore_artifacts` | `global` | `permission` | `custom` | `O` | **soft delete 역전이** — UPDATE 선언(restore_multi.py:21). 실제로는 DELETED→ALIVE 역전이(db_source.py:283)이므로 RESTORE여야 한다 |
+| `artifact` | — | `search` | `search_artifact_revisions` | `global` | `permission` | `custom` | `R` | **entity type 불일치** — 카탈로그 `artifact` / 감사 `global`. base.py:21이 GLOBAL_ENTITY_TYPE 선언, 형제 `ArtifactAction`은 ARTIFACT_ENTITY_TYPE |
+| `artifact` | — | `update` | `upsert_artifacts` | `global` | `permission` | `custom` | `W` `O` | **프로세서 우회** — 서비스가 프로세서 대신 자기 메서드를 직접 호출(artifact/service.py:334,651). 게이트·모니터·감사 기록이 건너뛰어진다 <br> **upsert** — UPDATE만 선언 → 검사가 CREATE\|UPDATE가 되지 않는다(upsert_multi.py:21) |
+| `artifact` | `artifact_revision` | `create` | `associate_with_storage` | `single_entity` | `permission` | `custom` | `W` `O` | **프로세서 우회** — 서비스가 직접 호출(revision/service.py:586). 게이트·모니터·감사 기록이 건너뛰어진다 <br> **field row 쓰기** — CREATE 선언 → 소유 artifact에 CREATE 요구(associate_with_storage.py:26) |
+| `artifact` | `artifact_revision` | `delete` | `cleanup_artifact_revision` | `single_entity` | `permission` | `custom` | `O` | **field row 쓰기** — DELETE 선언 → 소유 artifact에 SOFT_DELETE 요구(cleanup.py:21) |
+| `artifact` | `artifact_revision` | `delete` | `disassociate_with_storage` | `single_entity` | `permission` | `custom` | `W` `O` | **프로세서 우회** — 서비스가 직접 호출(revision/service.py:676). 게이트·모니터·감사 기록이 건너뛰어진다 <br> **field row 쓰기** — DELETE 선언 → 소유 artifact에 SOFT_DELETE 요구(disassociate_with_storage.py:24) |
+| `artifact` | `artifact_revision` | `create` | `import_artifact_revision` | `single_entity` | `permission` | `custom` | `O` | **field row 쓰기** — CREATE 선언 → 소유 artifact에 CREATE 요구. UPDATE여야 한다(import_revision.py:26) |
+| `artifact_registry` | — | `search` | `list_hugging_face_registry` | `global` | `permission` | `custom` | `W` | **배선됐지만 호출 안 됨** — 호출자 없음 |
+| `artifact_registry` | — | `search` | `list_reservoir_registries` | `global` | `permission` | `custom` | `W` | **배선됐지만 호출 안 됨** — 호출자 없음 |
 
 ### artifact_registry — 성공 (59행)
 
@@ -150,7 +149,7 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 | `artifact` | `artifact_revision` | `get` | `get_artifact_revision_verification_result` | `single_entity` | `permission` | `custom` | `성공` | — |
 | `artifact` | `artifact_revision` | `get` | `get_download_presigned_url` | `single_entity` | `permission` | `custom` | `성공` | — |
 | `artifact` | `artifact_revision` | `get` | `get_download_progress` | `single_entity` | `permission` | `custom` | `성공` | — |
-| `artifact` | `artifact_revision` | `update` | `get_upload_presigned_url` | `single_entity` | `permission` | `custom` | `성공` | field row 쓰기를 UPDATE로 선언 — 이름은 get이지만 쓰기다 |
+| `artifact` | `artifact_revision` | `update` | `get_upload_presigned_url` | `single_entity` | `permission` | `custom` | `성공` | field row 쓰기를 UPDATE로 선언 — 이름은 get이지만 쓰기 |
 | `artifact` | `artifact_revision` | `update` | `reject_artifact_revision` | `single_entity` | `permission` | `custom` | `성공` | field row 쓰기를 UPDATE로 선언 |
 | `artifact_registry` | — | `create` | `create_hugging_face_registry` | `global` | `permission` | `custom` | `성공` | — |
 | `artifact_registry` | — | `create` | `create_reservoir_registry` | `global` | `permission` | `custom` | `성공` | — |
@@ -201,12 +200,12 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 
 | entity_type | field_type | operation | action_name | kind | gate | backing | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|
-| `container_registry` | — | `update` | `handle_harbor_webhook` | `global` | `anonymous` | `custom` | `F12` | **F12** — anonymous 게이트의 근거인 시크릿 비교가 조건부다. `extra["webhook_auth_header"]`가 없는 레지스트리 행은 검사 자체를 받지 않는다(container_registry/service.py:213) |
-| `image` | — | `delete` | `clear_image_custom_resource_limit_by_id` | `global` | `permission` | `custom` | `F2` | **F2** — 액션을 구성하는 호출자가 없음 |
-| `image` | — | `create` | `preload_image` | `global` | `permission` | `custom` | `F2` | **F2** — 액션을 구성하는 호출자가 없음. GraphQL 뮤테이션은 "Not implemented."만 반환한다(gql_legacy/image.py:943,964) |
-| `image` | — | `purge` | `purge_images` | `global` | `permission` | `custom` | `F2` | **F2** — 액션을 구성하는 호출자가 없음. 이미지 정리 bgtask는 단수 `purge_image`를 쓴다 |
-| `image` | — | `update` | `set_image_resource_limit_by_id` | `global` | `permission` | `custom` | `F2` | **F2** — 액션을 구성하는 호출자가 없음 |
-| `image` | — | `delete` | `unload_image` | `global` | `permission` | `custom` | `F2` | **F2** — 액션을 구성하는 호출자가 없음. GraphQL 뮤테이션은 "Not implemented."만 반환한다(gql_legacy/image.py:943,964) |
+| `container_registry` | — | `update` | `handle_harbor_webhook` | `global` | `anonymous` | `custom` | `G` | **게이트 근거 미흡** — 시크릿 비교가 조건부. `extra["webhook_auth_header"]`가 없으면 검사가 없다(service.py:213) |
+| `image` | — | `delete` | `clear_image_custom_resource_limit_by_id` | `global` | `permission` | `custom` | `W` | **배선됐지만 호출 안 됨** — 호출자 없음 |
+| `image` | — | `create` | `preload_image` | `global` | `permission` | `custom` | `W` | **배선됐지만 호출 안 됨** — 호출자 없음. GraphQL 뮤테이션은 "Not implemented."만 반환(gql_legacy/image.py:943,964) |
+| `image` | — | `purge` | `purge_images` | `global` | `permission` | `custom` | `W` | **배선됐지만 호출 안 됨** — 호출자 없음. bgtask는 단수 `purge_image`를 쓴다 |
+| `image` | — | `update` | `set_image_resource_limit_by_id` | `global` | `permission` | `custom` | `W` | **배선됐지만 호출 안 됨** — 호출자 없음 |
+| `image` | — | `delete` | `unload_image` | `global` | `permission` | `custom` | `W` | **배선됐지만 호출 안 됨** — 호출자 없음. GraphQL 뮤테이션은 "Not implemented."만 반환(gql_legacy/image.py:943,964) |
 
 ### container_registry — 성공 (33행)
 
@@ -254,14 +253,14 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 
 | entity_type | field_type | operation | action_name | kind | gate | backing | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|
-| `deployment` | — | `delete` | `delete_model_service` | `single_entity` | `permission` | `custom` | `F2` | **F2** — 액션을 구성하는 호출자가 없음 |
-| `deployment` | — | `search` | `global_search_replica_group_history` | `global` | `permission` | `custom` | `F10` | **F10** — 카탈로그는 `deployment`, 감사 기록은 `global` |
-| `deployment` | — | `search` | `search_deployments_in_project` | `scope` | `permission` | `custom` | `F2` | **F2** — 액션을 구성하는 호출자가 없음 |
-| `deployment` | — | `update` | `upsert_deployment_policy` | `single_entity` | `permission` | `custom` | `F7` | **F7** — UPDATE만 선언한다(upsert_deployment_policy.py:28). docstring은 "create or update ... ON CONFLICT"라고 적혀 있다 |
-| `deployment_preset` | — | `lookup` | `lookup_bulk_preset_resource_slot_owner` | `lookup` | `permission` | `generic` | `F4` | **F4** — `field_group()`이 single과 bulk 룩업을 둘 다 등록하지만, 이 도메인은 bulk field 연산을 배선하지 않는다 |
-| `deployment_preset` | — | `lookup` | `lookup_preset_resource_slot_owner` | `lookup` | `permission` | `generic` | `F4` | **F4** — `field_group()`이 single과 bulk 룩업을 둘 다 등록하지만, 이 도메인은 single field 연산을 배선하지 않는다 |
-| `model_card` | — | `lookup` | `lookup_bulk_model_card_resource_requirement_owner` | `lookup` | `permission` | `generic` | `F4` | **F4** — `field_group()`이 single과 bulk 룩업을 둘 다 등록하지만, 이 도메인은 bulk field 연산을 배선하지 않는다 |
-| `model_card` | — | `lookup` | `lookup_model_card_resource_requirement_owner` | `lookup` | `permission` | `generic` | `F4` | **F4** — `field_group()`이 single과 bulk 룩업을 둘 다 등록하지만, 이 도메인은 single field 연산을 배선하지 않는다 |
+| `deployment` | — | `delete` | `delete_model_service` | `single_entity` | `permission` | `custom` | `W` | **배선됐지만 호출 안 됨** — 호출자 없음 |
+| `deployment` | — | `search` | `global_search_replica_group_history` | `global` | `permission` | `custom` | `R` | **entity type 불일치** — 카탈로그 `deployment` / 감사 `global` |
+| `deployment` | — | `search` | `search_deployments_in_project` | `scope` | `permission` | `custom` | `W` | **배선됐지만 호출 안 됨** — 호출자 없음 |
+| `deployment` | — | `update` | `upsert_deployment_policy` | `single_entity` | `permission` | `custom` | `O` | **upsert** — UPDATE만 선언(upsert_deployment_policy.py:28). docstring은 ON CONFLICT라고 적는다 |
+| `deployment_preset` | — | `lookup` | `lookup_bulk_preset_resource_slot_owner` | `lookup` | `permission` | `generic` | `W` | **도달 불가 owner lookup** — `field_group()`이 등록하지만 이 도메인은 bulk field 연산을 배선하지 않는다 |
+| `deployment_preset` | — | `lookup` | `lookup_preset_resource_slot_owner` | `lookup` | `permission` | `generic` | `W` | **도달 불가 owner lookup** — `field_group()`이 등록하지만 이 도메인은 single field 연산을 배선하지 않는다 |
+| `model_card` | — | `lookup` | `lookup_bulk_model_card_resource_requirement_owner` | `lookup` | `permission` | `generic` | `W` | **도달 불가 owner lookup** — `field_group()`이 등록하지만 이 도메인은 bulk field 연산을 배선하지 않는다 |
+| `model_card` | — | `lookup` | `lookup_model_card_resource_requirement_owner` | `lookup` | `permission` | `generic` | `W` | **도달 불가 owner lookup** — `field_group()`이 등록하지만 이 도메인은 single field 연산을 배선하지 않는다 |
 
 ### deployment — 성공 (77행)
 
@@ -353,16 +352,16 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 
 | entity_type | field_type | operation | action_name | kind | gate | backing | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|
-| `global` | `label` | `lookup` | `lookup_bulk_entity_label_owner` | `lookup` | `permission` | `generic` | `F4` | **F4** — `field_group()`이 single과 bulk 룩업을 둘 다 등록하지만, 이 도메인은 bulk field 연산을 배선하지 않는다 |
+| `global` | `label` | `lookup` | `lookup_bulk_entity_label_owner` | `lookup` | `permission` | `generic` | `W` | **도달 불가 owner lookup** — `field_group()`이 등록하지만 이 도메인은 bulk field 연산을 배선하지 않는다 |
 
 ### label — 성공 (4행)
 
 | entity_type | field_type | operation | action_name | kind | gate | backing | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|
 | `global` | `label` | `lookup` | `lookup_entity_label_owner` | `lookup` | `permission` | `generic` | `성공` | — |
-| `global` | `label` | `update` | `purge_entity_label` | `single_entity` | `permission` | `generic` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답이다 |
+| `global` | `label` | `update` | `purge_entity_label` | `single_entity` | `permission` | `generic` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답 |
 | `global` | `label` | `search` | `search_entity_labels` | `bulk` | `permission` | `generic` | `성공` | — |
-| `global` | `label` | `update` | `upsert_entity_label` | `single_entity` | `permission` | `generic` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답이다 |
+| `global` | `label` | `update` | `upsert_entity_label` | `single_entity` | `permission` | `generic` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답 |
 
 ## metric
 
@@ -425,24 +424,24 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 
 | entity_type | field_type | operation | action_name | kind | gate | backing | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|
-| `user` | — | `lookup` | `lookup_bulk_error_log_owner` | `lookup` | `permission` | `generic` | `F4` | **F4** — `field_group()`이 single과 bulk 룩업을 둘 다 등록하지만, 이 도메인은 bulk field 연산을 배선하지 않는다 |
-| `user` | — | `lookup` | `lookup_bulk_keypair_owner` | `lookup` | `permission` | `generic` | `F4` | **F4** — `field_group()`이 single과 bulk 룩업을 둘 다 등록하지만, 이 도메인은 bulk field 연산을 배선하지 않는다 |
-| `user` | — | `lookup` | `lookup_bulk_login_history_owner` | `lookup` | `permission` | `generic` | `F4` | **F4** — `field_group()`이 single과 bulk 룩업을 둘 다 등록하지만, 이 도메인은 bulk field 연산을 배선하지 않는다 |
-| `user` | — | `lookup` | `lookup_bulk_login_session_owner` | `lookup` | `permission` | `generic` | `F4` | **F4** — `field_group()`이 single과 bulk 룩업을 둘 다 등록하지만, 이 도메인은 bulk field 연산을 배선하지 않는다 |
-| `user` | — | `lookup` | `lookup_login_history_owner` | `lookup` | `permission` | `generic` | `F4` | **F4** — `field_group()`이 single과 bulk 룩업을 둘 다 등록하지만, 이 도메인은 single field 연산을 배선하지 않는다 |
-| `user` | — | `lookup` | `lookup_user_by_access_key` | `lookup` | `permission` | `generic` | `F2` | **F2** — 액션을 구성하는 호출자가 없음 |
+| `user` | — | `lookup` | `lookup_bulk_error_log_owner` | `lookup` | `permission` | `generic` | `W` | **도달 불가 owner lookup** — `field_group()`이 등록하지만 이 도메인은 bulk field 연산을 배선하지 않는다 |
+| `user` | — | `lookup` | `lookup_bulk_keypair_owner` | `lookup` | `permission` | `generic` | `W` | **도달 불가 owner lookup** — `field_group()`이 등록하지만 이 도메인은 bulk field 연산을 배선하지 않는다 |
+| `user` | — | `lookup` | `lookup_bulk_login_history_owner` | `lookup` | `permission` | `generic` | `W` | **도달 불가 owner lookup** — `field_group()`이 등록하지만 이 도메인은 bulk field 연산을 배선하지 않는다 |
+| `user` | — | `lookup` | `lookup_bulk_login_session_owner` | `lookup` | `permission` | `generic` | `W` | **도달 불가 owner lookup** — `field_group()`이 등록하지만 이 도메인은 bulk field 연산을 배선하지 않는다 |
+| `user` | — | `lookup` | `lookup_login_history_owner` | `lookup` | `permission` | `generic` | `W` | **도달 불가 owner lookup** — `field_group()`이 등록하지만 이 도메인은 single field 연산을 배선하지 않는다 |
+| `user` | — | `lookup` | `lookup_user_by_access_key` | `lookup` | `permission` | `generic` | `W` | **배선됐지만 호출 안 됨** — 호출자 없음 |
 
 ### organization — 성공 (93행)
 
 | entity_type | field_type | operation | action_name | kind | gate | backing | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|
-| `auth` | — | `create` | `authorize` | `global` | `anonymous` | `custom` | `성공` | anonymous 게이트 — 서비스가 자격 증명을 직접 검사한다 |
+| `auth` | — | `create` | `authorize` | `global` | `anonymous` | `custom` | `성공` | anonymous 게이트 — 서비스가 자격 증명을 직접 검사 |
 | `auth` | — | `delete` | `global_revoke_login_session` | `global` | `permission` | `custom` | `성공` | — |
 | `auth` | — | `update` | `global_unblock_user` | `global` | `permission` | `custom` | `성공` | — |
 | `auth` | — | `get` | `public_get_role` | `global` | `public` | `custom` | `성공` | public 게이트 — 읽기 전용 확인 |
 | `auth` | — | `get` | `public_resolve_access_key_scope` | `global` | `public` | `custom` | `성공` | public 게이트 — 읽기 전용 확인 |
 | `auth` | — | `get` | `public_resolve_user_scope` | `global` | `public` | `custom` | `성공` | public 게이트 — 읽기 전용 확인 |
-| `auth` | — | `update` | `update_password_no_auth` | `global` | `anonymous` | `custom` | `성공` | anonymous 게이트 — 서비스가 자격 증명을 직접 검사한다 |
+| `auth` | — | `update` | `update_password_no_auth` | `global` | `anonymous` | `custom` | `성공` | anonymous 게이트 — 서비스가 자격 증명을 직접 검사 |
 | `domain` | — | `update` | `create_domain_dotfile` | `single_entity` | `permission` | `custom` | `성공` | — |
 | `domain` | — | `delete` | `delete_domain` | `single_entity` | `permission` | `generic` | `성공` | — |
 | `domain` | — | `update` | `delete_domain_dotfile` | `single_entity` | `permission` | `custom` | `성공` | — |
@@ -474,8 +473,8 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 | `project` | — | `update` | `unassign_users_from_project` | `single_entity` | `permission` | `custom` | `성공` | — |
 | `project` | — | `update` | `update_project` | `single_entity` | `permission` | `custom` | `성공` | — |
 | `project` | — | `update` | `update_project_dotfile` | `single_entity` | `permission` | `custom` | `성공` | — |
-| `user` | — | `update` | `admin_create_keypair` | `single_entity` | `permission` | `custom` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답이다 |
-| `user` | — | `update` | `admin_delete_ssh_keypair` | `single_entity` | `permission` | `custom` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답이다 |
+| `user` | — | `update` | `admin_create_keypair` | `single_entity` | `permission` | `custom` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답 |
+| `user` | — | `update` | `admin_delete_ssh_keypair` | `single_entity` | `permission` | `custom` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답 |
 | `user` | — | `get` | `admin_get_ssh_keypair` | `single_entity` | `permission` | `custom` | `성공` | — |
 | `user` | — | `update` | `admin_register_ssh_keypair` | `single_entity` | `permission` | `custom` | `성공` | — |
 | `user` | — | `update` | `create_keypair_dotfile` | `single_entity` | `permission` | `custom` | `성공` | — |
@@ -508,7 +507,7 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 | `user` | — | `search` | `search_users_by_project` | `scope` | `permission` | `generic` | `성공` | — |
 | `user` | — | `search` | `search_users_by_role` | `global` | `permission` | `generic` | `성공` | — |
 | `user` | — | `delete` | `signout` | `single_entity` | `permission` | `custom` | `성공` | — |
-| `user` | — | `create` | `signup` | `global` | `anonymous` | `custom` | `성공` | anonymous 게이트 — 서비스가 자격 증명을 직접 검사한다 |
+| `user` | — | `create` | `signup` | `global` | `anonymous` | `custom` | `성공` | anonymous 게이트 — 서비스가 자격 증명을 직접 검사 |
 | `user` | — | `update` | `switch_default_access_key` | `single_entity` | `permission` | `custom` | `성공` | — |
 | `user` | — | `update` | `update_bootstrap_script` | `single_entity` | `permission` | `custom` | `성공` | — |
 | `user` | — | `update` | `update_full_name` | `single_entity` | `permission` | `custom` | `성공` | — |
@@ -516,18 +515,18 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 | `user` | — | `update` | `update_password` | `single_entity` | `permission` | `custom` | `성공` | — |
 | `user` | — | `update` | `update_user` | `single_entity` | `permission` | `custom` | `성공` | — |
 | `user` | — | `update` | `upload_ssh_keypair` | `single_entity` | `permission` | `custom` | `성공` | — |
-| `user` | `error_log` | `update` | `create_error_log` | `single_entity` | `permission` | `generic` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답이다 |
-| `user` | `error_log` | `update` | `delete_error_log` | `single_entity` | `permission` | `generic` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답이다 |
+| `user` | `error_log` | `update` | `create_error_log` | `single_entity` | `permission` | `generic` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답 |
+| `user` | `error_log` | `update` | `delete_error_log` | `single_entity` | `permission` | `generic` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답 |
 | `user` | `error_log` | `search` | `global_search_error_logs` | `global` | `permission` | `generic` | `성공` | — |
 | `user` | `error_log` | `search` | `search_error_logs` | `scope` | `permission` | `generic` | `성공` | — |
 | `user` | `keypair` | `get` | `get_default_keypairs` | `bulk` | `permission` | `generic` | `성공` | — |
 | `user` | `keypair` | `get` | `get_keypair` | `single_entity` | `permission` | `custom` | `성공` | — |
-| `user` | `keypair` | `update` | `purge_keypair` | `single_entity` | `permission` | `custom` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답이다 |
-| `user` | `keypair` | `update` | `update_keypair` | `single_entity` | `permission` | `custom` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답이다 |
+| `user` | `keypair` | `update` | `purge_keypair` | `single_entity` | `permission` | `custom` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답 |
+| `user` | `keypair` | `update` | `update_keypair` | `single_entity` | `permission` | `custom` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답 |
 | `user` | `login_history` | `search` | `global_search_login_history` | `global` | `permission` | `generic` | `성공` | — |
 | `user` | `login_history` | `search` | `search_login_history` | `scope` | `permission` | `generic` | `성공` | — |
 | `user` | `login_session` | `search` | `global_search_login_sessions` | `global` | `permission` | `generic` | `성공` | — |
-| `user` | `login_session` | `update` | `revoke_login_session` | `single_entity` | `permission` | `custom` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답이다 |
+| `user` | `login_session` | `update` | `revoke_login_session` | `single_entity` | `permission` | `custom` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답 |
 | `user` | `login_session` | `search` | `search_login_sessions` | `scope` | `permission` | `generic` | `성공` | — |
 
 ## rbac
@@ -538,8 +537,8 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 
 | entity_type | field_type | operation | action_name | kind | gate | backing | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|
-| `role_preset` | — | `lookup` | `lookup_role_permission_preset_owner` | `lookup` | `permission` | `generic` | `F4` | **F4** — `field_group()`이 single과 bulk 룩업을 둘 다 등록하지만, 이 도메인은 single field 연산을 배선하지 않는다 |
-| `role_preset` | — | `purge` | `purge_role_preset` | `single_entity` | `permission` | `generic` | `F2` | **F2** — 액션을 구성하는 호출자가 없음. API는 `bulk_purge`만 호출한다 |
+| `role_preset` | — | `lookup` | `lookup_role_permission_preset_owner` | `lookup` | `permission` | `generic` | `W` | **도달 불가 owner lookup** — `field_group()`이 등록하지만 이 도메인은 single field 연산을 배선하지 않는다 |
+| `role_preset` | — | `purge` | `purge_role_preset` | `single_entity` | `permission` | `generic` | `W` | **배선됐지만 호출 안 됨** — 호출자 없음. API는 `bulk_purge`만 호출 |
 
 ### rbac — 성공 (17행)
 
@@ -559,7 +558,7 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 | `role_preset` | — | `lookup` | `lookup_bulk_role_permission_preset_owner` | `lookup` | `permission` | `generic` | `성공` | — |
 | `role_preset` | — | `search` | `search_role_presets` | `global` | `permission` | `generic` | `성공` | — |
 | `role_preset` | — | `update` | `update_role_preset` | `single_entity` | `permission` | `custom` | `성공` | — |
-| `role_preset` | `role_permission_preset` | `update` | `bulk_add_role_permission_presets` | `single_entity` | `permission` | `generic` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답이다 |
+| `role_preset` | `role_permission_preset` | `update` | `bulk_add_role_permission_presets` | `single_entity` | `permission` | `generic` | `성공` | field row 쓰기 — 규칙상 UPDATE가 정답 |
 | `role_preset` | `role_permission_preset` | `update` | `bulk_remove_role_permission_presets` | `bulk` | `permission` | `generic` | `성공` | — |
 | `role_preset` | `role_permission_preset` | `search` | `search_role_permission_presets` | `scope` | `permission` | `generic` | `성공` | — |
 
@@ -571,15 +570,15 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 
 | entity_type | field_type | operation | action_name | kind | gate | backing | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|
-| `domain_fair_share` | — | `update` | `bulk_upsert_domain_fair_share_weights` | `scope` | `permission` | `custom` | `F7` | **F7** — UPDATE만 선언한다(fair_share/actions.py:157,188,305,337,456,489) |
-| `domain_fair_share` | — | `update` | `upsert_domain_fair_share_weight` | `scope` | `permission` | `custom` | `F7` | **F7** — UPDATE만 선언한다(fair_share/actions.py:157,188,305,337,456,489) |
-| `global` | `domain_usage_bucket` | `search` | `search_domain_usage_buckets` | `scope` | `permission` | `generic` | `F10` | **F10** — 카탈로그는 `global`, 감사 기록은 `domain` |
-| `global` | `project_usage_bucket` | `search` | `search_project_usage_buckets` | `scope` | `permission` | `generic` | `F10` | **F10** — 카탈로그는 `global`, 감사 기록은 `project` |
-| `global` | `user_usage_bucket` | `search` | `search_user_usage_buckets` | `scope` | `permission` | `generic` | `F10` | **F10** — 카탈로그는 `global`, 감사 기록은 `user` |
-| `project_fair_share` | — | `update` | `bulk_upsert_project_fair_share_weights` | `scope` | `permission` | `custom` | `F7` | **F7** — UPDATE만 선언한다(fair_share/actions.py:157,188,305,337,456,489) |
-| `project_fair_share` | — | `update` | `upsert_project_fair_share_weight` | `scope` | `permission` | `custom` | `F7` | **F7** — UPDATE만 선언한다(fair_share/actions.py:157,188,305,337,456,489) |
-| `user_fair_share` | — | `update` | `bulk_upsert_user_fair_share_weights` | `scope` | `permission` | `custom` | `F7` | **F7** — UPDATE만 선언한다(fair_share/actions.py:157,188,305,337,456,489) |
-| `user_fair_share` | — | `update` | `upsert_user_fair_share_weight` | `scope` | `permission` | `custom` | `F7` | **F7** — UPDATE만 선언한다(fair_share/actions.py:157,188,305,337,456,489) |
+| `domain_fair_share` | — | `update` | `bulk_upsert_domain_fair_share_weights` | `scope` | `permission` | `custom` | `O` | **upsert** — UPDATE만 선언(fair_share/actions.py:157,188,305,337,456,489) |
+| `domain_fair_share` | — | `update` | `upsert_domain_fair_share_weight` | `scope` | `permission` | `custom` | `O` | **upsert** — UPDATE만 선언(fair_share/actions.py:157,188,305,337,456,489) |
+| `global` | `domain_usage_bucket` | `search` | `search_domain_usage_buckets` | `scope` | `permission` | `generic` | `R` | **entity type 불일치** — 카탈로그 `global` / 감사 `domain` |
+| `global` | `project_usage_bucket` | `search` | `search_project_usage_buckets` | `scope` | `permission` | `generic` | `R` | **entity type 불일치** — 카탈로그 `global` / 감사 `project` |
+| `global` | `user_usage_bucket` | `search` | `search_user_usage_buckets` | `scope` | `permission` | `generic` | `R` | **entity type 불일치** — 카탈로그 `global` / 감사 `user` |
+| `project_fair_share` | — | `update` | `bulk_upsert_project_fair_share_weights` | `scope` | `permission` | `custom` | `O` | **upsert** — UPDATE만 선언(fair_share/actions.py:157,188,305,337,456,489) |
+| `project_fair_share` | — | `update` | `upsert_project_fair_share_weight` | `scope` | `permission` | `custom` | `O` | **upsert** — UPDATE만 선언(fair_share/actions.py:157,188,305,337,456,489) |
+| `user_fair_share` | — | `update` | `bulk_upsert_user_fair_share_weights` | `scope` | `permission` | `custom` | `O` | **upsert** — UPDATE만 선언(fair_share/actions.py:157,188,305,337,456,489) |
+| `user_fair_share` | — | `update` | `upsert_user_fair_share_weight` | `scope` | `permission` | `custom` | `O` | **upsert** — UPDATE만 선언(fair_share/actions.py:157,188,305,337,456,489) |
 
 ### resource_group — 성공 (68행)
 
@@ -695,10 +694,10 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 
 | entity_type | field_type | operation | action_name | kind | gate | backing | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|
-| `session` | — | `search` | `batch_get_kernel_live_stats` | `bulk` | `permission` | `custom` | `F9` | **F9** — `atomic_bulk_field()`가 field_type을 None으로 기록해(registry/group.py:241,370) session에 대한 평범한 bulk 연산으로 보인다. 그 결과 `mgr ops entities`에 kernel이 field type으로 전혀 나타나지 않는다 |
-| `session` | — | `search` | `batch_get_kernel_resource_allocation` | `bulk` | `permission` | `custom` | `F9` | **F9** — `atomic_bulk_field()`가 field_type을 None으로 기록해(registry/group.py:241,370) session에 대한 평범한 bulk 연산으로 보인다. 그 결과 `mgr ops entities`에 kernel이 field type으로 전혀 나타나지 않는다 |
-| `session` | — | `lookup` | `lookup_bulk_kernel_owner` | `lookup` | `permission` | `generic` | `F9` | **F9** — `atomic_bulk_field()` 두 번의 배선으로 카탈로그에 두 번 기록된다. 카탈로그의 유일한 중복 행이며 field_type도 None으로 남는다 |
-| `session` | — | `lookup` | `lookup_bulk_kernel_owner` | `lookup` | `permission` | `generic` | `F9` | **F9** — `atomic_bulk_field()` 두 번의 배선으로 카탈로그에 두 번 기록된다. 카탈로그의 유일한 중복 행이며 field_type도 None으로 남는다 |
+| `session` | — | `search` | `batch_get_kernel_live_stats` | `bulk` | `permission` | `custom` | `R` | **카탈로그 기록 결함** — `atomic_bulk_field()`가 field_type을 None으로 기록(group.py:241,370). kernel이 field type으로 나타나지 않는다 |
+| `session` | — | `search` | `batch_get_kernel_resource_allocation` | `bulk` | `permission` | `custom` | `R` | **카탈로그 기록 결함** — `atomic_bulk_field()`가 field_type을 None으로 기록(group.py:241,370). kernel이 field type으로 나타나지 않는다 |
+| `session` | — | `lookup` | `lookup_bulk_kernel_owner` | `lookup` | `permission` | `generic` | `R` | **카탈로그 기록 결함** — `atomic_bulk_field()` 두 번의 배선으로 중복 기록. 카탈로그의 유일한 중복 행 |
+| `session` | — | `lookup` | `lookup_bulk_kernel_owner` | `lookup` | `permission` | `generic` | `R` | **카탈로그 기록 결함** — `atomic_bulk_field()` 두 번의 배선으로 중복 기록. 카탈로그의 유일한 중복 행 |
 
 ### session — 성공 (59행)
 
@@ -778,7 +777,7 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 |---|---|---|---|---|---|---|---|---|
 | `client_ip_masking_policy` | — | `purge` | `purge_client_ip_masking_policy` | `single_entity` | `permission` | `generic` | `성공` | — |
 | `client_ip_masking_policy` | — | `search` | `search_client_ip_masking_policies` | `global` | `permission` | `generic` | `성공` | — |
-| `client_ip_masking_policy` | — | `upsert` | `upsert_client_ip_masking_policy` | `global` | `permission` | `generic` | `성공` | UPSERT 선언 — 검사가 CREATE\|UPDATE가 된다 |
+| `client_ip_masking_policy` | — | `upsert` | `upsert_client_ip_masking_policy` | `global` | `permission` | `generic` | `성공` | UPSERT 선언 — 검사가 CREATE\|UPDATE |
 | `etcd_config` | — | `delete` | `delete_etcd_config` | `global` | `permission` | `custom` | `성공` | — |
 | `etcd_config` | — | `get` | `get_etcd_config` | `global` | `permission` | `custom` | `성공` | — |
 | `etcd_config` | — | `get` | `get_resource_metadata` | `global` | `public` | `custom` | `성공` | public 게이트 — 읽기 전용 확인 |
@@ -830,14 +829,14 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 
 | entity_type | field_type | operation | action_name | kind | gate | backing | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|
-| `vfolder` | — | `create` | `create_vfolder_upload_session` | `single_entity` | `permission` | `custom` | `F8` | **F8** — v2인 `create_vfolder_upload_session_v2`는 UPDATE를 선언한다. 같은 작업이 API 버전에 따라 다른 권한을 요구한다(file.py:28) |
-| `vfolder` | — | `update` | `create_vfolder_upload_session_v2` | `single_entity` | `permission` | `custom` | `F8` | **F8** — v1인 `create_vfolder_upload_session`은 CREATE를 선언한다(upload_session_v2.py:20) |
-| `vfolder` | — | `delete` | `delete_vfolder_files` | `single_entity` | `permission` | `custom` | `F8` | **F8** — v2인 `delete_vfolder_files_v2`는 UPDATE를 선언해, SOFT_DELETE 권한을 요구하는 쪽은 v1뿐이다(file.py:155) |
-| `vfolder` | — | `update` | `delete_vfolder_files_v2` | `single_entity` | `permission` | `custom` | `F8` | **F8** — v1인 `delete_vfolder_files`는 DELETE(=SOFT_DELETE)를 선언한다(file_v2.py:103) |
-| `vfolder` | — | `search` | `list_vfolder_files` | `single_entity` | `permission` | `custom` | `F8` | **F8** — v2인 `list_vfolder_files_v2`는 GET을 선언한다. 권한은 같고 감사 기록만 다르다(file.py:107) |
-| `vfolder` | — | `get` | `list_vfolder_files_v2` | `single_entity` | `permission` | `custom` | `F8` | **F8** — v1인 `list_vfolder_files`는 SEARCH를 선언한다. 권한은 같고 감사 기록만 다르다(file_v2.py:30) |
-| `vfolder` | — | `create` | `vfolder_mkdir` | `single_entity` | `permission` | `custom` | `F8` | **F8** — v2인 `vfolder_mkdir_v2`는 UPDATE를 선언한다(file.py:226) |
-| `vfolder` | — | `update` | `vfolder_mkdir_v2` | `single_entity` | `permission` | `custom` | `F8` | **F8** — v1인 `vfolder_mkdir`은 CREATE를 선언한다(file_v2.py:55) |
+| `vfolder` | — | `create` | `create_vfolder_upload_session` | `single_entity` | `permission` | `custom` | `O` | **v1/v2 불일치** — CREATE. v2는 UPDATE(file.py:28) |
+| `vfolder` | — | `update` | `create_vfolder_upload_session_v2` | `single_entity` | `permission` | `custom` | `O` | **v1/v2 불일치** — UPDATE. v1은 CREATE(upload_session_v2.py:20) |
+| `vfolder` | — | `delete` | `delete_vfolder_files` | `single_entity` | `permission` | `custom` | `O` | **v1/v2 불일치** — DELETE=SOFT_DELETE. v2는 UPDATE(file.py:155) |
+| `vfolder` | — | `update` | `delete_vfolder_files_v2` | `single_entity` | `permission` | `custom` | `O` | **v1/v2 불일치** — UPDATE. v1은 DELETE=SOFT_DELETE(file_v2.py:103) |
+| `vfolder` | — | `search` | `list_vfolder_files` | `single_entity` | `permission` | `custom` | `O` | **v1/v2 불일치** — SEARCH. v2는 GET — 권한은 같고 감사 기록만 다르다(file.py:107) |
+| `vfolder` | — | `get` | `list_vfolder_files_v2` | `single_entity` | `permission` | `custom` | `O` | **v1/v2 불일치** — GET. v1은 SEARCH — 권한은 같고 감사 기록만 다르다(file_v2.py:30) |
+| `vfolder` | — | `create` | `vfolder_mkdir` | `single_entity` | `permission` | `custom` | `O` | **v1/v2 불일치** — CREATE. v2는 UPDATE(file.py:226) |
+| `vfolder` | — | `update` | `vfolder_mkdir_v2` | `single_entity` | `permission` | `custom` | `O` | **v1/v2 불일치** — UPDATE. v1은 CREATE(file_v2.py:55) |
 
 ### vfolder — 성공 (60행)
 
@@ -912,15 +911,15 @@ concern으로 섹션을 갈랐다. 컬럼은 `backend.ai mgr ops list`의 것에
 
 | entity_type | field_type | operation | action_name | kind | gate | backing | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|
-| `export` | — | `create` | `export_audit_logs_c_s_v` | `global` | `permission` | `custom` | `F11` | **F11** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다. 선언된 이름이 그대로 감사 기록에 남는다 |
-| `export` | — | `create` | `export_keypairs_c_s_v` | `global` | `permission` | `custom` | `F11` | **F11** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다. 선언된 이름이 그대로 감사 기록에 남는다 |
-| `export` | — | `create` | `export_my_keypairs_c_s_v` | `scope` | `permission` | `custom` | `F11` | **F11** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다. 선언된 이름이 그대로 감사 기록에 남는다 |
-| `export` | — | `create` | `export_my_sessions_c_s_v` | `scope` | `permission` | `custom` | `F11` | **F11** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다. 선언된 이름이 그대로 감사 기록에 남는다 |
-| `export` | — | `create` | `export_projects_c_s_v` | `global` | `permission` | `custom` | `F11` | **F11** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다. 선언된 이름이 그대로 감사 기록에 남는다 |
-| `export` | — | `create` | `export_sessions_by_project_c_s_v` | `scope` | `permission` | `custom` | `F11` | **F11** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다. 선언된 이름이 그대로 감사 기록에 남는다 |
-| `export` | — | `create` | `export_sessions_c_s_v` | `global` | `permission` | `custom` | `F11` | **F11** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다. 선언된 이름이 그대로 감사 기록에 남는다 |
-| `export` | — | `create` | `export_users_by_domain_c_s_v` | `scope` | `permission` | `custom` | `F11` | **F11** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다. 선언된 이름이 그대로 감사 기록에 남는다 |
-| `export` | — | `create` | `export_users_c_s_v` | `global` | `permission` | `custom` | `F11` | **F11** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다. 선언된 이름이 그대로 감사 기록에 남는다 |
+| `export` | — | `create` | `export_audit_logs_c_s_v` | `global` | `permission` | `custom` | `R` | **action_name 자동 변환** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다 |
+| `export` | — | `create` | `export_keypairs_c_s_v` | `global` | `permission` | `custom` | `R` | **action_name 자동 변환** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다 |
+| `export` | — | `create` | `export_my_keypairs_c_s_v` | `scope` | `permission` | `custom` | `R` | **action_name 자동 변환** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다 |
+| `export` | — | `create` | `export_my_sessions_c_s_v` | `scope` | `permission` | `custom` | `R` | **action_name 자동 변환** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다 |
+| `export` | — | `create` | `export_projects_c_s_v` | `global` | `permission` | `custom` | `R` | **action_name 자동 변환** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다 |
+| `export` | — | `create` | `export_sessions_by_project_c_s_v` | `scope` | `permission` | `custom` | `R` | **action_name 자동 변환** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다 |
+| `export` | — | `create` | `export_sessions_c_s_v` | `global` | `permission` | `custom` | `R` | **action_name 자동 변환** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다 |
+| `export` | — | `create` | `export_users_by_domain_c_s_v` | `scope` | `permission` | `custom` | `R` | **action_name 자동 변환** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다 |
+| `export` | — | `create` | `export_users_c_s_v` | `global` | `permission` | `custom` | `R` | **action_name 자동 변환** — 클래스명의 `CSV`가 `_c_s_v`로 자동 변환됐다 |
 
 ### visibility — 성공 (4행)
 
