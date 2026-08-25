@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.api.adapters.agent.adapter import AgentAdapter
 from ai.backend.manager.api.adapters.app_config.adapter import AppConfigAdapter
 from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
@@ -25,6 +26,8 @@ from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
 )
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
+from ai.backend.manager.api.adapters.entity.adapter import EntityAdapter
+from ai.backend.manager.api.adapters.entity.types import WiredEntityTypes
 from ai.backend.manager.api.adapters.entity_invitation.adapter import EntityInvitationAdapter
 from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 from ai.backend.manager.api.adapters.huggingface_registry.adapter import HuggingFaceRegistryAdapter
@@ -97,6 +100,7 @@ class Adapters:
         artifact: ArtifactAdapter,
         artifact_registry: ArtifactRegistryAdapter,
         audit_log: AuditLogAdapter,
+        entity: EntityAdapter,
         container_registry: ContainerRegistryAdapter,
         deployment: DeploymentAdapter,
         domain: DomainAdapter,
@@ -147,6 +151,7 @@ class Adapters:
         self.artifact = artifact
         self.artifact_registry = artifact_registry
         self.audit_log = audit_log
+        self.entity = entity
         self.container_registry = container_registry
         self.deployment = deployment
         self.domain = domain
@@ -193,6 +198,7 @@ class Adapters:
     def create(
         cls,
         processors: Processors,
+        action_registry: ProcessorRegistry[Any],
         auth_config: AuthConfig,
         key_provider_pool: KeyProviderPool,
         deployment_coordinator: DeploymentCoordinator,
@@ -208,6 +214,7 @@ class Adapters:
         catalog endpoints always agree with the coordinators' live
         registrations.
         """
+        entity_types = WiredEntityTypes(action_registry)
         return cls(
             agent=AgentAdapter(processors),
             app_config=AppConfigAdapter(processors),
@@ -217,6 +224,7 @@ class Adapters:
             artifact=ArtifactAdapter(processors),
             artifact_registry=ArtifactRegistryAdapter(processors),
             audit_log=AuditLogAdapter(processors),
+            entity=EntityAdapter(entity_types),
             container_registry=ContainerRegistryAdapter(processors),
             deployment=DeploymentAdapter(processors, deployment_coordinator),
             domain=DomainAdapter(processors),

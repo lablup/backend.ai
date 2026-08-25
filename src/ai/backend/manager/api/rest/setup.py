@@ -32,6 +32,7 @@ def setup_api(
     r = dep_resources
     adapters = Adapters.create(
         r.processing.processors,
+        r.processing.action_registry,
         r.bootstrap.config_provider.config.auth,
         key_provider_pool=r.bootstrap.key_provider_pool,
         deployment_coordinator=r.orchestration.sokovan_orchestrator.deployment_coordinator,
