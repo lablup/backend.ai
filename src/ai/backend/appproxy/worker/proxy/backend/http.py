@@ -62,14 +62,15 @@ class HTTPBackend(BaseBackend):
             sock_connect=10.0,
             sock_read=None,
         )
-        cleanup_interval = self.root_context.local_config.proxy_worker.client_pool_cleanup_interval
+        worker_config = self.root_context.local_config.proxy_worker
         self.client_pool = ClientPool(
             partial(
                 tcp_client_session_factory,
                 timeout=client_timeout,
                 auto_decompress=False,  # transparently pass the response body
             ),
-            cleanup_interval_seconds=cleanup_interval,
+            cleanup_interval_seconds=worker_config.client_pool_cleanup_interval,
+            keep_inflight_sessions=worker_config.client_pool_keep_inflight_sessions,
         )
 
     @override
