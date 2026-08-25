@@ -55,6 +55,18 @@ from ai.backend.manager.actions.v2.lookup.monitor.audit_log import LookupActionA
 from ai.backend.manager.actions.v2.lookup.monitor.prometheus import (
     LookupActionPrometheusMonitor,
 )
+from ai.backend.manager.actions.v2.relation.monitor.audit_log import (
+    RelationActionAuditLogMonitor,
+)
+from ai.backend.manager.actions.v2.relation.monitor.prometheus import (
+    RelationActionPrometheusMonitor,
+)
+from ai.backend.manager.actions.v2.relation.monitor.reporter import (
+    RelationActionReporterMonitor,
+)
+from ai.backend.manager.actions.v2.relation.validator.rbac import (
+    VirtualScopeRelationActionRBACValidator,
+)
 from ai.backend.manager.actions.v2.scope.monitor.audit_log import ScopeActionAuditLogMonitor
 from ai.backend.manager.actions.v2.scope.monitor.prometheus import ScopeActionPrometheusMonitor
 from ai.backend.manager.actions.v2.scope.monitor.reporter import ScopeActionReporterMonitor
@@ -307,6 +319,15 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                     client_ip_masking_repository,
                 ),
             ],
+            relation=[
+                RelationActionReporterMonitor(reporter_hub),
+                RelationActionPrometheusMonitor(),
+                RelationActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
+            ],
             scope=[
                 ScopeActionReporterMonitor(reporter_hub),
                 ScopeActionPrometheusMonitor(),
@@ -389,6 +410,9 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             single_entity=LegacySingleEntityActionRBACValidator(permission_controller_repository),
         )
         virtual_scope_rbac_validators = VirtualScopeRBACValidators(
+            relation=VirtualScopeRelationActionRBACValidator(
+                permission_controller_repository, config_provider
+            ),
             scope=VirtualScopeScopeActionRBACValidator(
                 permission_controller_repository, config_provider
             ),
@@ -420,6 +444,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                     partial_bulk=[virtual_scope_rbac_validators.partial_bulk],
                     atomic_bulk=[virtual_scope_rbac_validators.atomic_bulk],
                     scope=[virtual_scope_rbac_validators.scope],
+                    relation=[virtual_scope_rbac_validators.relation],
                 ),
             ),
         )

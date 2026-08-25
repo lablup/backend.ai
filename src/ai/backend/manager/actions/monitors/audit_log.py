@@ -45,6 +45,7 @@ class AuditLogMonitor(ActionMonitor):
             ClientIPMaskingTarget.AUDIT_LOGS, current_client_ip()
         )
         creator = LegacyAuditLogCreator(
+            entity_type=EntityType(action.entity_type()),
             action_id=result.meta.action_id,
             operation=action.operation_type(),
             # Legacy actions declare no name; record the spec type until each
@@ -59,7 +60,7 @@ class AuditLogMonitor(ActionMonitor):
             duration=result.meta.duration,
             client_ip=client_ip,
         )
-        await self._repository.create_dangling_field(EntityType(action.entity_type()), creator)
+        await self._repository.create_dangling_field(creator)
 
     @override
     async def prepare(self, action: BaseAction, meta: BaseActionTriggerMeta) -> None:

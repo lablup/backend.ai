@@ -18,6 +18,24 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 | `global` | none (system-wide) |
 | `lookup` / `bulk_lookup` | an external key into an internal id |
 | `single_field` / `bulk_field` | field rows |
+| `relation` | two entities, linked or unlinked |
+
+## Linking two entities
+
+- The shape splits on **whether one side is contained in the other**.
+
+| | Example | Shape |
+|---|---|---|
+| Contained | project ⊃ user | `scope`: `scope_targets` = the container, `entity_type` = what it contains |
+| Not contained | resource group ↔ domain | `relation`: `scope_targets` = both, no entity type |
+
+- A `relation` action declares no `entity_type`, because what it writes is not an entity.
+  With no type there is nothing to read at a scope, so the permission is asked of each
+  named scope itself and every one of them has to permit the run.
+- Its audit row names no entity and no kind; the scopes go to `audit_log_scopes`, which
+  is why `audit_logs.entity_type` is nullable.
+- Putting a user in an organization is the contained case, and it grants roles as a
+  second write — see `proposals/BEP-1076-project-membership.md`.
 
 ## What an action takes
 

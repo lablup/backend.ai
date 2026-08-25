@@ -2,13 +2,16 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from typing import Any, override
 
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.common.data.entity.types import EntityIdentifier as OwnerEntityID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction, BasePartialBulkAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
 from ai.backend.manager.actions.v2.ops.backend import OpsBackendAction
+from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.models.base import Base
@@ -30,6 +33,11 @@ from ai.backend.manager.models.specs.querier import (
     DataQuerier,
     FieldQuerier,
     OwnedFieldQuerier,
+)
+from ai.backend.manager.models.specs.relation import (
+    RelationCreator,
+    RelationLifecycleUpdater,
+    RelationPurger,
 )
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.models.specs.updater import (
@@ -110,6 +118,21 @@ __all__ = (
     "BatchUpdateGlobalOpsAction",
     "BatchPurgeScopeOpsAction",
     "BatchPurgeGlobalOpsAction",
+    "RevokeRolesOpsAction",
+    "GrantRolesOpsAction",
+    "RoleRevokeOpsAction",
+    "RoleGrantOpsAction",
+    "WithdrawFromOrganizationOpsAction",
+    "EnrollInOrganizationOpsAction",
+    "OrganizationWithdrawOpsAction",
+    "OrganizationEnrollOpsAction",
+    "PurgeRelationOpsAction",
+    "RestoreRelationOpsAction",
+    "DeleteRelationOpsAction",
+    "CreateRelationOpsAction",
+    "RelationPurgeOpsAction",
+    "RelationLifecycleOpsAction",
+    "RelationCreateOpsAction",
     "GetGlobalOpsAction",
     "OwnedFieldGetOpsAction",
     "BulkGetOwnedFieldOpsAction",
@@ -1088,3 +1111,212 @@ class BatchPurgeGlobalOpsAction[TRow: Base, TData](
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.PURGE
+
+
+class RelationEndpointsOpsAction(OpsBackendAction):
+    """The pair a relation operation is about.
+
+    The two ends are the execution input; the same pair reaches the check as the
+    action's scope targets. Declared here rather than read off the shape for the reason
+    ``FieldCreateOpsAction.owner_id`` is: what a run is checked against and what it
+    writes are different axes.
+    """
+
+    @abstractmethod
+    def left(self) -> EntityIdentifier:
+        """Return the entity on one end of the relation."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def right(self) -> EntityIdentifier:
+        """Return the entity on the other end."""
+        raise NotImplementedError
+
+
+class RelationCreateOpsAction[TRow: Base](RelationEndpointsOpsAction):
+    """Carries the insert spec of the row linking the pair."""
+
+    @abstractmethod
+    def to_creator(self) -> RelationCreator[TRow]:
+        """Return the insert spec this action executes."""
+        raise NotImplementedError
+
+
+class RelationLifecycleOpsAction[TRow: Base](RelationEndpointsOpsAction):
+    """Carries the spec that switches the pair's relation off or back on."""
+
+    @abstractmethod
+    def to_updater(self) -> RelationLifecycleUpdater[TRow]:
+        """Return the lifecycle spec this action executes."""
+        raise NotImplementedError
+
+
+class RelationPurgeOpsAction[TRow: Base](RelationEndpointsOpsAction):
+    """Carries the delete spec of the row linking the pair."""
+
+    @abstractmethod
+    def to_purger(self) -> RelationPurger[TRow]:
+        """Return the delete spec this action executes."""
+        raise NotImplementedError
+
+
+class CreateRelationOpsAction[TRow: Base](BaseRelationAction, RelationCreateOpsAction[TRow], ABC):
+    """A link between two entities, permitted by both."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+
+class DeleteRelationOpsAction[TRow: Base](
+    BaseRelationAction, RelationLifecycleOpsAction[TRow], ABC
+):
+    """A link switched off; the updater writes the lifecycle column alone."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
+
+
+class RestoreRelationOpsAction[TRow: Base](
+    BaseRelationAction, RelationLifecycleOpsAction[TRow], ABC
+):
+    """The reverse transition of a link's soft delete."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.RESTORE
+
+
+class PurgeRelationOpsAction[TRow: Base](BaseRelationAction, RelationPurgeOpsAction[TRow], ABC):
+    """A link removed for good."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
+
+
+class OrganizationEnrollOpsAction[TRow: Base](OpsBackendAction):
+    """Carries what putting a user in an organization writes.
+
+    ``role_ids`` names the roles to give; ``None`` means the organization's auto-assign
+    roles, which is what a join with no role named asks for. A named role must be one
+    the organization holds — the service checks that before this reaches ops.
+    """
+
+    @abstractmethod
+    def organization(self) -> EntityIdentifier:
+        """Return the organization being joined."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def user_id(self) -> UserID:
+        """Return the user joining it."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_creator(self) -> RelationCreator[TRow]:
+        """Return the membership row's insert spec."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def role_ids(self) -> Sequence[RoleID] | None:
+        """Return the roles to grant, or ``None`` for the auto-assign ones."""
+        raise NotImplementedError
+
+
+class OrganizationWithdrawOpsAction[TRow: Base](OpsBackendAction):
+    """Carries what taking a user out of an organization removes."""
+
+    @abstractmethod
+    def organization(self) -> EntityIdentifier:
+        """Return the organization being left."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def user_id(self) -> UserID:
+        """Return the user leaving it."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_purger(self) -> RelationPurger[TRow]:
+        """Return the membership row's delete spec."""
+        raise NotImplementedError
+
+
+class RoleGrantOpsAction(OpsBackendAction):
+    """Carries a grant of roles to a user, standing on its own.
+
+    A member's roles change without the membership changing, so this is reachable
+    without going through a join.
+    """
+
+    @abstractmethod
+    def user_id(self) -> UserID:
+        raise NotImplementedError
+
+    @abstractmethod
+    def role_ids(self) -> Sequence[RoleID]:
+        raise NotImplementedError
+
+
+class RoleRevokeOpsAction(OpsBackendAction):
+    """Carries a revocation of roles from a user, standing on its own."""
+
+    @abstractmethod
+    def user_id(self) -> UserID:
+        raise NotImplementedError
+
+    @abstractmethod
+    def role_ids(self) -> Sequence[RoleID]:
+        raise NotImplementedError
+
+
+class EnrollInOrganizationOpsAction[TRow: Base](
+    BaseScopeAction, OrganizationEnrollOpsAction[TRow], ABC
+):
+    """A user put in an organization, answered for by the organization alone.
+
+    The scope shape as it stands: the user is inside the organization, so the
+    organization is the scope and ``user`` is the type the permission is read for. The
+    other party is the recipient, not a second permission target
+    (`proposals/BEP-1076-project-membership.md`).
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+
+class WithdrawFromOrganizationOpsAction[TRow: Base](
+    BaseScopeAction, OrganizationWithdrawOpsAction[TRow], ABC
+):
+    """A user taken out of an organization, with the organization's roles."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
+
+
+class GrantRolesOpsAction(BaseScopeAction, RoleGrantOpsAction, ABC):
+    """Roles given to a user within the scope those roles belong to."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+
+class RevokeRolesOpsAction(BaseScopeAction, RoleRevokeOpsAction, ABC):
+    """Roles taken back from a user within the scope those roles belong to."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE

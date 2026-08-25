@@ -97,21 +97,28 @@ from ai.backend.manager.actions.v2.ops.base import (
     CreateGlobalOpsAction,
     CreateGlobalRoleManagedEntityOpsAction,
     CreateGlobalWithFieldsOpsAction,
+    CreateRelationOpsAction,
     CreateRoleManagedEntityOpsAction,
     DeletePartialBulkOpsAction,
+    DeleteRelationOpsAction,
     DeleteSingleEntityGuardedOpsAction,
     DeleteSingleEntityOpsAction,
+    EnrollInOrganizationOpsAction,
     GetGlobalOpsAction,
     GetSingleEntityOpsAction,
+    GrantRolesOpsAction,
     LookupEntityOpsAction,
     OperationScopeOpsAction,
     PartialBulkGetEntityOpsAction,
     PartialBulkPurgeEntityOpsAction,
     PartialBulkPurgeGlobalEntityOpsAction,
     PurgeEntityOpsAction,
+    PurgeRelationOpsAction,
     RestorePartialBulkOpsAction,
+    RestoreRelationOpsAction,
     RestoreSingleEntityGuardedOpsAction,
     RestoreSingleEntityOpsAction,
+    RevokeRolesOpsAction,
     SearchGlobalOpsAction,
     UpdateGlobalOpsAction,
     UpdatePartialBulkOpsAction,
@@ -119,6 +126,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     UpdateSingleEntityOpsAction,
     UpsertEntityOpsAction,
     UpsertGlobalOpsAction,
+    WithdrawFromOrganizationOpsAction,
 )
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
@@ -129,8 +137,14 @@ from ai.backend.manager.actions.v2.ops.result import (
     FieldKeyLookupOpsResult,
     FieldOwnerLookupOpsResult,
     LookupOpsResult,
+    OrganizationMembershipOpsResult,
+    RelationOpsResult,
+    RoleAssignmentOpsResult,
     ScopedBatchOpsResult,
 )
+from ai.backend.manager.actions.v2.relation.monitor import RelationActionMonitor
+from ai.backend.manager.actions.v2.relation.processor import RelationActionProcessor
+from ai.backend.manager.actions.v2.relation.validator import RelationActionValidator
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.monitor import ScopeActionMonitor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
@@ -172,13 +186,21 @@ from ai.backend.manager.services.ops.service import (
     GlobalUpsertService,
     GuardedUpdateService,
     LookupService,
+    OrganizationEnrollService,
+    OrganizationWithdrawService,
     PartialBulkDeleteService,
     PartialBulkGetService,
     PartialBulkRestoreService,
     PartialBulkUpdateService,
+    RelationCreateService,
+    RelationDeleteService,
+    RelationPurgeService,
+    RelationRestoreService,
     RestoreService,
+    RoleGrantService,
     RoleManagedEntityAtomicCreateService,
     RoleManagedEntityCreateService,
+    RoleRevokeService,
     SearchService,
     UpdateService,
 )
@@ -261,6 +283,125 @@ class ProcessorGroup[TData: EntityData]:
             func,
             monitors=(*self._deps.monitors.single_entity, *monitors),
             validators=(*self._deps.validators.single_entity, *validators),
+        )
+
+    def create_relation_ops[TAction: CreateRelationOpsAction[Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[RelationActionValidator] = (),
+        monitors: Sequence[RelationActionMonitor] = (),
+    ) -> RelationActionProcessor[TAction, RelationOpsResult]:
+        self._record(action_cls, ActionKind.RELATION, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return RelationActionProcessor(
+            RelationCreateService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.relation, *monitors),
+            validators=(*self._deps.validators.relation, *validators),
+        )
+
+    def delete_relation_ops[TAction: DeleteRelationOpsAction[Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[RelationActionValidator] = (),
+        monitors: Sequence[RelationActionMonitor] = (),
+    ) -> RelationActionProcessor[TAction, RelationOpsResult]:
+        self._record(action_cls, ActionKind.RELATION, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return RelationActionProcessor(
+            RelationDeleteService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.relation, *monitors),
+            validators=(*self._deps.validators.relation, *validators),
+        )
+
+    def restore_relation_ops[TAction: RestoreRelationOpsAction[Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[RelationActionValidator] = (),
+        monitors: Sequence[RelationActionMonitor] = (),
+    ) -> RelationActionProcessor[TAction, RelationOpsResult]:
+        self._record(action_cls, ActionKind.RELATION, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return RelationActionProcessor(
+            RelationRestoreService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.relation, *monitors),
+            validators=(*self._deps.validators.relation, *validators),
+        )
+
+    def purge_relation_ops[TAction: PurgeRelationOpsAction[Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[RelationActionValidator] = (),
+        monitors: Sequence[RelationActionMonitor] = (),
+    ) -> RelationActionProcessor[TAction, RelationOpsResult]:
+        self._record(action_cls, ActionKind.RELATION, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return RelationActionProcessor(
+            RelationPurgeService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.relation, *monitors),
+            validators=(*self._deps.validators.relation, *validators),
+        )
+
+    def enroll_in_organization_ops[TAction: EnrollInOrganizationOpsAction[Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[ScopeActionValidator] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[TAction, OrganizationMembershipOpsResult]:
+        """Put a user in the organization and give them its roles.
+
+        Scope-shaped: the user is inside the organization, so the organization answers
+        for it and the other party is the recipient rather than a second target."""
+        self._record(action_cls, ActionKind.SCOPE, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return ScopeActionProcessor(
+            OrganizationEnrollService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(*self._deps.validators.scope, *validators),
+        )
+
+    def withdraw_from_organization_ops[TAction: WithdrawFromOrganizationOpsAction[Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[ScopeActionValidator] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[TAction, OrganizationMembershipOpsResult]:
+        """Take a user out of the organization, and its roles with them."""
+        self._record(action_cls, ActionKind.SCOPE, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return ScopeActionProcessor(
+            OrganizationWithdrawService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(*self._deps.validators.scope, *validators),
+        )
+
+    def grant_roles_ops[TAction: GrantRolesOpsAction](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[ScopeActionValidator] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[TAction, RoleAssignmentOpsResult]:
+        """Give a user roles without touching their membership."""
+        self._record(action_cls, ActionKind.SCOPE, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return ScopeActionProcessor(
+            RoleGrantService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(*self._deps.validators.scope, *validators),
+        )
+
+    def revoke_roles_ops[TAction: RevokeRolesOpsAction](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[ScopeActionValidator] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[TAction, RoleAssignmentOpsResult]:
+        """Take roles back from a user without touching their membership."""
+        self._record(action_cls, ActionKind.SCOPE, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return ScopeActionProcessor(
+            RoleRevokeService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(*self._deps.validators.scope, *validators),
         )
 
     def scope[TAction: BaseScopeAction, TResult: BaseScopeActionResult](

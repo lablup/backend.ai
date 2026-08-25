@@ -266,7 +266,7 @@ class TestAuditLogMonitorActorIdentities:
     def _recorded_spec(self, mock_audit_log_repository: MagicMock) -> LegacyAuditLogCreator:
         mock_audit_log_repository.create_dangling_field.assert_called_once()
         spec: LegacyAuditLogCreator = (
-            mock_audit_log_repository.create_dangling_field.call_args.args[1]
+            mock_audit_log_repository.create_dangling_field.call_args.args[0]
         )
         return spec
 

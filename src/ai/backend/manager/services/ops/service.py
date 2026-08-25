@@ -37,6 +37,9 @@ from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
     BatchUpdateOpsAction,
     BulkGetOwnedFieldOpsAction,
+    CreateRelationOpsAction,
+    DeleteRelationOpsAction,
+    EnrollInOrganizationOpsAction,
     EntityAtomicCreateOpsAction,
     EntityAtomicUpsertOpsAction,
     EntityCreateOpsAction,
@@ -61,14 +64,19 @@ from ai.backend.manager.actions.v2.ops.base import (
     GlobalEntityWithFieldsCreateOpsAction,
     GlobalRoleManagedEntityCreateOpsAction,
     GlobalSearchOpsAction,
+    GrantRolesOpsAction,
     GuardedUpdateOpsAction,
     LookupOpsAction,
     PartialBulkGetEntityOpsAction,
     PartialBulkUpdateOpsAction,
+    PurgeRelationOpsAction,
+    RestoreRelationOpsAction,
+    RevokeRolesOpsAction,
     RoleManagedEntityAtomicCreateOpsAction,
     RoleManagedEntityCreateOpsAction,
     SearchOpsAction,
     UpdateOpsAction,
+    WithdrawFromOrganizationOpsAction,
 )
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
@@ -82,7 +90,10 @@ from ai.backend.manager.actions.v2.ops.result import (
     FieldOwnerLookupOpsResult,
     FieldsOpsResult,
     LookupOpsResult,
+    OrganizationMembershipOpsResult,
     OwnedFieldsOpsResult,
+    RelationOpsResult,
+    RoleAssignmentOpsResult,
     ScopedBatchOpsResult,
     ScopedFieldsOpsResult,
 )
@@ -131,6 +142,14 @@ __all__ = (
     "BatchUpdateService",
     "GlobalBatchUpdateService",
     "BatchPurgeService",
+    "RelationPurgeService",
+    "RoleRevokeService",
+    "RoleGrantService",
+    "OrganizationWithdrawService",
+    "OrganizationEnrollService",
+    "RelationRestoreService",
+    "RelationDeleteService",
+    "RelationCreateService",
     "GlobalBatchPurgeService",
 )
 
@@ -926,6 +945,130 @@ class BatchPurgeService[TData: EntityData]:
                 action.operation_scopes(), action.to_batch_purger()
             )
         )
+
+
+class RelationCreateService:
+    """Links the two entities the action names."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: CreateRelationOpsAction[Any]) -> RelationOpsResult:
+        changed = await self._repository.create_relation(
+            action.left(), action.right(), action.to_creator()
+        )
+        return RelationOpsResult(changed=changed)
+
+
+class RelationDeleteService:
+    """Switches the pair's relation off."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: DeleteRelationOpsAction[Any]) -> RelationOpsResult:
+        changed = await self._repository.delete_relation(
+            action.left(), action.right(), action.to_updater()
+        )
+        return RelationOpsResult(changed=changed)
+
+
+class RelationRestoreService:
+    """Switches the pair's relation back on."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: RestoreRelationOpsAction[Any]) -> RelationOpsResult:
+        changed = await self._repository.restore_relation(
+            action.left(), action.right(), action.to_updater()
+        )
+        return RelationOpsResult(changed=changed)
+
+
+class RelationPurgeService:
+    """Removes the row linking the pair."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: PurgeRelationOpsAction[Any]) -> RelationOpsResult:
+        changed = await self._repository.purge_relation(
+            action.left(), action.right(), action.to_purger()
+        )
+        return RelationOpsResult(changed=changed)
+
+
+class OrganizationEnrollService:
+    """Puts a user in an organization and gives them its roles."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: EnrollInOrganizationOpsAction[Any]
+    ) -> OrganizationMembershipOpsResult:
+        user_id = action.user_id()
+        changed = await self._repository.enroll_in_organization(
+            action.organization(), user_id, action.to_creator(), action.role_ids()
+        )
+        return OrganizationMembershipOpsResult(user=user_id, changed=changed)
+
+
+class OrganizationWithdrawService:
+    """Takes a user out of an organization, and its roles with them."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: WithdrawFromOrganizationOpsAction[Any]
+    ) -> OrganizationMembershipOpsResult:
+        user_id = action.user_id()
+        changed = await self._repository.withdraw_from_organization(
+            action.organization(), user_id, action.to_purger()
+        )
+        return OrganizationMembershipOpsResult(user=user_id, changed=changed)
+
+
+class RoleGrantService:
+    """Gives a user the roles the action names."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: GrantRolesOpsAction) -> RoleAssignmentOpsResult:
+        user_id = action.user_id()
+        await self._repository.grant_roles(user_id, action.role_ids())
+        return RoleAssignmentOpsResult(user=user_id)
+
+
+class RoleRevokeService:
+    """Takes the roles the action names back from a user."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: RevokeRolesOpsAction) -> RoleAssignmentOpsResult:
+        user_id = action.user_id()
+        await self._repository.revoke_roles(user_id, action.role_ids())
+        return RoleAssignmentOpsResult(user=user_id)
 
 
 class GlobalBatchPurgeService[TData: EntityData]:

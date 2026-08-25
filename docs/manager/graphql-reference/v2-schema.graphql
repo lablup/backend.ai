@@ -1463,8 +1463,10 @@ type AuditLogV2 implements Node {
   """UUID of the action that generated this log."""
   actionId: UUID!
 
-  """Type of entity this log relates to."""
-  entityType: String!
+  """
+  Type of entity this log relates to. Null for an operation that names scopes and no entity kind, such as linking two entities.
+  """
+  entityType: String
 
   """Operation performed (create, update, delete, etc.)."""
   operation: String!

@@ -23,7 +23,13 @@ class AuditLogNode(BaseResponseModel):
 
     id: UUID = Field(description="Audit log entry ID")
     action_id: UUID = Field(description="UUID of the action that generated this log")
-    entity_type: str = Field(description="Type of entity this log relates to")
+    entity_type: str | None = Field(
+        default=None,
+        description=(
+            "Type of entity this log relates to. Null for an operation that names "
+            "scopes and no entity kind, such as linking two entities."
+        ),
+    )
     operation: str = Field(description="Operation performed")
     entity_id: str | None = Field(default=None, description="ID of the affected entity")
     created_at: datetime = Field(description="Timestamp when the audit log was created")

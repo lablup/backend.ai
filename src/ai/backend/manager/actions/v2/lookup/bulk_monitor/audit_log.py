@@ -73,6 +73,7 @@ class BulkLookupActionAuditLogMonitor(BulkLookupActionMonitor):
                 # The key named nothing, so only the key itself identifies the row.
                 missed.append(
                     MissedLookupAuditLogCreator(
+                        entity_type=meta.entity_type,
                         action_id=result.meta.action_id,
                         operation=meta.operation_type,
                         action_name=meta.action_name,
@@ -112,7 +113,7 @@ class BulkLookupActionAuditLogMonitor(BulkLookupActionMonitor):
         if resolved:
             await self._repository.atomic_create_fields(resolved)
         if missed:
-            await self._repository.atomic_create_dangling_fields(meta.entity_type, missed)
+            await self._repository.atomic_create_dangling_fields(missed)
 
     def _render_key(self, key: LookupKey) -> str:
         """Rendered as the single lookup's is, so both are filterable the same way."""

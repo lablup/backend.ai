@@ -13,6 +13,8 @@ from ai.backend.manager.repositories.ops.v2.field_write import V2FieldWriteOps
 from ai.backend.manager.repositories.ops.v2.global_write import V2GlobalWriteOps
 from ai.backend.manager.repositories.ops.v2.grant_write import V2GrantWriteOps
 from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
+from ai.backend.manager.repositories.ops.v2.relation_write import V2RelationWriteOps
+from ai.backend.manager.repositories.ops.v2.role_write import V2RoleWriteOps
 from ai.backend.manager.repositories.ops.v2.update_write import V2UpdateWriteOps
 
 
@@ -24,6 +26,8 @@ class V2WriteOps(
     V2DanglingFieldWriteOps,
     V2UpdateWriteOps,
     V2BatchWriteOps,
+    V2RelationWriteOps,
+    V2RoleWriteOps,
     V2ReadOps,
 ):
     """Read-write operations over the v2 write specs, bound to a single session.

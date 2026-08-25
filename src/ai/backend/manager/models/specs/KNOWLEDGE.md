@@ -1,9 +1,9 @@
 ---
 name: write-spec-design
 type: design-rationale
-description: write-spec selection criteria (Entity/Global/Field/Sidecar), why the roots share no common ABC, what a sidecar row is and why it belongs to neither position, why the role-managed root is not an EntityCreator subtype, why a global entity is provisioned in the graph, how a field row's owner is read, the distinction between member_of and cap-based sharing, open entity-type strings
+description: write-spec selection criteria (Entity/Global/Field/Sidecar/Relation), why a row two entities own belongs to neither position and declares its own conflict handling, why the roots share no common ABC, what a sidecar row is and why it belongs to neither position, why the role-managed root is not an EntityCreator subtype, why a global entity is provisioned in the graph, how a field row's owner is read, the distinction between member_of and cap-based sharing, open entity-type strings
 scope: src/ai/backend/manager/models/specs
-keywords: [EntityCreator, GlobalEntityCreator, FieldCreator, RoleManagedEntityCreator, SidecarCreator, FieldOwnerLookup, RoleTemplateSource, member_of, entity_id, virtual-scope, preset-role, DataUpdater, soft-delete]
+keywords: [RelationCreator, RelationPurger, RelationLifecycleUpdater, EntityCreator, GlobalEntityCreator, FieldCreator, RoleManagedEntityCreator, SidecarCreator, FieldOwnerLookup, RoleTemplateSource, member_of, entity_id, virtual-scope, preset-role, DataUpdater, soft-delete]
 sources:
   - src/ai/backend/manager/models/specs/creator.py
   - src/ai/backend/manager/models/specs/lookup.py
@@ -38,6 +38,24 @@ execution path.
 | Global | An entity that goes under no other entity | Entity behavior minus `member_of` — the node is provisioned the same way |
 | Field | A row another entity owns (even with its own get/delete API) | create requires `owner_id`; purge is a plain delete |
 | Sidecar | A row outside the graph — an audit record, an event log | create inserts and nothing else; the entity it names is read by, not belonged to |
+
+## A relation belongs to both, so it belongs to neither position
+
+- The write specs split on ownership, and both positions assume it is zero or one: an
+  entity owns itself, a field is owned by exactly one entity. A row linking two entities
+  is owned by both, which neither position can say.
+- Ownership is read off the schema, not off the call site: what deletes the row when it
+  goes is what owns it. A polymorphic reference carries no foreign key, so ownership
+  there is a fact about the code that cleans up rather than about a constraint.
+- The relation roots therefore name the pair, never a row id. Nothing outside the layer
+  that wrote the row holds that id, and a read answers with the entities the relation
+  reaches rather than the row between them.
+- Conflict handling is the spec's because it is the table's. A unique constraint on the
+  bare pair means a soft-deleted row still occupies it, so an insert that did nothing
+  would leave the relation switched off; a partial index on (pair, alive) admits a new
+  row and keeps the history. One rule cannot serve both, so `build_conflict_values()`
+  declares which.
+- Full rationale: `proposals/BEP-1075-entity-relation-operations.md`.
 
 ## A sidecar belongs to neither position
 

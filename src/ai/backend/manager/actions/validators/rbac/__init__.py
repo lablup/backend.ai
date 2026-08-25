@@ -4,6 +4,9 @@ from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualScopeAtomicBulkActionRBACValidator,
     VirtualScopePartialBulkActionRBACValidator,
 )
+from ai.backend.manager.actions.v2.relation.validator.rbac import (
+    VirtualScopeRelationActionRBACValidator,
+)
 from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualScopeScopeActionRBACValidator,
 )
@@ -39,6 +42,7 @@ class VirtualScopeRBACValidators:
     """RBAC validators for the v2 action bases (actions/v2/{single_entity,bulk,scope})."""
 
     scope: VirtualScopeScopeActionRBACValidator
+    relation: VirtualScopeRelationActionRBACValidator
     single_entity: VirtualScopeSingleEntityActionRBACValidator
     partial_bulk: VirtualScopePartialBulkActionRBACValidator
     atomic_bulk: VirtualScopeAtomicBulkActionRBACValidator

@@ -6,6 +6,7 @@ from ai.backend.manager.actions.v2.bulk.validator.base import (
 )
 from ai.backend.manager.actions.v2.global_scope.validator.base import GlobalActionValidator
 from ai.backend.manager.actions.v2.lookup.validator.base import LookupActionValidator
+from ai.backend.manager.actions.v2.relation.validator.base import RelationActionValidator
 from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
 from ai.backend.manager.actions.v2.single_entity.validator.base import SingleEntityActionValidator
 
@@ -20,5 +21,6 @@ class ActionValidators:
     partial_bulk: list[PartialBulkActionValidator] = field(default_factory=list)
     atomic_bulk: list[AtomicBulkActionValidator] = field(default_factory=list)
     scope: list[ScopeActionValidator] = field(default_factory=list)
+    relation: list[RelationActionValidator] = field(default_factory=list)
     global_scope: list[GlobalActionValidator] = field(default_factory=list)
     lookup: list[LookupActionValidator] = field(default_factory=list)
