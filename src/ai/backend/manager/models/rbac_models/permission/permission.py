@@ -7,7 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.permission.permission import PermissionCreator, PermissionData
 from ai.backend.manager.data.permission.types import (
     OperationType,
@@ -52,7 +52,7 @@ class PermissionRow(CreatedAtMixin, Base):
         sa.ForeignKey("roles.id", ondelete="CASCADE"),
         nullable=False,
     )
-    scope_type: Mapped[ScopeType] = mapped_column(
+    scope_type: Mapped[EntityType] = mapped_column(
         "scope_type", sa.String(length=32), nullable=False
     )
     scope_id: Mapped[str] = mapped_column("scope_id", sa.String(64), nullable=False)

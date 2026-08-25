@@ -24,7 +24,7 @@ class PermissionCreator:
 class PermissionData:
     id: uuid.UUID
     role_id: uuid.UUID
-    scope_type: ScopeType
+    scope_type: EntityType
     scope_id: str
     entity_type: EntityType
     operation: OperationType
