@@ -28,7 +28,6 @@ from ai.backend.manager.data.retention.types import (
     RetentionPolicyData,
     RetentionPurgeResult,
 )
-from ai.backend.manager.data.role_invitation.types import RoleInvitationState
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderInvitationState
 from ai.backend.manager.errors.retention import RetentionCategoryNotSupportedError
@@ -53,7 +52,6 @@ from ai.backend.manager.models.resource_usage_history.row import (
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.retention.searchers import RetentionPolicySearcher
 from ai.backend.manager.models.retention.updaters import LastSweptAtUpdater
-from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.scheduling_history.row import (
     DeploymentHistoryRow,
@@ -171,14 +169,6 @@ class RetentionDBSource:
                     RoleRow.deleted_at,
                     threshold,
                     conditions=(RoleRow.status == RoleStatus.DELETED,),
-                ),
-                RetentionDrain(
-                    RoleInvitationRow,
-                    RoleInvitationRow.updated_at,
-                    threshold,
-                    conditions=(
-                        RoleInvitationRow.state.in_(RoleInvitationState.declined_states()),
-                    ),
                 ),
                 RetentionDrain(
                     VFolderInvitationRow,

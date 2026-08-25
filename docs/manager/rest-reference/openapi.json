@@ -16725,492 +16725,6 @@
         "title": "ScopedSearchEntityInvitationsInput",
         "type": "object"
       },
-      "CreateRoleInvitationInput": {
-        "description": "Input for creating role invitations.",
-        "properties": {
-          "role_id": {
-            "description": "Role ID to invite for",
-            "format": "uuid",
-            "title": "Role Id",
-            "type": "string"
-          },
-          "emails": {
-            "description": "Invitee email addresses",
-            "items": {
-              "type": "string"
-            },
-            "minItems": 1,
-            "title": "Emails",
-            "type": "array"
-          }
-        },
-        "required": [
-          "role_id",
-          "emails"
-        ],
-        "title": "CreateRoleInvitationInput",
-        "type": "object"
-      },
-      "RoleInvitationFilter": {
-        "description": "Filter for role invitations.",
-        "properties": {
-          "state": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RoleInvitationStateFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "role_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UUIDFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "role": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RoleNestedFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "inviter": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserNestedFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "invitee": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserNestedFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "AND": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RoleInvitationFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "And"
-          },
-          "OR": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RoleInvitationFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Or"
-          },
-          "NOT": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RoleInvitationFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Not"
-          }
-        },
-        "title": "RoleInvitationFilter",
-        "type": "object"
-      },
-      "RoleInvitationOrderBy": {
-        "description": "Order by specification for role invitations.",
-        "properties": {
-          "field": {
-            "$ref": "#/components/schemas/RoleInvitationOrderField"
-          },
-          "direction": {
-            "$ref": "#/components/schemas/OrderDirection",
-            "default": "DESC"
-          }
-        },
-        "required": [
-          "field"
-        ],
-        "title": "RoleInvitationOrderBy",
-        "type": "object"
-      },
-      "RoleInvitationOrderField": {
-        "description": "Orderable fields for role invitations.",
-        "enum": [
-          "created_at",
-          "state"
-        ],
-        "title": "RoleInvitationOrderField",
-        "type": "string"
-      },
-      "RoleInvitationStateDTO": {
-        "description": "Role invitation state.",
-        "enum": [
-          "pending",
-          "accepted",
-          "rejected",
-          "canceled"
-        ],
-        "title": "RoleInvitationStateDTO",
-        "type": "string"
-      },
-      "RoleInvitationStateFilter": {
-        "description": "Filter for invitation state with equality and membership operators.\n\nFollows the Strawberry GQL EnumFilter pattern.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RoleInvitationStateDTO"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact match for invitation state."
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RoleInvitationStateDTO"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Match any of the provided states.",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RoleInvitationStateDTO"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exclude exact state match."
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RoleInvitationStateDTO"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exclude any of the provided states.",
-            "title": "Not In"
-          }
-        },
-        "title": "RoleInvitationStateFilter",
-        "type": "object"
-      },
-      "RoleNestedFilter": {
-        "description": "Nested filter for roles within a role assignment.",
-        "properties": {
-          "name": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "source": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RoleSourceFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "status": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RoleStatusFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "AND": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RoleNestedFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "And"
-          },
-          "OR": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RoleNestedFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Or"
-          },
-          "NOT": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RoleNestedFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Not"
-          }
-        },
-        "title": "RoleNestedFilter",
-        "type": "object"
-      },
-      "UserNestedFilter": {
-        "description": "Filter roles by their user assignments.",
-        "properties": {
-          "user_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UUIDFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "AND": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/UserNestedFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "And"
-          },
-          "OR": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/UserNestedFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Or"
-          },
-          "NOT": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/UserNestedFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Not"
-          }
-        },
-        "title": "UserNestedFilter",
-        "type": "object"
-      },
-      "SearchRoleInvitationsInput": {
-        "description": "Pagination search input for role invitations.",
-        "properties": {
-          "filter": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RoleInvitationFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "order": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RoleInvitationOrderBy"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Order"
-          },
-          "first": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "First"
-          },
-          "after": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "After"
-          },
-          "last": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Last"
-          },
-          "before": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Before"
-          },
-          "limit": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Limit"
-          },
-          "offset": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Offset"
-          }
-        },
-        "title": "SearchRoleInvitationsInput",
-        "type": "object"
-      },
       "OperationTypeDTO": {
         "description": "RBAC operation type enum for DTO layer.",
         "enum": [
@@ -19235,6 +18749,69 @@
         "title": "RoleStatusFilter",
         "type": "object"
       },
+      "UserNestedFilter": {
+        "description": "Filter roles by their user assignments.",
+        "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UserNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UserNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UserNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Not"
+          }
+        },
+        "title": "UserNestedFilter",
+        "type": "object"
+      },
       "SearchRolesInput": {
         "description": "Pagination search input for roles.",
         "properties": {
@@ -20138,6 +19715,91 @@
           "field"
         ],
         "title": "RoleAssignmentOrderBy",
+        "type": "object"
+      },
+      "RoleNestedFilter": {
+        "description": "Nested filter for roles within a role assignment.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleSourceFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleStatusFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RoleNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RoleNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RoleNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Not"
+          }
+        },
+        "title": "RoleNestedFilter",
         "type": "object"
       },
       "SearchRoleAssignmentsInput": {
@@ -48533,247 +48195,6 @@
         },
         "parameters": [],
         "description": "The invitations the named sides reach.\n\n**Preconditions:**\n* User privilege required.\n"
-      }
-    },
-    "/v2/role-invitations": {
-      "post": {
-        "operationId": "v2/role-invitations.create",
-        "tags": [
-          "v2/role-invitations"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateRoleInvitationInput"
-              }
-            }
-          }
-        },
-        "parameters": [],
-        "description": "Create role invitations by email.\n\n**Preconditions:**\n* User privilege required.\n"
-      }
-    },
-    "/v2/role-invitations/{invitation_id}/accept": {
-      "post": {
-        "operationId": "v2/role-invitations.accept",
-        "tags": [
-          "v2/role-invitations"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "invitation_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "description": "Invitee accepts a pending invitation.\n\n**Preconditions:**\n* User privilege required.\n"
-      }
-    },
-    "/v2/role-invitations/{invitation_id}/reject": {
-      "post": {
-        "operationId": "v2/role-invitations.reject",
-        "tags": [
-          "v2/role-invitations"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "invitation_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "description": "Invitee rejects a pending invitation.\n\n**Preconditions:**\n* User privilege required.\n"
-      }
-    },
-    "/v2/role-invitations/{invitation_id}": {
-      "delete": {
-        "operationId": "v2/role-invitations.cancel",
-        "tags": [
-          "v2/role-invitations"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "invitation_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "description": "Admin cancels a pending invitation.\n\n**Preconditions:**\n* User privilege required.\n"
-      }
-    },
-    "/v2/role-invitations/my/search": {
-      "post": {
-        "operationId": "v2/role-invitations.my_search",
-        "tags": [
-          "v2/role-invitations"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SearchRoleInvitationsInput"
-              }
-            }
-          }
-        },
-        "parameters": [],
-        "description": "Search invitations addressed to the current user.\n\n**Preconditions:**\n* User privilege required.\n"
-      }
-    },
-    "/v2/role-invitations/my/sent-search": {
-      "post": {
-        "operationId": "v2/role-invitations.my_sent_search",
-        "tags": [
-          "v2/role-invitations"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SearchRoleInvitationsInput"
-              }
-            }
-          }
-        },
-        "parameters": [],
-        "description": "Search invitations sent by the current user.\n\n**Preconditions:**\n* User privilege required.\n"
-      }
-    },
-    "/v2/role-invitations/roles/{role_id}/search": {
-      "post": {
-        "operationId": "v2/role-invitations.role_search",
-        "tags": [
-          "v2/role-invitations"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SearchRoleInvitationsInput"
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "role_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "description": "Search invitations for a specific role (admin view).\n\n**Preconditions:**\n* User privilege required.\n"
-      }
-    },
-    "/v2/role-invitations/search": {
-      "post": {
-        "operationId": "v2/role-invitations.admin_search",
-        "tags": [
-          "v2/role-invitations"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SearchRoleInvitationsInput"
-              }
-            }
-          }
-        },
-        "parameters": [],
-        "description": "Search all invitations across the system (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/role-presets": {

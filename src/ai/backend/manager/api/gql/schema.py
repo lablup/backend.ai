@@ -328,13 +328,11 @@ from .prometheus_query_preset import (
     prometheus_query_presets,
 )
 from .rbac import (
-    accept_role_invitation,
     admin_assign_role,
     admin_bulk_add_role_permissions,
     admin_bulk_assign_role,
     admin_bulk_remove_role_permissions,
     admin_bulk_revoke_role,
-    admin_cancel_role_invitation,
     admin_create_permission,
     admin_create_role,
     admin_delete_permission,
@@ -346,20 +344,14 @@ from .rbac import (
     admin_revoke_role,
     admin_role,
     admin_role_assignments,
-    admin_role_invitations,
     admin_roles,
     admin_update_permission,
     admin_update_role,
-    create_role_invitation,
-    my_role_invitations,
     my_roles,
-    my_sent_role_invitations,
     project_roles,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
-    reject_role_invitation,
-    role_scoped_role_invitations,
 )
 from .reservoir_registry import (
     create_reservoir_registry,
@@ -679,13 +671,8 @@ class Query:
     my_login_history_v2 = my_login_history_v2
     # RBAC User APIs
     my_roles = my_roles
-    my_role_invitations = my_role_invitations
-    my_sent_role_invitations = my_sent_role_invitations
-    # RBAC Admin Invitation APIs
-    admin_role_invitations = admin_role_invitations
     # RBAC Scoped APIs
     project_roles = project_roles
-    role_scoped_role_invitations = role_scoped_role_invitations
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
     rbac_entity_operation_combinations = rbac_entity_operation_combinations
     rbac_permission_matrix = rbac_permission_matrix
@@ -993,11 +980,6 @@ class Mutation:
     admin_bulk_add_role_permissions = admin_bulk_add_role_permissions
     admin_bulk_remove_role_permissions = admin_bulk_remove_role_permissions
     admin_replace_role_permissions = admin_replace_role_permissions
-    # RBAC Invitation Mutations
-    create_role_invitation = create_role_invitation
-    accept_role_invitation = accept_role_invitation
-    reject_role_invitation = reject_role_invitation
-    admin_cancel_role_invitation = admin_cancel_role_invitation
     # Resource Policy V2 APIs
     admin_create_keypair_resource_policy_v2 = admin_create_keypair_resource_policy_v2
     admin_update_keypair_resource_policy_v2 = admin_update_keypair_resource_policy_v2
