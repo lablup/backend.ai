@@ -3,7 +3,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, cast
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -16,9 +16,6 @@ from ai.backend.common.data.permission.types import (
     RelationType,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.action.rbac_role_invitation import (
-    CreateRoleInvitationResult,
-)
 from ai.backend.manager.data.permission.entity import (
     ElementAssociationListResult,
     EntityData,
@@ -68,18 +65,8 @@ from ai.backend.manager.data.permission.virtual_scope import (
     EntityPermissionCheckKey,
     ScopePermissionCheckKey,
 )
-from ai.backend.manager.data.role_invitation.types import (
-    RoleInvitationData,
-    RoleInvitationState,
-)
-from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.permission import RoleNotAssigned, RoleNotFound
-from ai.backend.manager.errors.role_invitation import (
-    DuplicateRoleInvitationError,
-    RoleInvitationInvalidState,
-    RoleInvitationNotFound,
-)
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -91,12 +78,6 @@ from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOp
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
-from ai.backend.manager.models.role_invitation.scopes import (
-    InviteeOperationScope,
-    InviterOperationScope,
-    RoleInvitationOperationScope,
-)
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
@@ -129,10 +110,6 @@ from ai.backend.manager.repositories.permission_controller.purgers import (
     ObjectPermissionPurgerSpec,
     PermissionPurgerSpec,
 )
-from ai.backend.manager.repositories.role_invitation.creators import (
-    RoleInvitationCreatorSpec,
-)
-from ai.backend.manager.repositories.role_invitation.types import RoleInvitationSearchResult
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -1417,233 +1394,3 @@ class PermissionDBSource:
                     failures.append(BulkRoleRevocationFailure(user_id=user_id, message=str(e)))
 
         return BulkRoleRevocationResultData(successes=successes, failures=failures)
-
-    # -- role invitation --
-
-    async def create_invitation_by_email(
-        self,
-        *,
-        invitee_emails: list[str],
-        inviter_user_id: uuid.UUID,
-        role_id: uuid.UUID,
-    ) -> CreateRoleInvitationResult:
-        """Resolve emails and create invitations in a single transaction.
-
-        Emails that don't resolve to exactly one ACTIVE user are silently skipped.
-        Duplicate active invitations (caught by the partial unique index)
-        are also silently skipped.
-        """
-        async with self._db.begin_session_read_committed() as session:
-            email_to_user_id = await self._resolve_invitation_emails(session, invitee_emails)
-            creators = [
-                RBACEntityCreator(
-                    spec=RoleInvitationCreatorSpec(
-                        inviter_user_id=inviter_user_id,
-                        invitee_user_id=invitee_user_id,
-                        role_id=role_id,
-                    ),
-                    element_type=RBACElementType.ROLE_ASSIGNMENT,
-                    scope_ref=RBACElementRef(
-                        element_type=RBACElementType.USER,
-                        element_id=str(invitee_user_id),
-                    ),
-                    additional_scope_refs=[
-                        RBACElementRef(
-                            element_type=RBACElementType.ROLE,
-                            element_id=str(role_id),
-                        ),
-                    ],
-                )
-                for email in invitee_emails
-                if (invitee_user_id := email_to_user_id.get(email)) is not None
-            ]
-            if not creators:
-                return CreateRoleInvitationResult()
-
-            created_rows: list[RoleInvitationRow] = []
-            for creator in creators:
-                async with session.begin_nested():
-                    try:
-                        row = (await execute_rbac_entity_creator(session, creator)).row
-                    except DuplicateRoleInvitationError:
-                        continue
-                    created_rows.append(row)
-            return CreateRoleInvitationResult(
-                created=[row.to_data() for row in created_rows],
-            )
-
-    async def search_invitations_by_invitee(
-        self,
-        querier: BatchQuerier,
-        scope: InviteeOperationScope,
-    ) -> RoleInvitationSearchResult:
-        async with self._db.begin_readonly_session_read_committed() as session:
-            query = sa.select(RoleInvitationRow)
-            result = await execute_batch_querier(session, query, querier, scopes=[scope])
-            items = [row.RoleInvitationRow.to_data() for row in result.rows]
-            return RoleInvitationSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_invitations_by_inviter(
-        self,
-        querier: BatchQuerier,
-        scope: InviterOperationScope,
-    ) -> RoleInvitationSearchResult:
-        async with self._db.begin_readonly_session_read_committed() as session:
-            query = sa.select(RoleInvitationRow)
-            result = await execute_batch_querier(session, query, querier, scopes=[scope])
-            items = [row.RoleInvitationRow.to_data() for row in result.rows]
-            return RoleInvitationSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_invitations_by_role(
-        self,
-        querier: BatchQuerier,
-        scope: RoleInvitationOperationScope,
-    ) -> RoleInvitationSearchResult:
-        async with self._db.begin_readonly_session_read_committed() as session:
-            query = sa.select(RoleInvitationRow)
-            result = await execute_batch_querier(session, query, querier, scopes=[scope])
-            items = [row.RoleInvitationRow.to_data() for row in result.rows]
-            return RoleInvitationSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def admin_search_invitations(
-        self,
-        querier: BatchQuerier,
-    ) -> RoleInvitationSearchResult:
-        async with self._db.begin_readonly_session_read_committed() as session:
-            query = sa.select(RoleInvitationRow)
-            result = await execute_batch_querier(session, query, querier)
-            items = [row.RoleInvitationRow.to_data() for row in result.rows]
-            return RoleInvitationSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def accept_invitation(
-        self,
-        invitation_id: uuid.UUID,
-    ) -> RoleInvitationData:
-        """Transition PENDING→ACCEPTED and assign the role in one session."""
-        async with self._db.begin_session_read_committed() as session:
-            row = await self._update_invitation_state(
-                session, invitation_id, RoleInvitationState.ACCEPTED
-            )
-            if row is None:
-                existing = await self._get_failed_invitation(session, invitation_id)
-                raise RoleInvitationInvalidState(
-                    f"Cannot accept: invitation is {existing.state.value}, expected pending"
-                )
-            await self._assign_role_in_session(
-                session,
-                UserRoleAssignmentInput(user_id=row.invitee_user_id, role_id=row.role_id),
-            )
-            return row.to_data()
-
-    async def reject_invitation(
-        self,
-        invitation_id: uuid.UUID,
-    ) -> RoleInvitationData:
-        async with self._db.begin_session_read_committed() as session:
-            row = await self._update_invitation_state(
-                session, invitation_id, RoleInvitationState.REJECTED
-            )
-            if row is not None:
-                return row.to_data()
-            existing = await self._get_failed_invitation(session, invitation_id)
-            if existing.state == RoleInvitationState.REJECTED:
-                return existing.to_data()
-            raise RoleInvitationInvalidState(
-                f"Cannot reject: invitation is {existing.state.value}, expected pending"
-            )
-
-    async def cancel_invitation(
-        self,
-        invitation_id: uuid.UUID,
-    ) -> RoleInvitationData:
-        async with self._db.begin_session_read_committed() as session:
-            row = await self._update_invitation_state(
-                session, invitation_id, RoleInvitationState.CANCELED
-            )
-            if row is not None:
-                return row.to_data()
-            existing = await self._get_failed_invitation(session, invitation_id)
-            if existing.state == RoleInvitationState.CANCELED:
-                return existing.to_data()
-            raise RoleInvitationInvalidState(
-                f"Cannot cancel: invitation is {existing.state.value}, expected pending"
-            )
-
-    @staticmethod
-    async def _update_invitation_state(
-        session: SASession,
-        invitation_id: uuid.UUID,
-        target_state: RoleInvitationState,
-    ) -> RoleInvitationRow | None:
-        """UPDATE PENDING→*target_state* with RETURNING; None if no row matched."""
-        update_stmt = (
-            sa.update(RoleInvitationRow)
-            .where(
-                RoleInvitationRow.id == invitation_id,
-                RoleInvitationRow.state == RoleInvitationState.PENDING,
-            )
-            .values(state=target_state)
-            .returning(*RoleInvitationRow.__table__.columns)
-        )
-        result = await session.execute(sa.select(RoleInvitationRow).from_statement(update_stmt))
-        return cast(RoleInvitationRow | None, result.scalar_one_or_none())
-
-    @staticmethod
-    async def _get_failed_invitation(
-        session: SASession,
-        invitation_id: uuid.UUID,
-    ) -> RoleInvitationRow:
-        """Fetch the row that caused an update to match no row.
-
-        Raises RoleInvitationNotFound if the row does not exist. The caller
-        inspects the returned row's state to decide idempotent vs. invalid.
-        """
-        existing = await session.scalar(
-            sa.select(RoleInvitationRow).where(RoleInvitationRow.id == invitation_id)
-        )
-        if existing is None:
-            raise RoleInvitationNotFound()
-        return existing
-
-    @staticmethod
-    async def _resolve_invitation_emails(
-        session: SASession,
-        emails: Collection[str],
-    ) -> dict[str, uuid.UUID]:
-        """Resolve emails to user UUIDs (ACTIVE users only).
-
-        Emails that don't match exactly one ACTIVE user are silently skipped.
-        """
-        if not emails:
-            return {}
-        stmt = sa.select(UserRow.email, UserRow.uuid).where(
-            UserRow.status == UserStatus.ACTIVE,
-            UserRow.email.in_(emails),
-        )
-        result = await session.execute(stmt)
-        rows = result.all()
-
-        resolved: dict[str, uuid.UUID] = {}
-        for row in rows:
-            resolved[row.email] = row.uuid
-        return resolved
