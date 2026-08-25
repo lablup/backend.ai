@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
@@ -30,6 +30,7 @@ from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.v2 import validators as v2_validators
 from ai.backend.manager.actions.v2.bulk.monitor.audit_log import BulkActionAuditLogMonitor
 from ai.backend.manager.actions.v2.bulk.monitor.prometheus import BulkActionPrometheusMonitor
@@ -196,6 +197,7 @@ class ProcessingResources:
 
     event_dispatcher: EventDispatcher
     processors: Processors
+    action_registry: ProcessorRegistry[Any]
     stream_cleanup_handler: StreamCleanupEventHandler
 
 
@@ -401,7 +403,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             ),
         )
 
-        processors = await stack.enter_dependency(
+        processor_bundle = await stack.enter_dependency(
             ProcessorsDependency(),
             ProcessorsProviderInput(
                 service_args=service_args,
@@ -421,6 +423,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 ),
             ),
         )
+        processors = processor_bundle.processors
 
         # Step 3: Register Dispatchers and start EventDispatcher
         dispatchers = Dispatchers(
@@ -495,5 +498,6 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         yield ProcessingResources(
             event_dispatcher=event_dispatcher,
             processors=processors,
+            action_registry=processor_bundle.registry,
             stream_cleanup_handler=dispatchers.stream_cleanup_handler,
         )

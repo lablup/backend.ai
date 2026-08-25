@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderStatusFilter,
     VFolderUsageModeFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -17,10 +18,12 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_enum,
     gql_field,
     gql_pydantic_input,
 )
+from ai.backend.manager.api.gql.entity_label.types import EntityLabelNestedFilterGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 from .enum import VFolderOperationStatusGQL, VFolderUsageModeGQL
@@ -86,6 +89,14 @@ class VFolderFilterGQL(PydanticInputMixin[VFolderFilter]):
     usage_mode: VFolderUsageModeFilterGQL | None = None
     cloneable: bool | None = None
     created_at: DateTimeFilter | None = None
+    labels: EntityLabelNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Select entities by the labels on them.",
+        ),
+        default=None,
+    )
+
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None

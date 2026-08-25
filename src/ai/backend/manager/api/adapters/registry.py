@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.api.adapters.agent.adapter import AgentAdapter
 from ai.backend.manager.api.adapters.app_config.adapter import AppConfigAdapter
 from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
@@ -25,6 +26,10 @@ from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
 )
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
+from ai.backend.manager.api.adapters.entity.adapter import EntityAdapter
+from ai.backend.manager.api.adapters.entity.types import WiredEntityTypes
+from ai.backend.manager.api.adapters.entity_invitation.adapter import EntityInvitationAdapter
+from ai.backend.manager.api.adapters.entity_label.adapter import EntityLabelAdapter
 from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 from ai.backend.manager.api.adapters.huggingface_registry.adapter import HuggingFaceRegistryAdapter
 from ai.backend.manager.api.adapters.idle_checker.adapter import IdleCheckerAdapter
@@ -96,6 +101,8 @@ class Adapters:
         artifact: ArtifactAdapter,
         artifact_registry: ArtifactRegistryAdapter,
         audit_log: AuditLogAdapter,
+        entity: EntityAdapter,
+        entity_label: EntityLabelAdapter,
         container_registry: ContainerRegistryAdapter,
         deployment: DeploymentAdapter,
         domain: DomainAdapter,
@@ -120,6 +127,7 @@ class Adapters:
         resource_policy: ResourcePolicyAdapter,
         resource_preset: ResourcePresetAdapter,
         resource_slot: ResourceSlotAdapter,
+        entity_invitation: EntityInvitationAdapter,
         retention_policy: RetentionPolicyAdapter,
         runtime_variant: RuntimeVariantAdapter,
         runtime_variant_preset: RuntimeVariantPresetAdapter,
@@ -145,6 +153,8 @@ class Adapters:
         self.artifact = artifact
         self.artifact_registry = artifact_registry
         self.audit_log = audit_log
+        self.entity = entity
+        self.entity_label = entity_label
         self.container_registry = container_registry
         self.deployment = deployment
         self.domain = domain
@@ -169,6 +179,7 @@ class Adapters:
         self.resource_policy = resource_policy
         self.resource_preset = resource_preset
         self.resource_slot = resource_slot
+        self.entity_invitation = entity_invitation
         self.retention_policy = retention_policy
         self.runtime_variant = runtime_variant
         self.runtime_variant_preset = runtime_variant_preset
@@ -190,6 +201,7 @@ class Adapters:
     def create(
         cls,
         processors: Processors,
+        action_registry: ProcessorRegistry[Any],
         auth_config: AuthConfig,
         key_provider_pool: KeyProviderPool,
         deployment_coordinator: DeploymentCoordinator,
@@ -205,6 +217,7 @@ class Adapters:
         catalog endpoints always agree with the coordinators' live
         registrations.
         """
+        entity_types = WiredEntityTypes(action_registry)
         return cls(
             agent=AgentAdapter(processors),
             app_config=AppConfigAdapter(processors),
@@ -214,6 +227,8 @@ class Adapters:
             artifact=ArtifactAdapter(processors),
             artifact_registry=ArtifactRegistryAdapter(processors),
             audit_log=AuditLogAdapter(processors),
+            entity=EntityAdapter(entity_types),
+            entity_label=EntityLabelAdapter(processors, entity_types),
             container_registry=ContainerRegistryAdapter(processors),
             deployment=DeploymentAdapter(processors, deployment_coordinator),
             domain=DomainAdapter(processors),
@@ -240,6 +255,7 @@ class Adapters:
             resource_policy=ResourcePolicyAdapter(processors),
             resource_preset=ResourcePresetAdapter(processors),
             resource_slot=ResourceSlotAdapter(processors),
+            entity_invitation=EntityInvitationAdapter(processors),
             retention_policy=RetentionPolicyAdapter(processors),
             runtime_variant=RuntimeVariantAdapter(processors),
             runtime_variant_preset=RuntimeVariantPresetAdapter(processors),

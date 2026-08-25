@@ -8,7 +8,10 @@ import uuid
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerm,
     create_v2_registry,
+    entity_label_filter_options,
+    entity_label_relations,
     load_v2_config,
     parse_order_options,
     print_result,
@@ -40,6 +43,7 @@ def agent() -> None:
     default=None,
     help="Filter by schedulable flag.",
 )
+@entity_label_filter_options
 @click.option(
     "--order-by",
     multiple=True,
@@ -52,21 +56,24 @@ def search(
     scaling_group: str | None,
     schedulable: bool | None,
     order_by: tuple[str, ...],
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search agents (superadmin only)."""
+    from ai.backend.common.dto.manager.query import StringFilter
     from ai.backend.common.dto.manager.v2.agent.request import (
         AdminSearchAgentsInput,
         AgentFilter,
         AgentOrder,
     )
-    from ai.backend.common.dto.manager.v2.agent.types import AgentOrderField
+    from ai.backend.common.dto.manager.v2.agent.types import (
+        AgentOrderField,
+        AgentStatusEnum,
+        AgentStatusFilter,
+    )
 
-    # Build filter only if any filter option is provided
+    relations = entity_label_relations(label)
     filter_dto: AgentFilter | None = None
-    if any(opt is not None for opt in (status, scaling_group, schedulable)):
-        from ai.backend.common.dto.manager.query import StringFilter
-        from ai.backend.common.dto.manager.v2.agent.types import AgentStatusEnum, AgentStatusFilter
-
+    if relations or any(opt is not None for opt in (status, scaling_group, schedulable)):
         filter_dto = AgentFilter(
             status=(
                 AgentStatusFilter(equals=AgentStatusEnum(status.upper()))
@@ -77,6 +84,7 @@ def search(
                 StringFilter(contains=scaling_group) if scaling_group is not None else None
             ),
             schedulable=schedulable,
+            AND=[AgentFilter(labels=rel) for rel in relations] or None,
         )
 
     # Build order only if --order-by is provided

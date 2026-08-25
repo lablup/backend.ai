@@ -154,6 +154,152 @@
         "title": "AgentStatusFilter",
         "type": "object"
       },
+      "EntityLabelFilter": {
+        "description": "Filter over label rows.\n\nOne instance matches a single label at a time, so `key` and `value` given together\nconstrain the same label rather than two different ones.",
+        "properties": {
+          "key": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Label key filter"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Label value filter"
+          },
+          "entity_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Type of the labeled entity"
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ID of the labeled entity"
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityLabelFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "All conditions must match",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityLabelFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "At least one condition must match",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityLabelFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "None of the conditions must match",
+            "title": "Not"
+          }
+        },
+        "title": "EntityLabelFilter",
+        "type": "object"
+      },
+      "EntityLabelNestedFilter": {
+        "description": "The `labels` field of a labelable entity's filter.\n\nEach relation matches one label at a time. To require two different labels, combine\ntwo of these with the entity filter's own `AND`.",
+        "properties": {
+          "some": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityLabelFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "At least one of the entity's labels matches"
+          },
+          "every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityLabelFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "All of the entity's labels match; true for an unlabeled entity"
+          },
+          "none": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityLabelFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "None of the entity's labels matches"
+          }
+        },
+        "title": "EntityLabelNestedFilter",
+        "type": "object"
+      },
       "OrderDirection": {
         "description": "Order direction for sorting.",
         "enum": [
@@ -440,6 +586,75 @@
           }
         },
         "title": "StringFilter",
+        "type": "object"
+      },
+      "UUIDFilter": {
+        "description": "Filter for UUID fields supporting equality and set operations.\n\nProvides UUID matching with equals/not_equals and in/not_in operations.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact UUID match",
+            "title": "Equals"
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UUID is in list",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not equals UUID",
+            "title": "Not Equals"
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UUID is not in list",
+            "title": "Not In"
+          }
+        },
+        "title": "UUIDFilter",
         "type": "object"
       },
       "AdminSearchAgentsInput": {
@@ -2396,75 +2611,6 @@
         "title": "AuditLogStatusFilter",
         "type": "object"
       },
-      "UUIDFilter": {
-        "description": "Filter for UUID fields supporting equality and set operations.\n\nProvides UUID matching with equals/not_equals and in/not_in operations.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact UUID match",
-            "title": "Equals"
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "UUID is in list",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not equals UUID",
-            "title": "Not Equals"
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "UUID is not in list",
-            "title": "Not In"
-          }
-        },
-        "title": "UUIDFilter",
-        "type": "object"
-      },
       "AdminSearchAuditLogsInput": {
         "description": "Input for searching audit logs (admin, no scope).",
         "properties": {
@@ -2580,6 +2726,215 @@
           }
         },
         "title": "AdminSearchAuditLogsInput",
+        "type": "object"
+      },
+      "EntityTarget": {
+        "description": "One entity, named by its type and its id.\n\nThe type is a plain string rather than a closed enum: an entity type is declared\nwhere its operations are wired, so `entityTypes` is what lists the valid ones.",
+        "properties": {
+          "entity_type": {
+            "description": "Type of the entity, as `entityTypes` lists them",
+            "minLength": 1,
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "entity_id": {
+            "description": "ID of the entity",
+            "format": "uuid",
+            "title": "Entity Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_id"
+        ],
+        "title": "EntityTarget",
+        "type": "object"
+      },
+      "UpsertEntityLabelInput": {
+        "description": "Input for putting one key on one entity, replacing the value it carries.",
+        "properties": {
+          "target": {
+            "$ref": "#/components/schemas/EntityTarget",
+            "description": "The entity to label"
+          },
+          "key": {
+            "description": "Label key",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "description": "Label value",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target",
+          "key",
+          "value"
+        ],
+        "title": "UpsertEntityLabelInput",
+        "type": "object"
+      },
+      "EntityLabelOrder": {
+        "description": "Ordering specification for labels.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/EntityLabelOrderField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "DESC"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "EntityLabelOrder",
+        "type": "object"
+      },
+      "EntityLabelOrderField": {
+        "description": "Fields available for ordering labels.",
+        "enum": [
+          "key",
+          "value",
+          "created_at"
+        ],
+        "title": "EntityLabelOrderField",
+        "type": "string"
+      },
+      "SearchEntityLabelsInput": {
+        "description": "Input for reading the labels on the entities named.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityLabelFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter criteria"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityLabelOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Sort order",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-forward page size",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-forward start cursor",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-backward page size",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-backward end cursor",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset-based page size",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset-based page offset",
+            "title": "Offset"
+          },
+          "scope": {
+            "description": "The entities whose labels to read (OR across items)",
+            "items": {
+              "$ref": "#/components/schemas/EntityTarget"
+            },
+            "minItems": 1,
+            "title": "Scope",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "SearchEntityLabelsInput",
         "type": "object"
       },
       "ContainerRegistryFilter": {
@@ -16013,6 +16368,363 @@
         "title": "UnassignUsersFromProjectInput",
         "type": "object"
       },
+      "EntityID": {
+        "format": "uuid",
+        "type": "string"
+      },
+      "PermissionBitDTO": {
+        "description": "One bit of the permission mask.\n\nDistinct from :class:`OperationTypeDTO`, which names an action: this names what is\nheld. A cap is a set of these, and an empty set is no cap at all.",
+        "enum": [
+          "read",
+          "update",
+          "create",
+          "soft_delete",
+          "hard_delete"
+        ],
+        "title": "PermissionBitDTO",
+        "type": "string"
+      },
+      "CreateEntityInvitationInput": {
+        "description": "One offer of one entity to one address.\n\nThe cap is given as the permissions it holds rather than a bitmask; an empty list\nmeans no ceiling, so the invitee's own permissions stand unclipped.",
+        "properties": {
+          "target_entity_type": {
+            "description": "Type of the entity being offered",
+            "title": "Target Entity Type",
+            "type": "string"
+          },
+          "target_entity_id": {
+            "$ref": "#/components/schemas/EntityID",
+            "description": "Id of the entity being offered"
+          },
+          "invitee_email": {
+            "description": "Address the offer goes to",
+            "title": "Invitee Email",
+            "type": "string"
+          },
+          "permissions": {
+            "description": "Permissions the offer caps at; empty for no ceiling",
+            "items": {
+              "$ref": "#/components/schemas/PermissionBitDTO"
+            },
+            "title": "Permissions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "target_entity_type",
+          "target_entity_id",
+          "invitee_email"
+        ],
+        "title": "CreateEntityInvitationInput",
+        "type": "object"
+      },
+      "EntityInvitationFilter": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityInvitationStatusFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "target_entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "invitee_email": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "title": "EntityInvitationFilter",
+        "type": "object"
+      },
+      "EntityInvitationOrderBy": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/EntityInvitationOrderField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "DESC"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "EntityInvitationOrderBy",
+        "type": "object"
+      },
+      "EntityInvitationOrderField": {
+        "enum": [
+          "created_at",
+          "updated_at",
+          "status"
+        ],
+        "title": "EntityInvitationOrderField",
+        "type": "string"
+      },
+      "EntityInvitationScope": {
+        "description": "Scope for the scoped entity invitation query.\n\nEach list is OR'd internally and across lists. Raises an error if every field is\nempty. Naming a user reads the invitations they were sent or sent themselves, which\nthe permission check on that user's scope is what allows.",
+        "properties": {
+          "invitee": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users the invitations are addressed to",
+            "title": "Invitee"
+          },
+          "inviter": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users who sent the invitations",
+            "title": "Inviter"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityInvitationTargetScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities the invitations offer",
+            "title": "Target"
+          }
+        },
+        "title": "EntityInvitationScope",
+        "type": "object"
+      },
+      "EntityInvitationStatusDTO": {
+        "enum": [
+          "pending",
+          "accepted",
+          "rejected",
+          "canceled"
+        ],
+        "title": "EntityInvitationStatusDTO",
+        "type": "string"
+      },
+      "EntityInvitationStatusFilter": {
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityInvitationStatusDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityInvitationStatusDTO"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "In"
+          }
+        },
+        "title": "EntityInvitationStatusFilter",
+        "type": "object"
+      },
+      "EntityInvitationTargetScope": {
+        "description": "One entity whose invitations are being read.\n\nIts own pair rather than the shared ``EntityTypeScope``: what an invitation offers\nis an open entity type, which that closed element enum cannot name.",
+        "properties": {
+          "entity_type": {
+            "description": "Type of the entity being offered",
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "entity_id": {
+            "$ref": "#/components/schemas/EntityID",
+            "description": "Id of the entity being offered"
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_id"
+        ],
+        "title": "EntityInvitationTargetScope",
+        "type": "object"
+      },
+      "UUIDScope": {
+        "description": "Single-UUID scope item wrapper.\n\nA thin wrapper around a UUID used as a scope item. The wrapper exists so\nthat scope-input lists stay structurally uniform with other scope item\ntypes and leave room for per-item metadata in the future.",
+        "properties": {
+          "value": {
+            "format": "uuid",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "UUIDScope",
+        "type": "object"
+      },
+      "ScopedSearchEntityInvitationsInput": {
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/EntityInvitationScope",
+            "description": "Scope (OR across all items)"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityInvitationFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityInvitationOrderBy"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchEntityInvitationsInput",
+        "type": "object"
+      },
       "CreateRoleInvitationInput": {
         "description": "Input for creating role invitations.",
         "properties": {
@@ -27103,21 +27815,6 @@
         "title": "KernelHistoryScopeDTO",
         "type": "object"
       },
-      "UUIDScope": {
-        "description": "Single-UUID scope item wrapper.\n\nA thin wrapper around a UUID used as a scope item. The wrapper exists so\nthat scope-input lists stay structurally uniform with other scope item\ntypes and leave room for per-item metadata in the future.",
-        "properties": {
-          "value": {
-            "format": "uuid",
-            "title": "Value",
-            "type": "string"
-          }
-        },
-        "required": [
-          "value"
-        ],
-        "title": "UUIDScope",
-        "type": "object"
-      },
       "ScopedSearchKernelHistoriesInput": {
         "description": "Input for searching kernel scheduling histories under a non-admin scope.",
         "properties": {
@@ -29036,6 +29733,18 @@
             ],
             "default": null
           },
+          "labels": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityLabelNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the labels on the entity"
+          },
           "AND": {
             "anyOf": [
               {
@@ -30906,6 +31615,18 @@
             ],
             "default": null,
             "description": "Filter by creation time."
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityLabelNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the labels on the entity"
           },
           "AND": {
             "anyOf": [
@@ -43217,6 +43938,93 @@
         "description": "Search audit logs with admin scope.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/entity-labels": {
+      "put": {
+        "operationId": "v2/entity-labels.upsert_label",
+        "tags": [
+          "v2/entity-labels"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertEntityLabelInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Set one key on an entity, replacing the value it carries.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-labels/{label_id}": {
+      "delete": {
+        "operationId": "v2/entity-labels.purge_label",
+        "tags": [
+          "v2/entity-labels"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "label_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Take one label off, named by its own id.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-labels/search": {
+      "post": {
+        "operationId": "v2/entity-labels.search_labels",
+        "tags": [
+          "v2/entity-labels"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchEntityLabelsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Read the labels on the entities named.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/container-registries/search": {
       "post": {
         "operationId": "v2/container-registries.admin_search_container_registries",
@@ -44884,6 +45692,26 @@
         },
         "parameters": [],
         "description": "Permanently purge a domain (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/entity-types": {
+      "get": {
+        "operationId": "v2/entity-types.list_entity_types",
+        "tags": [
+          "v2/entity-types"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "List every entity type a request may name.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/fair-share/domains/get": {
@@ -47493,6 +48321,178 @@
           }
         ],
         "description": "Unassign users from a project.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-invitations": {
+      "post": {
+        "operationId": "v2/entity-invitations.create",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEntityInvitationInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Offer one entity to one address.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-invitations/{invitation_id}": {
+      "get": {
+        "operationId": "v2/entity-invitations.get",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Read one invitation from the side that offered it.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/entity-invitations.cancel",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Withdraw the offer before it was answered.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-invitations/{invitation_id}/accept": {
+      "post": {
+        "operationId": "v2/entity-invitations.accept",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Take what was offered.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-invitations/{invitation_id}/reject": {
+      "post": {
+        "operationId": "v2/entity-invitations.reject",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Turn down what was offered.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-invitations/scoped/search": {
+      "post": {
+        "operationId": "v2/entity-invitations.scoped_search",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchEntityInvitationsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "The invitations the named sides reach.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/role-invitations": {

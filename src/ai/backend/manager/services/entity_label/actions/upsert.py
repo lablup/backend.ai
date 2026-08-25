@@ -11,8 +11,10 @@ from ai.backend.manager.models.entity_label.upserters import EntityLabelUpserter
 
 
 @dataclass
-class PutEntityLabelAction(UpsertFieldOpsAction[RuntimeEntityID, EntityLabelRow, EntityLabelData]):
-    """Put one key on the entity the caller named, replacing the value it carries."""
+class UpsertEntityLabelAction(
+    UpsertFieldOpsAction[RuntimeEntityID, EntityLabelRow, EntityLabelData]
+):
+    """Set one key on the entity the caller named, replacing the value it carries."""
 
     owner: RuntimeEntityID
     upserter: EntityLabelUpserter
@@ -20,7 +22,7 @@ class PutEntityLabelAction(UpsertFieldOpsAction[RuntimeEntityID, EntityLabelRow,
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "put_entity_label"
+        return "upsert_entity_label"
 
     @override
     def entity_id(self) -> EntityIdentifier:

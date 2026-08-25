@@ -133,6 +133,20 @@ from .domain_v2 import (
     domain_v2,
     rg_domains_v2,
 )
+from .entity.resolver import entity_types
+from .entity_invitation import (
+    accept_entity_invitation,
+    cancel_entity_invitation,
+    create_entity_invitation,
+    entity_invitation,
+    entity_invitations,
+    reject_entity_invitation,
+)
+from .entity_label.resolver import (
+    entity_labels,
+    purge_entity_label,
+    upsert_entity_label,
+)
 from .fair_share import (
     admin_bulk_upsert_domain_fair_share_weight,
     admin_bulk_upsert_project_fair_share_weight,
@@ -620,6 +634,10 @@ class Query:
     admin_kernels_v2 = admin_kernels_v2
     admin_audit_logs_v2 = admin_audit_logs_v2
     scoped_audit_logs_v2 = scoped_audit_logs_v2
+    # Entity APIs
+    entity_types = entity_types
+    # Entity Label APIs
+    entity_labels = entity_labels
     admin_container_registries_v2 = admin_container_registries_v2
     admin_login_sessions_v2 = admin_login_sessions_v2
     admin_login_history_v2 = admin_login_history_v2
@@ -754,6 +772,8 @@ class Query:
     # Retention Policy APIs
     admin_retention_policies = admin_retention_policies
     admin_retention_policy = admin_retention_policy
+    entity_invitation = entity_invitation
+    entity_invitations = entity_invitations
     # Runtime Variant Preset APIs
     runtime_variant_presets = runtime_variant_presets
     runtime_variant_preset = runtime_variant_preset
@@ -1006,6 +1026,10 @@ class Mutation:
     admin_purge_client_ip_masking_policy = admin_purge_client_ip_masking_policy
     # Retention Policy mutations
     admin_create_retention_policy = admin_create_retention_policy
+    create_entity_invitation = create_entity_invitation
+    accept_entity_invitation = accept_entity_invitation
+    reject_entity_invitation = reject_entity_invitation
+    cancel_entity_invitation = cancel_entity_invitation
     admin_update_retention_policy = admin_update_retention_policy
     admin_delete_retention_policy = admin_delete_retention_policy
     admin_purge_retention_policy = admin_purge_retention_policy
@@ -1045,6 +1069,9 @@ class Mutation:
     terminate_sessions_v2 = terminate_sessions_v2
     exclude_session_idle_checks = exclude_session_idle_checks
     include_session_idle_checks = include_session_idle_checks
+    # Entity Label mutations
+    upsert_entity_label = upsert_entity_label
+    purge_entity_label = purge_entity_label
 
 
 @strawberry.type

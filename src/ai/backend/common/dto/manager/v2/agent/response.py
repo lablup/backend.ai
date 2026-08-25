@@ -13,6 +13,7 @@ from typing import Any
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
@@ -149,6 +150,7 @@ class AgentNode(BaseResponseModel):
     """Node model representing an agent entity with nested information groups."""
 
     id: str = Field(description="Agent ID.")
+    uuid: AgentUUID = Field(description="Agent UUID, which is what rows keyed on the agent carry.")
     resource_info: AgentResourceInfo = Field(
         description="Hardware resource capacity, usage, and availability information."
     )

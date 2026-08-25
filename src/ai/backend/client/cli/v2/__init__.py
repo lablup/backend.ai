@@ -211,11 +211,29 @@ def object_storage() -> None:
 
 @v2.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.entity_label:entity_label",
+    name="entity-label",
+)
+def entity_label() -> None:
+    """Entity label commands."""
+
+
+@v2.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.login_client_type.commands:login_client_type",
     name="login-client-type",
 )
 def login_client_type() -> None:
     """Read-only commands for inspecting registered login client types."""
+
+
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.entity_type.commands:entity_type",
+    name="entity-type",
+)
+def entity_type() -> None:
+    """Read-only commands for inspecting the entity types a request may name."""
 
 
 @v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.rbac:rbac")
@@ -253,6 +271,15 @@ def resource_usage() -> None:
 @v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.audit_log:audit_log")
 def audit_log() -> None:
     """Audit log commands."""
+
+
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.entity_invitation:entity_invitation",
+    name="entity-invitation",
+)
+def entity_invitation() -> None:
+    """Entity invitation commands."""
 
 
 @v2.group(

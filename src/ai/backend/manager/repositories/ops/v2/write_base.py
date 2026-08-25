@@ -296,6 +296,36 @@ class V2WriteOpsBase(V2OpsBase):
             self._match_integrity_error(self._parse_integrity_error(e), checks)
         return result.scalar_one_or_none()
 
+    async def _update_guarded_row_returning[TRow: Base](
+        self,
+        row_class: type[TRow],
+        id_column: InstrumentedAttribute[Any],
+        id_value: Any,
+        guards: Sequence[Callable[[], sa.sql.expression.ColumnElement[bool]]],
+        values: dict[str, Any],
+        checks: Sequence[IntegrityErrorCheck],
+    ) -> TRow | None:
+        """Update the row the id names while its guards hold; ``None`` if none matched.
+
+        The guards ride on the statement, so no separate read and no row lock stand
+        between the check and the write. With nothing to set, reads the current row
+        instead, so callers can tell "nothing to change" apart from "row not found".
+        """
+        table = row_class.__table__
+        if not values:
+            existing = await self._sess.execute(sa.select(row_class).where(id_column == id_value))
+            return existing.scalar_one_or_none()
+        stmt = sa.update(table).values(values).where(id_column == id_value)
+        for guard in guards:
+            stmt = stmt.where(guard())
+        # from_statement lets SQLAlchemy map the RETURNING columns onto the ORM class.
+        select_stmt = sa.select(row_class).from_statement(stmt.returning(*table.columns))
+        try:
+            result = await self._sess.execute(select_stmt)
+        except sa.exc.IntegrityError as e:
+            self._match_integrity_error(self._parse_integrity_error(e), checks)
+        return result.scalar_one_or_none()
+
     async def _delete_row_returning[TRow: Base](
         self, row_class: type[TRow], id_column: InstrumentedAttribute[Any], id_value: Any
     ) -> TRow | None:
