@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.entity_invitation.request import (
     ScopedSearchEntityInvitationsInput,
 )
 from ai.backend.common.dto.manager.v2.entity_invitation.types import EntityInvitationOrderField
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -30,12 +31,10 @@ from ai.backend.manager.api.gql.entity_invitation.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
-_ADDED = "26.8.3"
-
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=_ADDED,
+        added_version=NEXT_RELEASE_VERSION,
         description=(
             "Page through the invitations the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."
@@ -97,7 +96,7 @@ async def entity_invitations(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=_ADDED,
+        added_version=NEXT_RELEASE_VERSION,
         description=(
             "Read one invitation by id, from the side that offered it. "
             "The invitee reaches theirs through the search addressed to them."
@@ -113,7 +112,9 @@ async def entity_invitation(
 
 
 @gql_mutation(
-    BackendAIGQLMeta(added_version=_ADDED, description="Offer one entity to one address.")
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Offer one entity to one address."
+    )
 )
 async def create_entity_invitation(
     info: Info[StrawberryGQLContext],
@@ -123,7 +124,9 @@ async def create_entity_invitation(
     return EntityInvitationPayloadGQL.from_pydantic(payload)
 
 
-@gql_mutation(BackendAIGQLMeta(added_version=_ADDED, description="Take what was offered."))
+@gql_mutation(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Take what was offered.")
+)
 async def accept_entity_invitation(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -132,7 +135,9 @@ async def accept_entity_invitation(
     return EntityInvitationPayloadGQL.from_pydantic(payload)
 
 
-@gql_mutation(BackendAIGQLMeta(added_version=_ADDED, description="Turn down what was offered."))
+@gql_mutation(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Turn down what was offered.")
+)
 async def reject_entity_invitation(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -142,7 +147,9 @@ async def reject_entity_invitation(
 
 
 @gql_mutation(
-    BackendAIGQLMeta(added_version=_ADDED, description="Withdraw an offer before it was answered.")
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Withdraw an offer before it was answered."
+    )
 )
 async def cancel_entity_invitation(
     info: Info[StrawberryGQLContext],

@@ -29,6 +29,7 @@ from ai.backend.common.dto.manager.v2.entity_invitation.response import (
 )
 from ai.backend.common.dto.manager.v2.entity_invitation.types import EntityInvitationStatusDTO
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -42,17 +43,17 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.scope import UUIDScopeGQL
 
-_ADDED = "26.8.3"
-
 EntityInvitationStatusGQL: type[EntityInvitationStatusDTO] = gql_enum(
-    BackendAIGQLMeta(added_version=_ADDED, description="Whether an invitation is still open."),
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Whether an invitation is still open."
+    ),
     EntityInvitationStatusDTO,
     name="EntityInvitationStatus",
 )
 
 PermissionBitGQL: type[PermissionBitDTO] = gql_enum(
     BackendAIGQLMeta(
-        added_version=_ADDED,
+        added_version=NEXT_RELEASE_VERSION,
         description="One bit of a permission mask; distinct from OperationType, which names an action.",
     ),
     PermissionBitDTO,
@@ -61,7 +62,9 @@ PermissionBitGQL: type[PermissionBitDTO] = gql_enum(
 
 
 @gql_enum(
-    BackendAIGQLMeta(added_version=_ADDED, description="Order fields for entity invitations."),
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Order fields for entity invitations."
+    ),
     name="EntityInvitationOrderField",
 )
 class EntityInvitationOrderFieldGQL(StrEnum):
@@ -72,7 +75,7 @@ class EntityInvitationOrderFieldGQL(StrEnum):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=_ADDED,
+        added_version=NEXT_RELEASE_VERSION,
         description="An offer of one existing entity to one address, settled by the answer.",
     ),
     name="EntityInvitation",
@@ -94,14 +97,18 @@ class EntityInvitationGQL(PydanticNodeMixin[NodeDTO]):
 
 
 @gql_connection_type(
-    BackendAIGQLMeta(added_version=_ADDED, description="One entity invitation within a connection.")
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="One entity invitation within a connection."
+    )
 )
 class EntityInvitationEdge(Edge[EntityInvitationGQL]):
     pass
 
 
 @gql_connection_type(
-    BackendAIGQLMeta(added_version=_ADDED, description="Paginated list of entity invitations.")
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Paginated list of entity invitations."
+    )
 )
 class EntityInvitationConnection(Connection[EntityInvitationGQL]):
     # Restated so the schema's edge type is the described one above rather than the
@@ -117,7 +124,9 @@ class EntityInvitationConnection(Connection[EntityInvitationGQL]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=_ADDED, description="Filter for entity invitations."),
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Filter for entity invitations."
+    ),
     name="EntityInvitationFilter",
 )
 class EntityInvitationFilterGQL(PydanticInputMixin[FilterDTO]):
@@ -126,7 +135,7 @@ class EntityInvitationFilterGQL(PydanticInputMixin[FilterDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=_ADDED, description="Order specification."),
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Order specification."),
     name="EntityInvitationOrderBy",
 )
 class EntityInvitationOrderByGQL(PydanticInputMixin[OrderByDTO]):
@@ -136,7 +145,8 @@ class EntityInvitationOrderByGQL(PydanticInputMixin[OrderByDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=_ADDED, description="One entity whose invitations are being read."
+        added_version=NEXT_RELEASE_VERSION,
+        description="One entity whose invitations are being read.",
     ),
     name="EntityInvitationTargetScope",
 )
@@ -147,7 +157,7 @@ class EntityInvitationTargetScopeGQL(PydanticInputMixin[TargetScopeDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=_ADDED,
+        added_version=NEXT_RELEASE_VERSION,
         description=(
             "Scope for the scoped entity invitation query. "
             "All items are OR'd; raises an error if every field is empty."
@@ -168,7 +178,9 @@ class EntityInvitationScopeGQL(PydanticInputMixin[ScopeDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=_ADDED, description="Create entity invitation input."),
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Create entity invitation input."
+    ),
     name="CreateEntityInvitationInput",
 )
 class CreateEntityInvitationInputGQL(PydanticInputMixin[CreateInputDTO]):
@@ -181,7 +193,7 @@ class CreateEntityInvitationInputGQL(PydanticInputMixin[CreateInputDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version=_ADDED, description="Entity invitation payload."),
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Entity invitation payload."),
     model=PayloadDTO,
     name="EntityInvitationPayload",
 )
