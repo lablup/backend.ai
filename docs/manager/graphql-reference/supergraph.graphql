@@ -8030,7 +8030,7 @@ type EntityType implements Node
   name: String!
 
   """
-  The scope types an operation on this entity type may be targeted at; `global` where the caller names the scope type, empty where no operation on it names a scope.
+  Added in 26.9.0. The scope types an operation on this entity type may be targeted at; `global` where the caller names the scope type, empty where no operation on it names a scope.
   """
   scopeTypes: [String!]!
 }

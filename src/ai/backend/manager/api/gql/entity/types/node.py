@@ -8,6 +8,7 @@ from ai.backend.common.dto.manager.v2.entity.response import EntityTypeNode
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_field,
     gql_node_type,
 )
@@ -30,10 +31,13 @@ __all__ = ("EntityTypeGQL",)
 class EntityTypeGQL(PydanticNodeMixin[EntityTypeNode]):
     id: NodeID[str] = gql_field(description="The entity type, which is its own id.")
     name: str = gql_field(description="The entity type, as a request names it.")
-    scope_types: list[str] = gql_field(
-        description=(
-            "The scope types an operation on this entity type may be targeted at; "
-            "`global` where the caller names the scope type, empty where no operation "
-            "on it names a scope."
+    scope_types: list[str] = gql_added_field(
+        BackendAIGQLMeta(
+            description=(
+                "The scope types an operation on this entity type may be targeted at; "
+                "`global` where the caller names the scope type, empty where no operation "
+                "on it names a scope."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
         )
     )
