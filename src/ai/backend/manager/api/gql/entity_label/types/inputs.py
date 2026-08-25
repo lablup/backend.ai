@@ -11,8 +11,8 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_input,
 )
+from ai.backend.manager.api.gql.entity.types.inputs import EntityTargetGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
-from ai.backend.manager.api.gql.rbac.types.scope import EntityTypeScopeGQL
 
 __all__ = ("UpsertEntityLabelInputGQL",)
 
@@ -28,6 +28,6 @@ __all__ = ("UpsertEntityLabelInputGQL",)
     name="UpsertEntityLabelInput",
 )
 class UpsertEntityLabelInputGQL(PydanticInputMixin[UpsertEntityLabelInputDTO]):
-    target: EntityTypeScopeGQL = gql_field(description="The entity to label.")
+    target: EntityTargetGQL = gql_field(description="The entity to label.")
     key: str = gql_field(description="Label key.")
     value: str = gql_field(description="Label value.")

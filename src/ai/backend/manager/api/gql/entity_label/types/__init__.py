@@ -1,8 +1,4 @@
-"""Label GQL types.
-
-`inputs` is deliberately absent: it reaches the RBAC scope input, whose package pulls
-in the deployment types that import this one. Mutation resolvers import it directly.
-"""
+"""Label GQL types."""
 
 from .field import resolve_entity_labels
 from .filters import (
@@ -11,6 +7,7 @@ from .filters import (
     EntityLabelOrderByGQL,
     EntityLabelOrderFieldGQL,
 )
+from .inputs import UpsertEntityLabelInputGQL
 from .node import (
     EntityLabelConnection,
     EntityLabelEdge,
@@ -31,6 +28,8 @@ __all__ = [
     "EntityLabelNestedFilterGQL",
     "EntityLabelOrderByGQL",
     "EntityLabelOrderFieldGQL",
+    # Input types
+    "UpsertEntityLabelInputGQL",
     # Payload types
     "UpsertEntityLabelPayloadGQL",
     "PurgeEntityLabelPayloadGQL",

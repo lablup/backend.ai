@@ -228,7 +228,7 @@ class Adapters:
             artifact_registry=ArtifactRegistryAdapter(processors),
             audit_log=AuditLogAdapter(processors),
             entity=EntityAdapter(entity_types),
-            entity_label=EntityLabelAdapter(processors),
+            entity_label=EntityLabelAdapter(processors, entity_types),
             container_registry=ContainerRegistryAdapter(processors),
             deployment=DeploymentAdapter(processors, deployment_coordinator),
             domain=DomainAdapter(processors),

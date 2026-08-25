@@ -14,9 +14,9 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.entity_label.types import (
     PurgeEntityLabelPayloadGQL,
+    UpsertEntityLabelInputGQL,
     UpsertEntityLabelPayloadGQL,
 )
-from ai.backend.manager.api.gql.entity_label.types.inputs import UpsertEntityLabelInputGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 

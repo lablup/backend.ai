@@ -27,18 +27,15 @@ def entity_label() -> None:
 @click.option("--value", required=True, type=str, help="Label value.")
 def upsert(entity_type: str, entity_id: uuid.UUID, key: str, value: str) -> None:
     """Set one key on an entity, replacing the value it carries."""
+    from ai.backend.common.dto.manager.v2.entity.types import EntityTarget
     from ai.backend.common.dto.manager.v2.entity_label.request import UpsertEntityLabelInput
-    from ai.backend.common.dto.manager.v2.rbac.types import EntityTypeScope, RBACElementTypeDTO
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.entity_label.upsert(
                 UpsertEntityLabelInput(
-                    target=EntityTypeScope(
-                        entity_type=RBACElementTypeDTO(entity_type),
-                        entity_id=str(entity_id),
-                    ),
+                    target=EntityTarget(entity_type=entity_type, entity_id=entity_id),
                     key=key,
                     value=value,
                 ),
@@ -95,13 +92,13 @@ def search(
 ) -> None:
     """Read the labels on the entities named."""
     from ai.backend.common.dto.manager.query import StringFilter
+    from ai.backend.common.dto.manager.v2.entity.types import EntityTarget
     from ai.backend.common.dto.manager.v2.entity_label.request import (
         EntityLabelFilter,
         EntityLabelOrder,
         SearchEntityLabelsInput,
     )
     from ai.backend.common.dto.manager.v2.entity_label.types import EntityLabelOrderField
-    from ai.backend.common.dto.manager.v2.rbac.types import EntityTypeScope, RBACElementTypeDTO
 
     filter_dto: EntityLabelFilter | None = None
     if key is not None or value is not None:
@@ -120,10 +117,7 @@ def search(
             result = await registry.entity_label.search(
                 SearchEntityLabelsInput(
                     scope=[
-                        EntityTypeScope(
-                            entity_type=RBACElementTypeDTO(entity_type),
-                            entity_id=str(one_id),
-                        )
+                        EntityTarget(entity_type=entity_type, entity_id=one_id)
                         for one_id in entity_id
                     ],
                     filter=filter_dto,

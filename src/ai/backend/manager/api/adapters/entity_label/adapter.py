@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import uuid
-
 from ai.backend.common.data.entity.entity_label import EntityLabelID, EntityLabelKey
-from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
+from ai.backend.common.data.entity.types import RuntimeEntityID
+from ai.backend.common.dto.manager.v2.entity.types import EntityTarget
 from ai.backend.common.dto.manager.v2.entity_label.request import (
     EntityLabelOrder,
     EntityLabelPageInput,
@@ -22,11 +21,10 @@ from ai.backend.common.dto.manager.v2.entity_label.types import (
     EntityLabelOrderField,
     OrderDirection,
 )
-from ai.backend.common.dto.manager.v2.rbac.types import EntityTypeScope
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
+from ai.backend.manager.api.adapters.entity.types import WiredEntityTypes
 from ai.backend.manager.data.entity_label.types import EntityLabelData
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.entity_label.conditions import (
     EntityLabelConditions,
@@ -38,6 +36,7 @@ from ai.backend.manager.models.entity_label.upserters import EntityLabelUpserter
 from ai.backend.manager.services.entity_label.actions.purge import PurgeEntityLabelAction
 from ai.backend.manager.services.entity_label.actions.search import SearchEntityLabelsAction
 from ai.backend.manager.services.entity_label.actions.upsert import UpsertEntityLabelAction
+from ai.backend.manager.services.processors import Processors
 
 _LABEL_PAGINATION_SPEC = PaginationSpec(
     forward_order=EntityLabelOrders.created_at(ascending=False),
@@ -50,6 +49,12 @@ _LABEL_PAGINATION_SPEC = PaginationSpec(
 
 class EntityLabelAdapter(BaseAdapter):
     """Adapter for label domain operations."""
+
+    _entity_types: WiredEntityTypes
+
+    def __init__(self, processors: Processors, entity_types: WiredEntityTypes) -> None:
+        super().__init__(processors)
+        self._entity_types = entity_types
 
     async def upsert(self, input: UpsertEntityLabelInput) -> UpsertEntityLabelPayload:
         """Set one key on the entity the request names, replacing the value it carries."""
@@ -111,16 +116,9 @@ class EntityLabelAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    @staticmethod
-    def _target(scope: EntityTypeScope) -> RuntimeEntityID:
-        """The entity the request names; an id that is not an entity id is refused here."""
-        try:
-            entity_id = uuid.UUID(scope.entity_id)
-        except ValueError as e:
-            raise InvalidAPIParameters(
-                f"Label target id {scope.entity_id!r} is not an entity id"
-            ) from e
-        return RuntimeEntityID(EntityType(scope.entity_type.value), entity_id)
+    def _target(self, target: EntityTarget) -> RuntimeEntityID:
+        """The entity the request names; a type nothing is wired for is refused here."""
+        return RuntimeEntityID(self._entity_types.resolve(target.entity_type), target.entity_id)
 
     @staticmethod
     def _convert_orders(orders: list[EntityLabelOrder]) -> list[QueryOrder]:

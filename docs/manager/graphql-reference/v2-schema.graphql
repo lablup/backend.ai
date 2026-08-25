@@ -5306,51 +5306,6 @@ input EntityFilter {
   NOT: [EntityFilter!] = null
 }
 
-"""Added in 26.9.0. One `key=value` label and the entity carrying it."""
-type EntityLabel implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-
-  """Type of the labeled entity."""
-  entityType: String!
-
-  """ID of the labeled entity."""
-  entityId: UUID!
-
-  """Label key."""
-  key: String!
-
-  """Label value."""
-  value: String!
-
-  """When the label was first put on the entity."""
-  createdAt: DateTime!
-
-  """When the label's value was last replaced."""
-  updatedAt: DateTime!
-}
-
-"""Added in 26.9.0. Paginated connection for label records."""
-type EntityLabelConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [EntityLabelEdge!]!
-
-  """Total number of label records matching the query criteria."""
-  count: Int!
-}
-
-"""An edge in a connection."""
-type EntityLabelEdge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: EntityLabel!
-}
-
 """
 Added in 26.9.0. An offer of one existing entity to one address, settled by the answer.
 """
@@ -5464,6 +5419,51 @@ input EntityInvitationTargetScope {
   entityId: UUID!
 }
 
+"""Added in 26.9.0. One `key=value` label and the entity carrying it."""
+type EntityLabel implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Type of the labeled entity."""
+  entityType: String!
+
+  """ID of the labeled entity."""
+  entityId: UUID!
+
+  """Label key."""
+  key: String!
+
+  """Label value."""
+  value: String!
+
+  """When the label was first put on the entity."""
+  createdAt: DateTime!
+
+  """When the label's value was last replaced."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.9.0. Paginated connection for label records."""
+type EntityLabelConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [EntityLabelEdge!]!
+
+  """Total number of label records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type EntityLabelEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: EntityLabel!
+}
+
 """
 Added in 26.9.0. Filter matching a single label. A key and a value given together constrain the same label rather than two different ones.
 """
@@ -5550,6 +5550,17 @@ type EntityRefEdge {
 
   """The item at the end of the edge"""
   node: EntityRef!
+}
+
+"""
+Added in 26.9.0. One entity, named by its type and its id. `entityTypes` lists the types a request may name.
+"""
+input EntityTarget {
+  """Type of the entity."""
+  entityType: String!
+
+  """ID of the entity."""
+  entityId: UUID!
 }
 
 """
@@ -11407,7 +11418,7 @@ type Query {
   """
   Added in 26.9.0. Read the labels on the entities named. Scope items are OR'd, and naming an entity the caller cannot read refuses the whole read.
   """
-  entityLabels(scope: [EntityTypeScope!]!, filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
+  entityLabels(scope: [EntityTarget!]!, filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 
   """
   Added in 26.4.2. List container registries with filtering, ordering, and pagination (admin only).
@@ -16732,7 +16743,7 @@ Added in 26.9.0. Input for putting one key on one entity. A key holds one value,
 """
 input UpsertEntityLabelInput {
   """The entity to label."""
-  target: EntityTypeScope!
+  target: EntityTarget!
 
   """Label key."""
   key: String!

@@ -6,7 +6,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
-from ai.backend.common.dto.manager.v2.rbac.types import EntityTypeScope
+from ai.backend.common.dto.manager.v2.entity.types import EntityTarget
 
 from .types import EntityLabelOrderField, OrderDirection
 
@@ -74,7 +74,7 @@ class EntityLabelOrder(BaseRequestModel):
 class UpsertEntityLabelInput(BaseRequestModel):
     """Input for putting one key on one entity, replacing the value it carries."""
 
-    target: EntityTypeScope = Field(description="The entity to label")
+    target: EntityTarget = Field(description="The entity to label")
     key: str = Field(min_length=1, max_length=255, description="Label key")
     value: str = Field(min_length=1, max_length=255, description="Label value")
 
@@ -95,6 +95,6 @@ class EntityLabelPageInput(BaseRequestModel):
 class SearchEntityLabelsInput(EntityLabelPageInput):
     """Input for reading the labels on the entities named."""
 
-    scope: list[EntityTypeScope] = Field(
+    scope: list[EntityTarget] = Field(
         min_length=1, description="The entities whose labels to read (OR across items)"
     )

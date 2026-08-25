@@ -16,6 +16,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
 )
+from ai.backend.manager.api.gql.entity.types.inputs import EntityTargetGQL
 from ai.backend.manager.api.gql.entity_label.types import (
     EntityLabelConnection,
     EntityLabelEdge,
@@ -23,7 +24,6 @@ from ai.backend.manager.api.gql.entity_label.types import (
     EntityLabelGQL,
     EntityLabelOrderByGQL,
 )
-from ai.backend.manager.api.gql.rbac.types.scope import EntityTypeScopeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
@@ -38,7 +38,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 )  # type: ignore[misc]
 async def entity_labels(
     info: Info[StrawberryGQLContext],
-    scope: list[EntityTypeScopeGQL],
+    scope: list[EntityTargetGQL],
     filter: EntityLabelFilterGQL | None = None,
     order_by: list[EntityLabelOrderByGQL] | None = None,
     before: str | None = None,
