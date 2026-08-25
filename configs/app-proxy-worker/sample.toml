@@ -175,6 +175,11 @@
   # connections.
   # Added in 25.9.0
   client_pool_cleanup_interval = 60.0
+  # Skip idle-session cleanup for sessions with a request still in flight, so
+  # streamed responses longer than client_pool_cleanup_interval are not cut off.
+  # Experimental; off by default.
+  # Added in 26.9.0
+  client_pool_keep_inflight_sessions = false
   # The address this worker announces to the service discovery system. Other
   # components use this address to locate and connect to the worker. If not set,
   # defaults to api_bind_addr. Required when behind NAT or containers.
