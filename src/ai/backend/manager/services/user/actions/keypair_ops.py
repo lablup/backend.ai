@@ -24,6 +24,7 @@ from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
+from ai.backend.manager.data.secret.types import SecretSweepProgress, SecretSweepStatus
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
@@ -350,3 +351,53 @@ class AdminGetSSHKeypairAction(_KeypairOfUserAction):
 class AdminGetSSHKeypairActionResult:
     access_key: str
     ssh_public_key: str | None
+
+
+@dataclass(frozen=True)
+class ReencryptKeypairSecretsAction(BaseGlobalAction):
+    """Move stored keypair secrets onto whatever the write provider setting names."""
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return USER_ENTITY_TYPE
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "reencrypt_keypair_secrets"
+
+
+@dataclass(frozen=True)
+class ReencryptKeypairSecretsActionResult:
+    progress: SecretSweepProgress
+
+
+@dataclass(frozen=True)
+class GetKeypairSecretStatusAction(BaseGlobalAction):
+    """Count the stored keypair secrets by the key holding them."""
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return USER_ENTITY_TYPE
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_keypair_secret_status"
+
+
+@dataclass(frozen=True)
+class GetKeypairSecretStatusActionResult:
+    status: SecretSweepStatus

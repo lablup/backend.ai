@@ -245,3 +245,38 @@ def ssh_delete(access_key: str) -> None:
             await registry.close()
 
     asyncio.run(_run())
+
+
+@keypair.group(name="secret")
+def secret() -> None:
+    """Stored secret key re-encryption commands."""
+
+
+@secret.command(name="reencrypt")
+def secret_reencrypt() -> None:
+    """Move stored keypair secrets onto the configured write key (superadmin only)."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.keypair.admin_reencrypt_secrets()
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@secret.command(name="status")
+def secret_status() -> None:
+    """Report the stored keypair secrets per key id (superadmin only)."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.keypair.admin_secret_status()
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())

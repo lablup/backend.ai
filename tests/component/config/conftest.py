@@ -109,6 +109,7 @@ def server_module_registries(
                 KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
             ),
             MagicMock(),
+            MagicMock(),
         ),
     )
     return [

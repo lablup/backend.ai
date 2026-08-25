@@ -62,6 +62,7 @@ from ai.backend.manager.repositories.scheduler.repositories import SchedulerRepo
 from ai.backend.manager.repositories.scheduling_history.repositories import (
     SchedulingHistoryRepositories,
 )
+from ai.backend.manager.repositories.secret.repositories import SecretRepositories
 from ai.backend.manager.repositories.session.repositories import SessionRepositories
 from ai.backend.manager.repositories.storage_namespace.repositories import (
     StorageNamespaceRepositories,
@@ -126,6 +127,7 @@ class Repositories:
     events: EventsRepositories
     storage_namespace: StorageNamespaceRepositories
     retention: RetentionRepositories
+    secret: SecretRepositories
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
@@ -174,6 +176,7 @@ class Repositories:
         events_repositories = EventsRepositories.create(args)
         storage_namespace_repositories = StorageNamespaceRepositories.create(args)
         retention_repositories = RetentionRepositories.create(args)
+        secret_repositories = SecretRepositories.create(args)
 
         return cls(
             agent=agent_repositories,
@@ -223,4 +226,5 @@ class Repositories:
             events=events_repositories,
             storage_namespace=storage_namespace_repositories,
             retention=retention_repositories,
+            secret=secret_repositories,
         )

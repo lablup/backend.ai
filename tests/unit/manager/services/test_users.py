@@ -67,6 +67,7 @@ class TestCreateUser:
             valkey_stat_client=MagicMock(),
             agent_registry=MagicMock(),
             user_repository=mock_user_repository,
+            secret_repository=MagicMock(),
             scheduling_controller=MagicMock(),
         )
 
@@ -246,6 +247,7 @@ class TestModifyUser:
             valkey_stat_client=MagicMock(),
             agent_registry=MagicMock(),
             user_repository=mock_user_repository,
+            secret_repository=MagicMock(),
             scheduling_controller=MagicMock(),
         )
 
@@ -341,6 +343,7 @@ class TestDeleteUser:
             valkey_stat_client=MagicMock(),
             agent_registry=MagicMock(),
             user_repository=mock_user_repository,
+            secret_repository=MagicMock(),
             scheduling_controller=MagicMock(),
         )
 
@@ -400,6 +403,7 @@ class TestPurgeUser:
             valkey_stat_client=MagicMock(),
             agent_registry=mock_agent_registry,
             user_repository=mock_user_repository,
+            secret_repository=MagicMock(),
             scheduling_controller=MagicMock(),
         )
 
@@ -649,6 +653,7 @@ class TestBulkPurgeUsers:
             valkey_stat_client=MagicMock(),
             agent_registry=mock_agent_registry,
             user_repository=mock_user_repository,
+            secret_repository=MagicMock(),
             scheduling_controller=MagicMock(),
         )
 

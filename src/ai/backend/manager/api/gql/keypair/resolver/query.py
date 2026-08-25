@@ -9,6 +9,7 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
     AdminSearchKeypairsInput,
     SearchMyKeypairsRequest,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -16,7 +17,10 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.keypair.types.filters import KeypairFilterGQL, KeypairOrderByGQL
 from ai.backend.manager.api.gql.keypair.types.node import KeyPairConnection, KeyPairEdge, KeyPairGQL
-from ai.backend.manager.api.gql.keypair.types.payloads import AdminGetSSHKeypairPayloadGQL
+from ai.backend.manager.api.gql.keypair.types.payloads import (
+    AdminGetSSHKeypairPayloadGQL,
+    AdminKeypairSecretStatusPayloadGQL,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
@@ -136,3 +140,20 @@ async def admin_ssh_keypair_v2(
     check_admin_only()
     payload = await info.context.adapters.user.admin_get_ssh_keypair(access_key)
     return AdminGetSSHKeypairPayloadGQL.from_pydantic(payload)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Report the stored keypair secrets per key id (admin only). Requires superadmin "
+            "privileges."
+        ),
+    )
+)  # type: ignore[misc]
+async def admin_keypair_secret_status_v2(
+    info: Info[StrawberryGQLContext],
+) -> AdminKeypairSecretStatusPayloadGQL | None:
+    check_admin_only()
+    payload = await info.context.adapters.user.admin_keypair_secret_status()
+    return AdminKeypairSecretStatusPayloadGQL.from_pydantic(payload)

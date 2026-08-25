@@ -95,7 +95,7 @@ A key is 32 random bytes in base64, produced by `openssl rand -base64 32`. Both 
 | ❌ | **There is no precedent for reversible at-rest encryption.** |
 | ➕ | `SecretColumn` - converts between the stored string and its parsed form, and performs no cryptography (3.3) |
 | ➕ | Value types expressing the stored form (3.1) |
-| ➕ | `KeyProvider` - encrypts, decrypts, and rewraps one value (3.2) |
+| ➕ | `KeyProvider` - encrypts and decrypts one value (3.2) |
 | ➕ | `KeyProviderPool` - sends a read to the provider its value names, and a write to the provider designated for writes |
 | ➕ | A branch for the new column type in `populate_fixture` (fixtures carry plaintext, so they need no key) |
 
@@ -108,7 +108,7 @@ A key is 32 random bytes in base64, produced by `openssl rand -base64 32`. Both 
 | ✅ | Read (rest): the keypair plugin's `/login` plaintext `compare_digest`, the plugin hook's token signing, legacy GQL `KeyPair.secret_key`, and the `/auth/authorize` and `/auth/signup` responses |
 | ➕ | Write paths encrypt through a provider and bind the result. **Encryption is asynchronous, so it finishes before binding** |
 | ➕ | Read paths get a parsed value instead of `str`, and every place that needs plaintext decrypts explicitly through the pool |
-| ➕ | Batch rewrapping exposed on **all three surfaces: REST API, GQL, and the admin CLI** (3.4) |
+| ➕ | Batch re-encryption exposed on **all three surfaces: REST API, GQL, and the admin CLI** (3.4) |
 
 > **Every read path has to be touched.** In exchange, the column's static type is no longer `str`, so any place left unfixed fails type checking. Making it structurally impossible for a ciphertext string to flow downstream disguised as plaintext is the central benefit of this approach.
 
@@ -124,7 +124,7 @@ A key is 32 random bytes in base64, produced by `openssl rand -base64 32`. Both 
 
 ## 3. Implementation Design
 
-**Core flow:** on write, draw a fresh data encryption key per value, encrypt the value with it, wrap that key under the provider's active key, and store a self-describing string. On read the column **parses only**, and the value is decrypted through the provider it names. Rotating a key rewraps the data encryption key, so the ciphertext is never touched.
+**Core flow:** on write, draw a fresh data encryption key per value, encrypt the value with it, wrap that key under the provider's active key, and store a self-describing string. On read the column **parses only**, and the value is decrypted through the provider it names. Rotating a key is followed by a batch pass that encrypts the stored values again, drawing a fresh data encryption key per row.
 
 ### 3.1 Stored format (self-describing)
 
@@ -159,7 +159,6 @@ A `KeyProvider` works **on one value**. Which key id it writes under and how it 
 | `provider_type()` | The type written into stored values |
 | `encrypt(plaintext, context)` | Encrypts a new value under this provider's current key |
 | `decrypt(value, context)` | Recovers the plaintext of a value this provider wrote |
-| `rewrap(value, context)` | Moves a value onto this provider's current key. **Only the wrapped data encryption key changes, so the plaintext is never produced** |
 
 There is one implementation for now, backed by the config. It draws a data encryption key per value, encrypts the value with it, and wraps that key under the active key. A KMS attaches to the same interface later.
 
@@ -187,13 +186,13 @@ Decryption is pure CPU work against an in-memory key, with no remote I/O, so it 
 - Plaintext rows and encrypted rows are **expressed by a single type**, so consumers do not branch.
 - The value types are frozen dataclasses, and neither plaintext nor key material appears in `repr`.
 
-### 3.4 Key rotation and rewrapping
+### 3.4 Key rotation and re-encryption
 
 Rotating a key is **adding a new key to the config and changing the active key id**. The old key stays for decryption only.
 
-**Definition of rewrapping**: unwrap the value's data encryption key under the old key and wrap it again under the active one. **The data encryption key, the ciphertext, and the nonce are all unchanged** - only about sixty bytes per value differ. The plaintext is never produced, so the work needs no permission to read the values.
+**Definition of re-encryption**: decrypt the value, then encrypt it again through the write provider. A fresh data encryption key is drawn per row, so the wrapped key, the nonce, and the ciphertext all change.
 
-Because each row has its own data encryption key, that key never needs rotating: a new one is drawn on every write, leaving only the key that wraps it to rotate.
+**No row is treated differently.** There is no path that skips a value already on the active key, and none that rewraps its data encryption key alone. Whatever key a value sat on, it gets the same work.
 
 An old key left in the config keeps its values readable. Convergence is needed when that key is to be dropped, and a batch pass is what does it.
 
@@ -201,19 +200,20 @@ The batch takes no direction flag.
 
 | Write target | What the batch does |
 |---|---|
-| A provider | Moves plaintext rows and rows on an old key onto the active key |
-| `plain` | Returns encrypted rows to plaintext |
+| A provider | Encrypts every value again under that provider's active key |
+| `plain` | Returns every value to plaintext |
 
 Turning ciphertext back into plaintext is not a separate feature but a consequence of the setting.
 
-Rewrapping has one constraint to honor.
+Re-encryption has one constraint to honor.
 
 | Constraint | Reason |
 |---|---|
 | **Conditional UPDATE** - overwrite only if the stored value is still the exact string just read | If **the keypair is reissued between the read and the write, a stale value would overwrite the new one.** The condition prevents that. When several managers race on one row, one succeeds and the rest are harmless no-ops |
 
 - Total write volume is **one write per row**, a one-off load proportional to the number of keypairs.
-- Since the value does not change, a failure loses no consistency. The next run retries it.
+- The pass decrypts the values, so it **needs permission to handle plaintext**.
+- A failure leaves the stored value valid as it stands, and the next run handles it again.
 
 **The batch is provided on all three surfaces.**
 
@@ -223,7 +223,7 @@ Rewrapping has one constraint to honor.
 | GQL mutation (admin) | Management console integration |
 | `mgr` admin CLI | Run directly outside the server, for migration work |
 
-Common requirements: sweep the target column **in chunks, resumably**, report remaining counts per key id, and allow the run's status to be queried.
+Common requirements: sweep the target column **in chunks**, report the count per key id, and allow the stored state to be queried. The chunk size is the implementation's to decide and is not passed by the caller. An interrupted pass is continued by running it again.
 
 ### 3.5 Where the key material lives
 
@@ -232,7 +232,7 @@ Common requirements: sweep the target column **in chunks, resumably**, report re
 | Process | Needs the key | Basis |
 |---|---|---|
 | Manager server | Yes | Reaches unified config through `ManagerConfigProvider` |
-| `mgr` CLI (batch rewrapping) | Yes | A `ManagerConfigProvider` assembly path for one-shot CLI commands already exists |
+| `mgr` CLI (batch re-encryption) | Yes | A `ManagerConfigProvider` assembly path for one-shot CLI commands already exists |
 | alembic | **No** | Column type change only, no data conversion |
 | Fixture population | **No** | Written as plaintext and moved later by a batch pass |
 
@@ -269,11 +269,11 @@ Rollout order:
 | Decryption site | Explicit calls through the pool where plaintext is needed. Every read path is modified, and anything missed fails type checking |
 | Algorithm | AEAD (AES-256-GCM). No separate plaintext hash. The column's name is bound as associated data |
 | Key management | Each provider holds keys by id and names an active id. Decrypt with the id the value names, wrap new values under the active one |
-| Key provider abstraction | `KeyProvider` encrypts, decrypts, and rewraps one value. There is one config-backed implementation, and a KMS attaches to the same interface later |
-| Key rotation | Adding a key to the config and changing the active id is the whole procedure. **Rewrapping touches neither the ciphertext nor the plaintext** |
+| Key provider abstraction | `KeyProvider` encrypts and decrypts one value. There is one config-backed implementation, and a KMS attaches to the same interface later |
+| Key rotation | Adding a key to the config and changing the active id is the whole procedure. **A batch pass encrypts every value again under a fresh data encryption key** |
 | Immediate convergence | Not performed. An old key left in the config keeps its values readable, and convergence happens in a batch when that key is dropped |
-| Rewrapping constraint | **Conditional UPDATE** (guards against a reissue race) |
-| Batch surfaces | **REST admin API, GQL mutation, and the `mgr` admin CLI - all three.** Chunked, resumable, progress-reporting |
+| Re-encryption constraint | **Conditional UPDATE** (guards against a reissue race) |
+| Batch surfaces | **REST admin API, GQL mutation, and the `mgr` admin CLI - all three.** Chunked, reporting the count per key id |
 | Batch direction | No direction flag. It **normalizes to whatever the current write target specifies**, so `plain` yields conversion to plaintext |
 | Column type change | `String(40)` to `Text`, **with no length limit** - the stored size follows the provider implementation, so no limit can be known. `varchar` to `text` needs no table rewrite |
 | Backward compatibility | Plaintext and encrypted rows coexist indefinitely. No bulk conversion, forced re-login, or key reissue |

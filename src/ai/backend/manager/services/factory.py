@@ -281,6 +281,7 @@ def create_services(args: ServiceArgs) -> Services:
             args.valkey_stat_client,
             args.agent_registry,
             repositories.user.repository,
+            repositories.secret.repository,
             args.scheduling_controller,
         ),
         idle_checker=IdleCheckerService(

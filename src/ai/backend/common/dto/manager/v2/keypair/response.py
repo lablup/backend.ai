@@ -16,6 +16,8 @@ from ai.backend.common.types import SecretKey
 
 __all__ = (
     "AdminCreateKeypairPayload",
+    "AdminKeypairSecretStatusPayload",
+    "AdminReencryptKeypairSecretsPayload",
     "AdminDeleteKeypairPayload",
     "AdminDeleteSSHKeypairPayload",
     "AdminGetSSHKeypairPayload",
@@ -25,6 +27,7 @@ __all__ = (
     "CreateKeypairPayload",
     "IssueMyKeypairPayload",
     "KeypairNode",
+    "KeypairSecretKeyCount",
     "RevokeMyKeypairPayload",
     "SearchMyKeypairsPayload",
     "SSHKeypairNode",
@@ -170,3 +173,36 @@ class AdminGetSSHKeypairPayload(BaseResponseModel):
     """Payload returned by admin SSH keypair lookup (public key only)."""
 
     keypair: SSHKeypairNode = Field(description="SSH keypair public information.")
+
+
+class KeypairSecretKeyCount(BaseResponseModel):
+    """How many stored keypair secrets one provider's one key still holds."""
+
+    provider_type: str = Field(
+        description="The key provider holding these secrets. 'plain' means legacy plaintext."
+    )
+    key_id: str | None = Field(
+        default=None, description="The key within that provider. Unset for plaintext."
+    )
+    count: int = Field(description="How many stored secrets that key holds.")
+
+
+class AdminKeypairSecretStatusPayload(BaseResponseModel):
+    """Which key each stored keypair secret sits on."""
+
+    write_provider_type: str = Field(
+        description="The key provider new and re-encrypted secrets are written through."
+    )
+    counts: list[KeypairSecretKeyCount] = Field(
+        description="The stored secrets, grouped by the key holding them."
+    )
+
+
+class AdminReencryptKeypairSecretsPayload(BaseResponseModel):
+    """What one re-encryption pass wrote, and what the column holds afterwards."""
+
+    scanned: int = Field(description="How many rows this pass read.")
+    reencrypted: int = Field(description="How many rows this pass wrote back.")
+    status: AdminKeypairSecretStatusPayload = Field(
+        description="The count per key id after this pass."
+    )
