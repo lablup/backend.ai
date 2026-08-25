@@ -14,16 +14,9 @@ from ai.backend.common.clients.http_client.client_pool import (
 )
 
 CLEANUP_INTERVAL = 0.2
-"""Cleanup cadence for the pool under test, in seconds."""
-
 STREAM_CHUNKS = 6
-"""Chunks emitted by the stub upstream, spaced so the response outlives the interval."""
-
 CHUNK_DELAY = 0.1
-"""Delay between streamed chunks, in seconds."""
-
 READ_DEADLINE = 5.0
-"""Bound on the streamed read; an evicted session stalls the read rather than raising."""
 
 
 async def _slow_stream(request: web.Request) -> web.StreamResponse:
@@ -46,81 +39,74 @@ async def _read_stream(pool: ClientPool, upstream_url: str) -> list[bytes]:
     return chunks
 
 
-class TestClientPoolCleanup:
-    """Tests for ClientPool._cleanup_loop() against a streaming upstream."""
+@pytest.fixture
+async def streaming_upstream_url() -> AsyncIterator[str]:
+    app = web.Application()
+    app.router.add_get("/stream", _slow_stream)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    try:
+        _, port = runner.addresses[0][:2]
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        await runner.cleanup()
 
-    @pytest.fixture
-    async def streaming_upstream_url(self) -> AsyncIterator[str]:
-        app = web.Application()
-        app.router.add_get("/stream", _slow_stream)
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, "127.0.0.1", 0)
-        await site.start()
-        try:
-            _, port = runner.addresses[0][:2]
-            yield f"http://127.0.0.1:{port}"
-        finally:
-            await runner.cleanup()
 
-    @pytest.fixture
-    async def pool(self) -> AsyncIterator[ClientPool]:
-        client_pool = ClientPool(
-            partial(tcp_client_session_factory, ssl=False),
-            cleanup_interval_seconds=CLEANUP_INTERVAL,
-            keep_inflight_sessions=True,
-        )
-        try:
-            yield client_pool
-        finally:
-            await client_pool.close()
+@pytest.fixture
+async def pool() -> AsyncIterator[ClientPool]:
+    client_pool = ClientPool(
+        partial(tcp_client_session_factory, ssl=False),
+        cleanup_interval_seconds=CLEANUP_INTERVAL,
+        keep_inflight_sessions=True,
+    )
+    try:
+        yield client_pool
+    finally:
+        await client_pool.close()
 
-    @pytest.fixture
-    async def legacy_pool(self) -> AsyncIterator[ClientPool]:
-        client_pool = ClientPool(
-            partial(tcp_client_session_factory, ssl=False),
-            cleanup_interval_seconds=CLEANUP_INTERVAL,
-        )
-        try:
-            yield client_pool
-        finally:
-            await client_pool.close()
 
-    async def test_streaming_response_survives_a_cleanup_pass(
-        self,
-        pool: ClientPool,
-        streaming_upstream_url: str,
-    ) -> None:
-        """With the flag on, a response outliving the cleanup interval reads to the end."""
-        chunks = await _read_stream(pool, streaming_upstream_url)
+@pytest.fixture
+async def legacy_pool() -> AsyncIterator[ClientPool]:
+    client_pool = ClientPool(
+        partial(tcp_client_session_factory, ssl=False),
+        cleanup_interval_seconds=CLEANUP_INTERVAL,
+    )
+    try:
+        yield client_pool
+    finally:
+        await client_pool.close()
 
-        assert len(chunks) == STREAM_CHUNKS
-        assert chunks[-1] == f"chunk-{STREAM_CHUNKS - 1}\n".encode()
 
-    async def test_idle_session_is_still_evicted(
-        self,
-        pool: ClientPool,
-        streaming_upstream_url: str,
-    ) -> None:
-        """The in-flight guard must not disable cleanup for genuinely idle sessions."""
-        key = ClientKey(endpoint=streaming_upstream_url, domain="test")
-        session = pool.load_client_session(key)
-        async with session.get("/stream") as response:
-            await response.read()
+async def test_streaming_response_survives_a_cleanup_pass(
+    pool: ClientPool,
+    streaming_upstream_url: str,
+) -> None:
+    chunks = await _read_stream(pool, streaming_upstream_url)
 
-        await asyncio.sleep(CLEANUP_INTERVAL * 3)
+    assert len(chunks) == STREAM_CHUNKS
+    assert chunks[-1] == f"chunk-{STREAM_CHUNKS - 1}\n".encode()
 
-        assert session.closed
-        assert pool.load_client_session(key) is not session
 
-    async def test_flag_off_keeps_time_based_eviction(
-        self,
-        legacy_pool: ClientPool,
-        streaming_upstream_url: str,
-    ) -> None:
-        """With the flag off, the cleanup loop evicts by acquisition time alone.
+async def test_idle_session_is_still_evicted(
+    pool: ClientPool,
+    streaming_upstream_url: str,
+) -> None:
+    key = ClientKey(endpoint=streaming_upstream_url, domain="test")
+    session = pool.load_client_session(key)
+    async with session.get("/stream") as response:
+        await response.read()
 
-        The evicted session stalls the read instead of raising, so the deadline fires.
-        """
-        with pytest.raises(TimeoutError):
-            await _read_stream(legacy_pool, streaming_upstream_url)
+    await asyncio.sleep(CLEANUP_INTERVAL * 3)
+
+    assert session.closed
+    assert pool.load_client_session(key) is not session
+
+
+async def test_flag_off_keeps_time_based_eviction(
+    legacy_pool: ClientPool,
+    streaming_upstream_url: str,
+) -> None:
+    with pytest.raises(TimeoutError):
+        await _read_stream(legacy_pool, streaming_upstream_url)

@@ -52,11 +52,7 @@ def tcp_client_session_factory(
 
 
 def _has_inflight_requests(session: aiohttp.ClientSession) -> bool:
-    """Whether any request currently holds a connection from the session's connector.
-
-    A connection stays acquired until its response body is fully read, so this stays
-    true for the whole of a long-lived streaming response.
-    """
+    """A connection stays acquired until its response body is fully read."""
     connector = session.connector
     if connector is None:
         return False
@@ -93,10 +89,6 @@ class ClientPool:
         *,
         keep_inflight_sessions: bool = False,
     ) -> None:
-        """
-        keep_inflight_sessions: skip evicting a session while a request still holds one
-        of its connections. Off by default; enable for long-lived streaming upstreams.
-        """
         frame = inspect.stack()[1]
         self._keep_inflight_sessions = keep_inflight_sessions
         self._creator_info = f"{frame.filename}:{frame.lineno}:{frame.function}()"
@@ -136,8 +128,6 @@ class ClientPool:
                 if now - client.last_used <= cleanup_interval_seconds:
                     continue
                 if self._keep_inflight_sessions and _has_inflight_requests(client.session):
-                    # `last_used` is stamped on acquisition only, so a request outliving
-                    # the interval looks idle.
                     client.last_used = now
                     continue
                 del self._clients[key]

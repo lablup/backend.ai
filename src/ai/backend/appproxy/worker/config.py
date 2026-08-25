@@ -774,15 +774,15 @@ class ProxyWorkerConfig(BaseSchema):
 
     client_pool_keep_inflight_sessions: Annotated[
         bool,
-        Field(default=True),
+        Field(default=False),
         BackendAIConfigMeta(
             description=(
-                "Whether the idle-session cleanup skips sessions that still have a request in flight. "
-                "Keeps streamed responses longer than client_pool_cleanup_interval from being cut off. "
-                "Disable to restore eviction based on the acquisition time alone."
+                "Skip idle-session cleanup for sessions with a request still in flight, "
+                "so streamed responses longer than client_pool_cleanup_interval are not cut off. "
+                "Experimental; off by default."
             ),
-            added_version="26.8.0",
-            example=ConfigExample(local="true", prod="true"),
+            added_version="26.9.0",
+            example=ConfigExample(local="false", prod="false"),
         ),
     ]
 
