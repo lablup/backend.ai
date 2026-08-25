@@ -45228,6 +45228,26 @@
         "description": "Permanently purge a domain (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/entity-types": {
+      "get": {
+        "operationId": "v2/entity-types.list_entity_types",
+        "tags": [
+          "v2/entity-types"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "List every entity type a request may name.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/fair-share/domains/get": {
       "post": {
         "operationId": "v2/fair-share.admin_get_domain",
