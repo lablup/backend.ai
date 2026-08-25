@@ -467,7 +467,20 @@ class NativeBridgeAttachRunner:
     async def _ensure_bridge(self, bridge: str, mtu: str, gw_cidr: str | None) -> None:
         rc, _, _ = await _run(["ip", "link", "show", bridge], check=False)
         if rc != 0:
-            await _run(["ip", "link", "add", bridge, "type", "bridge"])
+            # show-then-add is check-then-act, and the two kernels of one session land on this
+            # node concurrently: both see it missing, both add, and the loser dies with
+            # "RTNETLINK answers: File exists", failing a session whose bridge is right there.
+            # The kernel is the arbiter -- let the add fail and settle it by looking again, which
+            # also covers a racing privnet helper (a lock inside this process would not).
+            rc_add, _, err_add = await _run(
+                ["ip", "link", "add", bridge, "type", "bridge"], check=False
+            )
+            if rc_add != 0:
+                rc_show, _, _ = await _run(["ip", "link", "show", bridge], check=False)
+                if rc_show != 0:
+                    raise RuntimeError(
+                        f"cannot create bridge {bridge}: {err_add.decode(errors='replace').strip()}"
+                    )
         await _run(["ip", "link", "set", bridge, "mtu", mtu], check=False)
         await _run(["ip", "link", "set", bridge, "up"])
         if gw_cidr:

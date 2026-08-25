@@ -562,3 +562,59 @@ class TestClusterDnsRedirect:
         await na.install_dns_redirect("172.30.1.1", 50012, "new-session")
         # A different gateway's rule (a co-located session) must NOT be touched.
         assert "-D PREROUTING" not in rec.flat()
+
+
+class _BridgeRaceRun:
+    """`ip` where another writer wins the create between our show and our add.
+
+    Models the kernel exactly: the first `link show` reports the bridge missing, the `link add`
+    then fails with EEXIST because the peer created it in between, and every later `link show`
+    reports it present.
+    """
+
+    def __init__(self, *, ever_appears: bool = True) -> None:
+        self.calls: list[list[str]] = []
+        self._created = False
+        self._ever_appears = ever_appears
+
+    async def __call__(self, argv: Any, *, check: bool = True) -> tuple[int, bytes, bytes]:
+        argv = list(argv)
+        self.calls.append(argv)
+        rc, err = 0, b""
+        if argv[:3] == ["ip", "link", "show"]:
+            rc = 0 if self._created else 1
+        elif argv[:3] == ["ip", "link", "add"] and argv[-1] == "bridge":
+            self._created = self._ever_appears
+            rc, err = 2, b"RTNETLINK answers: File exists"
+        # `check` must behave exactly as the real _run, or a caller that forgot check=False would
+        # sail through the stub and the test would prove nothing.
+        if check and rc != 0:
+            raise RuntimeError(f"command failed (rc={rc}): {' '.join(argv)}")
+        return rc, b"", err
+
+
+class TestEnsureBridgeIsRaceTolerant:
+    async def test_loser_of_a_concurrent_create_succeeds(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        # The two kernels of one session attach on this node at the same time. Before the fix the
+        # loser raised "RTNETLINK answers: File exists" and failed the whole session.
+        run = _BridgeRaceRun()
+        monkeypatch.setattr(na, "_run", run)
+        runner = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)
+        await runner._ensure_bridge("bailo4103", "1450", None)
+        flat = "\n".join(" ".join(c) for c in run.calls)
+        # it must go on to configure the bridge the winner made, not stop at the failed add
+        assert "ip link set bailo4103 mtu 1450" in flat
+        assert "ip link set bailo4103 up" in flat
+
+    async def test_a_create_that_really_failed_still_raises(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        # Tolerating EEXIST must not swallow a genuine failure: if the bridge is still absent
+        # after the add, there is nothing to attach to and the caller has to hear about it.
+        run = _BridgeRaceRun(ever_appears=False)
+        monkeypatch.setattr(na, "_run", run)
+        runner = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)
+        with pytest.raises(RuntimeError, match="cannot create bridge bailo4103"):
+            await runner._ensure_bridge("bailo4103", "1450", None)
