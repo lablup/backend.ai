@@ -7,11 +7,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DOMAIN_SCOPE_TYPE, DomainID
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
 from ai.backend.common.data.entity.types import EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE, UserID
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
@@ -113,6 +113,11 @@ class ScopedSearchResourceGroupsAction(
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return [item.scope_ref() for item in self.items]
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (DOMAIN_ENTITY_TYPE, PROJECT_ENTITY_TYPE, USER_ENTITY_TYPE)
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

@@ -120,6 +120,8 @@ def build_v2_routes(
     from .scheduling_handler.registry import register_v2_scheduling_handler_routes
     from .scheduling_history.handler import V2SchedulingHistoryHandler
     from .scheduling_history.registry import register_v2_scheduling_history_routes
+    from .scope_operation.handler import V2ScopeOperationHandler
+    from .scope_operation.registry import register_v2_scope_operation_routes
     from .secret.handler import V2SecretHandler
     from .secret.registry import register_v2_secret_routes
     from .service_catalog.handler import V2ServiceCatalogHandler
@@ -200,6 +202,7 @@ def build_v2_routes(
     resource_usage_handler = V2ResourceUsageHandler(adapter=adapters.resource_usage)
     scheduling_handler_handler = V2SchedulingHandlerHandler(adapter=adapters.scheduling_handler)
     scheduling_history_handler = V2SchedulingHistoryHandler(adapter=adapters.scheduling_history)
+    scope_operation_handler = V2ScopeOperationHandler(adapter=adapters.scope_operation)
     service_catalog_handler = V2ServiceCatalogHandler(adapter=adapters.service_catalog)
     session_handler = V2SessionHandler(adapter=adapters.session)
     storage_host_handler = V2StorageHostHandler(adapter=adapters.storage_host)
@@ -300,6 +303,7 @@ def build_v2_routes(
     v2_reg.add_subregistry(
         register_v2_scheduling_history_routes(scheduling_history_handler, route_deps)
     )
+    v2_reg.add_subregistry(register_v2_scope_operation_routes(scope_operation_handler, route_deps))
     v2_reg.add_subregistry(register_v2_service_catalog_routes(service_catalog_handler, route_deps))
     v2_reg.add_subregistry(register_v2_session_routes(session_handler, route_deps))
     v2_reg.add_subregistry(register_v2_storage_host_routes(storage_host_handler, route_deps))

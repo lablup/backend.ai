@@ -4,13 +4,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.session_template import (
     SESSION_TEMPLATE_ENTITY_TYPE,
     SessionTemplateID,
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE, UserID
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
@@ -43,6 +43,11 @@ class TemplateProjectScopeAction(BaseScopeAction):
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.requesting_project),)
 
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (PROJECT_ENTITY_TYPE,)
+
 
 @dataclass
 class TemplateUserScopeAction(BaseScopeAction):
@@ -58,6 +63,11 @@ class TemplateUserScopeAction(BaseScopeAction):
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_uuid),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (USER_ENTITY_TYPE,)
 
 
 @dataclass

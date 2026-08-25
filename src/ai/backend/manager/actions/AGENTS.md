@@ -29,6 +29,16 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 - **A create** takes the scope it applies to — the parent entity for an entity, the
   owning entity's id for a field row. There is no row to name yet, so this is an input.
 
+## Scope actions
+
+- A `scope` action declares both the scopes one run targets (`scope_targets()`) and the
+  scope types it may ever be targeted at (`available_scope_types()`). The declaration
+  bounds the run: every type `scope_targets()` can return is listed.
+- `global` is the declaration for a scope type the caller names, which no fixed set
+  bounds. The empty sequence is an action that names no scope at all.
+- Read the declared list with `./bai scope-operation list`. Do NOT transcribe it into a
+  document (`KNOWLEDGE.md`).
+
 ## Actions naming a field row
 
 - Every operation is answered for by an entity: both validation and the audit trail

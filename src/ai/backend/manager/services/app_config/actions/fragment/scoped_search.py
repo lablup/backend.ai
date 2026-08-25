@@ -9,12 +9,14 @@ from ai.backend.common.data.entity.app_config import (
     APP_CONFIG_FRAGMENT_ENTITY_TYPE,
     AppConfigScopeID,
 )
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
     EntityType,
     ScopeRef,
     ScopeType,
 )
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.app_config.types import AppConfigFragmentData
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
@@ -54,6 +56,11 @@ class ScopedSearchAppConfigFragmentAction(
         if owner is None:
             return ()
         return (ScopeRef(scope_type=ScopeType(owner.entity_type()), scope_id=owner),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (DOMAIN_ENTITY_TYPE, USER_ENTITY_TYPE)
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

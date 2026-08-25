@@ -6,10 +6,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DOMAIN_SCOPE_TYPE, DomainID
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE, UserID
 from ai.backend.manager.actions.v2.ops.base import (
     GetSingleEntityOpsAction,
     OperationScopeOpsAction,
@@ -64,6 +64,11 @@ class SearchProjectsByDomainAction(OperationScopeOpsAction[ProjectRow, ProjectDa
         return (ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=self.domain_id),)
 
     @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (DOMAIN_ENTITY_TYPE,)
+
+    @override
     def operation_scopes(self) -> Sequence[OperationScope]:
         return (DomainProjectOperationScope(domain_id=self.domain_id),)
 
@@ -92,6 +97,11 @@ class SearchProjectsByUserAction(OperationScopeOpsAction[ProjectRow, ProjectData
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (USER_ENTITY_TYPE,)
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

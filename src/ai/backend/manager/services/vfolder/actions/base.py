@@ -3,8 +3,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE
 from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE, VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
@@ -145,6 +146,11 @@ class CreateVFolderAction(VFolderScopeAction):
 
     @override
     @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (PROJECT_ENTITY_TYPE, USER_ENTITY_TYPE)
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
@@ -223,6 +229,11 @@ class ListVFolderAction(VFolderScopeAction):
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (self.scope,)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (PROJECT_ENTITY_TYPE, USER_ENTITY_TYPE)
 
     @override
     @classmethod
@@ -415,6 +426,11 @@ class GetTaskLogsAction(VFolderScopeAction):
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (USER_ENTITY_TYPE,)
 
     @override
     @classmethod

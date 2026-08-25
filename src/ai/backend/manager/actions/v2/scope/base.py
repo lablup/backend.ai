@@ -15,6 +15,16 @@ class BaseScopeAction(ABC):
 
     @classmethod
     @abstractmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        """The scope types this action may be targeted at.
+
+        Bounds what :meth:`scope_targets` returns. `global` stands for a scope type the
+        caller names, which no fixed set bounds; the empty sequence is no scope at all.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
     def entity_type(cls) -> EntityType:
         """Return the type of entity that this action applies to."""
         raise NotImplementedError

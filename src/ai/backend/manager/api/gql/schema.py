@@ -485,6 +485,7 @@ from .scheduling_history import (
     session_scheduling_histories,
     session_scoped_scheduling_histories,
 )
+from .scope_operation.resolver import scope_operations
 from .secret import admin_reencrypt_secrets, admin_secret_status
 from .service_catalog import admin_service_catalogs
 from .session.resolver import (
@@ -629,6 +630,8 @@ class Query:
     scoped_audit_logs_v2 = scoped_audit_logs_v2
     # Entity APIs
     entity_types = entity_types
+    # Scope Operation APIs
+    scope_operations = scope_operations
     # Entity Label APIs
     entity_labels = entity_labels
     admin_container_registries_v2 = admin_container_registries_v2

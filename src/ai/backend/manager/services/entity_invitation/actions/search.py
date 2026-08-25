@@ -9,6 +9,7 @@ from typing import override
 
 from ai.backend.common.data.entity.entity_invitation import ENTITY_INVITATION_ENTITY_TYPE
 from ai.backend.common.data.entity.types import (
+    GLOBAL_ENTITY_TYPE,
     EntityIdentifier,
     EntityType,
     ScopeRef,
@@ -124,6 +125,11 @@ class SearchEntityInvitationsAction(
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return [item.scope_ref() for item in self.items]
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (GLOBAL_ENTITY_TYPE,)
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

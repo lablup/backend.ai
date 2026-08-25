@@ -66,6 +66,8 @@ from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
 )
 from ai.backend.manager.api.adapters.scheduling_handler.adapter import SchedulingHandlerAdapter
 from ai.backend.manager.api.adapters.scheduling_history.adapter import SchedulingHistoryAdapter
+from ai.backend.manager.api.adapters.scope_operation.adapter import ScopeOperationAdapter
+from ai.backend.manager.api.adapters.scope_operation.types import WiredScopeOperations
 from ai.backend.manager.api.adapters.secret.adapter import SecretAdapter
 from ai.backend.manager.api.adapters.service_catalog.adapter import ServiceCatalogAdapter
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
@@ -139,6 +141,7 @@ class Adapters:
         role_preset: RolePresetAdapter,
         scheduling_handler: SchedulingHandlerAdapter,
         scheduling_history: SchedulingHistoryAdapter,
+        scope_operation: ScopeOperationAdapter,
         service_catalog: ServiceCatalogAdapter,
         session: SessionAdapter,
         storage_host: StorageHostAdapter,
@@ -192,6 +195,7 @@ class Adapters:
         self.role_preset = role_preset
         self.scheduling_handler = scheduling_handler
         self.scheduling_history = scheduling_history
+        self.scope_operation = scope_operation
         self.service_catalog = service_catalog
         self.session = session
         self.storage_host = storage_host
@@ -269,6 +273,7 @@ class Adapters:
             role_preset=RolePresetAdapter(processors),
             scheduling_handler=SchedulingHandlerAdapter(deployment_coordinator),
             scheduling_history=SchedulingHistoryAdapter(processors),
+            scope_operation=ScopeOperationAdapter(WiredScopeOperations(action_registry)),
             service_catalog=ServiceCatalogAdapter(processors),
             session=SessionAdapter(processors),
             storage_host=StorageHostAdapter(processors),

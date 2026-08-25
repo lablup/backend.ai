@@ -62,6 +62,7 @@ if TYPE_CHECKING:
     from .domains_v2.runtime_variant_preset import V2RuntimeVariantPresetClient
     from .domains_v2.scheduling_handler import V2SchedulingHandlerClient
     from .domains_v2.scheduling_history import V2SchedulingHistoryClient
+    from .domains_v2.scope_operation import V2ScopeOperationClient
     from .domains_v2.secret import V2SecretClient
     from .domains_v2.service_catalog import V2ServiceCatalogClient
     from .domains_v2.session import V2SessionClient
@@ -387,6 +388,12 @@ class V2ClientRegistry:
         from .domains_v2.scheduling_history import V2SchedulingHistoryClient
 
         return V2SchedulingHistoryClient(self._client)
+
+    @cached_property
+    def scope_operation(self) -> V2ScopeOperationClient:
+        from .domains_v2.scope_operation import V2ScopeOperationClient
+
+        return V2ScopeOperationClient(self._client)
 
     @cached_property
     def service_catalog(self) -> V2ServiceCatalogClient:

@@ -31,6 +31,11 @@ class SearchErrorLogsAction(OperationScopeOpsAction[ErrorLogRow, ErrorLogData]):
         return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id),)
 
     @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (USER_ENTITY_TYPE,)
+
+    @override
     def operation_scopes(self) -> Sequence[OperationScope]:
         return (UserErrorLogOperationScope(user_id=self.user_id),)
 
