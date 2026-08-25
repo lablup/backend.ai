@@ -407,6 +407,11 @@ def health() -> None:
     """Command set for health checking."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.secret:cli")
+def secret() -> None:
+    """Command set for stored secret key encryption."""
+
+
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.ops:cli")
 def ops() -> None:
     """Command set for inspecting the wired domain operation catalog."""

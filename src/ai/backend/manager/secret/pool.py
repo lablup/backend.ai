@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from ai.backend.manager.config.unified import SecretEncryptionConfig
-from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.data.secret.types import KeyProviderType, SecretKeyId
 from ai.backend.manager.errors.secret import (
     SecretEncryptionMisconfigured,
     UnknownSecretKeyProvider,
@@ -46,6 +46,25 @@ class KeyProviderPool:
         if config.config_provider is not None:
             providers.append(ConfigKeyProvider.from_config(config.config_provider))
         return cls(providers=providers, write_provider_type=config.write_provider_type)
+
+    def write_provider_type(self) -> KeyProviderType:
+        """The provider type new and re-encrypted secrets are written through."""
+        if self._writer is None:
+            return KeyProviderType.PLAIN
+        return self._writer.provider_type()
+
+    def holder_of(self, value: SecretValue) -> tuple[KeyProviderType, SecretKeyId | None]:
+        """The provider and key a stored value is held by; plaintext names neither."""
+        match value.content:
+            case EncryptedData() as data:
+                return data.provider_type, data.wrapped_key.key_id
+            case _:
+                return KeyProviderType.PLAIN, None
+
+    async def reencrypt(self, value: SecretValue, context: str) -> SecretValue:
+        """Encrypt the value again through the write provider, under a fresh data
+        encryption key. A write target of plaintext returns it to plaintext."""
+        return await self.encrypt(await self.decrypt(value, context), context)
 
     async def encrypt(self, plaintext: str, context: str) -> SecretValue:
         if self._writer is None:

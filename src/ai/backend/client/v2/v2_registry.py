@@ -63,6 +63,7 @@ if TYPE_CHECKING:
     from .domains_v2.runtime_variant_preset import V2RuntimeVariantPresetClient
     from .domains_v2.scheduling_handler import V2SchedulingHandlerClient
     from .domains_v2.scheduling_history import V2SchedulingHistoryClient
+    from .domains_v2.secret import V2SecretClient
     from .domains_v2.service_catalog import V2ServiceCatalogClient
     from .domains_v2.session import V2SessionClient
     from .domains_v2.storage_host import V2StorageHostClient
@@ -241,6 +242,12 @@ class V2ClientRegistry:
         from .domains_v2.client_ip_masking import V2ClientIPMaskingClient
 
         return V2ClientIPMaskingClient(self._client)
+
+    @cached_property
+    def secret(self) -> V2SecretClient:
+        from .domains_v2.secret import V2SecretClient
+
+        return V2SecretClient(self._client)
 
     @cached_property
     def login_history(self) -> V2LoginHistoryClient:
