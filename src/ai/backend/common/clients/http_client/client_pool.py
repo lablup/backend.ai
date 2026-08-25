@@ -60,9 +60,6 @@ def _has_inflight_requests(session: aiohttp.ClientSession) -> bool:
     connector = session.connector
     if connector is None:
         return False
-    # ponytail: aiohttp exposes no public in-flight count, and `_acquired` is the
-    # set the connector itself checks. Move to refcounting inside the pool if this
-    # ever breaks on an aiohttp upgrade — that needs an API change at every caller.
     return bool(connector._acquired)
 
 
@@ -87,13 +84,21 @@ class ClientKey:
 class ClientPool:
     _clients: MutableMapping[ClientKey, _Client]
     _cleanup_task: asyncio.Task[None]
+    _keep_inflight_sessions: bool
 
     def __init__(
         self,
         factory: ClientSessionFactory,
         cleanup_interval_seconds: float = 600,
+        *,
+        keep_inflight_sessions: bool = False,
     ) -> None:
+        """
+        keep_inflight_sessions: skip evicting a session while a request still holds one
+        of its connections. Off by default; enable for long-lived streaming upstreams.
+        """
         frame = inspect.stack()[1]
+        self._keep_inflight_sessions = keep_inflight_sessions
         self._creator_info = f"{frame.filename}:{frame.lineno}:{frame.function}()"
         self._cleanup_task = asyncio.create_task(
             self._cleanup_loop(cleanup_interval_seconds),
@@ -130,10 +135,9 @@ class ClientPool:
             for key, client in list(self._clients.items()):
                 if now - client.last_used <= cleanup_interval_seconds:
                     continue
-                if _has_inflight_requests(client.session):
-                    # `last_used` is only stamped on acquisition, so a request that
-                    # outlives the interval looks idle. Closing the session here
-                    # would tear down its connections mid-response.
+                if self._keep_inflight_sessions and _has_inflight_requests(client.session):
+                    # `last_used` is stamped on acquisition only, so a request outliving
+                    # the interval looks idle.
                     client.last_used = now
                     continue
                 del self._clients[key]

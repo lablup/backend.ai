@@ -772,6 +772,20 @@ class ProxyWorkerConfig(BaseSchema):
         ),
     ]
 
+    client_pool_keep_inflight_sessions: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description=(
+                "Whether the idle-session cleanup skips sessions that still have a request in flight. "
+                "Keeps streamed responses longer than client_pool_cleanup_interval from being cut off. "
+                "Disable to restore eviction based on the acquisition time alone."
+            ),
+            added_version="26.8.0",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
+
     announce_addr: Annotated[
         HostPortPair | None,
         Field(default=None),
