@@ -47,6 +47,7 @@ from ai.backend.agent.network.privnet.resolver import (
 from ai.backend.agent.network.provisioner import ContainerNetworkProvisioner
 from ai.backend.common.network.keys import endpoint_key, session_meta_key
 from ai.backend.common.network.types import (
+    DEFAULT_VXLAN_PORT,
     EndpointPlan,
     Member,
     NetworkBackendKind,
@@ -75,12 +76,17 @@ def session_net_meta_from_network_config(
     """Parse the manager-provided network_config into a SessionNetMeta."""
     vni_raw = network_config.get("vni")
     key_raw = network_config.get("encryption_key")
+    # A meta written before the port became configurable carries no `vxlan_port`; falling back to
+    # the shipped default keeps such a session (and a rolling upgrade) on the port it is already
+    # using, instead of silently rebuilding its tunnel on a different one.
+    port_raw = network_config.get("vxlan_port")
     return SessionNetMeta(
         session_id=session_id,
         subnet=network_config["subnet"],
         backend=NetworkBackendKind(network_config["backend"]),
         mtu=int(network_config.get("mtu") or _DEFAULT_MTU),
         vni=int(vni_raw) if vni_raw is not None else None,
+        vxlan_port=int(port_raw) if port_raw else DEFAULT_VXLAN_PORT,
         encryption_key=str(key_raw) if key_raw else None,
     )
 
@@ -320,6 +326,7 @@ class ContainerdSessionNetwork:
                 "vni": meta.vni,
                 "backend": str(meta.backend),
                 "mtu": meta.mtu,
+                "vxlan_port": meta.vxlan_port,
                 "encryption_key": meta.encryption_key,
             }),
         )

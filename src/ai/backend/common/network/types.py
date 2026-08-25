@@ -13,6 +13,28 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
+# --- tunnel constants, shared by the manager (which computes the overlay MTU) and the agent
+# (which builds the devices and checks the result against the real path) ---
+
+DEFAULT_VXLAN_PORT = 4789
+"""The IANA VXLAN port, and the default this project ships.
+
+It is a *default*, not a constant, because a cluster's CNI may already claim it in a way that is
+fatal to us. Calico programs an anti-spoofing rule on the host side of every pod veth --
+``-A cali-fw-<iface> -p udp -m multiport --dports <felix vxlanPort> -j DROP``, commented "Drop
+VXLAN encapped packets originating in workloads" -- whose port is Felix's ``vxlanPort``, also 4789
+by default. It is installed regardless of Calico's own encapsulation mode (measured: it fires with
+Calico in IPIP mode, where Calico uses no VXLAN at all), so on a Calico cluster a session overlay
+on 4789 comes up and carries nothing. Moving either side off 4789 restores it.
+"""
+
+VXLAN_OVERHEAD = 50
+"""IPv4 VXLAN encapsulation: 20 IP + 8 UDP + 8 VXLAN + 14 inner Ethernet."""
+
+ESP_OVERHEAD = 38
+"""Transport-mode ESP/AES-GCM added on top of VXLAN when overlay encryption is on: 8 ESP header
+(SPI + seq) + 8 IV + 16 ICV + up to 6 pad/trailer. See overlay-encryption.md."""
+
 
 def mac_for_ip(ip: str) -> str:
     """Derive a stable, locally-administered unicast MAC from an IPv4 address.
@@ -78,6 +100,13 @@ class SessionNetMeta:
     mtu: int
     vni: int | None = None
     """VXLAN Network Identifier; set only when ``backend == VXLAN``."""
+    vxlan_port: int = DEFAULT_VXLAN_PORT
+    """UDP port this session's VXLAN tunnel uses, on the wire and in the XFRM policy selector.
+
+    Carried in the meta rather than read from each agent's own config so the two ends of a tunnel
+    cannot disagree -- a one-sided change yields an overlay that comes up and carries nothing.
+    See ``DEFAULT_VXLAN_PORT`` for why an operator would move it off 4789.
+    """
     encryption_key: str | None = None
     """Hex-encoded 256-bit symmetric key for kernel IPSec (ESP/AES-GCM) on the VXLAN tunnel, or
     ``None`` for a plaintext overlay (the default). Distributed via the etcd meta like ``vni``; the

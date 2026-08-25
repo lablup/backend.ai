@@ -14,15 +14,20 @@ import hashlib
 import ipaddress
 import logging
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any, override
+from typing import Any, Final, override
 
-from ai.backend.agent.errors.network import OverlayAddressNotAssigned
+from ai.backend.agent.errors.network import OverlayAddressNotAssigned, OverlayMtuTooLarge
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.network.caps import probe_caps
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_local_subnet_allocator
 from ai.backend.agent.network.native_attacher import redirect_session_dns, remove_dns_redirect
+from ai.backend.agent.network.overlay_probe import arp_probe
+from ai.backend.agent.network.path_mtu import underlay_mtu
 from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
 from ai.backend.common.network.types import (
+    DEFAULT_VXLAN_PORT,
+    ESP_OVERHEAD,
+    VXLAN_OVERHEAD,
     AgentNetworkCaps,
     AttachKind,
     EndpointPlan,
@@ -38,11 +43,21 @@ from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-VXLAN_DSTPORT = 4789
+VXLAN_DSTPORT = DEFAULT_VXLAN_PORT
+"""Kept as the module-level default for the pure command builders. The value a live session
+actually uses comes from ``SessionNetMeta.vxlan_port``, so both ends of a tunnel agree."""
 OVERLAY_IFNAME = "baimulti0"
 _BROADCAST_MAC = "00:00:00:00:00:00"
 
 Runner = Callable[[Sequence[str]], Awaitable[None]]
+MtuProbe = Callable[[str], Awaitable[int | None]]
+# (bridge, target_ip, target_mac) -> answered? / None when the probe could not run.
+ReachProbe = Callable[[str, str, str], Awaitable[bool | None]]
+
+# A freshly published endpoint may belong to a container that is still starting, so the reach
+# probe is retried before it is believed. Cheap (one ARP frame each) and bounded.
+_REACH_ATTEMPTS: Final = 5
+_REACH_RETRY_DELAY_SEC: Final = 3.0
 
 
 # --- naming (kept within the 15-char interface name limit) ---
@@ -136,7 +151,9 @@ def _aead_key(key_hex: str) -> str:
     return "0x" + key_hex + salt.hex()
 
 
-def xfrm_add_args(self_vtep: str, peer_vtep: str, vni: int, key_hex: str) -> list[list[str]]:
+def xfrm_add_args(
+    self_vtep: str, peer_vtep: str, vni: int, key_hex: str, *, dstport: int = VXLAN_DSTPORT
+) -> list[list[str]]:
     """The `ip xfrm` commands that encrypt this node↔peer VXLAN traffic: an out/in ESP SA pair plus
     the out/in policy selecting the VXLAN UDP. Idempotent via `update`."""
     key = _aead_key(key_hex)
@@ -149,15 +166,17 @@ def xfrm_add_args(self_vtep: str, peer_vtep: str, vni: int, key_hex: str) -> lis
         ["ip", "xfrm", "state", "update", "src", peer_vtep, "dst", self_vtep,
          "proto", "esp", "spi", spi_in, "mode", "transport", *aead],
         ["ip", "xfrm", "policy", "update", "src", self_vtep, "dst", peer_vtep,
-         "proto", "udp", "dport", str(VXLAN_DSTPORT), "dir", "out",
+         "proto", "udp", "dport", str(dstport), "dir", "out",
          "tmpl", "src", self_vtep, "dst", peer_vtep, "proto", "esp", "mode", "transport"],
         ["ip", "xfrm", "policy", "update", "src", peer_vtep, "dst", self_vtep,
-         "proto", "udp", "dport", str(VXLAN_DSTPORT), "dir", "in",
+         "proto", "udp", "dport", str(dstport), "dir", "in",
          "tmpl", "src", peer_vtep, "dst", self_vtep, "proto", "esp", "mode", "transport"],
     ]  # fmt: skip
 
 
-def xfrm_del_args(self_vtep: str, peer_vtep: str, vni: int) -> list[list[str]]:
+def xfrm_del_args(
+    self_vtep: str, peer_vtep: str, vni: int, *, dstport: int = VXLAN_DSTPORT
+) -> list[list[str]]:
     spi_out = f"{_esp_spi(vni, self_vtep, peer_vtep):#x}"
     spi_in = f"{_esp_spi(vni, peer_vtep, self_vtep):#x}"
     return [
@@ -166,9 +185,9 @@ def xfrm_del_args(self_vtep: str, peer_vtep: str, vni: int) -> list[list[str]]:
         ["ip", "xfrm", "state", "del", "src", peer_vtep, "dst", self_vtep, "proto", "esp",
          "spi", spi_in],
         ["ip", "xfrm", "policy", "del", "src", self_vtep, "dst", peer_vtep,
-         "proto", "udp", "dport", str(VXLAN_DSTPORT), "dir", "out"],
+         "proto", "udp", "dport", str(dstport), "dir", "out"],
         ["ip", "xfrm", "policy", "del", "src", peer_vtep, "dst", self_vtep,
-         "proto", "udp", "dport", str(VXLAN_DSTPORT), "dir", "in"],
+         "proto", "udp", "dport", str(dstport), "dir", "in"],
     ]  # fmt: skip
 
 
@@ -336,6 +355,11 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     _sessions: dict[str, SessionNetMeta]
     _self_vteps: dict[str, str]
     _local_subnets: LocalSubnetAllocator
+    _mtu_probe: MtuProbe
+    _reach_probe: ReachProbe
+    # Per-session background reach probes, so teardown does not leave them running against a
+    # bridge that is being deleted.
+    _reach_tasks: dict[str, set[asyncio.Task[None]]]
 
     def __init__(
         self,
@@ -345,10 +369,17 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         uplink: str = "eth0",
         runner: Runner | None = None,
         local_subnets: LocalSubnetAllocator | None = None,
+        mtu_probe: MtuProbe | None = None,
+        reach_probe: ReachProbe | None = None,
     ) -> None:
         super().__init__(plugin_config, local_config)
         self._uplink = uplink
         self._runner = runner or _run_command
+        # Injectable for the same reason as `runner`: the probe shells out and reads sysfs, and the
+        # command builders must stay testable without either.
+        self._mtu_probe = mtu_probe or underlay_mtu
+        self._reach_probe = reach_probe or arp_probe
+        self._reach_tasks = {}
         self._sessions = {}
         # This node's own VXLAN tunnel endpoint per session — the local `src` for every XFRM SA,
         # captured from `self_member` at setup/adopt because add_peer/del_peer only receive the peer.
@@ -383,6 +414,39 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     async def probe_caps(self) -> AgentNetworkCaps:
         return await probe_caps(self._uplink)
 
+    async def _measured_overlay_ceiling(self, meta: SessionNetMeta) -> int | None:
+        """The largest overlay MTU this node's underlay can actually carry, or None if unmeasurable."""
+        underlay = await self._mtu_probe(self._uplink)
+        if underlay is None:
+            return None
+        return underlay - VXLAN_OVERHEAD - (ESP_OVERHEAD if meta.encryption_key else 0)
+
+    async def _require_mtu_fits(self, meta: SessionNetMeta) -> None:
+        """Refuse the session when the manager's overlay MTU exceeds this node's real underlay.
+
+        The manager derives the number from a configured constant; only the node can tell what its
+        pod network really leaves. When they disagree the overlay still comes up and still passes
+        small packets, so nothing surfaces until a bulk transfer hangs. See path_mtu.py for the
+        measured per-CNI numbers.
+        """
+        ceiling = await self._measured_overlay_ceiling(meta)
+        if ceiling is None:
+            log.warning(
+                "could not measure the underlay MTU on {}; accepting the manager's overlay MTU "
+                "{} unchecked",
+                self._uplink,
+                meta.mtu,
+            )
+            return
+        if meta.mtu > ceiling:
+            raise OverlayMtuTooLarge(
+                f"session {meta.session_id}: overlay MTU {meta.mtu} exceeds what uplink "
+                f"{self._uplink} can carry ({ceiling}). The pod network on this node encapsulates, "
+                f"so the manager's assumed underlay is {meta.mtu - ceiling} bytes too large. "
+                f"Set the manager's network plugin `mtu` to this node's measured underlay "
+                f"({ceiling + VXLAN_OVERHEAD + (ESP_OVERHEAD if meta.encryption_key else 0)})."
+            )
+
     async def _delete_link_quiet(self, dev: str) -> None:
         """Delete a link if present; ignore 'does not exist' failures."""
         try:
@@ -415,6 +479,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         if meta.backend is not NetworkBackendKind.VXLAN or meta.vni is None:
             raise ValueError(f"VxlanNetworkPlugin requires a vxlan meta with a VNI: {meta}")
         vni = meta.vni
+        # A precondition, so it runs before any side effect: a session this node cannot carry
+        # must leave nothing half-built behind.
+        await self._require_mtu_fits(meta)
         # Leftover-safe: a stale device from a crashed/uncleaned prior session would make
         # `ip link add` fail with 'File exists' (and could carry stale FDB/IP). Delete any
         # pre-existing devices of these names first so setup always yields a fresh device.
@@ -426,7 +493,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         await self._delete_link_quiet(local_bridge_dev(vni))
         # The overlay MTU (underlay - VXLAN overhead) the manager put in the meta, applied to both
         # the vxlan device and the overlay bridge so a full-size inner frame fits the tunnel.
-        await self._runner(vxlan_link_add_args(vni, self._uplink, mtu=meta.mtu))
+        await self._runner(
+            vxlan_link_add_args(vni, self._uplink, mtu=meta.mtu, dstport=meta.vxlan_port)
+        )
         await self._runner(bridge_link_add_args(vni, mtu=meta.mtu))
         await self._runner(set_master_args(vni))
         await self._runner(link_up_args(vxlan_dev(vni)))
@@ -440,6 +509,20 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     async def adopt_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
         if meta.backend is not NetworkBackendKind.VXLAN or meta.vni is None:
             raise ValueError(f"VxlanNetworkPlugin requires a vxlan meta with a VNI: {meta}")
+        # Warn, do not refuse: unlike setup, the devices here are already up and carrying traffic,
+        # and an agent restart that lands after the pod network changed under it would otherwise
+        # kill sessions that are running. The operator still gets the number to fix.
+        ceiling = await self._measured_overlay_ceiling(meta)
+        if ceiling is not None and meta.mtu > ceiling:
+            log.warning(
+                "adopting session {} whose overlay MTU {} exceeds this node's underlay ceiling {} "
+                "on {}; full-size frames will be dropped silently -- set the manager's network "
+                "plugin `mtu` lower",
+                meta.session_id,
+                meta.mtu,
+                ceiling,
+                self._uplink,
+            )
         # Devices are already up and carrying traffic; only the bookkeeping add_peer/add_endpoint
         # read is missing. The LOCAL subnet index is re-claimed from the journal by attach_endpoint,
         # which is idempotent per session. XFRM SAs survive in the kernel across an agent restart;
@@ -452,6 +535,8 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     async def teardown_session_network(self, session_id: str) -> None:
         meta = self._sessions.pop(session_id, None)
         self._self_vteps.pop(session_id, None)
+        for task in self._reach_tasks.pop(session_id, set()):
+            task.cancel()
         await self._local_subnets.release(session_id)
         if meta is None or meta.vni is None:
             return
@@ -485,7 +570,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 "cannot encrypt overlay for session {}: this node's VTEP is unknown", session_id
             )
             return
-        for args in xfrm_add_args(self_vtep, peer_vtep, meta.vni, meta.encryption_key):
+        for args in xfrm_add_args(
+            self_vtep, peer_vtep, meta.vni, meta.encryption_key, dstport=meta.vxlan_port
+        ):
             await self._runner(args)
 
     @override
@@ -496,7 +583,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         if meta.encryption_key is not None:
             self_vtep = self._self_vteps.get(session_id)
             if self_vtep is not None:
-                for args in xfrm_del_args(self_vtep, peer.vtep_ip, meta.vni):
+                for args in xfrm_del_args(
+                    self_vtep, peer.vtep_ip, meta.vni, dstport=meta.vxlan_port
+                ):
                     try:
                         await self._runner(args)
                     except RuntimeError:
@@ -518,6 +607,63 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             return
         await self._runner(fdb_replace_args(meta.vni, mac, vtep_ip))
         await self._runner(neigh_replace_args(meta.vni, ip, mac))
+        self._start_reach_probe(session_id, meta, ip=ip, mac=mac, vtep_ip=vtep_ip)
+
+    def _start_reach_probe(
+        self, session_id: str, meta: SessionNetMeta, *, ip: str, mac: str, vtep_ip: str
+    ) -> None:
+        """Check in the background that the tunnel to a REMOTE endpoint carries traffic.
+
+        Only remote ones: a local endpoint is reached over the bridge without touching the tunnel,
+        so probing it would prove nothing about the thing that silently breaks.
+
+        Background and non-fatal by design. This runs on the membership-reconcile path, which must
+        not stall, and the endpoint's container may still be starting -- refusing a session on a
+        probe that was merely early would be worse than the silence it replaces. A loud, greppable
+        error naming the remedy is the whole gain.
+        """
+        if meta.vni is None or self._self_vteps.get(session_id) == vtep_ip:
+            return
+        # Bound here, not inside the closure: the guard above narrows `meta.vni` only in this
+        # scope, and a nested function would read it as `int | None` again.
+        bridge = bridge_dev(meta.vni)
+
+        async def _run() -> None:
+            for attempt in range(1, _REACH_ATTEMPTS + 1):
+                answered = await self._reach_probe(bridge, ip, mac)
+                if answered is None:
+                    log.debug("overlay reach probe unavailable on {}; skipping", bridge)
+                    return
+                if answered:
+                    log.debug(
+                        "overlay reach probe: {} answered over {} (attempt {})",
+                        ip,
+                        bridge,
+                        attempt,
+                    )
+                    return
+                if attempt < _REACH_ATTEMPTS:
+                    await asyncio.sleep(_REACH_RETRY_DELAY_SEC)
+            log.error(
+                "session {}: the overlay to {} ({} via VTEP {}) carries no traffic -- {} ARP "
+                "probes over {} went unanswered. The devices are up and the FDB is programmed, so "
+                "suspect the pod network filtering the tunnel: Calico drops workload UDP on its "
+                "felix vxlanPort (4789 by default, which this session uses: {}) in every "
+                "encapsulation mode. Move the session's port with the manager's network plugin "
+                "`vxlan-port`, or check for a firewall on that UDP port between the nodes.",
+                session_id,
+                ip,
+                mac,
+                vtep_ip,
+                _REACH_ATTEMPTS,
+                bridge,
+                meta.vxlan_port,
+            )
+
+        task = asyncio.create_task(_run())
+        tasks = self._reach_tasks.setdefault(session_id, set())
+        tasks.add(task)
+        task.add_done_callback(tasks.discard)
 
     @override
     async def del_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:

@@ -52,6 +52,17 @@ class TestMetaParsing:
         assert meta.vni is None
         assert meta.mtu == 1500
 
+    def test_vxlan_port_is_carried_from_the_manager(self) -> None:
+        meta = session_net_meta_from_network_config("s1", {**_VXLAN_NC, "vxlan_port": 4790})
+        assert meta.vxlan_port == 4790
+
+    def test_meta_without_a_port_keeps_the_shipped_default(self) -> None:
+        # A session created before the port became configurable, or a peer still on the old code
+        # during a rolling upgrade: it must stay on the port its tunnel is already built with,
+        # not silently move to a different one.
+        assert "vxlan_port" not in _VXLAN_NC
+        assert session_net_meta_from_network_config("s1", _VXLAN_NC).vxlan_port == 4789
+
 
 class FakeEtcd:
     def __init__(self) -> None:

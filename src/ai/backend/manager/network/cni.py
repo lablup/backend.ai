@@ -25,6 +25,9 @@ from ai.backend.common.network.keys import (
     session_prefix,
 )
 from ai.backend.common.network.types import (
+    DEFAULT_VXLAN_PORT,
+    ESP_OVERHEAD,
+    VXLAN_OVERHEAD,
     Member,
     NetworkBackendKind,
 )
@@ -48,12 +51,11 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # a 1500-byte frame reach a 1450-MTU VXLAN port, where it is silently dropped with no ICMP (L2
 # bridging), i.e. a PMTUD black hole: handshakes pass, bulk transfers (NCCL/mpirun) hang.
 _DEFAULT_UNDERLAY_MTU = 1500
-_VXLAN_OVERHEAD = 50  # IPv4 VXLAN: 20 IP + 8 UDP + 8 VXLAN + 14 inner Ethernet
-# Transport-mode ESP/AES-GCM added on top of VXLAN when overlay encryption is on: 8 ESP header (SPI
-# + seq) + 8 IV + 16 ICV + up to 6 pad/trailer. Subtracted from the overlay MTU too, so an encrypted
-# inner frame still fits the underlay and does not reopen the PMTUD black hole `_VXLAN_OVERHEAD`
-# guards against. See overlay-encryption.md.
-_ESP_OVERHEAD = 38
+# The encapsulation overheads live in common/network/types.py: the agent subtracts the same two
+# numbers from the underlay it *measures*, and refuses the session if this computation came out
+# larger than the path can carry, so both sides must read one definition.
+_VXLAN_OVERHEAD = VXLAN_OVERHEAD
+_ESP_OVERHEAD = ESP_OVERHEAD
 
 
 class CNINetworkPlugin(AbstractNetworkManagerPlugin):
@@ -153,12 +155,18 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 mtu = underlay_mtu - _VXLAN_OVERHEAD - (_ESP_OVERHEAD if encrypt else 0)
             else:
                 mtu = underlay_mtu
+            # `mtu` above is an ASSUMPTION about the underlay, not a measurement, and it is one
+            # value for a possibly heterogeneous cluster. Each agent re-derives its own node's
+            # real underlay and refuses the session when this number does not fit, which turns a
+            # silent black hole into a named error. See agent/network/path_mtu.py.
+            vxlan_port = int(self.plugin_config.get("vxlan-port") or DEFAULT_VXLAN_PORT)
 
             meta: dict[str, Any] = {
                 "subnet": subnet,
                 "vni": vni,
                 "backend": str(backend),
                 "mtu": mtu,
+                "vxlan_port": vxlan_port,
                 "encryption_key": encryption_key,
             }
             await etcd.put(

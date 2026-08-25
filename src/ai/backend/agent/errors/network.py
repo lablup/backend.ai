@@ -169,6 +169,33 @@ class UnusableVtep(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class OverlayMtuTooLarge(BackendAIError, web.HTTPInternalServerError):
+    """The overlay MTU the manager computed does not fit this node's real underlay.
+
+    The manager derives it from a configured underlay constant, not from a measurement, so any
+    pod network that encapsulates (flannel vxlan/ipip/wireguard, calico vxlan/ipip, cilium tunnel)
+    leaves the overlay exactly its own overhead too large. Nothing reports that: small packets
+    pass, full-size frames are dropped with no ICMP, and the session hangs later in bulk transfer
+    with no hint of why. Refusing here, naming the measured value to configure, is the same trade
+    `UnusableVtep` makes -- a loud failure beats a silent one.
+
+    Clamping locally would be worse than refusing: each node would clamp to its own path and the
+    two ends of one tunnel would disagree, so the larger side's frames would vanish in exactly the
+    way this guard exists to prevent.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/overlay-mtu-too-large"
+    error_title = "The session's overlay MTU exceeds what this node's underlay can carry."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class PortForwardError(BackendAIError, web.HTTPInternalServerError):
     """Raised when installing or removing a container's host-port DNAT rule fails."""
 

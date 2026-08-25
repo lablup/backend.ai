@@ -1,10 +1,13 @@
-from collections.abc import Sequence
+import asyncio
+import logging
+from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
-from typing import cast, override
+from typing import Any, cast, override
 
 import pytest
 
-from ai.backend.agent.errors.network import OverlayAddressNotAssigned
+from ai.backend.agent.errors.network import OverlayAddressNotAssigned, OverlayMtuTooLarge
+from ai.backend.agent.network.backends import vxlan as vx
 from ai.backend.agent.network.backends.vxlan import (
     OVERLAY_IFNAME,
     VxlanNetworkPlugin,
@@ -65,8 +68,42 @@ class Recorder:
         self.calls.append(list(argv))
 
 
-def _plugin(recorder: Recorder, *, uplink: str = "eth0") -> VxlanNetworkPlugin:
-    return VxlanNetworkPlugin({}, {}, uplink=uplink, runner=recorder)
+def _mtu_probe(value: int | None) -> Callable[[str], Awaitable[int | None]]:
+    async def probe(uplink: str) -> int | None:
+        return value
+
+    return probe
+
+
+class _ReachRecorder:
+    """A stand-in for the ARP reach probe: records who was probed, answers as told."""
+
+    def __init__(self, answer: bool | None = True) -> None:
+        self.answer = answer
+        self.calls: list[tuple[str, str, str]] = []
+
+    async def __call__(self, bridge: str, ip: str, mac: str) -> bool | None:
+        self.calls.append((bridge, ip, mac))
+        return self.answer
+
+
+def _plugin(
+    recorder: Recorder,
+    *,
+    uplink: str = "eth0",
+    underlay: int | None = 1500,
+    reach: _ReachRecorder | None = None,
+) -> VxlanNetworkPlugin:
+    return VxlanNetworkPlugin(
+        {},
+        {},
+        uplink=uplink,
+        runner=recorder,
+        mtu_probe=_mtu_probe(underlay),
+        # Default to a probe that answers, so tests unrelated to reachability neither spawn a real
+        # AF_PACKET probe nor leave a retry loop running.
+        reach_probe=reach or _ReachRecorder(True),
+    )
 
 
 class TestCommandBuilders:
@@ -379,7 +416,12 @@ class TestLocalSubnetAllocation:
 
         # a fresh agent process: a brand-new allocator over the same on-disk store
         restarted = VxlanNetworkPlugin(
-            {}, {}, runner=Recorder(), local_subnets=LocalSubnetAllocator(local_subnet_state_dir)
+            {},
+            {},
+            runner=Recorder(),
+            local_subnets=LocalSubnetAllocator(local_subnet_state_dir),
+            mtu_probe=_mtu_probe(1500),
+            reach_probe=_ReachRecorder(True),
         )
         assert await restarted._local_subnet("survivor") == held
         assert await restarted._local_subnet("newcomer") != held
@@ -559,3 +601,170 @@ class TestAttachEndpoint:
         assert overlay.cni_config["ipam"]["addresses"] == [{"address": "10.128.5.7/24"}]
         # and the deterministic MAC rides along as the standard ``mac`` capability arg
         assert overlay.cni_capability_args == {"mac": "02:42:0a:80:05:07"}
+
+
+class TestVxlanPort:
+    def test_link_add_defaults_to_the_iana_port(self) -> None:
+        args = vxlan_link_add_args(4097, "eth0")
+        assert args[args.index("dstport") + 1] == "4789"
+
+    def test_link_add_honours_a_moved_port(self) -> None:
+        args = vxlan_link_add_args(4097, "eth0", dstport=4790)
+        assert args[args.index("dstport") + 1] == "4790"
+
+    def test_xfrm_selectors_follow_the_session_port(self) -> None:
+        # Both policies select on the VXLAN UDP port; a selector left on 4789 while the device
+        # moved would leave the tunnel unencrypted rather than fail loudly.
+        policies = [
+            a
+            for a in xfrm_add_args("1.1.1.1", "2.2.2.2", 7, "ab" * 32, dstport=4790)
+            if "policy" in a
+        ]
+        assert len(policies) == 2
+        for args in policies:
+            assert args[args.index("dport") + 1] == "4790"
+        for args in xfrm_del_args("1.1.1.1", "2.2.2.2", 7, dstport=4790):
+            if "policy" in args:
+                assert args[args.index("dport") + 1] == "4790"
+
+    async def test_setup_builds_the_device_on_the_session_port(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        moved = SessionNetMeta(
+            session_id="s1",
+            subnet="10.128.5.0/24",
+            backend=NetworkBackendKind.VXLAN,
+            mtu=1450,
+            vni=4097,
+            vxlan_port=4790,
+        )
+        await plugin.setup_session_network(moved, _SELF)
+        add = next(c for c in rec.calls if c[:3] == ["ip", "link", "add"] and "vxlan" in c)
+        assert add[add.index("dstport") + 1] == "4790"
+
+
+class TestOverlayMtuGuard:
+    async def test_accepts_an_overlay_that_fits(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, underlay=1500)
+        await plugin.setup_session_network(_META, _SELF)  # 1450 == 1500 - 50
+        assert any(c[:3] == ["ip", "link", "add"] for c in rec.calls)
+
+    async def test_refuses_an_overlay_the_underlay_cannot_carry(self) -> None:
+        # An encapsulating pod network (measured: flannel/calico vxlan, cilium tunnel) leaves 1450,
+        # so the manager's 1450 overlay is 50 bytes too large and would black-hole silently.
+        rec = Recorder()
+        plugin = _plugin(rec, underlay=1450)
+        with pytest.raises(OverlayMtuTooLarge) as excinfo:
+            await plugin.setup_session_network(_META, _SELF)
+        # The message must carry the value to configure, or the operator is no better off.
+        assert "1450" in str(excinfo.value)
+        assert not rec.calls, "no device may be built for a session that was refused"
+
+    async def test_encryption_overhead_counts_against_the_ceiling(self) -> None:
+        # 1500 - 50 - 38 = 1412 fits exactly; one byte more does not.
+        rec = Recorder()
+        await _plugin(rec, underlay=1500).setup_session_network(_ENC_META, _SELF)
+        too_big = SessionNetMeta(
+            session_id="s1",
+            subnet="10.128.5.0/24",
+            backend=NetworkBackendKind.VXLAN,
+            mtu=1413,
+            vni=4097,
+            encryption_key=_KEY,
+        )
+        with pytest.raises(OverlayMtuTooLarge):
+            await _plugin(Recorder(), underlay=1500).setup_session_network(too_big, _SELF)
+
+    async def test_unmeasurable_underlay_does_not_refuse(self) -> None:
+        # A node whose MTU cannot be read must not lose every session to the guard.
+        rec = Recorder()
+        plugin = _plugin(rec, underlay=None)
+        await plugin.setup_session_network(_META, _SELF)
+        assert any(c[:3] == ["ip", "link", "add"] for c in rec.calls)
+
+    async def test_adopt_warns_but_keeps_a_live_session(self) -> None:
+        # Restart recovery: the devices are already up and carrying traffic. Refusing here would
+        # kill running sessions because the pod network changed under a restarting agent.
+        rec = Recorder()
+        plugin = _plugin(rec, underlay=1450)
+        await plugin.adopt_session_network(_META, _SELF)
+        assert plugin._sessions["s1"] is _META
+
+
+class TestOverlayReachProbe:
+    async def _drain(self, plugin: VxlanNetworkPlugin, session_id: str) -> None:
+        for task in list(plugin._reach_tasks.get(session_id, set())):
+            await task
+
+    async def test_remote_endpoint_is_probed_over_the_session_bridge(self) -> None:
+        reach = _ReachRecorder(True)
+        plugin = _plugin(Recorder(), reach=reach)
+        await plugin.setup_session_network(_META, _SELF)
+        await plugin.add_endpoint(
+            "s1", ip="10.128.5.9", mac="02:42:0a:80:05:09", vtep_ip="10.0.0.2"
+        )
+        await self._drain(plugin, "s1")
+        assert reach.calls == [(bridge_dev(4097), "10.128.5.9", "02:42:0a:80:05:09")]
+
+    async def test_local_endpoint_is_not_probed(self) -> None:
+        # A local endpoint never crosses the tunnel, so probing it would prove nothing about the
+        # thing that fails silently -- and would fail on its own for unrelated reasons.
+        reach = _ReachRecorder(True)
+        plugin = _plugin(Recorder(), reach=reach)
+        await plugin.setup_session_network(_META, _SELF)  # _SELF.vtep_ip == 10.0.0.1
+        await plugin.add_endpoint(
+            "s1", ip="10.128.5.1", mac="02:42:0a:80:05:01", vtep_ip="10.0.0.1"
+        )
+        await self._drain(plugin, "s1")
+        assert reach.calls == []
+
+    async def test_unanswered_probe_is_retried_then_reported(
+        self, monkeypatch: Any, caplog: Any
+    ) -> None:
+        # This is the Calico case: devices up, FDB programmed, nothing crosses.
+        monkeypatch.setattr(vx, "_REACH_RETRY_DELAY_SEC", 0)
+        reach = _ReachRecorder(False)
+        plugin = _plugin(Recorder(), reach=reach)
+        await plugin.setup_session_network(_META, _SELF)
+        with caplog.at_level(logging.ERROR):
+            await plugin.add_endpoint(
+                "s1", ip="10.128.5.9", mac="02:42:0a:80:05:09", vtep_ip="10.0.0.2"
+            )
+            await self._drain(plugin, "s1")
+        assert len(reach.calls) == vx._REACH_ATTEMPTS
+        assert any("carries no traffic" in r.message for r in caplog.records)
+        # The remedy has to be in the message, or the operator is back to guessing.
+        assert any("vxlan-port" in r.message for r in caplog.records)
+
+    async def test_unprobeable_is_not_reported_as_broken(
+        self, monkeypatch: Any, caplog: Any
+    ) -> None:
+        # No CAP_NET_RAW / no such device: a diagnostic that could not run must not be mistaken
+        # for a diagnosis, and must not burn the retries either.
+        monkeypatch.setattr(vx, "_REACH_RETRY_DELAY_SEC", 0)
+        reach = _ReachRecorder(None)
+        plugin = _plugin(Recorder(), reach=reach)
+        await plugin.setup_session_network(_META, _SELF)
+        with caplog.at_level(logging.ERROR):
+            await plugin.add_endpoint(
+                "s1", ip="10.128.5.9", mac="02:42:0a:80:05:09", vtep_ip="10.0.0.2"
+            )
+            await self._drain(plugin, "s1")
+        assert len(reach.calls) == 1
+        assert not [r for r in caplog.records if "carries no traffic" in r.message]
+
+    async def test_teardown_cancels_a_pending_probe(self, monkeypatch: Any) -> None:
+        # The bridge is about to be deleted; a probe still retrying against it is pure noise.
+        monkeypatch.setattr(vx, "_REACH_RETRY_DELAY_SEC", 30)
+        reach = _ReachRecorder(False)
+        plugin = _plugin(Recorder(), reach=reach)
+        await plugin.setup_session_network(_META, _SELF)
+        await plugin.add_endpoint(
+            "s1", ip="10.128.5.9", mac="02:42:0a:80:05:09", vtep_ip="10.0.0.2"
+        )
+        task = next(iter(plugin._reach_tasks["s1"]))
+        await asyncio.sleep(0)
+        await plugin.teardown_session_network("s1")
+        assert task.cancelled() or task.cancelling()
+        assert "s1" not in plugin._reach_tasks
