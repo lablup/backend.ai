@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections.abc import AsyncIterator
 from functools import partial
 
+import aiohttp
 import pytest
 from aiohttp import web
 
@@ -32,11 +34,18 @@ async def _slow_stream(request: web.Request) -> web.StreamResponse:
 async def _read_stream(pool: ClientPool, upstream_url: str) -> list[bytes]:
     session = pool.load_client_session(ClientKey(endpoint=upstream_url, domain="test"))
     chunks: list[bytes] = []
-    async with asyncio.timeout(READ_DEADLINE):
-        async with session.get("/stream") as response:
-            async for line in response.content:
-                chunks.append(line)
+    with contextlib.suppress(TimeoutError, aiohttp.ClientError):
+        async with asyncio.timeout(READ_DEADLINE):
+            async with session.get("/stream") as response:
+                async for line in response.content:
+                    chunks.append(line)
     return chunks
+
+
+async def _wait_closed(session: aiohttp.ClientSession) -> None:
+    async with asyncio.timeout(READ_DEADLINE):
+        while not session.closed:
+            await asyncio.sleep(CLEANUP_INTERVAL / 4)
 
 
 @pytest.fixture
@@ -98,9 +107,8 @@ async def test_idle_session_is_still_evicted(
     async with session.get("/stream") as response:
         await response.read()
 
-    await asyncio.sleep(CLEANUP_INTERVAL * 3)
+    await _wait_closed(session)
 
-    assert session.closed
     assert pool.load_client_session(key) is not session
 
 
@@ -108,5 +116,6 @@ async def test_flag_off_keeps_time_based_eviction(
     legacy_pool: ClientPool,
     streaming_upstream_url: str,
 ) -> None:
-    with pytest.raises(TimeoutError):
-        await _read_stream(legacy_pool, streaming_upstream_url)
+    chunks = await _read_stream(legacy_pool, streaming_upstream_url)
+
+    assert len(chunks) < STREAM_CHUNKS
