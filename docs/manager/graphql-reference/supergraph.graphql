@@ -417,6 +417,9 @@ input AgentFilter
   status: AgentStatusFilter = null
   schedulable: Boolean = null
   scalingGroup: StringFilter = null
+
+  """Added in 26.9.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [AgentFilter!] = null
   OR: [AgentFilter!] = null
   NOT: [AgentFilter!] = null
@@ -730,6 +733,11 @@ type AgentV2 implements Node
   id: ID!
 
   """
+  Added in 26.9.0. Agent UUID. The agent's primary key is its name, so rows keyed on the agent carry this instead.
+  """
+  uuid: UUID!
+
+  """
   Hardware resource capacity, usage, and availability information. Contains capacity (total), used (occupied by sessions), and free (available) resource slots including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
   """
   resourceInfo: AgentResource!
@@ -758,6 +766,9 @@ type AgentV2 implements Node
   Name of the scaling group this agent belongs to. Scaling groups are logical collections of agents used for resource scheduling, quota management, and workload isolation across different user groups or projects.
   """
   scalingGroup: String!
+
+  """Added in 26.9.0. The labels on this agent."""
+  entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 
   """Added in 26.1.0. Load the container count for this agent."""
   containerCount: Int
@@ -6164,6 +6175,9 @@ input DeploymentFilter
 
   """Added in 26.8.0. Filter by conditions on deployment replicas."""
   replicas: ReplicaNestedFilter = null
+
+  """Added in 26.9.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [DeploymentFilter!] = null
   OR: [DeploymentFilter!] = null
   NOT: [DeploymentFilter!] = null
@@ -7800,6 +7814,101 @@ input EntityInvitationTargetScope
   entityId: UUID!
 }
 
+"""Added in 26.9.0. One `key=value` label and the entity carrying it."""
+type EntityLabel implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Type of the labeled entity."""
+  entityType: String!
+
+  """ID of the labeled entity."""
+  entityId: UUID!
+
+  """Label key."""
+  key: String!
+
+  """Label value."""
+  value: String!
+
+  """When the label was first put on the entity."""
+  createdAt: DateTime!
+
+  """When the label's value was last replaced."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.9.0. Paginated connection for label records."""
+type EntityLabelConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [EntityLabelEdge!]!
+
+  """Total number of label records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type EntityLabelEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: EntityLabel!
+}
+
+"""
+Added in 26.9.0. Filter matching a single label. A key and a value given together constrain the same label rather than two different ones.
+"""
+input EntityLabelFilter
+  @join__type(graph: STRAWBERRY)
+{
+  key: StringFilter = null
+  value: StringFilter = null
+  entityType: StringFilter = null
+  entityId: UUIDFilter = null
+  AND: [EntityLabelFilter!] = null
+  OR: [EntityLabelFilter!] = null
+  NOT: [EntityLabelFilter!] = null
+}
+
+"""
+Added in 26.9.0. Filter selecting entities by the labels on them. Each relation matches one label at a time; requiring two different labels is two relations combined by the entity filter's own AND.
+"""
+input EntityLabelNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  some: EntityLabelFilter = null
+  every: EntityLabelFilter = null
+  none: EntityLabelFilter = null
+}
+
+"""Added in 26.9.0. Ordering specification for labels."""
+input EntityLabelOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: EntityLabelOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.9.0. Fields available for ordering labels."""
+enum EntityLabelOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  KEY @join__enumValue(graph: STRAWBERRY)
+  VALUE @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
 union EntityNode
   @join__type(graph: STRAWBERRY)
   @join__unionMember(graph: STRAWBERRY, member: "UserV2")
@@ -7880,6 +7989,19 @@ type EntityRefEdge
 
   """The item at the end of the edge"""
   node: EntityRef!
+}
+
+"""
+Added in 26.9.0. One entity, named by its type and its id. `entityTypes` lists the types a request may name.
+"""
+input EntityTarget
+  @join__type(graph: STRAWBERRY)
+{
+  """Type of the entity."""
+  entityType: String!
+
+  """ID of the entity."""
+  entityId: UUID!
 }
 
 """
@@ -11258,6 +11380,9 @@ type ModelDeployment implements Node
 
   """The access tokens of this entity."""
   accessTokens(filter: AccessTokenFilter = null, orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection
+
+  """Added in 26.9.0. The labels on this deployment."""
+  entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 }
 
 """Added in 25.19.0. Connection for model deployments."""
@@ -13643,6 +13768,16 @@ type Mutation
   Added in 26.9.0. Include checker-session pairs into idle checks, resetting them so checks start from the initial grace period. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
   """
   includeSessionIdleChecks(input: IncludeSessionIdleChecksInput!): IncludeSessionIdleChecksPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Set one key on an entity, replacing the value it carries. Reachable by any caller RBAC authorizes to write the entity.
+  """
+  upsertEntityLabel(input: UpsertEntityLabelInput!): UpsertEntityLabelPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Take one label off, named by its own id. Which entity answers for it is read from the row before the delete runs.
+  """
+  purgeEntityLabel(id: ID!): PurgeEntityLabelPayload @join__field(graph: STRAWBERRY)
 }
 
 """
@@ -15572,6 +15707,14 @@ type PurgeDomainPayload
   purged: Boolean!
 }
 
+"""Added in 26.9.0. Payload returned after taking a label off an entity."""
+type PurgeEntityLabelPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The label taken off the entity."""
+  label: EntityLabel!
+}
+
 """
 Completely deletes a group from DB.
 
@@ -16451,6 +16594,11 @@ type Query
   Added in 26.9.0. Every entity type the manager has operations wired for, in name order. What a field taking an entity type may be given is what this lists.
   """
   entityTypes: [EntityType!]! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Read the labels on the entities named. Scope items are OR'd, and naming an entity the caller cannot read refuses the whole read.
+  """
+  entityLabels(scope: [EntityTarget!]!, filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. List container registries with filtering, ordering, and pagination (admin only).
@@ -20908,6 +21056,9 @@ type SessionV2 implements Node
   Added in 26.8.0. Resource allocation (requested / used / allocated) computed on-demand from the resource_allocations table. Unlike the deprecated eager `resource.allocation`, `allocated` here persists after the session is freed or terminated (for statistics and billing).
   """
   resourceAllocation: ResourceAllocation!
+
+  """Added in 26.9.0. The labels on this session."""
+  entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 }
 
 """Added in 26.3.0. Connection type for paginated session results."""
@@ -20943,6 +21094,9 @@ input SessionV2Filter
   domainName: StringFilter = null
   projectId: UUIDFilter = null
   userUuid: UUIDFilter = null
+
+  """Added in 26.9.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [SessionV2Filter!] = null
   OR: [SessionV2Filter!] = null
   NOT: [SessionV2Filter!] = null
@@ -22863,6 +23017,30 @@ type UpsertDomainFairShareWeightPayload
 }
 
 """
+Added in 26.9.0. Input for putting one key on one entity. A key holds one value, so naming a key the entity already carries replaces that value.
+"""
+input UpsertEntityLabelInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The entity to label."""
+  target: EntityTarget!
+
+  """Label key."""
+  key: String!
+
+  """Label value."""
+  value: String!
+}
+
+"""Added in 26.9.0. Payload returned after putting a label on an entity."""
+type UpsertEntityLabelPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The label as it now stands."""
+  label: EntityLabel!
+}
+
+"""
 Added in 26.1.0. Input for upserting project fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.
 """
 input UpsertProjectFairShareWeightInput
@@ -24172,6 +24350,9 @@ type VFolder implements Node
 
   """Added in 26.4.4. Model cards backed by this vfolder."""
   modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+
+  """Added in 26.9.0. The labels on this vfolder."""
+  entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 }
 
 """
@@ -24253,6 +24434,9 @@ input VFolderFilter
   usageMode: VFolderUsageModeFilter = null
   cloneable: Boolean = null
   createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
   NOT: [VFolderFilter!] = null

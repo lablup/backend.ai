@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import override
-
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -53,19 +51,3 @@ class EntityLabelRow(LifecycleTimestampsMixin, Base):
             created_at=self.created_at,
             updated_at=self.updated_at,
         )
-
-    @override
-    def __str__(self) -> str:
-        return (
-            f"EntityLabelRow("
-            f"id: {self.id}, "
-            f"entity_type: {self.entity_type}, "
-            f"entity_id: {self.entity_id}, "
-            f"key: {self.key}, "
-            f"value: {self.value}"
-            f")"
-        )
-
-    @override
-    def __repr__(self) -> str:
-        return self.__str__()

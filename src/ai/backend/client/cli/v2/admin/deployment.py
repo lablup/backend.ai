@@ -8,7 +8,10 @@ from uuid import UUID
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerm,
     create_v2_registry,
+    entity_label_filter_options,
+    entity_label_relations,
     load_v2_config,
     parse_order_options,
     print_result,
@@ -49,6 +52,7 @@ def deployment() -> None:
     default=None,
     help="Filter by endpoint URL (contains).",
 )
+@entity_label_filter_options
 def search(
     limit: int | None,
     offset: int | None,
@@ -58,6 +62,7 @@ def search(
     open_to_public: bool | None,
     tags_contains: str | None,
     endpoint_url_contains: str | None,
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search all deployments (admin)."""
     from ai.backend.common.dto.manager.query import StringFilter
@@ -69,9 +74,9 @@ def search(
     )
     from ai.backend.common.dto.manager.v2.deployment.types import DeploymentOrderField
 
-    # Build filter only if any filter option is provided
+    relations = entity_label_relations(label)
     filter_dto: DeploymentFilter | None = None
-    if any([
+    if relations or any([
         name_contains is not None,
         status,
         open_to_public is not None,
@@ -88,6 +93,7 @@ def search(
                 if endpoint_url_contains is not None
                 else None
             ),
+            AND=[DeploymentFilter(labels=rel) for rel in relations] or None,
         )
 
     # Build order only if --order-by is provided

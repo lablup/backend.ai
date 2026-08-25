@@ -47,6 +47,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     RouteOrderField,
 )
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTOInput
 from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.common.types import (
@@ -708,6 +709,9 @@ class DeploymentFilter(BaseRequestModel):
     )
     replicas: ReplicaNestedFilter | None = Field(
         default=None, description="Filter by conditions on deployment replicas"
+    )
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None, description="Filter by the labels on the entity"
     )
     AND: list[DeploymentFilter] | None = Field(default=None, description="AND conjunction")
     OR: list[DeploymentFilter] | None = Field(default=None, description="OR conjunction")

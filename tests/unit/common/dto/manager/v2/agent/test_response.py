@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import UTC, datetime
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.agent.response import (
     AgentNetworkInfo,
@@ -43,6 +45,7 @@ def _make_network_info() -> AgentNetworkInfo:
 def _make_agent_node(agent_id: str = "agent-001") -> AgentNode:
     return AgentNode(
         id=agent_id,
+        uuid=AgentUUID(uuid.uuid4()),
         resource_info=_make_resource_info(),
         status_info=_make_status_info(),
         system_info=_make_system_info(),

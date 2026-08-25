@@ -9,9 +9,11 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
-from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.types import RuntimeEntityID
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE, VFolderUUID
 from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCardsInput
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import BinarySizeInfoGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -19,6 +21,12 @@ from ai.backend.manager.api.gql.decorators import (
     gql_connection_type,
     gql_field,
     gql_node_type,
+)
+from ai.backend.manager.api.gql.entity_label.types import (
+    EntityLabelConnection,
+    EntityLabelFilterGQL,
+    EntityLabelOrderByGQL,
+    resolve_entity_labels,
 )
 from ai.backend.manager.api.gql.model_card.types import (
     ModelCardFilterGQL,
@@ -156,6 +164,37 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
                 end_cursor=edges[-1].cursor if edges else None,
             ),
             count=result.total_count,
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The labels on this vfolder.",
+        )
+    )  # type: ignore[misc]
+    async def entity_labels(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: EntityLabelFilterGQL | None = None,
+        order_by: list[EntityLabelOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> EntityLabelConnection | None:
+        return await resolve_entity_labels(
+            info,
+            RuntimeEntityID(VFOLDER_ENTITY_TYPE, UUID(self.id)),
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
         )
 
     @classmethod
